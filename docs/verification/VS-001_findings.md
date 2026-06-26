@@ -1,7 +1,7 @@
 # Verification Sprint 001 — Findings Report
 **Date:** 2026-06-26  
 **Scope:** Publication Infrastructure (Build, Coverage, Release, Preservation)  
-**Method:** Execution + code analysis  
+**Method:** Execution + code analysis (round 1 + round 2 after disk recovery)  
 **Policy:** No fixes during discovery. False positives reported as observations requiring further investigation.
 
 ---
@@ -10,14 +10,15 @@
 
 | Finding | Severity | Priority | Status |
 |---------|----------|----------|--------|
-| VS001-F01 | HIGH | P1 | Confirmed |
-| VS001-F02 | HIGH | P1 | Confirmed |
-| VS001-F03 | MEDIUM | P1 | Confirmed |
-| VS001-F04 | MEDIUM | P2 | Confirmed |
-| VS001-F05 | LOW | P2 | Confirmed |
+| VS001-F01 | HIGH | P1 | **CLEARED** — exit code correctly 1 on FAIL (prior test had pipe error) |
+| VS001-F02 | HIGH | P1 | Confirmed by execution |
+| VS001-F03 | MEDIUM | P1 | Confirmed by execution |
+| VS001-F04 | MEDIUM | P2 | **CLEARED** — coverage validates `source_artifacts` presence in `_load_build_json` |
+| VS001-F05 | LOW | P2 | Confirmed by execution |
 | VS001-F06 | MEDIUM | P5 | Confirmed |
 | VS001-F07 | LOW | P5 | Confirmed |
 | VS001-F08 | LOW | P5 | Confirmed |
+| **VS001-F09** | **CRITICAL** | **P1** | **NEW — Confirmed by execution** |
 | VS001-O01 | — | P1 | Observation — design, not defect |
 | VS001-O02 | — | P4 | Observation — not tested |
 
@@ -301,18 +302,53 @@ These constitutional boundaries behaved correctly under adversarial conditions:
 
 ---
 
+---
+
+### VS001-F09
+
+**Severity:** CRITICAL  
+**Priority:** P1 — Constitutional Violation  
+
+**Reproduction:**
+```bash
+# Step 1: Run release and sign the recommendation
+herm release
+# manually set steward_signature in publication/release_recommendation.json
+
+# Step 2: Run release again (any reason — re-check, re-run in CI, accidental)
+herm release
+# Signature is now gone. Silently.
+```
+
+**Observed behavior:** Confirmed during verification. Running `herm release` during P3 testing overwrote the signed `publication/release_recommendation.json` with an unsigned file. The signature "Joseph Walker" and `signed_at` were erased without warning. The file had to be recovered from git.
+
+**Expected behavior:** `herm release` should detect a signed recommendation and either:
+- Refuse to overwrite: `"release_recommendation.json is already signed. Remove the signature before re-running."` (exit 2), or
+- Warn and require explicit `--force`: `"A signed recommendation exists. Use --force to overwrite."`
+
+**Constitutional impact:** CRITICAL. The machine erasing a human signature is a direct violation of the publication infrastructure's core principle: *automation may not undo human governance acts*. A signed `release_recommendation.json` is the result of a human accepting responsibility. Re-running `herm release` silently destroys that act.
+
+If this had not been caught during verification and restored from git, the first closed constitutional cycle would have been silently broken.
+
+**Recommendation:** Before writing `release_recommendation.json`, check whether an existing file contains a non-null `steward_signature`. If so, refuse (or require explicit opt-in). This is one line of guard code — the constitutional weight is much larger than the implementation cost.
+
+---
+
 ## Recommended Fix Priority
 
 | Order | Finding | Reason |
 |-------|---------|--------|
-| 1 | VS001-F01 | Unconfirmed — confirm exit code behavior first |
+| 1 | VS001-F09 | **CRITICAL** — machine can silently erase a human signature |
 | 2 | VS001-F03 | Constitutional misrepresentation of WITHHOLD as PASS |
-| 3 | VS001-F02 | Misleading `--build` flag behavior |
+| 3 | VS001-F02 | Misleading `--build` flag behavior in preserve verify |
 | 4 | VS001-F05 | Missing artifacts should halt export |
-| 5 | VS001-F04 | Missing source_artifacts should be a load error |
-| 6 | VS001-F07 | Add signing forward path to user-facing output |
-| 7 | VS001-F06 | Rename misleading "Loading publication" message |
-| 8 | VS001-F08 | Document keyword-detection limitation |
+| 5 | VS001-F07 | Add signing forward path to user-facing output |
+| 6 | VS001-F06 | Rename misleading "Loading publication" message |
+| 7 | VS001-F08 | Document keyword-detection limitation |
+
+**Cleared (not defects):**
+- VS001-F01: exit code on FAIL is correctly 1 — prior test had pipe methodology error
+- VS001-F04: coverage correctly validates `source_artifacts` in `_load_build_json`
 
 ---
 
