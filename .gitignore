@@ -1,0 +1,49 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build/package artifacts
+dist/
+*.egg-info/
+
+# Local databases / generated runtime files
+*.db
+*.sqlite
+*.sqlite3
+
+# Local output/cache directories
+outputs/
+.cache/
+
+# Nested old repo backup
+hermeneia/.git_NESTED_BACKUP_do_not_delete/
+
+# Build outputs
+build/
+
+# Python packaging
+*.egg-info/
+
+# Uploads
+uploads/
+
+# Compiled Python
+*.pyc
+
+# macOS
+.DS_Store

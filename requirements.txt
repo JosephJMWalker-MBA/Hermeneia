@@ -1,0 +1,9 @@
+pydantic
+rich
+pymupdf
+markdown
+python-dotenv
+regex
+openai
+google-genai
+ollama

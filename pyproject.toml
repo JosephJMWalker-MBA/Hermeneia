@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hermeneia"
+version = "0.1.0"
+description = "An epistemic operating system for preserving observations and perspectives."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "flask",
+    "pydantic",
+    "rich",
+    "pymupdf",
+    "markdown",
+    "python-dotenv",
+    "regex",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic"]
+openai = ["openai"]
+gemini = ["google-genai"]
+ollama = ["ollama"]
+providers = [
+    "anthropic",
+    "openai",
+    "google-genai",
+    "ollama",
+]
+
+[project.scripts]
+herm = "hermeneia.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hermeneia", "hermeneia.*", "hermenia"]
+
+[tool.setuptools.package-data]
+"hermeneia.web" = ["static/*.html"]

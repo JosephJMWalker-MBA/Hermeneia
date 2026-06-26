@@ -1,0 +1,3 @@
+"""
+Compiler-specific exception hierarchy.
+"""

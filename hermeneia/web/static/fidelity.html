@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Semantic Contract Inspector — Hermeneia</title>
+<style>
+:root {
+  --bg:      #0a0a0a;
+  --surface: #111;
+  --border:  #1e1e1e;
+  --border2: #252525;
+  --fg:      #e2e2e2;
+  --fg2:     #a8a8a8;
+  --dim:     #4a4a4a;
+  --dim2:    #666;
+  --accent:  #5fcfd4;
+  --green:   #4ec94e;
+  --yellow:  #e8b84b;
+  --red:     #d45f5f;
+  --sans:    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono:    'JetBrains Mono', 'Cascadia Code', 'SF Mono', 'Fira Code', monospace;
+  --r:       5px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.65;
+  min-height: 100vh;
+  padding-bottom: 120px;
+}
+
+/* ── Nav ──────────────────────────────────────────────── */
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,10,10,0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  height: 56px;
+  display: flex; align-items: center;
+  padding: 0 28px; gap: 12px;
+}
+.nav-back {
+  color: var(--dim2); text-decoration: none;
+  font-size: 14px; transition: color .12s;
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+}
+.nav-back:hover { color: var(--accent); }
+.nav-sep   { color: var(--dim); font-size: 14px; flex-shrink: 0; }
+.nav-crumb {
+  font-size: 14px; color: var(--fg2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
+}
+.nav-label {
+  margin-left: auto; flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 11px; color: var(--dim2);
+  letter-spacing: .1em; text-transform: uppercase;
+}
+
+/* ── Content wrap ─────────────────────────────────────── */
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 28px; }
+
+/* ── Report header ────────────────────────────────────── */
+.report-head { padding: 44px 0 32px; border-bottom: 1px solid var(--border); margin-bottom: 0; }
+.report-title {
+  font-size: 26px; font-weight: 600; line-height: 1.2;
+  letter-spacing: -.01em; margin-bottom: 8px;
+}
+.report-thesis {
+  font-size: 16px; font-style: italic; color: var(--fg2);
+  line-height: 1.65; margin-bottom: 24px; max-width: 720px;
+}
+.report-meta {
+  display: flex; gap: 36px; flex-wrap: wrap;
+  padding: 16px 0; border-top: 1px solid var(--border);
+}
+.meta-label {
+  font-size: 11px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: .12em; color: var(--dim2); margin-bottom: 4px;
+}
+.meta-value { font-size: 16px; }
+.fidelity-score {
+  font-size: 32px; font-weight: 700; letter-spacing: -.02em; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Column headers ───────────────────────────────────── */
+.col-heads {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  position: sticky; top: 56px; background: var(--bg); z-index: 10;
+  border-bottom: 2px solid var(--border);
+}
+.col-head {
+  font-size: 13px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--accent); padding: 14px 16px;
+  border-right: 1px solid var(--border);
+}
+.col-head:last-child { border-right: none; }
+.col-sub {
+  font-size: 11px; color: var(--dim2);
+  font-weight: 400; text-transform: none; letter-spacing: 0; margin-top: 1px;
+}
+
+/* ── Paragraph grid ───────────────────────────────────── */
+.para-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+.para-cell {
+  padding: 20px 16px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  vertical-align: top;
+}
+.para-cell:nth-child(3n) { border-right: none; }
+
+.para-idx {
+  font-family: var(--mono); font-size: 10px;
+  color: var(--dim2); text-transform: uppercase;
+  letter-spacing: .1em; margin-bottom: 6px;
+}
+.para-purpose {
+  font-size: 15px; font-weight: 500; color: var(--fg);
+  margin-bottom: 12px; line-height: 1.5;
+}
+.term-list { display: flex; flex-direction: column; gap: 4px; }
+.term-row  { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.term-name { color: var(--fg2); }
+.term-pri  { font-family: var(--mono); font-size: 10px; color: var(--dim); }
+.forbidden-list { margin-top: 10px; }
+.forbidden-item { font-size: 12px; color: var(--dim2); font-style: italic; }
+
+.rendered-text { font-size: 15px; font-style: italic; color: var(--fg); line-height: 1.75; }
+.rendered-ph   { color: var(--dim2); font-style: italic; font-size: 14px; }
+.no-render     { color: var(--dim2); font-style: italic; font-size: 14px; }
+
+.critic-terms  { display: flex; flex-direction: column; gap: 4px; }
+.critic-term   { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.critic-empty  { color: var(--dim2); font-style: italic; font-size: 14px; }
+
+/* ── Atomic obligations ───────────────────────────────── */
+.obligation-section { padding: 28px 0 34px; border-bottom: 1px solid var(--border); }
+.obligation-head {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  gap: 18px; margin-bottom: 18px;
+}
+.obligation-title { font-size: 20px; font-weight: 600; }
+.obligation-sub { color: var(--dim2); font-size: 13px; margin-top: 2px; }
+.obligation-total { color: var(--accent); font-family: var(--mono); font-size: 13px; }
+.obligation-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 10px; margin-bottom: 18px;
+}
+.obligation-stat {
+  border: 1px solid var(--border); border-radius: var(--r);
+  padding: 11px 12px; color: var(--dim2); font-size: 12px;
+}
+.obligation-stat strong { display: block; font-size: 22px; line-height: 1.2; }
+.obligation-list { display: flex; flex-direction: column; gap: 8px; }
+.obligation {
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface); overflow: hidden;
+}
+.obligation summary {
+  list-style: none; cursor: pointer; padding: 14px 16px;
+  display: grid; grid-template-columns: 90px 1fr auto; gap: 14px;
+  align-items: center;
+}
+.obligation summary::-webkit-details-marker { display: none; }
+.obligation-kind {
+  color: var(--dim2); font-family: var(--mono); font-size: 10px;
+  text-transform: uppercase; letter-spacing: .08em;
+}
+.obligation-text { color: var(--fg); font-size: 14px; }
+.obligation-status { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.status-satisfied { color: var(--green); }
+.status-missing, .status-prohibited_claim_detected { color: var(--red); }
+.status-not_evaluated { color: var(--yellow); }
+.obligation-evidence {
+  border-top: 1px solid var(--border); padding: 13px 16px 16px;
+  color: var(--fg2); font-size: 13px;
+}
+.evidence-row {
+  display: grid; grid-template-columns: 150px 1fr; gap: 12px;
+  padding: 4px 0;
+}
+.evidence-key { color: var(--dim2); font-family: var(--mono); font-size: 10px; }
+.evidence-value { overflow-wrap: anywhere; }
+
+.loading { color: var(--dim2); padding: 80px 0; text-align: center; font-size: 16px; }
+.error   { color: var(--red);  padding: 40px 0; font-size: 16px; }
+
+@media (max-width: 760px) {
+  .obligation-stats { grid-template-columns: repeat(2, 1fr); }
+  .obligation summary { grid-template-columns: 1fr; gap: 5px; }
+  .evidence-row { grid-template-columns: 1fr; gap: 2px; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-back" href="/">← Hermeneia</a>
+  <span class="nav-sep">·</span>
+  <span class="nav-crumb" id="nav-crumb">Semantic Contract Inspector</span>
+  <span class="nav-label">Contract Inspector</span>
+</nav>
+
+<div class="wrap">
+  <div id="root"><div class="loading">Loading…</div></div>
+</div>
+
+<script>
+const params      = new URLSearchParams(location.search);
+const blueprintId = params.get('blueprint');
+const profileSlug = params.get('profile');
+const narrativeId = params.get('narrative');
+
+if (!blueprintId || !profileSlug) {
+  document.getElementById('root').innerHTML =
+    '<div class="error">Missing blueprint or profile parameter.</div>';
+} else {
+  load();
+}
+
+async function load() {
+  try {
+    const data = await fetch(
+      `/api/fidelity/${encodeURIComponent(blueprintId)}/${encodeURIComponent(profileSlug)}`
+      + (narrativeId ? `?narrative=${encodeURIComponent(narrativeId)}` : '')
+    ).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
+    render(data);
+  } catch(err) {
+    document.getElementById('root').innerHTML = `<div class="error">Error: ${err.message}</div>`;
+  }
+}
+
+function render(d) {
+  const vr      = d.validation_report;
+  const profile = d.profile;
+  const langTag = profile.language && profile.language !== 'en'
+    ? ` <span style="color:var(--dim2)">[${e(profile.language)}]</span>` : '';
+
+  const fCol = !vr                     ? 'var(--dim2)'
+    : vr.semantic_fidelity >= 80       ? 'var(--green)'
+    : vr.semantic_fidelity >= 50       ? 'var(--yellow)'
+    : 'var(--red)';
+
+  const statusEl = !vr
+    ? '<span style="color:var(--dim2)">○ Not yet reviewed</span>'
+    : vr.approved
+      ? '<span style="color:var(--green)">✓ Approved</span>'
+      : '<span style="color:var(--red)">✗ Not approved</span>';
+
+  document.getElementById('nav-crumb').textContent =
+    `${d.blueprint.title} — ${profile.name}`;
+  document.title = `${d.blueprint.title} — ${profile.name} — Hermeneia`;
+
+  let html = `
+<div class="report-head">
+  <div class="report-title">${e(d.blueprint.title)}</div>
+  <div class="report-thesis">"${e(d.blueprint.thesis)}"</div>
+  <div class="report-meta">
+    <div>
+      <div class="meta-label">Expression</div>
+      <div class="meta-value">${e(profile.name)}${langTag}</div>
+    </div>
+    <div>
+      <div class="meta-label">Semantic Fidelity</div>
+      <div class="meta-value fidelity-score" style="color:${fCol}">${vr ? vr.semantic_fidelity+'%' : '—'}</div>
+    </div>
+    <div>
+      <div class="meta-label">Status</div>
+      <div class="meta-value">${statusEl}</div>
+    </div>
+    <div>
+      <div class="meta-label">Provider</div>
+      <div class="meta-value" style="color:var(--dim2);font-family:var(--mono);font-size:13px">
+        ${d.rendered_narrative ? e(d.rendered_narrative.provider) : '—'}
+      </div>
+    </div>
+    <div>
+      <div class="meta-label">Paragraphs</div>
+      <div class="meta-value" style="color:var(--dim2)">${d.paragraphs.length}</div>
+    </div>
+  </div>
+</div>`;
+
+  if (vr?.warnings?.length) {
+    html += `<div style="padding:14px 0;border-bottom:1px solid var(--border)">
+      ${vr.warnings.map(w => `<div style="color:var(--yellow);font-size:14px;margin-bottom:2px">⚠ ${e(w)}</div>`).join('')}
+    </div>`;
+  }
+
+  const os = d.obligation_summary || {};
+  html += `
+<section class="obligation-section">
+  <div class="obligation-head">
+    <div>
+      <div class="obligation-title">Semantic Contract</div>
+      <div class="obligation-sub">Atomic obligations compiled by the Architect and measured by the Critic.</div>
+    </div>
+    <div class="obligation-total">${e(os.total || 0)} obligations</div>
+  </div>
+  <div class="obligation-stats">
+    <div class="obligation-stat">
+      <strong style="color:var(--green)">✓ ${e(os.satisfied || 0)}</strong>
+      Satisfied
+    </div>
+    <div class="obligation-stat">
+      <strong style="color:var(--red)">✗ ${e(os.missing || 0)}</strong>
+      Missing
+    </div>
+    <div class="obligation-stat">
+      <strong style="color:var(--red)">! ${e(os.violations || 0)}</strong>
+      Prohibited claims
+    </div>
+    <div class="obligation-stat">
+      <strong style="color:var(--yellow)">○ ${e(os.not_evaluated || 0)}</strong>
+      Not evaluated
+    </div>
+  </div>
+  <div class="obligation-list">
+    ${(d.obligations || []).map(obligationHTML).join('')}
+  </div>
+</section>`;
+
+  html += `
+<div class="col-heads">
+  <div class="col-head">Contract
+    <div class="col-sub">Architect — what the Artist must say</div>
+  </div>
+  <div class="col-head">Fulfillment
+    <div class="col-sub">Artist — what was actually written</div>
+  </div>
+  <div class="col-head">Compliance
+    <div class="col-sub">Critic — how well the contract was kept</div>
+  </div>
+</div>
+<div class="para-grid">`;
+
+  for (const para of d.paragraphs) {
+    const terms         = para.required_terms || [];
+    const hasRender     = !!para.rendered_text;
+    const isPlaceholder = hasRender && para.rendered_text.startsWith('[Artist not configured');
+    const presentTerms  = terms.filter(t => t.present);
+    const missingTerms  = terms.filter(t => !t.present);
+
+    // Architect column
+    const termHtml = terms.length === 0
+      ? '<span style="color:var(--dim);font-size:13px;font-style:italic">No required terms specified</span>'
+      : `<div class="term-list">${terms.map(t => {
+          const sym = !vr ? '○' : t.present ? '✓' : '✗';
+          const col = !vr ? 'var(--dim2)' : t.present ? 'var(--green)' : 'var(--red)';
+          return `<div class="term-row">
+            <span style="color:${col}">${sym}</span>
+            <span class="term-name">${e(t.term)}</span>
+            ${t.priority === 'recommended' ? '<span class="term-pri">rec</span>' : ''}
+          </div>`;
+        }).join('')}</div>`;
+
+    const forbHtml = para.forbidden_claims?.length
+      ? `<div class="forbidden-list">${para.forbidden_claims.map(f =>
+          `<div class="forbidden-item">✗ forbidden: "${e(f)}"</div>`
+        ).join('')}</div>` : '';
+
+    // Artist column
+    let artistHtml;
+    if (!hasRender)      artistHtml = '<div class="no-render">Not yet written.</div>';
+    else if (isPlaceholder) artistHtml = `<div class="rendered-ph">${e(para.rendered_text)}</div>`;
+    else                 artistHtml = `<div class="rendered-text">${e(para.rendered_text)}</div>`;
+
+    // Critic column
+    let criticHtml;
+    if (!vr) {
+      criticHtml = '<div class="critic-empty">Not yet reviewed.</div>';
+    } else if (terms.length === 0) {
+      criticHtml = '<div class="critic-empty" style="color:var(--dim2)">No terms to check.</div>';
+    } else {
+      criticHtml = `<div class="critic-terms">
+        ${presentTerms.map(t => `<div class="critic-term">
+          <span style="color:var(--green)">✓</span>
+          <span>${e(t.term)}</span>
+        </div>`).join('')}
+        ${missingTerms.map(t => `<div class="critic-term">
+          <span style="color:${t.priority==='critical'?'var(--red)':'var(--yellow)'}">✗</span>
+          <span style="color:${t.priority==='critical'?'var(--red)':'var(--fg2)'}">${e(t.term)}</span>
+          ${t.priority==='recommended'?'<span style="color:var(--dim);font-size:10px">rec</span>':''}
+        </div>`).join('')}
+      </div>`;
+    }
+
+    html += `
+<div class="para-cell">
+  <div class="para-idx">§${para.order_idx}</div>
+  <div class="para-purpose">${e(para.purpose)}</div>
+  ${termHtml}${forbHtml}
+</div>
+<div class="para-cell">${artistHtml}</div>
+<div class="para-cell">${criticHtml}</div>`;
+  }
+
+  html += '</div>';
+  document.getElementById('root').innerHTML = html;
+}
+
+function obligationHTML(item) {
+  const status = obligationStatus(item.status);
+  const evidence = item.evidence || {};
+  const rows = [
+    ['Paragraph', `§${item.paragraph}`],
+    ['Critic status', status.label],
+    ['Priority', evidence.priority],
+    ['Source object', evidence.source_id],
+    ['ValidationReport', evidence.validation_report_id],
+    ['Why not evaluated', evidence.reason],
+    ['Rendered paragraph', evidence.rendered_paragraph],
+  ].filter(([, value]) => value !== null && value !== undefined && value !== '');
+
+  return `<details class="obligation" data-obligation-kind="${e(item.kind)}"
+    data-obligation-status="${e(item.status)}">
+    <summary>
+      <span class="obligation-kind">${e(obligationKind(item.kind))} · §${e(item.paragraph)}</span>
+      <span class="obligation-text">${e(obligationText(item))}</span>
+      <span class="obligation-status status-${e(item.status)}">${status.mark} ${e(status.label)}</span>
+    </summary>
+    <div class="obligation-evidence">
+      ${rows.map(([key, value]) => `<div class="evidence-row">
+        <div class="evidence-key">${e(key)}</div>
+        <div class="evidence-value">${e(value)}</div>
+      </div>`).join('')}
+    </div>
+  </details>`;
+}
+
+function obligationKind(kind) {
+  return {
+    purpose: 'Purpose',
+    required_observation: 'Observation',
+    required_interpretation: 'Interpretation',
+    required_term: 'Required concept',
+    forbidden_claim: 'Prohibited claim'
+  }[kind] || kind;
+}
+
+function obligationText(item) {
+  return {
+    purpose: `Communicate: ${item.obligation}`,
+    required_observation: `Engage Observation ${shortId(item.obligation)}`,
+    required_interpretation: `Apply Interpretation ${shortId(item.obligation)}`,
+    required_term: `Include "${item.obligation}"`,
+    forbidden_claim: `Do not assert "${item.obligation}"`
+  }[item.kind] || item.obligation;
+}
+
+function obligationStatus(status) {
+  return {
+    satisfied: { mark: '✓', label: 'Satisfied' },
+    missing: { mark: '✗', label: 'Missing' },
+    prohibited_claim_detected: { mark: '✗', label: 'Prohibited claim detected' },
+    not_evaluated: { mark: '○', label: 'Not evaluated' }
+  }[status] || { mark: '○', label: 'Not evaluated' };
+}
+
+function shortId(value) {
+  const s = String(value || '');
+  return s.length > 18 ? `${s.slice(0, 10)}…${s.slice(-6)}` : s;
+}
+
+function e(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

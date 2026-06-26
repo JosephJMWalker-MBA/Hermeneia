@@ -1,0 +1,176 @@
+# White Paper Publication Build — Compile Manifest
+#
+# This file is a build recipe, not canonical knowledge.
+# The canonical source is Blueprint 000001 and the ratified artifacts listed below.
+# The compiled paper is an output. This manifest explains how it was produced.
+#
+# Principle: Communication artifacts are compiled from ratified understanding,
+# not incrementally edited into correctness.
+#
+# Convention: white-paper-specific implementation of a general compile pattern.
+# Canonicalization deferred until repeated use across multiple publications warrants it.
+
+build_id: white-paper-rc-2
+compiled_artifact: docs/papers/hermeneia_white_paper.md
+blueprint: docs/papers/blueprint_000001.md
+blueprint_id: "000001"
+blueprint_status: ratified
+blueprint_ratification_date: "2026-06-25"
+
+status: RC-2
+ratification: pending
+
+# ── Source Artifacts ──────────────────────────────────────────────────────────
+# These are the inputs to the compilation. Each artifact is tagged.
+# Blueprint sections declare required tags; the compiler assembles from tags.
+# Artifacts are not searched by filename — they are addressed by tag.
+
+source_artifacts:
+
+  - path: docs/papers/blueprint_000001.md
+    tags: [blueprint, governing-question, thesis, required-claims, forbidden-claims, tone, structure]
+    status: ratified
+    role: primary-contract
+
+  - path: docs/research/experiment_001_english.md
+    tags: [calibration, experiment, english, observations, governing-question, replicated]
+    status: complete
+    role: evidence
+
+  - path: docs/research/experiment_002_spanish.md
+    tags: [calibration, experiment, spanish, observations, governing-question, replicated]
+    status: complete
+    role: evidence
+
+  - path: docs/research/experiment_003_mandarin.md
+    tags: [calibration, experiment, mandarin, observations, governing-question, replicated]
+    status: complete
+    role: evidence
+
+  - path: docs/research/experiment_001_002_003_comparative_analysis.md
+    tags: [calibration, replicated, comparative, divergence, governing-question, figure]
+    status: complete
+    role: evidence
+
+  - path: docs/research/experiment_matrix.md
+    tags: [calibration, replicated, matrix, methodology, evidence]
+    status: complete
+    role: evidence
+
+  - path: docs/research/research_hypotheses.md
+    tags: [hypothesis, research-program, future-work]
+    status: active
+    role: research-program
+
+  - path: docs/papers/white_paper_methodological_provenance.md
+    tags: [provenance, methodology, writing-protocol, dataset-1]
+    status: active
+    role: provenance-record
+
+  - path: docs/papers/hermeneia_writing_protocol.md
+    tags: [methodology, writing-protocol, process]
+    status: ratified
+    role: process-definition
+
+  - path: docs/papers/scf_position_paper.md
+    tags: [scf, benchmark, measurement, methodology]
+    status: draft
+    role: related-work
+
+# ── Section Requirements ──────────────────────────────────────────────────────
+# Each section declares what evidence tags it requires.
+# Coverage report evaluates whether required tags are present and represented.
+
+sections:
+
+  - section: abstract
+    required_tags: [thesis, governing-question, calibration]
+    required_claims:
+      - "AI collapses distinct cognitive responsibilities into one generative act"
+      - "Separation makes inquiry more accountable"
+      - "Calibration experiments produced observable findings"
+
+  - section: "1-introduction"
+    required_tags: [thesis, methodology]
+    required_claims:
+      - "Single prompt collapses discovery, interpretation, communication, evaluation"
+      - "Hermeneia begins from a different premise"
+
+  - section: "2-problem"
+    required_tags: [methodology, thesis]
+    required_claims:
+      - "Failures in current AI are undiagnosable because responsibilities are collapsed"
+      - "Separation is the mechanism; preservation of understanding is the goal"
+
+  - section: "3-architecture"
+    required_tags: [blueprint, methodology]
+    required_claims:
+      - "Five named cognitive responsibilities: Explorer, Architect, Artist, Critic, Steward"
+      - "LLM occupies exactly one box (Artist)"
+      - "Architect is deterministic — no inference"
+      - "Constitutional governance preserves conditions for honest maturation"
+
+  - section: "4-evidential-standards"
+    required_tags: [methodology, provenance]
+    required_claims:
+      - "Demonstrated: implementation and automated tests"
+      - "Empirical Finding: supported by one or more experiments"
+      - "Research Hypothesis: candidate for investigation; not yet supported"
+
+  - section: "5-calibration"
+    required_tags: [calibration, replicated, observations, governing-question, figure]
+    required_claims:
+      - "RF-001: Observation stability across English, Spanish, Mandarin"
+      - "RF-002: Classification stability across all three"
+      - "RF-003: Governing question is primary culture-adaptive variable"
+      - "RF-004: Evidence weighting is downstream from governing question"
+      - "Divergence figure: same corpus → divergent governing questions"
+
+  - section: "6-discussion"
+    required_tags: [replicated, calibration, methodology]
+    required_claims:
+      - "Calibration, not validation — the distinction must be explicit"
+      - "Semantic obligation failure localizes to Architect, not the model"
+
+  - section: "7-limitations"
+    required_tags: [hypothesis, calibration]
+    required_claims:
+      - "One corpus (Gatsby) cannot validate a universal methodology"
+      - "Findings require domain-axis replication"
+
+  - section: "8-future-work"
+    required_tags: [research-program, hypothesis, future-work]
+    required_claims:
+      - "Explorer role: computational surface for candidate interpretations"
+      - "Layer 4: Purpose — cross-domain recurrence"
+      - "SCF benchmark as evaluation methodology"
+
+  - section: "9-conclusion"
+    required_tags: [governing-question, thesis]
+    required_claims:
+      - "Ends with the research program, not a sales pitch"
+      - "Final question: what if we have been measuring outputs when we should measure evolution"
+
+# ── Critic Configuration ──────────────────────────────────────────────────────
+
+critics:
+  - provider: anthropic
+    role: blueprint-fidelity
+    evaluates: required_claims, forbidden_claims
+  - provider: openai
+    role: evidence-coverage
+    evaluates: required_tags, section_requirements
+  - provider: grok
+    role: instrument-framing
+    evaluates: tone, research-register, advocacy-language
+
+# ── Artist Configuration ──────────────────────────────────────────────────────
+
+artist:
+  provider: openai
+  model: gpt-4o
+  expression_profile: academic-en
+  note: >
+    RC-2 rendered by GPT-4o under the academic-en profile.
+    The Architect plan is invariant across expression profiles.
+    A future RC may use a different Artist without invalidating the Blueprint.

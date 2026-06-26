@@ -1,0 +1,78 @@
+{
+  "classification": "interpretive_divergence_projection",
+  "persistence": "none",
+  "inputs": {
+    "interpretation_a": {
+      "interpretation_id": "b30219c5d86594ac75a34721f607d22c7c8286fadb35f8f6f0ac79bbf7ac8694",
+      "text": "The narrator claims a quasi-aristocratic inheritance of moral clarity \u2014 a 'sense of the fundamental decencies' passed down like property. This establishes him as a moral observer rather than participant, positioning his tolerance as a virtue rather than a failure of judgment.",
+      "perspective": {
+        "id": "458defad73e0f299b5f204d9ca9f478f98aee4d083f344b3e851b9cf42f50d6e",
+        "name": "Literary",
+        "registered": true
+      },
+      "evidential_status": "established",
+      "confidence": "human"
+    },
+    "interpretation_b": {
+      "interpretation_id": "4f2644038c65de4d50ae0c4a0eb910ba4541ed1ff3cd1331b931e9e77619b40d",
+      "text": "Gatsby is explicitly carved out from the narrator's moral disillusionment. The exemption is not earned through virtue but through the quality of his aspiration \u2014 'an extraordinary gift for hope.' This makes Gatsby not a moral exemplar but a category exception: someone whose meaning lies in what he reaches for, not what he does.",
+      "perspective": {
+        "id": "458defad73e0f299b5f204d9ca9f478f98aee4d083f344b3e851b9cf42f50d6e",
+        "name": "Literary",
+        "registered": true
+      },
+      "evidential_status": "established",
+      "confidence": "human"
+    }
+  },
+  "shared_claims": [],
+  "distinct_claims": {
+    "interpretation_a": [
+      "b30219c5d86594ac75a34721f607d22c7c8286fadb35f8f6f0ac79bbf7ac8694"
+    ],
+    "interpretation_b": [
+      "4f2644038c65de4d50ae0c4a0eb910ba4541ed1ff3cd1331b931e9e77619b40d"
+    ]
+  },
+  "contradictory_claims": {
+    "status": "not_computed",
+    "claims": [],
+    "reason": "No ratified deterministic Interpretation contradiction rule exists."
+  },
+  "evidence_differences": {
+    "shared": [],
+    "only_interpretation_a": [
+      {
+        "id": "2424f2c58e59fd0beee170440103e171437abd8e3209e22cc9af5a2ae159a7b4",
+        "raw_text": "ther snobbishly suggested, and I snobbishly repeat a sense \nof the fundamental decencies is parcelled out unequally at \nbirth.\n"
+      }
+    ],
+    "only_interpretation_b": [
+      {
+        "id": "b534058967b2016f054e1c607e76890e1291af25a4a0d530624620afb4505ef7",
+        "raw_text": "Only Gatsby, the man who gives his \nname to this book, was exempt from my reaction\u2014Gatsby \nwho represented everything for which I have an unaffect-\ned scorn. "
+      }
+    ]
+  },
+  "interpretive_summary": {
+    "what_stayed_the_same": [
+      "Both claims use the Literary Perspective.",
+      "Both claims have evidential status established."
+    ],
+    "what_changed": [
+      "The canonical Interpretation claims are distinct.",
+      "The supporting Observation sets differ."
+    ],
+    "why_it_changed": [
+      "The claims rely on disjoint Observation evidence."
+    ]
+  },
+  "expressive_divergence": {
+    "status": "not_evaluated",
+    "reason": "This surface compares Interpretations, not RenderedNarratives or ExpressionProfiles."
+  },
+  "regeneration": {
+    "source": "existing canonical Interpretation, Perspective, and Observation records",
+    "persisted": false
+  }
+}
