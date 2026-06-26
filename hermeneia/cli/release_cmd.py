@@ -201,9 +201,20 @@ def _emit_recommendation(
     }
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "release_recommendation.json").write_text(
-        json.dumps(doc, indent=2, ensure_ascii=False)
-    )
+    out_path = output_dir / "release_recommendation.json"
+    if out_path.exists():
+        try:
+            existing = json.loads(out_path.read_text())
+        except json.JSONDecodeError:
+            existing = {}
+        sig = existing.get("steward_signature")
+        if sig is not None:
+            raise ReleaseError(
+                f"release_recommendation.json is already signed by '{sig}'. "
+                "A signed recommendation cannot be overwritten by automation. "
+                "Remove the signature manually before re-running herm release."
+            )
+    out_path.write_text(json.dumps(doc, indent=2, ensure_ascii=False))
     return doc
 
 

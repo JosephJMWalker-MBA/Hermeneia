@@ -248,13 +248,26 @@ def _verify_continuation(
         note=None if bp_status == "ratified" else f"Blueprint status is '{bp_status}' — not ratified.",
     ))
 
-    # Release recommendation present
-    sig = release.get("steward_signature")
-    results.append({
+    # Release recommendation present and outcome verified
+    rel_outcome = release.get("outcome") if release else None
+    if rel_outcome == "RECOMMEND_RELEASE":
+        rel_status, rel_note = "PASS", None
+    elif release:
+        rel_status = "WARN"
+        rel_note = (
+            f"Release recommendation outcome is '{rel_outcome}', not RECOMMEND_RELEASE. "
+            "A future steward should review before continuing."
+        )
+    else:
+        rel_status, rel_note = "WARN", "release_recommendation.json not found."
+    rec_result: dict[str, Any] = {
         "name": "Release Recommendation",
-        "status": "PASS" if release else "WARN",
-        "note": None if release else "release_recommendation.json not found.",
-    })
+        "status": rel_status,
+        "outcome": rel_outcome,
+    }
+    if rel_note:
+        rec_result["note"] = rel_note
+    results.append(rec_result)
 
     # Steward notes (advisory — nice to have for future steward)
     steward_notes = release.get("steward_notes")
@@ -392,9 +405,11 @@ def _run_export(
 
     manifest_entries: list[dict] = []
     hash_mismatches: list[str] = []
+    missing_artifacts: list[str] = []
 
     def _copy_artifact(src: Path, dest_name: str, expected_hash: str | None) -> dict:
         if not src.exists():
+            missing_artifacts.append(str(src))
             return {"path": dest_name, "status": "MISSING"}
         actual_hash = _sha256(src)
         mismatch = expected_hash is not None and actual_hash != expected_hash
@@ -451,11 +466,22 @@ def _run_export(
         if verbose:
             console.print(f"  [dim]{label}[/]  {entry.get('status', 'OK')}")
 
-    if hash_mismatches:
+    if missing_artifacts or hash_mismatches:
+        msg_parts = []
+        if missing_artifacts:
+            msg_parts.append(
+                "Missing artifacts (absent from filesystem):\n"
+                + "\n".join(f"  {p}" for p in missing_artifacts)
+            )
+        if hash_mismatches:
+            msg_parts.append(
+                "Hash mismatches (modified since build):\n"
+                + "\n".join(f"  {p}" for p in hash_mismatches)
+            )
         raise PreservationError(
-            f"Hash mismatch detected — preservation halted to prevent false confidence.\n"
-            + "\n".join(f"  {p}" for p in hash_mismatches)
-            + "\nRe-run 'herm build' if artifacts have legitimately changed."
+            "Preservation halted — artifacts cannot be verified.\n"
+            + "\n".join(msg_parts)
+            + "\nA preservation package with missing or modified artifacts would misrepresent the investigation."
         )
 
     # Write manifest.json
@@ -486,10 +512,11 @@ def _load_inputs(
     if not build:
         raise PreservationError(f"build.json is empty or malformed: {build_path}")
 
-    coverage_path = project_root / "publication" / "coverage.json"
+    build_dir = build_path.parent
+    coverage_path = build_dir / "coverage.json"
     coverage = _load_json(coverage_path, "coverage.json")
 
-    release_path = project_root / "publication" / "release_recommendation.json"
+    release_path = build_dir / "release_recommendation.json"
     release = _load_json(release_path, "release_recommendation.json")
 
     manifest_rel = build.get("manifest_path", "")
@@ -513,7 +540,7 @@ def cmd_preserve_verify(
         build_id = build.get("build_id", "unknown")
         console.print(f"\n  [bold]herm preserve verify[/]  [cyan]{build_id}[/]\n")
 
-        console.print("  Loading publication...         [green]PASS[/]")
+        console.print("  Reading build.json...          [green]PASS[/]")
 
         console.print("\n  Verifying lineage (Reconstruction)...\n")
         reconstruction = _verify_reconstruction(build, coverage, release, project_root)
