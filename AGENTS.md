@@ -209,6 +209,98 @@ Open an architectural discussion instead.
 
 A delayed implementation is preferable to an incorrect ontology.
 
+## **Git Operating Policy**
+
+Git exists to preserve the constitutional lineage of the Hermeneia project.
+
+Git is infrastructure. Git is not the authority. The repository exists to preserve the evolution of the authoritative artifacts.
+
+### Repository Authority
+
+The authoritative Git repository shall exist at the constitutional project root:
+
+```
+Hermeneia/
+    .git/
+```
+
+Never initialize or maintain nested Git repositories inside canonical project directories unless explicitly approved.
+
+If a nested repository is discovered: stop, report it, do not silently continue.
+
+### Repository Health Check
+
+Before beginning substantive engineering work, verify:
+
+```
+git rev-parse --show-toplevel
+git status
+git remote -v
+git branch
+```
+
+If any command fails: stop, explain why, do not guess.
+
+✓ Repository root verified  
+✓ Working tree clean (or changes understood)  
+✓ Remote reachable  
+✓ Branch verified  
+✓ No nested Git repositories
+
+### Recovery
+
+If Git reports `fatal: not a git repository`:
+
+1. Locate existing repositories.
+2. Determine constitutional project root.
+3. Compare repository root against project root.
+4. Explain findings.
+5. Wait for approval before restructuring history.
+
+Never suggest `git init` until repository authority has been investigated.
+
+### Commit Philosophy
+
+Commits describe architectural intent, not file movement.
+
+Good: `Promote repository authority to project root`  
+Not: `Updated files`
+
+### Push Philosophy
+
+Never perform `git push --force` without explicit human approval. If history replacement appears appropriate, explain why, explain consequences, explain alternatives, and require confirmation. Prefer `git push --force-with-lease`.
+
+### Branch Philosophy
+
+Default branch: `main`. Do not create feature branches automatically. Branch strategy belongs to the human steward.
+
+### Ignore Policy
+
+Git tracks constitutional artifacts. Git ignores disposable projections.
+
+Track: `docs/`, `research/`, `tests/`, `hermeneia/`, `schemas/`  
+Ignore: `__pycache__/`, `build/`, `*.egg-info/`, `.pytest_cache/`
+
+When uncertain: ask whether the artifact is authoritative, derived, or disposable.
+
+### Release Discipline
+
+A release commit should occur only after:
+
+- Critic pass complete
+- Coverage reviewed
+- Steward decision made
+
+Git tags represent release decisions. They do not replace release documentation.
+
+### Behavioral Rule
+
+Infrastructure automation may: inspect, verify, package, preserve.
+
+Infrastructure automation shall not: rewrite history, change authority, force synchronization — without explicit human ratification.
+
+---
+
 ## **Final Principle**
 
 The greatest failure is not a compiler error.
