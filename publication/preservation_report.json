@@ -1,0 +1,153 @@
+{
+  "preservation_engine_version": "0.1.0",
+  "generated_at": "2026-06-26T18:10:40.079182+00:00",
+  "build_id": "white-paper-rc-2",
+  "reconstruction": {
+    "summary": {
+      "pass": 15,
+      "warn": 0,
+      "fail": 0,
+      "advisory": 0,
+      "outcome": "pass"
+    },
+    "checks": [
+      {
+        "name": "Blueprint",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/papers/blueprint_000001.md",
+        "sha256": "73125ceecb646dfa36beabe7a9da0d30d783d3470193ffe08a66be83a27e053d"
+      },
+      {
+        "name": "Compile Manifest",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/builds/white_paper.compile.yaml",
+        "sha256": "e5963d1150631316fbb27d67baa66855a80414efe623d9b495cac2a2e58b64dc"
+      },
+      {
+        "name": "Source: docs/papers/blueprint_000001.md",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/papers/blueprint_000001.md",
+        "sha256": "73125ceecb646dfa36beabe7a9da0d30d783d3470193ffe08a66be83a27e053d"
+      },
+      {
+        "name": "Source: docs/research/experiment_001_english.md",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/research/experiment_001_english.md",
+        "sha256": "0dc2fc0b7a5f18ded5eda84063fe145bb726f1a5855943dc812b226f7d30262a"
+      },
+      {
+        "name": "Source: docs/research/experiment_002_spanish.md",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/research/experiment_002_spanish.md",
+        "sha256": "d428840133b17862ee290540a270e6d7a0d2a826b5d154b3da25c1b37ffded4c"
+      },
+      {
+        "name": "Source: docs/research/experiment_003_mandarin.md",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/research/experiment_003_mandarin.md",
+        "sha256": "02dfc54c758929ac7a6258ec66ea9ddce7d9342ab3625dd4c5776476d5a55936"
+      },
+      {
+        "name": "Source: docs/research/experiment_001_002_003_comparative_analysis.md",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/research/experiment_001_002_003_comparative_analysis.md",
+        "sha256": "af9f862734f2226e097edfa18774335fcf1ad19403dce0ef6e0cdf97de8974fb"
+      },
+      {
+        "name": "Source: docs/research/experiment_matrix.md",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/research/experiment_matrix.md",
+        "sha256": "7320865463ad2eb8972bcea4b1547f2239e3df6c90d798e3ccd4970ac3405bbc"
+      },
+      {
+        "name": "Source: docs/research/research_hypotheses.md",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/research/research_hypotheses.md",
+        "sha256": "6a8a8d2144be211eeddd14aa94c58700f7ed7715bb092d5e492fd7ae45c04087"
+      },
+      {
+        "name": "Source: docs/papers/white_paper_methodological_provenance.md",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/papers/white_paper_methodological_provenance.md",
+        "sha256": "2423980792791485152de4ad30a7c36e9dc06c3c8fde1218049ffe5fc7544608"
+      },
+      {
+        "name": "Source: docs/papers/hermeneia_writing_protocol.md",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/papers/hermeneia_writing_protocol.md",
+        "sha256": "538cbbd8d374188240e85f822cb8ce5e682c965c17a6291d3b8b38dd1753a381"
+      },
+      {
+        "name": "Source: docs/papers/scf_position_paper.md",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/papers/scf_position_paper.md",
+        "sha256": "e31a731e21ddb0c874fe6757f2a9ce793fb7e27785825dc3d776acfdcf5d6bc7"
+      },
+      {
+        "name": "Coverage Record",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/publication/coverage.json",
+        "sha256": "5071d7a6ace39c8c3bac177bde30e0860bee8f0be8ffcdb65b30763a9d00335d"
+      },
+      {
+        "name": "Release Recommendation",
+        "status": "PASS",
+        "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/publication/release_recommendation.json",
+        "sha256": "3c44470c95f5bdf8b3ff7e0186f799f137ae7cb3d0ddf81fec89b0c97daa2137"
+      },
+      {
+        "name": "Steward Signature",
+        "status": "PASS",
+        "note": null,
+        "value": "Joseph Walker"
+      }
+    ]
+  },
+  "continuation": {
+    "summary": {
+      "pass": 8,
+      "warn": 0,
+      "fail": 0,
+      "advisory": 0,
+      "outcome": "pass"
+    },
+    "checks": [
+      {
+        "name": "Blueprint",
+        "status": "PASS"
+      },
+      {
+        "name": "Intent Hypothesis",
+        "status": "PASS"
+      },
+      {
+        "name": "Evidence Trail",
+        "status": "PASS"
+      },
+      {
+        "name": "Section Requirements",
+        "status": "PASS"
+      },
+      {
+        "name": "Research Hypotheses",
+        "status": "PASS"
+      },
+      {
+        "name": "Blueprint Ratification",
+        "status": "PASS"
+      },
+      {
+        "name": "Release Recommendation",
+        "status": "PASS",
+        "note": null
+      },
+      {
+        "name": "Steward Notes",
+        "status": "PASS",
+        "note": null
+      }
+    ]
+  },
+  "overall_outcome": "pass",
+  "note": "Restoration is constitutionally deferred in v0.1. This report verifies lineage and continuation prerequisites only."
+}
