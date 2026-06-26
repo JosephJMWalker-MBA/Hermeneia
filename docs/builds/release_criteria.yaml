@@ -1,0 +1,44 @@
+# release_criteria.yaml
+# Governs what must be true before herm release can recommend publication.
+# This file is governance, not a build recipe.
+#
+# Constitutional principle: Release criteria evaluate declared facts,
+# not executable policy. Every criterion here is an equality check
+# against a declared field in build.json or coverage.json.
+# There is no executable logic. This file is inspectable without running code.
+#
+# applies_to: white-paper
+
+criteria_version: "0.1"
+applies_to: white-paper
+
+criteria:
+  - name: Blueprint Ratified
+    source: build.json
+    path: blueprint_status
+    equals: ratified
+    required: true
+
+  - name: Build Pass
+    source: build.json
+    path: outcome
+    equals: pass
+    required: true
+
+  - name: Coverage Pass
+    source: coverage.json
+    path: outcome
+    equals: pass
+    required: true
+
+  - name: No Coverage Failures
+    source: coverage.json
+    path: summary.fail
+    equals: 0
+    required: true
+
+  - name: No Draft Artifacts
+    source: build.json
+    path: has_draft_artifacts
+    equals: false
+    required: false

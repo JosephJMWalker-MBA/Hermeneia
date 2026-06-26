@@ -34,6 +34,7 @@ from hermeneia.cli.extract_cmd import cmd_extract
 from hermeneia.cli.explorer_cmd import cmd_explorer_discover
 from hermeneia.cli.build_cmd import cmd_build
 from hermeneia.cli.coverage_cmd import cmd_coverage
+from hermeneia.cli.release_cmd import cmd_release
 
 
 def main() -> None:
@@ -125,6 +126,18 @@ def main() -> None:
     p_coverage.add_argument("--verbose", action="store_true",
                             help="Print per-section tag resolution detail")
 
+    p_release = sub.add_parser("release", help="Evaluate release criteria and produce a recommendation")
+    p_release.add_argument("--build", default=None,
+                           help="Path to build.json (default: publication/build.json)")
+    p_release.add_argument("--coverage", default=None,
+                           help="Path to coverage.json (default: publication/coverage.json)")
+    p_release.add_argument("--criteria", default=None,
+                           help="Path to release_criteria.yaml (default: docs/builds/release_criteria.yaml)")
+    p_release.add_argument("--output", default=None,
+                           help="Output directory (default: publication/)")
+    p_release.add_argument("--verbose", action="store_true",
+                           help="Print per-criterion evaluation detail")
+
     p_build = sub.add_parser("build", help="Compile a publication from a manifest")
     p_build.add_argument("--manifest", default=None,
                          help="Path to compile manifest YAML (default: docs/builds/white_paper.compile.yaml)")
@@ -209,6 +222,14 @@ def main() -> None:
                 perspective=args.perspective,
                 bundle_or_db=db,
             )
+    elif args.command == "release":
+        cmd_release(
+            build_path=args.build,
+            coverage_path=args.coverage,
+            criteria_path=args.criteria,
+            output_dir=args.output,
+            verbose=args.verbose,
+        )
     elif args.command == "coverage":
         cmd_coverage(
             build_path=args.build,

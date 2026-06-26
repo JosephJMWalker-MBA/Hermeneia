@@ -248,6 +248,10 @@ def _emit_build_json(
         },
         "warnings": [w.message for w in warnings],
         "outcome": outcome,
+        "blueprint_status": blueprint.get("status", "unknown"),
+        "has_draft_artifacts": any(
+            a.get("status") == "draft" for a in resolved_artifacts
+        ),
         "release_status": manifest.get("status", "unknown"),
         "release_ratification": manifest.get("ratification", "pending"),
         "outputs": {
