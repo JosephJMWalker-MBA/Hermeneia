@@ -35,6 +35,7 @@ from hermeneia.cli.explorer_cmd import cmd_explorer_discover
 from hermeneia.cli.build_cmd import cmd_build
 from hermeneia.cli.coverage_cmd import cmd_coverage
 from hermeneia.cli.release_cmd import cmd_release
+from hermeneia.cli.preserve_cmd import cmd_preserve_verify, cmd_preserve_export
 
 
 def main() -> None:
@@ -125,6 +126,19 @@ def main() -> None:
                             help="Output directory (default: publication/)")
     p_coverage.add_argument("--verbose", action="store_true",
                             help="Print per-section tag resolution detail")
+
+    p_preserve = sub.add_parser("preserve", help="Verify lineage and continuation prerequisites, or export preservation package")
+    preserve_sub = p_preserve.add_subparsers(dest="preserve_command", required=True)
+
+    p_pv = preserve_sub.add_parser("verify", help="Verify reconstruction lineage and continuation prerequisites")
+    p_pv.add_argument("--build", default=None, help="Path to build.json (default: publication/build.json)")
+    p_pv.add_argument("--output", default=None, help="Output directory (default: publication/)")
+    p_pv.add_argument("--verbose", action="store_true", help="Print notes for all checks")
+
+    p_pe = preserve_sub.add_parser("export", help="Assemble preservation package with all artifacts")
+    p_pe.add_argument("--build", default=None, help="Path to build.json (default: publication/build.json)")
+    p_pe.add_argument("--output", default=None, help="Output directory (default: preservation/)")
+    p_pe.add_argument("--verbose", action="store_true", help="Print per-artifact detail")
 
     p_release = sub.add_parser("release", help="Evaluate release criteria and produce a recommendation")
     p_release.add_argument("--build", default=None,
@@ -221,6 +235,19 @@ def main() -> None:
                 model=args.model,
                 perspective=args.perspective,
                 bundle_or_db=db,
+            )
+    elif args.command == "preserve":
+        if args.preserve_command == "verify":
+            cmd_preserve_verify(
+                build_path=args.build,
+                output_dir=args.output,
+                verbose=args.verbose,
+            )
+        elif args.preserve_command == "export":
+            cmd_preserve_export(
+                build_path=args.build,
+                output_dir=args.output,
+                verbose=args.verbose,
             )
     elif args.command == "release":
         cmd_release(

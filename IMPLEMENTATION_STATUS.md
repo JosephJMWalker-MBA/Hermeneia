@@ -1,7 +1,7 @@
 # Implementation Status
 
 **Last updated:** 2026-06-26  
-**Current tag:** `sprint-004-release-v0.1`
+**Current tag:** `sprint-005-preserve-v0.1`
 
 ---
 
@@ -33,7 +33,7 @@ Build → Coverage → Release → Preservation
 | Build (`herm build`) | v0.1 — complete | Manifest → resolve → coverage → compile → build.json. Tag: sprint-002-build-v0.1 |
 | Coverage Engine (`herm coverage`) | v0.1 — complete | Reads build.json; measures declared section obligations. Tag: sprint-003-coverage-v0.1 |
 | Release Steward (`herm release`) | v0.1 — complete | Evaluates declared criteria; recommends or withholds; steward_signature intentionally null. Tag: sprint-004-release-v0.1 |
-| Preservation Layer | Planned — Sprint 005 | Verification first; export second |
+| Preservation Layer (`herm preserve`) | v0.1 — complete | verify: reconstruction + continuation. export: hashed package. Tag: sprint-005-preserve-v0.1 |
 
 ---
 
