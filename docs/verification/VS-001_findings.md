@@ -8,19 +8,19 @@
 
 ## Summary
 
-| Finding | Severity | Priority | Status |
-|---------|----------|----------|--------|
-| VS001-F01 | HIGH | P1 | **CLEARED** — exit code correctly 1 on FAIL (prior test had pipe error) |
-| VS001-F02 | HIGH | P1 | Confirmed by execution |
-| VS001-F03 | MEDIUM | P1 | Confirmed by execution |
-| VS001-F04 | MEDIUM | P2 | **CLEARED** — coverage validates `source_artifacts` presence in `_load_build_json` |
-| VS001-F05 | LOW | P2 | Confirmed by execution |
-| VS001-F06 | MEDIUM | P5 | Confirmed |
-| VS001-F07 | LOW | P5 | Confirmed |
-| VS001-F08 | LOW | P5 | Confirmed |
-| **VS001-F09** | **CRITICAL** | **P1** | **NEW — Confirmed by execution** |
-| VS001-O01 | — | P1 | Observation — design, not defect |
-| VS001-O02 | — | P4 | Observation — not tested |
+| Finding | Class | Severity | Priority | Status |
+|---------|-------|----------|----------|--------|
+| VS001-F01 | Test Methodology | HIGH | P1 | **FALSIFIED** — exit code correctly 1 on FAIL (prior test had pipe error) |
+| VS001-F02 | UX / API Contract | HIGH | P1 | Confirmed by execution |
+| VS001-F03 | Behavioral | MEDIUM | P1 | Confirmed by execution |
+| VS001-F04 | Code Analysis | MEDIUM | P2 | **FALSIFIED** — coverage validates `source_artifacts` in `_load_build_json` |
+| VS001-F05 | Behavioral | LOW | P2 | Confirmed by execution |
+| VS001-F06 | UX | MEDIUM | P5 | Confirmed |
+| VS001-F07 | UX | LOW | P5 | Confirmed |
+| VS001-F08 | UX | LOW | P5 | Confirmed |
+| **VS001-F09** | **Constitutional** | **CRITICAL** | **P1** | **NEW — Confirmed by execution** |
+| VS001-O01 | — | — | P1 | Observation — design, not defect |
+| VS001-O02 | — | — | P4 | Observation — gap in coverage |
 
 ---
 
@@ -336,20 +336,44 @@ If this had not been caught during verification and restored from git, the first
 
 ## Recommended Fix Priority
 
-| Order | Finding | Reason |
-|-------|---------|--------|
-| 1 | VS001-F09 | **CRITICAL** — machine can silently erase a human signature |
-| 2 | VS001-F03 | Constitutional misrepresentation of WITHHOLD as PASS |
-| 3 | VS001-F02 | Misleading `--build` flag behavior in preserve verify |
-| 4 | VS001-F05 | Missing artifacts should halt export |
-| 5 | VS001-F07 | Add signing forward path to user-facing output |
-| 6 | VS001-F06 | Rename misleading "Loading publication" message |
-| 7 | VS001-F08 | Document keyword-detection limitation |
+| Order | Finding | Class | Reason |
+|-------|---------|-------|--------|
+| 1 | VS001-F09 | **Constitutional** | Machine can silently erase a human-ratified signature — authority boundary violation |
+| 2 | VS001-F03 | Behavioral | Continuation reports WITHHOLD outcome as PASS — misrepresents investigation state |
+| 3 | VS001-F02 | UX / API Contract | `--build` flag does not control coverage/release paths — silently incoherent |
+| 4 | VS001-F05 | Behavioral | Missing artifacts should halt export — same severity as hash mismatch |
+| 5 | VS001-F07 | UX | No signing forward path after `herm release` — governance boundary appears as dead end |
+| 6 | VS001-F06 | UX | "Loading publication... PASS" appears before verification begins |
+| 7 | VS001-F08 | UX | Keyword-detection limitation undocumented |
 
-**Cleared (not defects):**
-- VS001-F01: exit code on FAIL is correctly 1 — prior test had pipe methodology error
-- VS001-F04: coverage correctly validates `source_artifacts` in `_load_build_json`
+**Falsified (not defects):**
+- VS001-F01 — exit code on FAIL is correctly 1. Prior test captured `grep`'s exit code, not the Python process.
+- VS001-F04 — coverage validates `source_artifacts` key in `_load_build_json`. Initial code analysis read the wrong function.
 
 ---
 
-*Sprint VS-001 complete. No fixes applied. Evidence collected.*
+## Closure
+
+**Sprint VS-001 — Summary**
+
+| | Count |
+|--|--|
+| Initial candidate findings | 7 |
+| Confirmed | 5 |
+| Falsified | 2 |
+| New findings discovered during execution | 1 |
+| **Net findings entering repair** | **6** |
+
+The pipeline's constitutional invariants held under direct adversarial pressure:
+
+- Build refuses non-ratified and missing Blueprints
+- Release refuses to run without Coverage
+- No automated code path produces a signed artifact
+- Malformed JSON is rejected at every boundary
+- Coverage reports evidence present; never invents evidence absent
+
+One constitutional violation was confirmed by causing it: `herm release` silently overwrites a signed `release_recommendation.json`. The signed artifact was recovered from git. This is the highest-priority repair before empirical validation begins.
+
+The verification methodology itself yielded one calibration result: two candidate findings were falsified. A process that never falsifies findings is not testing — it is confirming. This sprint tested.
+
+*No fixes applied during discovery. Evidence collected. Sprint closed 2026-06-26.*
