@@ -32,6 +32,7 @@ from hermeneia.cli.critic_cmd import cmd_critic
 from hermeneia.cli.bootstrap_cmd import cmd_bootstrap
 from hermeneia.cli.extract_cmd import cmd_extract
 from hermeneia.cli.explorer_cmd import cmd_explorer_discover
+from hermeneia.cli.build_cmd import cmd_build
 
 
 def main() -> None:
@@ -115,6 +116,16 @@ def main() -> None:
     p_discover.add_argument("--perspective", default="Literary",
                             help="Investigative perspective label (default: Literary)")
 
+    p_build = sub.add_parser("build", help="Compile a publication from a manifest")
+    p_build.add_argument("--manifest", default=None,
+                         help="Path to compile manifest YAML (default: docs/builds/white_paper.compile.yaml)")
+    p_build.add_argument("--output", default=None,
+                         help="Output directory (default: publication/)")
+    p_build.add_argument("--dry-run", action="store_true",
+                         help="Resolve and check; do not write outputs")
+    p_build.add_argument("--verbose", action="store_true",
+                         help="Print per-stage detail")
+
     p_extract = sub.add_parser("extract", help="Extract a Blueprint Intent Hypothesis from an existing document")
     p_extract.add_argument("input", nargs="?", default=None, help="Path to input file (or omit with --stdin)")
     p_extract.add_argument("--stdin", action="store_true", help="Read document text from stdin")
@@ -189,6 +200,13 @@ def main() -> None:
                 perspective=args.perspective,
                 bundle_or_db=db,
             )
+    elif args.command == "build":
+        cmd_build(
+            manifest_path=args.manifest,
+            output_dir=args.output,
+            dry_run=args.dry_run,
+            verbose=args.verbose,
+        )
     elif args.command == "extract":
         cmd_extract(
             args.input,
