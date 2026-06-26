@@ -33,6 +33,7 @@ from hermeneia.cli.bootstrap_cmd import cmd_bootstrap
 from hermeneia.cli.extract_cmd import cmd_extract
 from hermeneia.cli.explorer_cmd import cmd_explorer_discover
 from hermeneia.cli.build_cmd import cmd_build
+from hermeneia.cli.coverage_cmd import cmd_coverage
 
 
 def main() -> None:
@@ -115,6 +116,14 @@ def main() -> None:
     p_discover.add_argument("--model", default=None, help="Override model")
     p_discover.add_argument("--perspective", default="Literary",
                             help="Investigative perspective label (default: Literary)")
+
+    p_coverage = sub.add_parser("coverage", help="Measure section coverage from build.json")
+    p_coverage.add_argument("--build", default=None,
+                            help="Path to build.json (default: publication/build.json)")
+    p_coverage.add_argument("--output", default=None,
+                            help="Output directory (default: publication/)")
+    p_coverage.add_argument("--verbose", action="store_true",
+                            help="Print per-section tag resolution detail")
 
     p_build = sub.add_parser("build", help="Compile a publication from a manifest")
     p_build.add_argument("--manifest", default=None,
@@ -200,6 +209,12 @@ def main() -> None:
                 perspective=args.perspective,
                 bundle_or_db=db,
             )
+    elif args.command == "coverage":
+        cmd_coverage(
+            build_path=args.build,
+            output_dir=args.output,
+            verbose=args.verbose,
+        )
     elif args.command == "build":
         cmd_build(
             manifest_path=args.manifest,
