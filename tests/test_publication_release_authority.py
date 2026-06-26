@@ -198,6 +198,29 @@ def test_f09_unsigned_recommendation_may_be_regenerated(tmp_path):
     assert result["build_id"] == "regenerated"
 
 
+def test_f09_corrupt_json_halts_rather_than_overwrites(tmp_path):
+    """Corrupt JSON in existing recommendation must halt, not silently overwrite."""
+    output_dir = tmp_path / "pub"
+    output_dir.mkdir()
+
+    corrupt_text = '{"steward_signature": "Joseph Walker", INVALID JSON}'
+    out_path = output_dir / "release_recommendation.json"
+    out_path.write_text(corrupt_text)
+
+    with pytest.raises(ReleaseError, match="cannot be parsed"):
+        _emit_recommendation(
+            build={"build_id": "test"},
+            criteria_path=tmp_path / "criteria.yaml",
+            build_path=tmp_path / "build.json",
+            coverage_path=tmp_path / "coverage.json",
+            criteria_results=[],
+            outcome="RECOMMEND_RELEASE",
+            output_dir=output_dir,
+        )
+
+    assert out_path.read_text() == corrupt_text, "Corrupt file was modified despite ReleaseError"
+
+
 def test_f09_missing_recommendation_allows_first_write(tmp_path):
     """If no recommendation file exists, herm release may write one freely."""
     output_dir = tmp_path / "pub"

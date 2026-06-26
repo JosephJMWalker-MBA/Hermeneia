@@ -206,7 +206,11 @@ def _emit_recommendation(
         try:
             existing = json.loads(out_path.read_text())
         except json.JSONDecodeError:
-            existing = {}
+            raise ReleaseError(
+                "release_recommendation.json exists but cannot be parsed as JSON. "
+                "Inspect the file before re-running herm release. "
+                "If the file is corrupt, restore it from version control before proceeding."
+            )
         sig = existing.get("steward_signature")
         if sig is not None:
             raise ReleaseError(
