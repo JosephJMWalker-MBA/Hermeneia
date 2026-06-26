@@ -92,6 +92,8 @@ def _verify_reconstruction(
     """Verify the lineage chain. Returns list of check results."""
     results: list[dict] = []
 
+    _EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
     def _check(name: str, path: Path | None, expected_hash: str | None) -> dict:
         if path is None or not path.exists():
             return {"name": name, "status": "FAIL", "note": "Artifact not found"}
@@ -104,6 +106,14 @@ def _verify_reconstruction(
                 "note": "Hash mismatch — artifact modified since build",
                 "hash_at_build": expected_hash,
                 "hash_now": actual_hash,
+            }
+        if actual_hash == _EMPTY_SHA256:
+            return {
+                "name": name,
+                "status": "WARN",
+                "path": str(path),
+                "sha256": actual_hash,
+                "note": "Artifact is empty (0 bytes) — present and hash-valid but contains no content.",
             }
         return {
             "name": name,
@@ -151,6 +161,37 @@ def _verify_reconstruction(
             "sha256": _sha256(p) if p.exists() else None,
             **({"note": "Artifact not found"} if not p.exists() else {}),
         })
+
+    # F01: Coverage build_id cross-check — coverage must attest to the same build
+    cov_build_id = coverage.get("build_id") if coverage else None
+    bld_build_id = build.get("build_id")
+    if coverage and cov_build_id and bld_build_id and cov_build_id != bld_build_id:
+        results.append({
+            "name": "Coverage Build ID",
+            "status": "WARN",
+            "note": (
+                f"coverage.json was generated for build '{cov_build_id}' "
+                f"but build.json identifies this build as '{bld_build_id}'. "
+                "Re-run herm coverage to generate coverage for the current build."
+            ),
+        })
+
+    # F02: Coverage corpus cross-check — coverage must not attest to artifacts absent from build
+    if coverage:
+        tag_index = coverage.get("tag_index", {})
+        covered_paths: set[str] = {p for paths in tag_index.values() for p in paths}
+        build_paths: set[str] = {a["path"] for a in build.get("source_artifacts", [])}
+        ghost_paths = covered_paths - build_paths
+        if ghost_paths:
+            results.append({
+                "name": "Coverage Corpus Integrity",
+                "status": "WARN",
+                "note": (
+                    "coverage.json attests to artifact(s) not declared in build.json: "
+                    + ", ".join(sorted(ghost_paths))
+                    + ". Coverage may have been generated from a different corpus than this build."
+                ),
+            })
 
     # Signature check — advisory
     sig = release.get("steward_signature")
