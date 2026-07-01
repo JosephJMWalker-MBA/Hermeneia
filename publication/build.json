@@ -1,0 +1,356 @@
+{
+  "build_id": "white-paper-rc-2-analytical-craftsmanship",
+  "build_timestamp": "2026-06-28T00:21:11.810693+00:00",
+  "hermeneia_version": "0.1.0",
+  "blueprint": {
+    "path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/papers/blueprint_000001.md",
+    "id": "000001",
+    "status": "ratified",
+    "sha256": "73125ceecb646dfa36beabe7a9da0d30d783d3470193ffe08a66be83a27e053d"
+  },
+  "manifest_path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/builds/white_paper.compile.yaml",
+  "manifest_hash": "9c68ad3b570673faa9cfcc091c6752ec1df7196021612117ceec379480099b24",
+  "source_artifacts": [
+    {
+      "path": "docs/papers/blueprint_000001.md",
+      "sha256": "73125ceecb646dfa36beabe7a9da0d30d783d3470193ffe08a66be83a27e053d",
+      "tags": [
+        "blueprint",
+        "governing-question",
+        "thesis",
+        "required-claims",
+        "forbidden-claims",
+        "tone",
+        "structure"
+      ],
+      "status": "ratified",
+      "role": "primary-contract",
+      "resolved": true
+    },
+    {
+      "path": "docs/research/experiment_001_english.md",
+      "sha256": "0dc2fc0b7a5f18ded5eda84063fe145bb726f1a5855943dc812b226f7d30262a",
+      "tags": [
+        "calibration",
+        "experiment",
+        "english",
+        "observations",
+        "governing-question",
+        "replicated"
+      ],
+      "status": "complete",
+      "role": "evidence",
+      "resolved": true
+    },
+    {
+      "path": "docs/research/experiment_002_spanish.md",
+      "sha256": "d428840133b17862ee290540a270e6d7a0d2a826b5d154b3da25c1b37ffded4c",
+      "tags": [
+        "calibration",
+        "experiment",
+        "spanish",
+        "observations",
+        "governing-question",
+        "replicated"
+      ],
+      "status": "complete",
+      "role": "evidence",
+      "resolved": true
+    },
+    {
+      "path": "docs/research/experiment_003_mandarin.md",
+      "sha256": "02dfc54c758929ac7a6258ec66ea9ddce7d9342ab3625dd4c5776476d5a55936",
+      "tags": [
+        "calibration",
+        "experiment",
+        "mandarin",
+        "observations",
+        "governing-question",
+        "replicated"
+      ],
+      "status": "complete",
+      "role": "evidence",
+      "resolved": true
+    },
+    {
+      "path": "docs/research/experiment_001_002_003_comparative_analysis.md",
+      "sha256": "af9f862734f2226e097edfa18774335fcf1ad19403dce0ef6e0cdf97de8974fb",
+      "tags": [
+        "calibration",
+        "replicated",
+        "comparative",
+        "divergence",
+        "governing-question",
+        "figure"
+      ],
+      "status": "complete",
+      "role": "evidence",
+      "resolved": true
+    },
+    {
+      "path": "docs/research/experiment_matrix.md",
+      "sha256": "7320865463ad2eb8972bcea4b1547f2239e3df6c90d798e3ccd4970ac3405bbc",
+      "tags": [
+        "calibration",
+        "replicated",
+        "matrix",
+        "methodology",
+        "evidence"
+      ],
+      "status": "complete",
+      "role": "evidence",
+      "resolved": true
+    },
+    {
+      "path": "docs/research/research_hypotheses.md",
+      "sha256": "6a8a8d2144be211eeddd14aa94c58700f7ed7715bb092d5e492fd7ae45c04087",
+      "tags": [
+        "hypothesis",
+        "research-program",
+        "future-work"
+      ],
+      "status": "active",
+      "role": "research-program",
+      "resolved": true
+    },
+    {
+      "path": "docs/papers/white_paper_methodological_provenance.md",
+      "sha256": "2423980792791485152de4ad30a7c36e9dc06c3c8fde1218049ffe5fc7544608",
+      "tags": [
+        "provenance",
+        "methodology",
+        "writing-protocol",
+        "dataset-1"
+      ],
+      "status": "active",
+      "role": "provenance-record",
+      "resolved": true
+    },
+    {
+      "path": "docs/papers/hermeneia_writing_protocol.md",
+      "sha256": "538cbbd8d374188240e85f822cb8ce5e682c965c17a6291d3b8b38dd1753a381",
+      "tags": [
+        "methodology",
+        "writing-protocol",
+        "process"
+      ],
+      "status": "ratified",
+      "role": "process-definition",
+      "resolved": true
+    },
+    {
+      "path": "docs/papers/scf_position_paper.md",
+      "sha256": "e31a731e21ddb0c874fe6757f2a9ce793fb7e27785825dc3d776acfdcf5d6bc7",
+      "tags": [
+        "scf",
+        "benchmark",
+        "measurement",
+        "methodology"
+      ],
+      "status": "draft",
+      "role": "related-work",
+      "resolved": true
+    }
+  ],
+  "coverage": {
+    "sections_evaluated": 11,
+    "sections_pass": 11,
+    "sections_warn": 0,
+    "sections_fail": 0,
+    "section_detail": [
+      {
+        "section": "abstract",
+        "status": "PASS",
+        "required_tags": [
+          "thesis",
+          "governing-question",
+          "calibration"
+        ],
+        "missing_tags": [],
+        "required_claims": [
+          "AI collapses distinct cognitive responsibilities into one generative act",
+          "Separation makes inquiry more accountable",
+          "Calibration experiments produced observable findings"
+        ],
+        "claims_checked": false
+      },
+      {
+        "section": "1-introduction",
+        "status": "PASS",
+        "required_tags": [
+          "thesis",
+          "methodology"
+        ],
+        "missing_tags": [],
+        "required_claims": [
+          "Single prompt collapses discovery, interpretation, communication, evaluation",
+          "Hermeneia begins from a different premise"
+        ],
+        "claims_checked": false
+      },
+      {
+        "section": "2-problem",
+        "status": "PASS",
+        "required_tags": [
+          "methodology",
+          "thesis"
+        ],
+        "missing_tags": [],
+        "required_claims": [
+          "Failures in current AI are undiagnosable because responsibilities are collapsed",
+          "Separation is the mechanism; preservation of understanding is the goal"
+        ],
+        "claims_checked": false
+      },
+      {
+        "section": "3-analytical-craftsmanship",
+        "status": "PASS",
+        "required_tags": [
+          "thesis",
+          "methodology"
+        ],
+        "missing_tags": [],
+        "required_claims": [
+          "Hermeneia does not merely preserve conclusions. It preserves intellectual conduct.",
+          "How did this investigator reason when faced with a complex, ambiguous problem?",
+          "Reasoning auditable, not just output auditable",
+          "Evidentiary discipline, calibrated confidence, rigorous revision, transparent uncertainty"
+        ],
+        "claims_checked": false
+      },
+      {
+        "section": "4-architecture",
+        "status": "PASS",
+        "required_tags": [
+          "blueprint",
+          "methodology"
+        ],
+        "missing_tags": [],
+        "required_claims": [
+          "Five named cognitive responsibilities: Explorer, Architect, Artist, Critic, Steward",
+          "LLM occupies exactly one box (Artist)",
+          "Architect is deterministic — no inference",
+          "Constitutional governance preserves conditions for honest maturation"
+        ],
+        "claims_checked": false
+      },
+      {
+        "section": "5-evidential-standards",
+        "status": "PASS",
+        "required_tags": [
+          "methodology",
+          "provenance"
+        ],
+        "missing_tags": [],
+        "required_claims": [
+          "Demonstrated: implementation and automated tests",
+          "Empirical Finding: supported by one or more experiments",
+          "Research Hypothesis: candidate for investigation; not yet supported"
+        ],
+        "claims_checked": false
+      },
+      {
+        "section": "6-calibration",
+        "status": "PASS",
+        "required_tags": [
+          "calibration",
+          "replicated",
+          "observations",
+          "governing-question",
+          "figure"
+        ],
+        "missing_tags": [],
+        "required_claims": [
+          "RF-001: Observation stability across English, Spanish, Mandarin",
+          "RF-002: Classification stability across all three",
+          "RF-003: Governing question is primary culture-adaptive variable",
+          "RF-004: Evidence weighting is downstream from governing question",
+          "Divergence figure: same corpus → divergent governing questions"
+        ],
+        "claims_checked": false
+      },
+      {
+        "section": "7-discussion",
+        "status": "PASS",
+        "required_tags": [
+          "replicated",
+          "calibration",
+          "methodology"
+        ],
+        "missing_tags": [],
+        "required_claims": [
+          "Calibration, not validation — the distinction must be explicit",
+          "Semantic obligation failure localizes to Architect, not the model"
+        ],
+        "claims_checked": false
+      },
+      {
+        "section": "8-limitations",
+        "status": "PASS",
+        "required_tags": [
+          "hypothesis",
+          "calibration"
+        ],
+        "missing_tags": [],
+        "required_claims": [
+          "One corpus (Gatsby) cannot validate a universal methodology",
+          "Findings require domain-axis replication"
+        ],
+        "claims_checked": false
+      },
+      {
+        "section": "9-future-work",
+        "status": "PASS",
+        "required_tags": [
+          "research-program",
+          "hypothesis",
+          "future-work"
+        ],
+        "missing_tags": [],
+        "required_claims": [
+          "Explorer role: computational surface for candidate interpretations",
+          "Layer 4: Purpose — cross-domain recurrence",
+          "SCF benchmark as evaluation methodology"
+        ],
+        "claims_checked": false
+      },
+      {
+        "section": "10-conclusion",
+        "status": "PASS",
+        "required_tags": [
+          "governing-question",
+          "thesis"
+        ],
+        "missing_tags": [],
+        "required_claims": [
+          "Ends with the research program, not a sales pitch",
+          "Final question: what if we have been measuring outputs when we should measure evolution"
+        ],
+        "claims_checked": false
+      }
+    ]
+  },
+  "compile": {
+    "source": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/papers/hermeneia_white_paper.md",
+    "sha256": "5d8a38f69d19f0d6f080373d4e91d61ee6ee5a3e6dc92e7655b10096dc6b23da",
+    "method": "copy",
+    "note": "v0.1 copies existing compiled artifact. Future versions drive Artist."
+  },
+  "critic": {
+    "enabled": false,
+    "note": "v0.1: critic pass is manual; future versions integrate programmatic critic"
+  },
+  "warnings": [],
+  "outcome": "pass",
+  "blueprint_status": "ratified",
+  "has_draft_artifacts": true,
+  "release_status": "RC-2",
+  "release_ratification": "pending",
+  "outputs": {
+    "white_paper": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/publication/white_paper.md",
+    "coverage": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/publication/coverage.md",
+    "rc_log": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/publication/rc_log.md",
+    "release_decision": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/publication/release_decision.md",
+    "build_json": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/publication/build.json"
+  }
+}

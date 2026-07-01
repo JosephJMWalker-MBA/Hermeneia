@@ -178,11 +178,17 @@ That is the deepest form of interpretive accountability. Making a reading audita
 
 ## The Category
 
-Hermeneia is a **Large Interpretation Language Model** — a LILM.
+Hermeneia is a **constitutional investigation architecture** — a governed system for the disciplined evolution and preservation of understanding.
 
-A large language model sees more text. A LILM sees more survived criticism.
+Hermeneia is not a language model. It is an architecture for governing how language, evidence, models, and human judgment participate in the evolution of understanding. Language models are participants inside Hermeneia, not the system itself.
 
-An LLM produces an interpretation and moves on. A LILM tracks what an interpretation has been subjected to — what evidence it rested on, what objections it faced, what revisions it required, what it finally withstood. The maturation of an interpretation through evidence, critique, revision, and ratification is the unit of value.
+A large language model produces an interpretation and moves on. Hermeneia tracks what an interpretation has been subjected to — what evidence it rested on, what objections it faced, what revisions it required, what it finally withstood. The maturation of an interpretation through evidence, critique, revision, and ratification is the unit of value.
+
+### Lineage
+
+Hermeneia descends from the concept of a **Large Interpretation Language Model** (LILM) — a system that models the *lifecycle of interpretation* rather than raw language. An LLM sees more text. A LILM sees more survived criticism.
+
+That lineage remains accurate as a description of what Hermeneia does. What it underspecifies is *how*: through a constitutional architecture that enforces evidence boundaries, governs participant roles, and makes every reading accountable to the corpus it claims to represent.
 
 ---
 

@@ -69,6 +69,27 @@ Rules:
 The human investigator will accept, amend, or reject your proposal.
 """
 
+# Mode-specific terminal instructions replace the default "One paragraph" ending
+_MODE_INSTRUCTIONS: dict[str, str] = {
+    "interpretive": (
+        "Propose one candidate interpretation from the perspective named above. "
+        "One paragraph. Begin with the idea, not with 'This observation.'"
+    ),
+    "triage": (
+        "Respond in exactly three lines. No headers, no labels, no blank lines between them.\n"
+        "Line 1: Confidence level — exactly one word: High, Medium, or Low.\n"
+        "Line 2: Pattern type — a short phrase (3–6 words) naming what kind of pattern this is.\n"
+        "Line 3: Reason — one sentence explaining why this observation warrants attention."
+    ),
+    "skeptical": (
+        "Challenge this observation. What would have to be true in the primary text for this "
+        "observation to be wrong or overstated? What alternative reading is available? "
+        "One paragraph. Be specific about what evidence would overturn this reading."
+    ),
+}
+
+VALID_RESPONSE_MODES = frozenset(_MODE_INSTRUCTIONS)
+
 
 # ── Prompt builders ───────────────────────────────────────────────────────────
 
@@ -76,6 +97,7 @@ def build_bucket_prompt(
     bucket_observations: list[dict],
     perspective_label: str,
     corpus_context: dict | None = None,
+    response_mode: str = "interpretive",
 ) -> str:
     """Build the prompt for a bucket of observations. Stored as prompt_reference."""
     role_descriptions = {
@@ -105,10 +127,8 @@ def build_bucket_prompt(
         lines.append(f"\n[{i}] {obs['raw_text'].strip()}")
 
     lines.append("")
-    lines.append(
-        "Propose one candidate interpretation that accounts for why these "
-        "observations might belong together. One paragraph. Begin with the idea."
-    )
+    instruction = _MODE_INSTRUCTIONS.get(response_mode, _MODE_INSTRUCTIONS["interpretive"])
+    lines.append(instruction)
 
     return "\n".join(lines)
 
@@ -117,6 +137,7 @@ def build_explorer_prompt(
     observation_text: str,
     perspective_label: str,
     corpus_context: dict | None = None,
+    response_mode: str = "interpretive",
 ) -> str:
     """Build the prompt for a single observation. Stored as prompt_reference."""
     role_descriptions = {
@@ -151,10 +172,8 @@ def build_explorer_prompt(
     lines.append("Observation:")
     lines.append(observation_text)
     lines.append("")
-    lines.append(
-        "Propose one candidate interpretation from the perspective named above. "
-        "One paragraph. Begin with the idea, not with 'This observation.'"
-    )
+    instruction = _MODE_INSTRUCTIONS.get(response_mode, _MODE_INSTRUCTIONS["interpretive"])
+    lines.append(instruction)
 
     return "\n".join(lines)
 
@@ -166,6 +185,7 @@ def generate_interpretation_from_bucket(
     perspective_label: str,
     provider: Any,
     corpus_context: dict | None = None,
+    response_mode: str = "interpretive",
 ) -> tuple[str, str]:
     """Generate a candidate interpretation from a bucket of related observations.
 
@@ -194,9 +214,10 @@ def generate_interpretation_from_bucket(
             perspective_label,
             provider,
             corpus_context,
+            response_mode,
         )
 
-    prompt = build_bucket_prompt(bucket_observations, perspective_label, corpus_context)
+    prompt = build_bucket_prompt(bucket_observations, perspective_label, corpus_context, response_mode)
     text = _call_provider(provider, _BUCKET_SYSTEM_PROMPT, prompt)
 
     text = text.strip()
@@ -213,13 +234,14 @@ def generate_candidate_interpretation(
     perspective_label: str,
     provider: Any,
     corpus_context: dict | None = None,
+    response_mode: str = "interpretive",
 ) -> tuple[str, str]:
     """Generate a candidate interpretation from a single observation.
 
     Not Explorer's primary job — Explorer works with buckets of observations.
     Retained for the E10 Lab's per-observation view and backward compatibility.
     """
-    prompt = build_explorer_prompt(observation_text, perspective_label, corpus_context)
+    prompt = build_explorer_prompt(observation_text, perspective_label, corpus_context, response_mode)
     text = _call_provider(provider, _SINGLE_OBS_SYSTEM_PROMPT, prompt)
 
     text = text.strip()

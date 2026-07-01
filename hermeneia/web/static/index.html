@@ -62,6 +62,8 @@ body.x .ho { display: none !important; }
   display: flex; align-items: center;
   padding: 0 28px;
   justify-content: space-between;
+  /* needed so .nav-cycle-wrap can anchor to true page center */
+  isolation: isolate;
 }
 .nav-brand {
   font-family: var(--mono);
@@ -74,10 +76,13 @@ body.x .ho { display: none !important; }
 .nav-right { display: flex; align-items: center; gap: 4px; }
 
 .nav-cycle-wrap {
-  flex: 1;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: auto;
 }
 /* Keep .nav-step / .nav-pipeline available for JS but hidden */
 .nav-step { display: none; }
@@ -97,6 +102,8 @@ body.x .ho { display: none !important; }
   background: var(--bg2);
   transition: border-color .2s, background .2s;
   user-select: none;
+  width: 160px;
+  box-sizing: border-box;
 }
 .nav-mini-cycle-wrap:hover {
   border-color: var(--accent);
@@ -161,7 +168,9 @@ body.x .ho { display: none !important; }
 
 /* Stage navigation bar */
 .stage-nav-bar {
-  display: flex; align-items: center; justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 160px 1fr;
+  align-items: center;
   padding: 0 24px;
   height: 52px;
   background: var(--bg);
@@ -178,14 +187,28 @@ body.x .ho { display: none !important; }
   height: 38px; padding: 0 16px;
   cursor: pointer;
   transition: border-color .12s, color .12s, background .12s;
-  white-space: nowrap; min-width: 120px;
+  white-space: nowrap;
+  width: 140px;
+  box-sizing: border-box;
 }
+#stage-nav-prev { justify-self: end; }
+#stage-nav-next { justify-self: start; justify-content: flex-end; }
 .stage-nav-arrow:hover { border-color: var(--accent); color: var(--accent); background: var(--accent2); }
 .stage-nav-arrow.disabled { opacity: 0.3; pointer-events: none; }
 .stage-nav-arrow-icon { font-size: 20px; line-height: 1; }
 .stage-nav-center {
   display: flex; flex-direction: column; align-items: center; gap: 1px;
+  width: 160px; text-align: center;
+  box-sizing: border-box;
 }
+.stage-nav-guide {
+  background: none; border: 1px solid var(--border);
+  color: var(--dim2); font-size: 12px; padding: 4px 0;
+  border-radius: 4px; cursor: pointer; letter-spacing: .04em;
+  transition: color .12s, border-color .12s;
+  width: 100%; box-sizing: border-box;
+}
+.stage-nav-guide:hover { color: var(--fg); border-color: var(--accent); }
 .stage-nav-label {
   font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim2);
 }
@@ -208,7 +231,8 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 
 /* ── Page header ──────────────────────────────────────── */
 .page-head { padding: 52px 0 40px; border-bottom: 1px solid var(--border); }
-.page-title { font-size: 30px; font-weight: 600; line-height: 1.15; letter-spacing: -.015em; margin-bottom: 6px; }
+.page-thesis-label { font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--dim2); margin-bottom: 8px; }
+.page-title { font-size: 30px; font-weight: 600; line-height: 1.15; letter-spacing: -.015em; margin-bottom: 12px; }
 .page-file  { font-family: var(--mono); font-size: 11px; color: var(--dim2); letter-spacing: .04em; }
 
 /* ── Section chrome ───────────────────────────────────── */
@@ -289,6 +313,17 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 }
 .btn-trace:hover    { border-color: var(--accent); color: var(--accent); }
 .btn-trace.active   { border-color: var(--accent); color: var(--accent); background: var(--accent2); }
+.lab-mode-btn { font-size:11px;padding:4px 12px;background:var(--bg);border:1px solid var(--border);color:var(--dim2);cursor:pointer;letter-spacing:.03em; }
+.lab-mode-btn:first-child { border-radius:var(--r) 0 0 var(--r); }
+.lab-mode-btn:last-child  { border-radius:0 var(--r) var(--r) 0; }
+.lab-mode-btn:not(:first-child) { margin-left:-1px; }
+.lab-mode-btn:hover { border-color:var(--accent);color:var(--accent);z-index:1;position:relative; }
+.lab-mode-active { border-color:var(--accent)!important;color:var(--accent)!important;background:var(--accent2)!important;font-weight:600;z-index:1;position:relative; }
+.triage-card { display:flex;flex-direction:column;gap:6px; }
+.triage-confidence { font-size:13px;font-weight:700; }
+.triage-pattern { font-size:12px;color:var(--fg2);letter-spacing:.04em;text-transform:uppercase; }
+.triage-reason { font-size:12px;color:var(--dim2);line-height:1.5; }
+.triage-expand { font-size:11px;color:var(--dim2);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px;margin-top:2px; }
 .btn-trace:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ── Trace ────────────────────────────────────────────── */
@@ -660,7 +695,11 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   color: var(--dim2);
   font-weight: 600;
   margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
 }
+.screen-explainer-title .tts-btn,
+.sec-label .tts-btn { text-transform: none; letter-spacing: normal; margin-left: auto; }
+.sec-label { display: flex; align-items: center; }
 .screen-explainer p { margin: 0 0 10px; }
 .screen-explainer strong { color: var(--fg2); }
 .screen-explainer em { color: var(--fg2); font-style: italic; }
@@ -683,6 +722,29 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   opacity: 0.35; transition: opacity .15s; padding: 2px 4px; line-height: 1;
 }
 .obs-bookmark-btn:hover, .e10-observation.bookmarked .obs-bookmark-btn { opacity: 1; }
+/* ── TTS controls ── */
+.tts-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--dim2); font-size: 11px; padding: 2px 7px;
+  border-radius: 4px; cursor: pointer; line-height: 1.4;
+  transition: color .12s, border-color .12s, background .12s;
+  flex-shrink: 0;
+}
+.tts-btn:hover { color: var(--fg); border-color: var(--accent); }
+.tts-btn.tts-playing { color: var(--accent); border-color: var(--accent); background: var(--accent2); }
+.tts-btn.tts-paused  { color: var(--yellow,#f4c542); border-color: var(--yellow,#f4c542); }
+.dict-wrap { position: relative; }
+.dict-btn {
+  position: absolute; right: 6px; bottom: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--dim2); font-size: 11px; padding: 2px 7px;
+  border-radius: 4px; cursor: pointer; line-height: 1.4;
+  transition: color .12s, border-color .12s, background .12s;
+  z-index: 1;
+}
+.dict-btn:hover { color: var(--fg); border-color: var(--accent); }
+.dict-btn.dict-active { color: #ef4444; border-color: #ef4444; background: rgba(239,68,68,.08); }
+.dict-wrap textarea, .dict-wrap input[type="text"] { padding-bottom: 28px; }
 .e10-meta {
   font-family: var(--mono); font-size: 10px; color: var(--dim2);
   letter-spacing: .06em; margin-bottom: 8px; text-transform: uppercase;
@@ -853,6 +915,134 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   border-radius: var(--r); cursor: pointer; font: inherit; font-size: 13px;
 }
 .reader-action:hover { color: var(--accent); border-color: var(--accent); }
+/* ── Close Reading Workspace ─────────────────────────── */
+.cr-layout {
+  display: grid; grid-template-columns: minmax(0,1fr) 300px;
+  gap: 20px; align-items: start;
+}
+.cr-doc-picker {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;
+}
+.cr-doc-btn {
+  padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--bg); color: var(--fg2); cursor: pointer; font: inherit;
+  font-size: 12px; display: flex; align-items: center; gap: 6px;
+}
+.cr-doc-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent2); font-weight: 600; }
+.cr-doc-btn:hover:not(.active) { border-color: var(--fg2); color: var(--fg); }
+.cr-role-badge {
+  font-size: 9px; text-transform: uppercase; letter-spacing: .08em;
+  padding: 2px 5px; border-radius: 3px; font-weight: 700;
+}
+.cr-role-primary   { background: #1e3a1e; color: #6fcf6f; }
+.cr-role-commentary { background: #1e2a3a; color: #6fb0cf; }
+.cr-role-reference { background: #2a2a1e; color: #cfcf6f; }
+.cr-role-notes     { background: #2a1e2a; color: #cf6fcf; }
+.cr-role-exploratory { background: #2a1e1e; color: #cf8f6f; }
+.cr-page-view {
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface); padding: 28px 32px;
+  min-height: 400px; user-select: text; cursor: text;
+}
+.cr-page-header {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--dim2); margin-bottom: 18px; display: flex; align-items: center; gap: 12px;
+}
+.cr-page-region {
+  font-size: 10px; color: var(--dim2); font-family: var(--mono);
+  text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px;
+}
+.cr-page-text {
+  font-size: 16px; line-height: 1.85; color: var(--fg);
+  white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 20px;
+}
+.cr-nav-bar {
+  display: flex; align-items: center; gap: 10px; margin-top: 18px;
+}
+.cr-nav-btn {
+  padding: 6px 16px; border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--bg); color: var(--fg2); cursor: pointer; font: inherit; font-size: 12px;
+}
+.cr-nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+.cr-nav-btn:disabled { opacity: .35; cursor: default; }
+.cr-progress { font-size: 11px; color: var(--dim2); font-family: var(--mono); flex: 1; text-align: center; }
+.cr-progress-bar {
+  height: 3px; background: var(--border2); border-radius: 2px; overflow: hidden; margin-top: 10px;
+}
+.cr-progress-fill { height: 100%; background: var(--accent); transition: width .4s; }
+.cr-side {
+  position: sticky; top: 72px; display: flex; flex-direction: column; gap: 14px;
+}
+.cr-side-panel {
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface); padding: 16px;
+}
+.cr-side-title {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--dim2); font-weight: 700; margin-bottom: 12px;
+}
+.cr-highlight-form textarea, .cr-highlight-form input[type=text] {
+  width: 100%; box-sizing: border-box; background: var(--bg);
+  border: 1px solid var(--border2); border-radius: var(--r);
+  color: var(--fg); font: inherit; font-size: 13px;
+  padding: 8px 10px; resize: vertical;
+}
+.cr-highlight-form textarea:focus, .cr-highlight-form input[type=text]:focus {
+  outline: none; border-color: var(--accent);
+}
+.cr-form-row { margin-bottom: 10px; }
+.cr-form-label { font-size: 10px; color: var(--dim2); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+.cr-relevance-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.cr-rel-btn {
+  padding: 3px 9px; border-radius: 3px; border: 1px solid var(--border2);
+  background: var(--bg); color: var(--dim2); cursor: pointer; font: inherit; font-size: 11px;
+}
+.cr-rel-btn.active { font-weight: 700; }
+.cr-rel-supports   { border-color: var(--green); color: var(--green); background: #0f2a0f; }
+.cr-rel-complicates { border-color: #e0a800; color: #e0a800; background: #2a220a; }
+.cr-rel-contradicts { border-color: var(--red); color: var(--red); background: #2a0f0f; }
+.cr-rel-background { border-color: var(--dim2); color: var(--dim2); }
+.cr-rel-unclear    { border-color: var(--border2); color: var(--dim2); }
+.cr-saved-passage {
+  font-size: 13px; color: var(--fg); background: var(--accent2);
+  border: 1px solid var(--border); border-radius: var(--r);
+  padding: 10px 12px; line-height: 1.6; max-height: 120px; overflow-y: auto;
+  font-style: italic;
+}
+.cr-highlight-list { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
+.cr-highlight-item {
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--bg); padding: 10px; font-size: 12px; cursor: pointer;
+}
+.cr-highlight-item:hover { border-color: var(--accent); }
+.cr-highlight-quote { color: var(--fg2); font-style: italic; line-height: 1.5; margin-bottom: 4px; }
+.cr-highlight-meta { color: var(--dim2); font-size: 10px; font-family: var(--mono); }
+.cr-candidate-badge {
+  display: inline-block; font-size: 9px; text-transform: uppercase; letter-spacing: .08em;
+  padding: 1px 5px; border-radius: 3px; background: #1e2a3a; color: #6fb0cf;
+  margin-left: 6px;
+}
+.cr-related-obs { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; }
+.cr-rel-obs-item {
+  font-size: 12px; color: var(--fg2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 8px 10px; line-height: 1.5;
+}
+.cr-non-primary-warning {
+  background: #2a220a; border: 1px solid #e0a800; border-radius: var(--r);
+  padding: 8px 12px; font-size: 12px; color: #e0a800; margin-bottom: 14px;
+}
+/* selection toolbar */
+.cr-sel-toolbar {
+  position: fixed; z-index: 9999;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  padding: 6px 8px; display: flex; gap: 6px; align-items: center;
+}
+.cr-sel-btn {
+  padding: 4px 10px; border-radius: 3px; border: 1px solid var(--border2);
+  background: var(--bg); color: var(--fg2); cursor: pointer; font: inherit; font-size: 11px;
+}
+.cr-sel-btn:hover { border-color: var(--accent); color: var(--accent); }
 /* ── Investigation Setup ─────────────────────────────── */
 .setup-wrap { max-width: 640px; }
 .setup-preamble { font-size: 14px; color: var(--fg2); line-height: 1.75; margin-bottom: 28px; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); }
@@ -1152,6 +1342,220 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 @media (min-width: 501px) and (max-width: 680px) {
   .ob-cycle-wrap { transform: scale(0.88); transform-origin: top center; margin-bottom: -53px; }
 }
+
+/* ── Accessibility Dock v0.2 ── */
+#a11y-dock {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 9500;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-right: none;
+  border-radius: 16px 0 0 16px;
+  padding: 10px 0 8px;
+  box-shadow: -3px 4px 22px rgba(0,0,0,.22);
+  user-select: none;
+  min-width: 72px;
+  transition: min-width .18s ease, padding .18s ease;
+}
+#a11y-dock .dock-header {
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--dim2);
+  text-align: center;
+  padding: 0 8px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+#a11y-dock.dock-collapsed {
+  min-width: 0;
+  padding: 0;
+  border-radius: 10px 0 0 10px;
+}
+#a11y-dock .dock-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 6px;
+}
+.a11y-btn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1.5px solid transparent;
+  background: none;
+  color: var(--dim2);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: color .1s, background .1s, border-color .1s;
+  white-space: nowrap;
+  text-align: left;
+}
+.a11y-btn .a11y-icon { font-size: 18px; line-height: 1; flex-shrink: 0; }
+.a11y-btn .a11y-label { font-size: 11px; line-height: 1.2; color: var(--fg2); }
+.a11y-btn .a11y-state { font-size: 9px; color: var(--dim2); letter-spacing: .04em; }
+.a11y-btn:hover { color: var(--fg); background: var(--bg2); border-color: var(--border); }
+.a11y-btn.a11y-on {
+  color: var(--accent);
+  background: var(--accent2);
+  border-color: var(--accent);
+}
+.a11y-btn.a11y-on .a11y-label { color: var(--accent); }
+.a11y-btn.a11y-on .a11y-state { color: var(--accent); opacity: .8; }
+.a11y-btn.a11y-speaking {
+  color: #22c55e;
+  background: rgba(34,197,94,.1);
+  border-color: #22c55e;
+}
+.a11y-btn.a11y-speaking .a11y-label { color: #22c55e; }
+.a11y-btn.a11y-speaking .a11y-state { color: #22c55e; }
+.a11y-btn:disabled { opacity: .3; cursor: default; pointer-events: none; }
+.a11y-divider { height: 1px; background: var(--border); margin: 4px 6px; }
+.a11y-status-bar {
+  font-size: 10px;
+  color: var(--dim2);
+  text-align: center;
+  padding: 5px 8px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  min-height: 22px;
+  letter-spacing: .02em;
+}
+.a11y-status-bar.status-speaking { color: #22c55e; }
+.a11y-status-bar.status-ready { color: var(--accent); }
+.a11y-collapse-row {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 0;
+}
+.a11y-collapse-btn {
+  background: none;
+  border: none;
+  color: var(--dim2);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 10px;
+  border-radius: 4px;
+  letter-spacing: .05em;
+}
+.a11y-collapse-btn:hover { color: var(--fg); background: var(--bg2); }
+
+/* Collapsed pill */
+#a11y-dock-collapsed-pill {
+  display: none;
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 9500;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  box-shadow: -2px 3px 14px rgba(0,0,0,.18);
+  padding: 10px 8px;
+  cursor: pointer;
+  user-select: none;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 11px;
+  color: var(--fg2);
+  letter-spacing: .08em;
+  align-items: center;
+  gap: 4px;
+}
+#a11y-dock-collapsed-pill:hover { background: var(--bg2); color: var(--fg); }
+
+/* Selection floating toolbar */
+#a11y-selection-tip {
+  position: fixed;
+  z-index: 9600;
+  background: var(--surface);
+  border: 1.5px solid var(--accent);
+  border-radius: 10px;
+  padding: 5px 8px;
+  display: none;
+  gap: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  align-items: center;
+  pointer-events: auto;
+}
+#a11y-selection-tip::before {
+  content: '🔊 ';
+  font-size: 13px;
+  color: var(--accent);
+}
+.a11y-tip-btn {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1.5px solid var(--accent);
+  background: var(--accent2);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background .1s;
+}
+.a11y-tip-btn:hover { background: var(--accent); color: #fff; }
+.a11y-tip-stop {
+  font-size: 12px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--fg2);
+  cursor: pointer;
+}
+.a11y-tip-stop:hover { background: var(--bg2); }
+
+/* Focus mode */
+body.a11y-focus-mode .e10-screen:not(.active),
+body.a11y-focus-mode .section.xo { opacity: 0.12; pointer-events: none; transition: opacity .2s; }
+body.a11y-focus-mode .nav { opacity: 0.35; transition: opacity .2s; }
+body.a11y-focus-mode #a11y-dock,
+body.a11y-focus-mode #a11y-dock-collapsed-pill { opacity: 1 !important; pointer-events: auto !important; }
+
+/* Text size override — broad enough for visible difference */
+body.a11y-text-lg .e10-text,
+body.a11y-text-lg .obs-card p,
+body.a11y-text-lg .obs-raw-text,
+body.a11y-text-lg p { font-size: 15.5px !important; line-height: 1.85 !important; }
+body.a11y-text-lg .e10-card .e10-text { font-size: 15px !important; }
+
+/* First-use hint */
+#a11y-hint {
+  position: fixed;
+  right: 80px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 9400;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 9px 13px;
+  font-size: 12px;
+  color: var(--fg2);
+  line-height: 1.5;
+  max-width: 210px;
+  box-shadow: 0 3px 14px rgba(0,0,0,.18);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .3s;
+}
+#a11y-hint.hint-visible { opacity: 1; }
 </style>
 </head>
 <body>
@@ -1160,10 +1564,11 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   <span class="nav-brand" onclick="e10Go('onboarding')" style="cursor:pointer">Hermeneia</span>
   <!-- Hidden nav-step buttons preserved for JS .active class toggling -->
   <button class="nav-step" id="navstep-corpus"    onclick="e10Go('corpus')">Corpus</button>
+  <button class="nav-step" id="navstep-reader"    onclick="e10Go('reader')">Reader</button>
   <button class="nav-step" id="navstep-lab"       onclick="e10Go('lab')">Lab</button>
   <button class="nav-step" id="navstep-review"    onclick="e10Go('review')">Review</button>
   <button class="nav-step" id="navstep-architect" onclick="e10Go('architect')">Architect</button>
-  <button class="nav-step" id="navstep-reader"    onclick="e10Go('reader')">Read</button>
+  <button class="nav-step" id="navstep-reports"   onclick="e10Go('reports')">Reports</button>
   <button class="nav-step" id="navstep-critic"    onclick="e10Go('critic')">Critic</button>
   <div class="nav-cycle-wrap">
     <div class="nav-mini-cycle-wrap" id="nav-mini-cycle-wrap" onclick="e10Go('onboarding')" title="View the full interpretive cycle">
@@ -1180,7 +1585,7 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
     <button class="nav-btn" onclick="e10Go('guide')" style="font-size:13px">Guide</button>
     <button class="nav-btn" onclick="e10Go('constitution')" style="font-size:13px">Constitution</button>
     <button class="nav-btn" onclick="e10Go('lineage')" style="font-size:13px">Lineage</button>
-    <button class="expert-btn" onclick="toggleExpert()">⚙ Expert</button>
+    <button class="expert-btn" onclick="toggleExpert()">⚙ Connections</button>
   </div>
 </nav>
 
@@ -1190,13 +1595,74 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
     <span id="stage-nav-prev-label">Previous</span>
   </button>
   <div class="stage-nav-center">
-    <div class="stage-nav-name" id="stage-nav-current">Start</div>
+    <button class="stage-nav-guide" onclick="e10Go('guide')">Guide</button>
   </div>
   <button class="stage-nav-arrow" id="stage-nav-next" onclick="stageNavStep(1)" style="justify-content:flex-end">
     <span id="stage-nav-next-label">Next</span>
     <span class="stage-nav-arrow-icon">→</span>
   </button>
 </div>
+
+<!-- Accessibility Dock v0.2 — fixed right-center, always visible -->
+<div id="a11y-dock" role="toolbar" aria-label="Accessibility tools">
+  <div class="dock-header">Access Tools</div>
+  <div class="dock-inner">
+    <button class="a11y-btn" id="a11y-btn-read" onclick="a11yClickRead()"
+      aria-label="Read selected text" title="Enable: highlight text, then click Read in the popup">
+      <span class="a11y-icon">🔊</span>
+      <span style="display:flex;flex-direction:column;gap:1px">
+        <span class="a11y-label">Read</span>
+        <span class="a11y-state" id="a11y-read-state">Off</span>
+      </span>
+    </button>
+    <button class="a11y-btn" id="a11y-btn-stop" onclick="a11yStop()"
+      aria-label="Stop reading" title="Stop speech" disabled>
+      <span class="a11y-icon">⏹</span>
+      <span style="display:flex;flex-direction:column;gap:1px">
+        <span class="a11y-label">Stop</span>
+        <span class="a11y-state">Reading</span>
+      </span>
+    </button>
+    <div class="a11y-divider"></div>
+    <button class="a11y-btn" id="a11y-btn-focus" onclick="a11yToggle('focus')"
+      aria-label="Focus mode" title="Dim everything except the active screen">
+      <span class="a11y-icon">👁</span>
+      <span style="display:flex;flex-direction:column;gap:1px">
+        <span class="a11y-label">Focus</span>
+        <span class="a11y-state" id="a11y-focus-state">Off</span>
+      </span>
+    </button>
+    <button class="a11y-btn" id="a11y-btn-text" onclick="a11yToggle('textLg')"
+      aria-label="Larger text" title="Increase reading text size">
+      <span class="a11y-icon" style="font-size:16px;font-weight:700">Aa</span>
+      <span style="display:flex;flex-direction:column;gap:1px">
+        <span class="a11y-label">Text</span>
+        <span class="a11y-state" id="a11y-text-state">Normal</span>
+      </span>
+    </button>
+  </div>
+  <div class="a11y-status-bar" id="a11y-status">Reading off</div>
+  <div class="a11y-collapse-row">
+    <button class="a11y-collapse-btn" id="a11y-collapse" onclick="a11yCollapse()"
+      aria-label="Collapse accessibility dock">▾ hide</button>
+  </div>
+</div>
+
+<!-- Collapsed pill — replaces dock when collapsed -->
+<div id="a11y-dock-collapsed-pill" onclick="a11yCollapse()"
+  role="button" tabindex="0" aria-label="Expand accessibility tools"
+  title="Expand accessibility tools">
+  ♿ Access
+</div>
+
+<!-- Floating Read toolbar — appears near highlighted text when Read is ON -->
+<div id="a11y-selection-tip" role="dialog" aria-label="Read selected text">
+  <button class="a11y-tip-btn" onclick="a11yReadSelection()">Read</button>
+  <button class="a11y-tip-stop" onclick="a11yDismissTip()" title="Cancel">✕</button>
+</div>
+
+<!-- First-use hint -->
+<div id="a11y-hint">Turn on <strong>Read</strong>, highlight any text, then tap <strong>Read</strong> in the popup.</div>
 
 <div class="wrap">
   <div id="root"><span style="color:var(--dim);display:block;padding:80px 0">Loading…</span></div>
@@ -1210,6 +1676,197 @@ let _activeCell = null, _covOpen = false;
 let _e10Selected = null, _e10Detail = null, _e10ActiveProposal = null;
 let _e10Providers = null;
 let _e10ProviderNotices = {};
+
+// ── Accessibility Dock v0.2 ────────────────────────────
+const _a11y = { read: false, focus: false, textLg: false, speaking: false, collapsed: false };
+let _a11yHintTimer = null;
+let _a11yHintShown = false;
+
+function _a11yGetSelectedText() {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return '';
+  return sel.toString().replace(/\s+/g, ' ').trim();
+}
+
+function _a11ySetStatus(msg, cls) {
+  const el = document.getElementById('a11y-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'a11y-status-bar' + (cls ? ' ' + cls : '');
+}
+
+function _a11ySync() {
+  const btnRead  = document.getElementById('a11y-btn-read');
+  const btnStop  = document.getElementById('a11y-btn-stop');
+  const btnFocus = document.getElementById('a11y-btn-focus');
+  const btnText  = document.getElementById('a11y-btn-text');
+  const readState  = document.getElementById('a11y-read-state');
+  const focusState = document.getElementById('a11y-focus-state');
+  const textState  = document.getElementById('a11y-text-state');
+
+  // Read button — three visual states: off, on, speaking
+  if (btnRead) {
+    btnRead.classList.toggle('a11y-on', _a11y.read && !_a11y.speaking);
+    btnRead.classList.toggle('a11y-speaking', _a11y.speaking);
+  }
+  if (readState) {
+    readState.textContent = _a11y.speaking ? 'Speaking' : _a11y.read ? 'On — select text' : 'Off';
+  }
+
+  // Stop — only enabled while speaking
+  if (btnStop) btnStop.disabled = !_a11y.speaking;
+
+  // Focus
+  if (btnFocus) btnFocus.classList.toggle('a11y-on', _a11y.focus);
+  if (focusState) focusState.textContent = _a11y.focus ? 'On' : 'Off';
+
+  // Text size
+  if (btnText) btnText.classList.toggle('a11y-on', _a11y.textLg);
+  if (textState) textState.textContent = _a11y.textLg ? 'Large' : 'Normal';
+
+  // Body classes
+  document.body.classList.toggle('a11y-focus-mode', _a11y.focus);
+  document.body.classList.toggle('a11y-text-lg', _a11y.textLg);
+
+  // Status bar
+  if (_a11y.speaking) {
+    _a11ySetStatus('Speaking…', 'status-speaking');
+  } else if (_a11y.read) {
+    _a11ySetStatus('Select text to read', 'status-ready');
+  } else {
+    _a11ySetStatus('Reading off');
+  }
+
+  // Hide tip when read is turned off
+  if (!_a11y.read) a11yDismissTip();
+}
+
+function a11yToggle(cap) {
+  _a11y[cap] = !_a11y[cap];
+  if (cap === 'read' && !_a11y.read) a11yStop();
+  _a11ySync();
+}
+
+// Read button: toggle mode ON, or if already ON read current selection directly
+function a11yClickRead() {
+  if (!_a11y.read) {
+    _a11y.read = true;
+    _a11ySync();
+    // Show first-use hint
+    if (!_a11yHintShown) {
+      _a11yHintShown = true;
+      const hint = document.getElementById('a11y-hint');
+      if (hint) {
+        hint.classList.add('hint-visible');
+        clearTimeout(_a11yHintTimer);
+        _a11yHintTimer = setTimeout(() => hint.classList.remove('hint-visible'), 4000);
+      }
+    }
+    return;
+  }
+  // Already on — try to read current selection
+  const text = _a11yGetSelectedText();
+  if (text) {
+    a11ySpeak(text);
+  } else {
+    _a11ySetStatus('Select text first', 'status-ready');
+    setTimeout(() => _a11y.read && _a11ySetStatus('Select text to read', 'status-ready'), 1800);
+  }
+}
+
+function a11ySpeak(text) {
+  if (typeof speechSynthesis === 'undefined') {
+    _a11ySetStatus('Speech not supported in this browser');
+    return;
+  }
+  if (!text) {
+    _a11ySetStatus('Select text first', 'status-ready');
+    return;
+  }
+  speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = 1.0; utt.pitch = 1.0; utt.volume = 1.0;
+  utt.onstart = () => { _a11y.speaking = true; _a11ySync(); };
+  utt.onend   = () => { _a11y.speaking = false; _a11ySync(); };
+  utt.onerror = (e) => {
+    _a11y.speaking = false;
+    _a11ySync();
+    _a11ySetStatus('Speech error — try again');
+  };
+  speechSynthesis.speak(utt);
+  a11yDismissTip();
+}
+
+// Called from the floating tip's Read button
+function a11yReadSelection() {
+  const text = _a11yGetSelectedText();
+  a11ySpeak(text);
+}
+
+function a11yStop() {
+  if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
+  _a11y.speaking = false;
+  _a11ySync();
+  a11yDismissTip();
+  if (_a11y.read) {
+    _a11ySetStatus('Stopped — select text to read again', 'status-ready');
+    setTimeout(() => _a11y.read && _a11ySetStatus('Select text to read', 'status-ready'), 2000);
+  }
+}
+
+function a11yDismissTip() {
+  const tip = document.getElementById('a11y-selection-tip');
+  if (tip) tip.style.display = 'none';
+}
+
+function a11yCollapse() {
+  _a11y.collapsed = !_a11y.collapsed;
+  const dock  = document.getElementById('a11y-dock');
+  const pill  = document.getElementById('a11y-dock-collapsed-pill');
+  if (_a11y.collapsed) {
+    if (dock) dock.style.display = 'none';
+    if (pill) pill.style.display = 'flex';
+  } else {
+    if (dock) dock.style.display = '';
+    if (pill) pill.style.display = 'none';
+  }
+}
+
+// Show floating Read toolbar near the selection when Read mode is on
+document.addEventListener('mouseup', (e) => {
+  // Don't trigger if click was inside dock or tip
+  if (e.target.closest('#a11y-dock, #a11y-dock-collapsed-pill, #a11y-selection-tip')) return;
+  if (!_a11y.read) return;
+  if (_a11y.speaking) return;
+  const text = _a11yGetSelectedText();
+  const tip  = document.getElementById('a11y-selection-tip');
+  if (!tip) return;
+  if (!text) { tip.style.display = 'none'; return; }
+
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const rect = sel.getRangeAt(0).getBoundingClientRect();
+
+  // Position above selection, clamped to viewport
+  const tipW = 160;
+  const tipH = 44;
+  let left = rect.left + rect.width / 2 - tipW / 2;
+  let top  = rect.top + window.scrollY - tipH - 8;
+  left = Math.max(8, Math.min(left, window.innerWidth - tipW - 90)); // keep clear of dock
+  top  = Math.max(window.scrollY + 8, top);
+
+  tip.style.left    = `${left}px`;
+  tip.style.top     = `${top}px`;
+  tip.style.display = 'flex';
+});
+
+// Dismiss tip when user clicks away
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('#a11y-selection-tip')) a11yDismissTip();
+});
+
+// Cancel speech on tab hide or screen navigation
+document.addEventListener('visibilitychange', () => { if (document.hidden) a11yStop(); });
 
 // ── Boot ───────────────────────────────────────────────
 (async () => {
@@ -1244,13 +1901,16 @@ function mount(h) {
 
   document.getElementById('root').innerHTML = `
 <header class="page-head">
-  <div class="page-title">E10 Vertical Slice</div>
+  <div id="page-thesis-wrap" style="display:none">
+    <div class="page-thesis-label">Working Thesis</div>
+    <div class="page-title" id="page-thesis"></div>
+  </div>
   ${fn ? `<div class="page-file">${x(fn)}</div>` : ''}
   <div id="app-error" class="app-error"></div>
 </header>
 
 <section class="section xo" id="provider-settings">
-  <div class="sec-label">Expert — Providers</div>
+  <div class="sec-label">Connections — Providers</div>
   <div id="provider-panel" class="e10-empty">Loading provider status...</div>
 </section>
 
@@ -1285,8 +1945,10 @@ function mount(h) {
   <div class="search-meta" id="qmeta"></div>
   <div id="motif-panel"></div>
   <div id="results"></div>
-  <div class="screen-explainer">
-    <div class="screen-explainer-title">What is the Corpus?</div>
+  <div class="screen-explainer" id="corpus-explainer">
+    <div class="screen-explainer-title">What is the Corpus?
+      <button class="tts-btn" id="tts-btn-corpus-explainer" onclick="ttsReadEl('corpus-explainer','corpus-explainer')" title="Read aloud">▶</button>
+    </div>
     <p>The Corpus is the evidence base — every sentence and passage extracted from your document, preserved exactly as written. These are called <strong>observations</strong>. They are immutable: the machine never rewrites them, summarizes them, or loses them.</p>
     <p>Use the search box to find passages by keyword. When a search returns multiple results, a <strong>Pattern View</strong> appears at the top — showing all occurrences simultaneously with a distribution timeline. This is how recurring concepts (symbols, phrases, contested terms) become visible across the full document.</p>
     <p><strong>How to use it:</strong> Search for a term you want to investigate. Review the Pattern View if multiple passages appear. Click any observation to select it, then go to the Lab to generate an interpretation.</p>
@@ -1299,10 +1961,24 @@ function mount(h) {
   <div id="lab-scope-banner"></div>
   <div id="selected-observation" class="e10-empty">Select an observation from the corpus.</div>
   <div id="lab-participants-host"></div>
-  <button class="btn-trace" onclick="e10GenerateInterpretations()">Generate Interpretations</button>
+  <div id="lab-scope-summary"></div>
+  <div style="margin:10px 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <div style="font-size:11px;color:var(--dim2);letter-spacing:.06em;text-transform:uppercase">Response mode</div>
+      <div style="display:flex;gap:0" id="lab-mode-selector">
+        <button class="lab-mode-btn lab-mode-active" data-mode="interpretive" onclick="labSetMode('interpretive')" title="Full paragraph interpretation — explores meaning in depth">Interpretive</button>
+        <button class="lab-mode-btn" data-mode="triage" onclick="labSetMode('triage')" title="Three-line summary: confidence, pattern type, reason — for moving quickly through observations">Triage</button>
+        <button class="lab-mode-btn" data-mode="skeptical" onclick="labSetMode('skeptical')" title="Challenges the observation — what would make this wrong?">Skeptical</button>
+      </div>
+      <div id="lab-mode-desc" style="font-size:11px;color:var(--dim2);max-width:340px;margin-top:2px">Explores meaning in depth. One paragraph per observation.</div>
+    </div>
+    <button class="btn-trace" style="align-self:flex-end" onclick="e10GenerateInterpretations()">Generate</button>
+  </div>
   <div id="lab-results" class="e10-stack"></div>
-  <div class="screen-explainer">
-    <div class="screen-explainer-title">What is the Interpretation Lab?</div>
+  <div class="screen-explainer" id="lab-explainer">
+    <div class="screen-explainer-title">What is the Interpretation Lab?
+      <button class="tts-btn" id="tts-btn-lab-explainer" onclick="ttsReadEl('lab-explainer','lab-explainer')" title="Read aloud">▶</button>
+    </div>
     <p>This is where AI providers propose what each observation <em>means</em>. Select an observation from the Corpus, choose one or more providers, and click Generate. Each provider produces a proposal — a candidate interpretation anchored to the observed text.</p>
     <p>Proposals are not canonical. They are drafts. Nothing enters the permanent record here. The next step — Steward Review — is where a human decides which proposals to accept.</p>
     <p><strong>How to use it:</strong> Select an observation from the Corpus tab. The observation text appears above. Check the providers you want to hear from. Click Generate. Review the proposals on the next screen.</p>
@@ -1317,8 +1993,10 @@ function mount(h) {
   <div class="sec-label">Screen 3 — Steward Review</div>
   <div id="review-canon-panel"></div>
   <div id="review-panel" class="e10-empty" style="display:none">Generated proposals will appear here.</div>
-  <div class="screen-explainer">
-    <div class="screen-explainer-title">What is Steward Review?</div>
+  <div class="screen-explainer" id="review-explainer">
+    <div class="screen-explainer-title">What is Steward Review?
+      <button class="tts-btn" id="tts-btn-review-explainer" onclick="ttsReadEl('review-explainer','review-explainer')" title="Read aloud">▶</button>
+    </div>
     <p>This is where human judgment enters the record. AI proposals from the Lab arrive here as candidates. You read each one, decide whether it accurately represents what the text says, and choose to <strong>Establish</strong> (accept as canonical), <strong>Contest</strong> (mark as questionable), or <strong>Mark Uncertain</strong> (flag for further review).</p>
     <p>Nothing becomes canonical without your decision. Every status change is logged with a timestamp and your note — so the record shows not just what was decided, but when and why it changed.</p>
     <p>The <strong>Pipeline Actions</strong> bar at the top lets you run the Artist (generate the full report) and Critic (audit the report) once interpretations are in place. Select providers and profiles, then run.</p>
@@ -1330,13 +2008,15 @@ function mount(h) {
   </div>
 </section>
 
-<section class="section e10-screen" id="reader">
-  <div class="sec-label">Reader View</div>
+<section class="section e10-screen" id="reports">
+  <div class="sec-label">Reports</div>
   <div id="reader-panel">
     <div class="e10-empty">Loading rendered narratives…</div>
   </div>
-  <div class="screen-explainer">
-    <div class="screen-explainer-title">What is the Reader View?</div>
+  <div class="screen-explainer" id="reports-explainer">
+    <div class="screen-explainer-title">What are Reports?
+      <button class="tts-btn" id="tts-btn-reports-explainer" onclick="ttsReadEl('reports-explainer','reports-explainer')" title="Read aloud">▶</button>
+    </div>
     <p>These are the rendered reports — the final output of the pipeline. Each card represents one narrative generated by an AI provider using a specific expression profile (literary, executive, children's, Spanish, etc.) from the same underlying evidence base.</p>
     <p>The same evidence, expressed differently. The thesis and meaning are fixed by the Architect Plan. The voice, register, and language adapt to the profile. A 74% fidelity score means 74% of the required concepts made it into the prose.</p>
     <p><strong>How to use it:</strong> Click any card to read the full report. Compare versions rendered in different profiles to see how the same understanding translates across audiences. Use Run Critic (from the Review tab) to audit any report's fidelity.</p>
@@ -1347,6 +2027,13 @@ function mount(h) {
   </div>
 </section>
 
+<section class="section e10-screen" id="reader">
+  <div class="sec-label">Reader — Close Reading Workspace</div>
+  <div id="reader-workspace">
+    <div class="e10-empty">Select a document to begin reading.</div>
+  </div>
+</section>
+
 <section class="section e10-screen" id="critic">
   <div class="sec-label">Screen 4 — Critic</div>
   <div id="critic-explorer-root">
@@ -1354,13 +2041,15 @@ function mount(h) {
     <div id="critic-detail-panel" style="display:none"></div>
   </div>
   <div id="critic-panel" class="e10-empty" style="display:none">Select a proposed interpretation to run the Critic.</div>
-  <div class="screen-explainer">
-    <div class="screen-explainer-title">What is the Critic?</div>
+  <div class="screen-explainer" id="critic-explainer">
+    <div class="screen-explainer-title">What is the Critic?
+      <button class="tts-btn" id="tts-btn-critic-explainer" onclick="ttsReadEl('critic-explainer','critic-explainer')" title="Read aloud">▶</button>
+    </div>
     <p>The Critic is an automated auditor. After the Artist renders a report, the Critic checks whether the report faithfully preserved the evidence it was built from. It runs deterministic evaluation functions — not another AI opinion, but structured checks against the Architect Plan.</p>
     <p>The <strong>semantic fidelity score</strong> measures what percentage of required concepts survived into the final prose. A score below 100% means some evidence was lost in translation. The Critic identifies exactly what was dropped, what was unsupported, and what warnings apply.</p>
     <p><strong>How to use it:</strong> After running the Artist, return here to run the Critic. Select a report, click Run Critic from the Review tab, then come back here to review the findings.</p>
     <div style="margin-top:16px;display:flex;gap:10px">
-      <button onclick="e10Go('reader')" style="padding:8px 16px;background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);cursor:pointer">← Read</button>
+      <button onclick="e10Go('reports')" style="padding:8px 16px;background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);cursor:pointer">← Read</button>
       <button onclick="e10Go('lineage')" style="padding:8px 16px;background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);cursor:pointer">Lineage →</button>
     </div>
   </div>
@@ -1370,8 +2059,10 @@ function mount(h) {
   <div class="sec-label">Screen 5 — Lineage Explorer</div>
   <div id="lineage-explorer"><div class="e10-empty">Loading…</div></div>
   <div id="finding-panel" class="e10-empty" style="display:none"></div>
-  <div class="screen-explainer">
-    <div class="screen-explainer-title">What is the Lineage Explorer?</div>
+  <div class="screen-explainer" id="lineage-explainer">
+    <div class="screen-explainer-title">What is the Lineage Explorer?
+      <button class="tts-btn" id="tts-btn-lineage-explainer" onclick="ttsReadEl('lineage-explainer','lineage-explainer')" title="Read aloud">▶</button>
+    </div>
     <p>Every object in Hermeneia has a traceable origin. This screen lets you walk the chain from any rendered report back to the exact passages in the source document that produced it. Nothing is asserted without evidence. Nothing is lost without a record.</p>
     <p>Lineage answers the question: <em>how did this conclusion get here?</em> From report → architect plan → blueprint → interpretation → observation → source document. Each link is preserved and auditable.</p>
     <p><strong>How to use it:</strong> Select a rendered narrative to trace its full lineage. Or navigate here from the Reader View using the "View Lineage" button on any report card.</p>
@@ -1383,25 +2074,31 @@ function mount(h) {
   <div id="architect-panel">
     <div class="e10-empty">Loading blueprints…</div>
   </div>
-  <div class="screen-explainer">
-    <div class="screen-explainer-title">What is the Architect?</div>
+  <div class="screen-explainer" id="architect-explainer">
+    <div class="screen-explainer-title">What is the Architect?
+      <button class="tts-btn" id="tts-btn-architect-explainer" onclick="ttsReadEl('architect-explainer','architect-explainer')" title="Read aloud">▶</button>
+    </div>
     <p>The Architect is the structural layer between interpretation and prose. A <strong>Narrative Blueprint</strong> organizes accepted interpretations into a coherent argument — a thesis and supporting claims. The <strong>Architect Plan</strong> translates that argument into specific instructions for the Artist: what the report must say, what evidence it must cite, what it must not omit.</p>
     <p>The Plan is what makes reports auditable. The Critic checks the rendered prose against the Plan, not against a vague notion of quality. If the Plan says "discuss Gatsby's exemption from moral judgment," the Critic verifies that the report actually does.</p>
     <p><strong>How to use it:</strong> Browse existing blueprints and plans here. Generate a new blueprint from a research directive, or import your own. Set a blueprint as active, then go to Review to run the Artist against it.</p>
     <div style="margin-top:16px;display:flex;gap:10px">
       <button onclick="e10Go('review')" style="padding:8px 16px;background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);cursor:pointer">← Review</button>
-      <button class="btn-primary" onclick="e10Go('reader')" style="padding:8px 20px">Next: Read →</button>
+      <button class="btn-primary" onclick="e10Go('reports')" style="padding:8px 20px">Next: Read →</button>
     </div>
   </div>
 </section>
 
 <section class="section e10-screen" id="guide">
-  <div class="sec-label">How Hermeneia Works</div>
+  <div class="sec-label">How Hermeneia Works
+    <button class="tts-btn" id="tts-btn-guide" onclick="ttsReadEl('guide','guide-panel')" title="Read page aloud">▶ Read</button>
+  </div>
   <div id="guide-panel"></div>
 </section>
 
 <section class="section e10-screen" id="constitution">
-  <div class="sec-label">Hermeneia Constitution</div>
+  <div class="sec-label">Hermeneia Constitution
+    <button class="tts-btn" id="tts-btn-constitution" onclick="ttsReadEl('constitution','constitution-panel')" title="Read page aloud">▶ Read</button>
+  </div>
   <div id="constitution-panel"></div>
 </section>
 `;
@@ -1410,11 +2107,15 @@ function mount(h) {
   document.getElementById('q').addEventListener('keydown', e => {
     if (e.key === 'Escape') clearResults();
   });
+  ttsInit();
+  updatePageThesis();
   e10LoadObservations();
   e10LoadFindings();
   e10LoadResearchBanner();
   // Fetch pipeline statuses for the nav mini cycle, then navigate
-  refreshNavCycleStatuses().then(() => updateNavCycle(invLoad() ? 'onboarding' : 'setup'));
+  refreshEditionCycleCount().then(() =>
+    refreshNavCycleStatuses().then(() => updateNavCycle(invLoad() ? 'onboarding' : 'setup'))
+  );
   e10Go(invLoad() ? 'onboarding' : 'setup');
 }
 
@@ -1577,7 +2278,16 @@ function setupSubmit() {
   }
   document.getElementById('setup-thesis-err').style.display = 'none';
   invSave({ thesis, purpose, lenses: [..._setupTags], reconsider, created: new Date().toISOString() });
-  e10Go('onboarding');
+  updatePageThesis();
+  // Check corpus boundary before proceeding — warn if no primary document
+  get('/api/e10/scope').then(d => {
+    if (!d.boundary_clear) {
+      showAppError('No primary corpus document is in scope. Upload and assign at least one document as Primary before beginning the investigation.');
+      e10Go('corpus');
+    } else {
+      e10Go('onboarding');
+    }
+  }).catch(() => e10Go('onboarding'));
 }
 
 function e10LoadSetup() {
@@ -1604,8 +2314,11 @@ function e10LoadSetup() {
         <div class="setup-label">Thesis</div>
         <div class="setup-prompt">What are you trying to understand?</div>
         <div class="setup-example">Example: I want to understand the difference in interpretation of the metaphors in The Great Gatsby.</div>
-        <textarea id="setup-thesis" class="setup-textarea" rows="3"
-          placeholder="I want to understand…">${x(existing?.thesis || '')}</textarea>
+        <div class="dict-wrap">
+          <textarea id="setup-thesis" class="setup-textarea" rows="3"
+            placeholder="I want to understand…">${x(existing?.thesis || '')}</textarea>
+          ${sttMakeBtn('setup-thesis')}
+        </div>
         <div id="setup-thesis-err" style="display:none;font-size:12px;color:var(--red);margin-top:4px">A thesis is required before beginning.</div>
       </div>
 
@@ -1613,8 +2326,11 @@ function e10LoadSetup() {
         <div class="setup-label">Purpose</div>
         <div class="setup-prompt">Why does this matter?</div>
         <div class="setup-example">Example: So that I can discover lessons I may have missed from a literary masterpiece.</div>
-        <textarea id="setup-purpose" class="setup-textarea" rows="2"
-          placeholder="So that…">${x(existing?.purpose || '')}</textarea>
+        <div class="dict-wrap">
+          <textarea id="setup-purpose" class="setup-textarea" rows="2"
+            placeholder="So that…">${x(existing?.purpose || '')}</textarea>
+          ${sttMakeBtn('setup-purpose')}
+        </div>
       </div>
 
       <div class="setup-field">
@@ -1623,10 +2339,10 @@ function e10LoadSetup() {
         <div class="setup-example">Not demographics. Interpretive lenses. Every reader arrives with assumptions — Hermeneia makes them visible.<br>
           Examples: Christian · Business owner · First-time reader · Parent · Historian · Recovering addict</div>
         <div id="setup-tag-row" class="setup-tag-row"></div>
-        <input class="setup-tag-input" id="setup-tag-input"
+        <div class="dict-wrap"><input class="setup-tag-input" id="setup-tag-input"
           placeholder="Type a lens and press Enter…"
           onkeydown="setupTagKeydown(event)"
-          onblur="setupTagBlur(event)">
+          onblur="setupTagBlur(event)">${sttMakeBtn('setup-tag-input')}</div>
       </div>
 
       <hr class="setup-divider">
@@ -1636,8 +2352,11 @@ function e10LoadSetup() {
         <div class="setup-prompt">What result would change your mind?</div>
         <div class="setup-example">Turns the investigation from "prove my thesis" into "test my thesis."<br>
           Example: I would reconsider if the evidence suggested Gatsby's metaphors are primarily about status rather than aspiration.</div>
-        <textarea id="setup-reconsider" class="setup-textarea" rows="2"
-          placeholder="I would reconsider my understanding if…">${x(existing?.reconsider || '')}</textarea>
+        <div class="dict-wrap">
+          <textarea id="setup-reconsider" class="setup-textarea" rows="2"
+            placeholder="I would reconsider my understanding if…">${x(existing?.reconsider || '')}</textarea>
+          ${sttMakeBtn('setup-reconsider')}
+        </div>
       </div>
 
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -1696,13 +2415,13 @@ async function e10LoadOnboarding() {
         <div class="onboarding-current-cta-text">All six stages have artifacts. Read your report or inspect the audit.</div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn-primary" onclick="e10Go('reader')">Read Report</button>
+        <button class="btn-primary" onclick="e10Go('reports')">Read Report</button>
         <button class="btn-trace"   onclick="e10Go('critic')">View Audit</button>
       </div>
     </div>`;
   } else if (currentStage) {
     const ctaTarget  = currentStage.nav_target || 'corpus';
-    const ctaLabel   = { corpus: 'Open Corpus', lab: 'Open Lab', architect: 'Open Architect', reader: 'Read Report', critic: 'Open Critic', lineage: 'Inspect Lineage' };
+    const ctaLabel   = { corpus: 'Open Corpus', reader: 'Open Reader', lab: 'Open Lab', architect: 'Open Architect', reports: 'Read Report', critic: 'Open Critic', lineage: 'Inspect Lineage' };
     ctaHtml = `<div class="onboarding-current-cta">
       <div>
         <div class="onboarding-current-cta-label">Current stage · ${x(currentStage.label)}</div>
@@ -1756,7 +2475,7 @@ async function e10LoadOnboarding() {
     const seen = new Set();
     const profilePills = narratives
       .filter(n => { const k = n.profile?.name || n.provider; if (seen.has(k)) return false; seen.add(k); return true; })
-      .map(n => `<button class="ob-report-pill" onclick="e10Go('reader');setTimeout(()=>e10LoadReaderDetail('${x(n.id)}'),120)">${x(n.profile?.name || n.provider)}</button>`)
+      .map(n => `<button class="ob-report-pill" onclick="e10Go('reports');setTimeout(()=>e10LoadReaderDetail('${x(n.id)}'),120)">${x(n.profile?.name || n.provider)}</button>`)
       .join('');
 
     const thesis = latestNarrative.blueprint?.thesis || d.project_goal?.text || '';
@@ -1769,7 +2488,7 @@ async function e10LoadOnboarding() {
             <div class="ob-understanding-label">Generated Understanding</div>
             <div class="ob-understanding-title">${x(latestNarrative.blueprint?.title || 'Untitled')}</div>
           </div>
-          <button class="btn-primary" onclick="e10Go('reader')">Read Report</button>
+          <button class="btn-primary" onclick="e10Go('reports')">Read Report</button>
         </div>
         <div class="ob-understanding-thesis">${x(shortThesis)}</div>
         <div class="ob-understanding-meta">
@@ -1786,15 +2505,33 @@ async function e10LoadOnboarding() {
       </div>`;
   }
 
-  // Recent documents block
+  // Corpus library — always shown when docs exist, with role labels and mute toggles
+  const roleLabels = { primary: 'Primary', reference: 'Reference', notes: 'Notes', commentary: 'Commentary', exploratory: 'Exploratory' };
   const recentDocsHtml = documents.length > 0 ? `
-    <div class="ob-recent-docs">
-      <div class="ob-recent-label">Recent documents</div>
-      ${documents.map(doc => `
-        <div class="ob-recent-item">
-          <span class="ob-recent-name">${x(doc.filename)}</span>
-          <span class="ob-recent-meta">${doc.observation_count.toLocaleString()} observations · ${doc.total_pages} pages</span>
-        </div>`).join('')}
+    <div id="ob-corpus-library" style="margin-bottom:24px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg2);overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--dim2)">Corpus — ${documents.filter(d=>!d.excluded).length} of ${documents.length} active</span>
+      </div>
+      ${documents.map(doc => {
+        const active = !doc.excluded;
+        const role = doc.source_role || 'primary';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);opacity:${active ? 1 : 0.45}">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x(doc.filename)}</div>
+            <div style="font-size:11px;color:var(--dim2);margin-top:2px">${doc.observation_count.toLocaleString()} obs · ${doc.total_pages}pp</div>
+          </div>
+          <select onchange="obDocSetRole('${x(doc.id)}', this.value)"
+            style="font-size:11px;padding:3px 6px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);flex-shrink:0">
+            ${['primary','reference','commentary','notes','exploratory'].map(r =>
+              `<option value="${r}"${role===r?' selected':''}>${roleLabels[r]}</option>`
+            ).join('')}
+          </select>
+          <button onclick="obDocMute('${x(doc.id)}', ${doc.excluded})"
+            style="font-size:11px;padding:3px 10px;border-radius:var(--r);cursor:pointer;border:1px solid ${active ? 'var(--border)' : 'var(--yellow,#f4c542)'};color:${active ? 'var(--dim2)' : 'var(--yellow,#f4c542)'};background:none;white-space:nowrap;flex-shrink:0">
+            ${active ? 'Mute' : '⊘ Muted'}
+          </button>
+        </div>`;
+      }).join('')}
     </div>` : '';
 
   // Upload zone (always shown; collapses after first compile)
@@ -1812,21 +2549,50 @@ async function e10LoadOnboarding() {
       </div>
       <div id="ob-upload-status" style="display:none"></div>
     </div>
+    <div id="ob-supporting-area" style="margin-bottom:24px">
+      <button class="ob-extract-toggle" onclick="obToggleSupporting()" id="ob-supporting-toggle" style="width:100%">
+        <span style="font-size:16px">📚</span>
+        <span><strong>Add supporting documents</strong> — upload reference, commentary, or exploratory PDFs that inform but don't contaminate the primary study</span>
+      </button>
+      <div class="ob-extract-panel" id="ob-supporting-panel">
+        <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px">
+          <div style="flex:1;min-width:180px">
+            <div class="ob-extract-label" style="margin-bottom:6px">Corpus role</div>
+            <select class="ob-extract-provider" id="ob-supporting-role" style="width:100%">
+              <option value="reference">Reference — comparative context</option>
+              <option value="commentary">Commentary — external perspective on primary</option>
+              <option value="notes">Notes — background context only</option>
+              <option value="exploratory">Exploratory — discovery, not evidence</option>
+            </select>
+          </div>
+        </div>
+        <input type="file" id="ob-supporting-file-input" accept=".pdf" style="display:none" onchange="obHandleSupportingFileSelect(this)">
+        <div class="ob-upload-zone" id="ob-supporting-upload-zone"
+             onclick="document.getElementById('ob-supporting-file-input').click()"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondrop="event.preventDefault();this.classList.remove('drag-over');obHandleSupportingFileDrop(event)">
+          <div class="ob-upload-zone-icon">📄</div>
+          <div class="ob-upload-zone-label">Upload supporting document</div>
+          <div class="ob-upload-zone-sub">PDF · drag and drop or click to browse</div>
+        </div>
+        <div id="ob-supporting-status" style="display:none"></div>
+      </div>
+    </div>
     <button class="ob-extract-toggle" onclick="obToggleExtract()" id="ob-extract-toggle">
       <span style="font-size:16px">📋</span>
       <span><strong>Start from existing work</strong> — paste a report, memo, or analysis and let Hermeneia reconstruct your intent</span>
     </button>
     <div class="ob-extract-panel" id="ob-extract-panel">
       <div class="ob-extract-label">Paste your existing document</div>
-      <textarea class="ob-extract-textarea" id="ob-extract-text"
-        placeholder="Paste the text of your existing report, paper, memo, or analysis here…"></textarea>
+      <div class="dict-wrap">
+        <textarea class="ob-extract-textarea" id="ob-extract-text"
+          placeholder="Paste the text of your existing report, paper, memo, or analysis here…"></textarea>
+        ${sttMakeBtn('ob-extract-text')}
+      </div>
       <div class="ob-extract-row">
         <select class="ob-extract-provider" id="ob-extract-provider">
-          <option value="null">null (stub)</option>
-          <option value="anthropic">anthropic</option>
-          <option value="openai">openai</option>
-          <option value="gemini">gemini</option>
-          <option value="grok">grok</option>
+          <option value="null">Loading providers…</option>
         </select>
         <button class="btn-primary" onclick="obExtractBlueprint(false)" id="ob-extract-btn">Extract Intent Hypothesis</button>
       </div>
@@ -1961,6 +2727,27 @@ function obToggleExtract() {
   panel.classList.toggle('open');
   const btn = document.getElementById('ob-extract-toggle');
   if (btn) btn.style.borderColor = panel.classList.contains('open') ? 'var(--accent)' : '';
+  if (panel.classList.contains('open')) _obPopulateProviders();
+}
+
+function _obPopulateProviders() {
+  const sel = document.getElementById('ob-extract-provider');
+  if (!sel) return;
+  get('/api/e10/providers').then(d => {
+    const providers = d.providers || [];
+    if (!providers.length) {
+      sel.innerHTML = '<option value="null">null (stub)</option>';
+      return;
+    }
+    sel.innerHTML = '<option value="null">null (stub)</option>' +
+      providers.map(p =>
+        `<option value="${x(p.provider_id)}"${p.configured ? '' : ' disabled'}>${x(p.label)}${p.configured ? '' : ' (no key)'}</option>`
+      ).join('');
+    const first = providers.find(p => p.configured);
+    if (first) sel.value = first.provider_id;
+  }).catch(() => {
+    sel.innerHTML = '<option value="null">null (stub)</option>';
+  });
 }
 
 async function obExtractBlueprint(save) {
@@ -2023,6 +2810,109 @@ async function obExtractBlueprint(save) {
   }
 }
 
+// ── Supporting corpus upload ────────────────────────────
+async function obDocMute(docId, currentlyMuted) {
+  try {
+    await fetch(`/api/documents/${encodeURIComponent(docId)}/scope`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ excluded: !currentlyMuted }),
+    });
+    e10LoadOnboarding();
+  } catch(e) { showAppError(e.message); }
+}
+
+async function obDocSetRole(docId, role) {
+  try {
+    await fetch(`/api/documents/${encodeURIComponent(docId)}/scope`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source_role: role }),
+    });
+    e10LoadOnboarding();
+  } catch(e) { showAppError(e.message); }
+}
+
+function obToggleSupporting() {
+  const panel = document.getElementById('ob-supporting-panel');
+  if (!panel) return;
+  panel.classList.toggle('open');
+  const btn = document.getElementById('ob-supporting-toggle');
+  if (btn) btn.style.borderColor = panel.classList.contains('open') ? 'var(--accent)' : '';
+}
+
+function obHandleSupportingFileDrop(event) {
+  const file = event.dataTransfer.files[0];
+  if (file) obUploadSupportingFile(file);
+}
+function obHandleSupportingFileSelect(input) {
+  const file = input.files[0];
+  if (file) obUploadSupportingFile(file);
+}
+
+async function obUploadSupportingFile(file) {
+  const statusEl = document.getElementById('ob-supporting-status');
+  const zoneEl   = document.getElementById('ob-supporting-upload-zone');
+  const roleEl   = document.getElementById('ob-supporting-role');
+  if (!statusEl || !zoneEl) return;
+
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `<div class="ob-upload-progress"><div class="ob-upload-status"><span class="err">✗ Only PDF files are supported.</span></div></div>`;
+    return;
+  }
+
+  const role = roleEl?.value || 'reference';
+  const roleLabels = { reference: 'Reference', commentary: 'Commentary', notes: 'Notes', exploratory: 'Exploratory' };
+
+  zoneEl.style.display = 'none';
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = `<div class="ob-upload-progress">
+    <div class="ob-upload-status">
+      <div>📄 ${x(file.name)}</div>
+      <div style="color:var(--dim2);margin-top:6px">Compiling as ${roleLabels[role] || role} corpus…</div>
+    </div>
+  </div>`;
+
+  const form = new FormData();
+  form.append('file', file);
+  form.append('role', role);
+
+  let result;
+  try {
+    const resp = await fetch('/api/upload', { method: 'POST', body: form });
+    result = await resp.json();
+    if (!resp.ok) throw new Error(result.error || 'Upload failed');
+  } catch (err) {
+    statusEl.innerHTML = `<div class="ob-upload-progress"><div class="ob-upload-status">
+      <div>📄 ${x(file.name)}</div>
+      <span class="err">✗ ${x(String(err.message))}</span>
+    </div></div>`;
+    zoneEl.style.display = '';
+    return;
+  }
+
+  const confirmedRole = result.source_role || role;
+  statusEl.innerHTML = `<div class="ob-upload-progress"><div class="ob-upload-status">
+    <div style="font-weight:650;color:var(--fg);margin-bottom:8px">📄 ${x(result.filename)}</div>
+    <div><span class="ok">✓</span> Added as <strong>${roleLabels[confirmedRole] || confirmedRole}</strong> corpus</div>
+    <div><span class="ok">✓</span> ${result.observation_count?.toLocaleString() ?? 0} observations extracted</div>
+    ${result.total_pages ? `<div><span class="ok">✓</span> ${result.total_pages} pages processed</div>` : ''}
+    <div style="color:var(--dim2);font-size:12px;margin-top:8px">These observations inform interpretation without entering the primary study.</div>
+    <div style="margin-top:12px">
+      <button class="btn-trace" onclick="obUploadAnotherSupporting()">Add another →</button>
+    </div>
+  </div></div>`;
+  e10LoadOnboarding();
+}
+
+function obUploadAnotherSupporting() {
+  const statusEl = document.getElementById('ob-supporting-status');
+  const zoneEl   = document.getElementById('ob-supporting-upload-zone');
+  const input    = document.getElementById('ob-supporting-file-input');
+  if (statusEl) { statusEl.style.display = 'none'; statusEl.innerHTML = ''; }
+  if (zoneEl)   zoneEl.style.display = '';
+  if (input)    input.value = '';
+}
+
 // ── Upload handlers ────────────────────────────────────
 function obHandleFileDrop(event) {
   const file = event.dataTransfer.files[0];
@@ -2079,6 +2969,7 @@ async function obUploadFile(file) {
       <button class="btn-trace" onclick="e10LoadOnboarding()">Back to Start</button>
     </div>
   </div></div>`;
+  e10LoadOnboarding();
 }
 
 // ── Nav helpers ────────────────────────────────────────
@@ -2110,6 +3001,169 @@ function clearResults() {
 }
 
 let _motifViewActive = false;
+
+// ── Accessibility Capability Layer v0 — TTS ──────────────────────────────────
+// Provider interface: { name, speak(text, id, onDone), pause(), resume(), stop(), state() }
+// State values: 'idle' | 'playing' | 'paused' | 'error' | 'unsupported'
+// TTSProviderName: 'web_speech' | 'kokoro' | 'none'
+
+let _ttsProvider = null;
+let _ttsSpeakingId = null;
+
+function _makeWebSpeechProvider() {
+  if (typeof speechSynthesis === 'undefined') return null;
+  let _state = 'idle';
+  return {
+    name: 'web_speech',
+    speak(text, id, onDone) {
+      speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.rate = 0.95;
+      utt.onend   = () => { _state = 'idle'; _ttsSpeakingId = null; onDone?.(); };
+      utt.onerror = () => { _state = 'error'; _ttsSpeakingId = null; onDone?.(); };
+      _state = 'playing';
+      _ttsSpeakingId = id;
+      speechSynthesis.speak(utt);
+    },
+    pause()  { if (_state === 'playing') { speechSynthesis.pause();  _state = 'paused';  } },
+    resume() { if (_state === 'paused')  { speechSynthesis.resume(); _state = 'playing'; } },
+    stop()   { speechSynthesis.cancel(); const prev = _ttsSpeakingId; _state = 'idle'; _ttsSpeakingId = null; if (prev) ttsUpdateBtn(prev); },
+    state()  { return _state; },
+  };
+}
+
+function ttsInit() {
+  _ttsProvider = _makeWebSpeechProvider();
+  // Future: try KokoroProvider here when available
+}
+
+function ttsToggleId(id) {
+  if (!_ttsProvider) return;
+  const btn = document.getElementById('tts-btn-' + id);
+  const text = btn?.dataset?.tts;
+  if (!text) return;
+  if (_ttsSpeakingId === id) {
+    const s = _ttsProvider.state();
+    if      (s === 'playing') { _ttsProvider.pause();  }
+    else if (s === 'paused')  { _ttsProvider.resume(); }
+    ttsUpdateBtn(id);
+  } else {
+    const prev = _ttsSpeakingId;
+    _ttsProvider.stop();
+    if (prev) ttsUpdateBtn(prev);
+    _ttsProvider.speak(text, id, () => ttsUpdateBtn(id));
+    ttsUpdateBtn(id);
+  }
+}
+
+function ttsUpdateBtn(id) {
+  const btn = document.getElementById('tts-btn-' + id);
+  if (!btn) return;
+  const active  = _ttsSpeakingId === id;
+  const playing = active && _ttsProvider?.state() === 'playing';
+  const paused  = active && _ttsProvider?.state() === 'paused';
+  btn.textContent = playing ? '⏸' : '▶';
+  btn.title       = playing ? 'Pause' : (paused ? 'Resume' : 'Read aloud');
+  btn.classList.toggle('tts-playing', playing);
+  btn.classList.toggle('tts-paused',  paused);
+}
+
+function ttsMakeBtn(id, rawText) {
+  if (!_ttsProvider) return '';
+  return `<button class="tts-btn" id="tts-btn-${x(id)}" data-tts="${x(rawText)}"
+    onclick="ttsToggleId('${x(id)}');event.stopPropagation()" title="Read aloud">▶</button>`;
+}
+
+function ttsReadEl(ttsId, elId) {
+  if (!_ttsProvider) return;
+  if (_ttsSpeakingId === ttsId) {
+    const s = _ttsProvider.state();
+    if      (s === 'playing') { _ttsProvider.pause();  }
+    else if (s === 'paused')  { _ttsProvider.resume(); }
+    ttsUpdateBtn(ttsId);
+    return;
+  }
+  const prev = _ttsSpeakingId;
+  _ttsProvider.stop();
+  if (prev) ttsUpdateBtn(prev);
+  const text = (document.getElementById(elId)?.innerText || '').trim();
+  if (!text) return;
+  _ttsProvider.speak(text, ttsId, () => ttsUpdateBtn(ttsId));
+  ttsUpdateBtn(ttsId);
+}
+
+// ── Dictation (STT) layer ────────────────────────────────────────────────────
+let _sttRec       = null;
+let _sttActiveId  = null;
+
+function sttAvailable() {
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
+function sttToggle(targetId) {
+  if (!sttAvailable()) { alert('Dictation is not supported in this browser. Try Chrome or Edge.'); return; }
+  const el  = document.getElementById(targetId);
+  const btn = document.getElementById('dict-btn-' + targetId);
+  if (!el) return;
+
+  if (_sttActiveId === targetId && _sttRec) {
+    _sttRec.stop();
+    return;
+  }
+  if (_sttRec) _sttRec.stop();
+
+  const SR  = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new SR();
+  rec.continuous      = true;
+  rec.interimResults  = true;
+  rec.lang            = 'en-US';
+
+  const isInput = el.tagName === 'INPUT';
+  let baseText  = (isInput ? el.value : el.value) || '';
+  if (baseText && !baseText.endsWith(' ')) baseText += ' ';
+
+  rec.onresult = (e) => {
+    let final = '', interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    if (final) { baseText += final + ' '; }
+    el.value = baseText + interim;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  const _onEnd = () => {
+    _sttRec       = null;
+    _sttActiveId  = null;
+    if (btn) { btn.textContent = '🎤 Dictate'; btn.classList.remove('dict-active'); }
+  };
+  rec.onend   = _onEnd;
+  rec.onerror = _onEnd;
+
+  rec.start();
+  _sttRec      = rec;
+  _sttActiveId = targetId;
+  if (btn) { btn.textContent = '◼ Stop'; btn.classList.add('dict-active'); }
+}
+
+function sttMakeBtn(targetId) {
+  if (!sttAvailable()) return '';
+  return `<button class="dict-btn" id="dict-btn-${targetId}" onclick="sttToggle('${targetId}')" title="Dictate">🎤 Dictate</button>`;
+}
+
+function dictWrap(targetId, innerHtml) {
+  return `<div class="dict-wrap">${innerHtml}${sttMakeBtn(targetId)}</div>`;
+}
+
+function updatePageThesis() {
+  const el   = document.getElementById('page-thesis');
+  const wrap = document.getElementById('page-thesis-wrap');
+  if (!el || !wrap) return;
+  const thesis = invLoad()?.thesis || '';
+  el.textContent = thesis;
+  wrap.style.display = thesis ? '' : 'none';
+}
 
 function _groupByDoc(observations) {
   const order = [];
@@ -2155,7 +3209,10 @@ function renderResults(q, { count, observations }) {
       return `
 <div class="e10-observation ${_e10Selected === r.id ? 'active' : ''} ${isBookmarked ? 'bookmarked' : ''}" onclick="e10SelectObservation('${x(r.id)}')">
   <button class="obs-bookmark-btn" onclick="bmToggle('${x(r.id)}',event)" title="${isBookmarked ? 'Remove bookmark' : 'Bookmark this observation'}">${isBookmarked ? '🔖' : '○'}</button>
-  <div class="e10-meta">OBS-${r.obs_index} · p.${r.page} §${r.paragraph} s${r.sentence}</div>
+  <div class="e10-meta">OBS-${r.obs_index} · p.${r.page} §${r.paragraph} s${r.sentence}
+    ${r.source_role && r.source_role !== 'primary' ? `<span class="obs-provenance role-${x(r.source_role)}" title="From ${x(r.source_role)} corpus — not primary evidence">${x(r.source_role)}</span>` : ''}
+    <span style="margin-left:auto">${ttsMakeBtn('obs-' + r.id, r.raw_text)}</span>
+  </div>
   <div class="e10-text">"${truncate(hi, 260)}"</div>
   <div class="e10-badges">
     <span class="e10-badge">${fmt(r.interpretation_count)} interpretations</span>
@@ -2241,6 +3298,70 @@ function renderMotifPanel(q, observations, host) {
       </div>`;
   }).join('');
 
+  // ── Corpus distribution comparison (primary vs. commentary) ──────────────────
+  const primaryRows = observations.filter(r => !r.source_role || r.source_role === 'primary');
+  const commentaryRows = observations.filter(r => r.source_role && r.source_role !== 'primary');
+  const hasCrossCorpus = primaryRows.length > 0 && commentaryRows.length > 0;
+
+  let corpusComparisonHtml = '';
+  if (hasCrossCorpus) {
+    const pCount = primaryRows.length;
+    const cCount = commentaryRows.length;
+    const ratio = pCount > 0 ? (cCount / pCount).toFixed(1) : '—';
+    const ratioNum = pCount > 0 ? cCount / pCount : 0;
+
+    // Primary distribution bar
+    const pPages = primaryRows.map(r => r.page).sort((a,b) => a - b);
+    const pMax = _corpusTotalPages || Math.max(...pPages, 1);
+    const { bar: pBar, note: pNote } = _makeDistBar(pPages, pMax);
+    const pUniquePages = [...new Set(pPages)];
+
+    // Commentary distribution — per role
+    const byRole = {};
+    commentaryRows.forEach(r => {
+      const role = r.source_role;
+      if (!byRole[role]) byRole[role] = [];
+      byRole[role].push(r);
+    });
+    const roleSummary = Object.entries(byRole)
+      .map(([role, rows]) => `<span class="obs-provenance role-${x(role)}" style="font-size:10px">${role}: ${rows.length}</span>`)
+      .join(' ');
+
+    // Signal: is commentary emphasis significantly higher than primary?
+    let signalHtml = '';
+    if (ratioNum >= 3) {
+      signalHtml = `<div style="margin-top:10px;padding:8px 12px;border-left:3px solid var(--yellow,#f4c542);background:rgba(244,197,66,.06);border-radius:0 6px 6px 0;font-size:12px;color:var(--fg2);line-height:1.6">
+        <strong style="color:var(--yellow,#f4c542)">Commentary emphasis ×${ratio}</strong> — commentary references this term ${ratio}× more often than the primary corpus.
+        Investigate: does the text support this emphasis, or does commentary amplify beyond textual evidence?
+      </div>`;
+    } else if (ratioNum >= 1.5) {
+      signalHtml = `<div style="margin-top:10px;font-size:11px;color:var(--dim2)">Commentary emphasis ×${ratio} relative to primary corpus.</div>`;
+    }
+
+    corpusComparisonHtml = `
+      <div style="border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:14px;background:var(--bg2)">
+        <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim2);font-weight:600;margin-bottom:12px">Corpus Distribution — "${x(q)}"</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <div style="font-size:10px;color:var(--dim2);letter-spacing:.06em;margin-bottom:6px">PRIMARY CORPUS</div>
+            <div style="font-size:24px;font-weight:700;color:var(--fg);line-height:1">${pCount}</div>
+            <div style="font-size:11px;color:var(--dim2);margin-top:2px">occurrence${pCount !== 1 ? 's' : ''} · p.${pUniquePages.join(', ')}</div>
+            <div style="margin-top:8px;font-size:10px;font-family:var(--mono);color:var(--dim2);letter-spacing:1px">${pBar}</div>
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--dim2);margin-top:1px;font-family:var(--mono)"><span>p.1</span><span>p.${pMax}</span></div>
+            <div style="font-size:10px;color:var(--dim2);margin-top:4px">${pNote}</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--dim2);letter-spacing:.06em;margin-bottom:6px">COMMENTARY CORPUS</div>
+            <div style="font-size:24px;font-weight:700;color:var(--fg);line-height:1">${cCount}</div>
+            <div style="font-size:11px;color:var(--dim2);margin-top:2px">occurrence${cCount !== 1 ? 's' : ''}</div>
+            <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${roleSummary}</div>
+            <div style="font-size:12px;font-weight:600;color:var(--fg2);margin-top:10px">×${ratio} relative to primary</div>
+          </div>
+        </div>
+        ${signalHtml}
+      </div>`;
+  }
+
   host.innerHTML = `
     <div style="border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:20px;background:var(--surface)">
       <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap">
@@ -2254,6 +3375,7 @@ function renderMotifPanel(q, observations, host) {
           Send All to Lab →
         </button>
       </div>
+      ${corpusComparisonHtml}
       ${docSections}
     </div>`;
 }
@@ -3156,7 +4278,8 @@ const _STAGE_ORDER = ['corpus', 'lab', 'review', 'architect', 'reader', 'critic'
 const _STAGE_NAMES = {
   corpus: 'Corpus', lab: 'Lab', review: 'Review',
   architect: 'Architect', reader: 'Read', critic: 'Critic',
-  onboarding: 'Start', guide: 'Guide', lineage: 'Lineage',
+  onboarding: 'Start', setup: 'Setup', guide: 'Guide',
+  constitution: 'Constitution', lineage: 'Lineage',
 };
 let _currentStageId = 'onboarding';
 
@@ -3167,13 +4290,10 @@ function _updateStageNavBar(id) {
   const bar = document.getElementById('stage-nav-bar');
   if (!bar) return;
 
-  const currentEl = document.getElementById('stage-nav-current');
   const prevBtn   = document.getElementById('stage-nav-prev');
   const nextBtn   = document.getElementById('stage-nav-next');
   const prevLabel = document.getElementById('stage-nav-prev-label');
   const nextLabel = document.getElementById('stage-nav-next-label');
-
-  if (currentEl) currentEl.textContent = _STAGE_NAMES[id] || id;
 
   if (inCycle) {
     const prevIdx = (idx - 1 + _STAGE_ORDER.length) % _STAGE_ORDER.length;
@@ -3185,16 +4305,21 @@ function _updateStageNavBar(id) {
     if (prevBtn)   prevBtn.classList.remove('disabled');
     if (nextBtn)   nextBtn.classList.remove('disabled');
   } else {
-    if (prevLabel) prevLabel.textContent = 'Previous';
-    if (nextLabel) nextLabel.textContent = 'Next';
-    if (prevBtn)   prevBtn.classList.add('disabled');
-    if (nextBtn)   nextBtn.classList.add('disabled');
+    // On non-cycle pages (e.g. Start/onboarding), wire buttons to cycle endpoints
+    if (prevLabel) prevLabel.textContent = _STAGE_NAMES[_STAGE_ORDER[_STAGE_ORDER.length - 1]];
+    if (nextLabel) nextLabel.textContent = _STAGE_NAMES[_STAGE_ORDER[0]];
+    if (prevBtn)   prevBtn.classList.remove('disabled');
+    if (nextBtn)   nextBtn.classList.remove('disabled');
   }
 }
 
 function stageNavStep(direction) {
   const idx = _STAGE_ORDER.indexOf(_currentStageId);
-  if (idx === -1) return;
+  if (idx === -1) {
+    // From a non-cycle page: → goes to first stage, ← goes to last stage
+    e10Go(direction > 0 ? _STAGE_ORDER[0] : _STAGE_ORDER[_STAGE_ORDER.length - 1]);
+    return;
+  }
   const nextIdx = (idx + direction + _STAGE_ORDER.length) % _STAGE_ORDER.length;
   e10Go(_STAGE_ORDER[nextIdx]);
 }
@@ -3212,6 +4337,14 @@ const _NAV_STAGES = ['corpus','lab','review','architect','reader','critic'];
 const _NAV_STAGE_NAMES = { corpus:'Corpus', lab:'Lab', review:'Review', architect:'Architect', reader:'Read', critic:'Critic', onboarding:'Home', setup:'Setup', guide:'Guide', constitution:'Constitution', lineage:'Lineage' };
 
 let _navCycleStatuses = {};
+let _navCycleCount = 0;
+
+async function refreshEditionCycleCount() {
+  const d = await fetch('/api/edition/cycles').then(r => r.json()).catch(() => null);
+  if (d && typeof d.cycle_count === 'number') {
+    _navCycleCount = d.cycle_count;
+  }
+}
 
 async function refreshNavCycleStatuses() {
   const d = await fetch('/api/project/summary').then(r => r.json()).catch(() => null);
@@ -3236,16 +4369,18 @@ function updateNavCycle(activeId, statuses) {
   const CX = 50, CY = 50, R = 36;
   const toRad = d => d * Math.PI / 180;
 
-  // Build arc segments between nodes for completed stages
+  // Blue base ring = unvisited/pending track
+  const baseRing = `<circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="#60a5fa" stroke-width="2.5" opacity="0.45"/>`;
+
+  // Green arcs paint over the blue ring for completed segments
   let arcPaths = '';
   _NAV_NODES.forEach((n, i) => {
     const status = _navCycleStatuses[n.id] || 'pending';
     if (status !== 'complete') return;
-    // Arc from this node to the next
     const a1 = n.angle, a2 = n.angle + 60;
     const x1 = CX + R * Math.sin(toRad(a1)), y1 = CY - R * Math.cos(toRad(a1));
     const x2 = CX + R * Math.sin(toRad(a2)), y2 = CY - R * Math.cos(toRad(a2));
-    arcPaths += `<path d="M${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R} 0 0,1 ${x2.toFixed(2)},${y2.toFixed(2)}" fill="none" stroke="#2d6a4f" stroke-width="3" stroke-linecap="round" opacity="0.7"/>`;
+    arcPaths += `<path d="M${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R} 0 0,1 ${x2.toFixed(2)},${y2.toFixed(2)}" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round"/>`;
   });
 
   // Clockwise direction arrow at top-right midpoint (between corpus & lab)
@@ -3266,9 +4401,9 @@ function updateNavCycle(activeId, statuses) {
     if (isActive) {
       r = 8; fill = 'var(--accent)'; strokeCol = 'var(--accent)'; strokeW = 0;
     } else if (status === 'complete') {
-      r = 5.5; fill = '#3a9e6a'; strokeCol = '#4fbf85'; strokeW = 1;
+      r = 5.5; fill = '#22c55e'; strokeCol = '#4ade80'; strokeW = 1;
     } else {
-      r = 4.5; fill = 'var(--bg)'; strokeCol = 'var(--border2)'; strokeW = 1.5;
+      r = 4.5; fill = 'var(--bg)'; strokeCol = '#60a5fa'; strokeW = 1.5;
     }
     // Glow ring for active
     if (isActive) {
@@ -3277,12 +4412,17 @@ function updateNavCycle(activeId, statuses) {
     nodeSvg += `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${r}" fill="${fill}" stroke="${strokeCol}" stroke-width="${strokeW}"><title>${n.label}</title></circle>`;
   });
 
-  // Center ↺ glyph
-  const centerGlyph = `<text x="50" y="54" text-anchor="middle" fill="var(--dim)" font-size="14" font-family="inherit" opacity="0.6" pointer-events="none">↺</text>`;
+  // Center cycle counter
+  const countColor = _navCycleCount > 0 ? 'var(--accent)' : 'var(--dim)';
+  const countOpacity = _navCycleCount > 0 ? '0.9' : '0.45';
+  const centerGlyph = _navCycleCount > 0
+    ? `<text x="50" y="46" text-anchor="middle" fill="${countColor}" font-size="18" font-weight="700" font-family="inherit" opacity="${countOpacity}" pointer-events="none">${_navCycleCount}</text>
+       <text x="50" y="57" text-anchor="middle" fill="var(--dim2)" font-size="8" font-family="inherit" opacity="0.6" letter-spacing="0.06em" pointer-events="none">CYCLES</text>`
+    : `<text x="50" y="54" text-anchor="middle" fill="var(--dim)" font-size="14" font-family="inherit" opacity="${countOpacity}" pointer-events="none">↺</text>`;
 
   svg.innerHTML = `
     ${arrMark}
-    <circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="4 3"/>
+    ${baseRing}
     ${arcPaths}
     ${nodeSvg}
     ${centerGlyph}`;
@@ -3297,7 +4437,7 @@ function updateNavCycle(activeId, statuses) {
   }
 }
 
-function e10Go(id) {
+function e10Go(id, scrollTarget) {
   _expert = false;
   document.body.classList.remove('x');
   document.querySelectorAll('.e10-screen').forEach(screen => {
@@ -3311,16 +4451,24 @@ function e10Go(id) {
   updateNavCycle(id);
   refreshNavCycleStatuses().then(() => updateNavCycle(id));
   _updateStageNavBar(id);
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (scrollTarget) {
+    requestAnimationFrame(() => {
+      const el = typeof scrollTarget === 'string' ? document.getElementById(scrollTarget) : scrollTarget;
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
   if (id === 'setup')      e10LoadSetup();
   if (id === 'onboarding') e10LoadOnboarding();
   if (id === 'corpus')    { e10LoadDocumentScope(); renderScopeBannerInto('research-question-banner'); }
-  if (id === 'lab')        { e10LoadLabParticipants(); renderScopeBannerInto('lab-scope-banner'); }
+  if (id === 'lab')        { e10LoadLabParticipants(); e10LoadScopeSummary(); renderScopeBannerInto('lab-scope-banner'); }
   if (id === 'architect') e10LoadArchitect();
   if (id === 'lineage')   e10LoadLineageExplorer();
   if (id === 'critic')    e10LoadCriticExplorer();
   if (id === 'review')    e10LoadReview();
-  if (id === 'reader')    e10LoadReader();
+  if (id === 'reports')   e10LoadReader();
+  if (id === 'reader')    e10LoadCloseReader();
   if (id === 'guide')          e10LoadGuide();
   if (id === 'constitution')   e10LoadConstitution();
 }
@@ -3361,6 +4509,48 @@ async function e10LoadObservations(q = null) {
   renderResults(query, data);
 }
 
+async function e10LoadScopeSummary() {
+  const host = document.getElementById('lab-scope-summary');
+  if (!host) return;
+  const d = await get('/api/e10/scope').catch(() => null);
+  if (!d) return;
+
+  const roleColor = { reference: '#a855f7', notes: '#94a3b8', commentary: '#f59e0b', exploratory: '#22d3ee' };
+  const primary = d.primary || [];
+  const supporting = d.supporting || [];
+  const muted = d.muted || [];
+
+  if (primary.length === 0) {
+    host.innerHTML = `<div style="margin-bottom:12px;padding:10px 12px;border:1px solid var(--yellow,#f4c542);border-radius:var(--r);background:rgba(244,197,66,.07);font-size:12px;color:var(--yellow,#f4c542)">
+      ⚠ No primary corpus document. Interpretations cannot be grounded in primary evidence until a primary document is in scope.
+      <button onclick="e10Go('corpus')" style="margin-left:10px;background:none;border:1px solid currentColor;border-radius:4px;padding:2px 8px;cursor:pointer;color:inherit;font-size:11px">Manage corpus →</button>
+    </div>`;
+    return;
+  }
+
+  const primaryChips = primary.map(d =>
+    `<span class="obs-provenance role-primary" style="font-size:10px">${x(d.filename.replace(/\.pdf$/i,''))} · ${d.observation_count} obs</span>`
+  ).join(' ');
+
+  const supportingChips = supporting.map(d =>
+    `<span class="obs-provenance role-${x(d.source_role)}" style="font-size:10px">${x(d.filename.replace(/\.pdf$/i,''))} · ${x(d.source_role)}</span>`
+  ).join(' ');
+
+  const mutedNote = muted.length
+    ? `<span style="font-size:11px;color:var(--dim2)">· ${muted.length} muted</span>`
+    : '';
+
+  host.innerHTML = `<div style="margin-bottom:12px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg2);font-size:11px">
+    <div style="font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--dim2);margin-bottom:6px">Evidence boundary</div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center">
+      ${primaryChips}
+      ${supporting.length ? `<span style="color:var(--dim2);font-size:10px">+</span>${supportingChips}` : ''}
+      ${mutedNote}
+    </div>
+    ${supporting.length ? `<div style="margin-top:6px;color:var(--dim2);font-size:11px">Supporting documents may inform inquiry. Interpretations derived from them will be flagged.</div>` : ''}
+  </div>`;
+}
+
 async function e10LoadLabParticipants() {
   const host = document.getElementById('lab-participants-host');
   if (!host) return;
@@ -3389,45 +4579,233 @@ async function e10LoadLabParticipants() {
     </div>`;
 }
 
+let _e10CalibrationData = {};
+let _e10PerfData = {};
+let _labResponseMode = 'interpretive';
+
+const _LAB_MODE_DESCS = {
+  interpretive: 'Explores meaning in depth. One paragraph per observation.',
+  triage:       'Three lines: confidence level, pattern type, one-sentence reason. Move fast.',
+  skeptical:    'Challenges the observation. What evidence would make this wrong?',
+};
+
+function labSetMode(mode) {
+  _labResponseMode = mode;
+  document.querySelectorAll('.lab-mode-btn').forEach(b => {
+    b.classList.toggle('lab-mode-active', b.dataset.mode === mode);
+  });
+  const desc = document.getElementById('lab-mode-desc');
+  if (desc) desc.textContent = _LAB_MODE_DESCS[mode] || '';
+}
+
 async function e10LoadProviders() {
   const host = document.getElementById('provider-panel');
   if (!host) return;
-  const data = await get('/api/e10/providers');
-  _e10Providers = data.providers || [];
+  const [provData, calData] = await Promise.all([
+    get('/api/e10/providers'),
+    get('/api/e10/calibration').catch(() => ({ calibration: {} })),
+  ]);
+  _e10Providers = provData.providers || [];
+  _e10CalibrationData = calData.calibration || {};
+  // Performance is nested per participant inside calibration
+  _e10PerfData = {};
+  for (const [pk, rec] of Object.entries(_e10CalibrationData)) {
+    _e10PerfData[pk] = rec.performance || {};
+  }
   host.className = '';
+  const expertId = 'connections-expert-panel';
   host.innerHTML = `
-    <div class="provider-note">
-      Credential storage: ${x(data.credential_storage)} · Stores API keys: ${data.stores_api_keys ? 'yes' : 'no'} · Live connection test: ${data.live_connection_test ? 'yes' : 'no'}
+    <div style="font-size:12px;color:var(--dim2);margin-bottom:14px;line-height:1.6">
+      Credential storage: <strong style="color:var(--fg2)">${x(provData.credential_storage)}</strong> ·
+      Keys are held in server memory only — never written to disk, forgotten when the server stops.
     </div>
-    <div class="provider-grid" style="margin-top:12px">
-      ${_e10Providers.map(e10ProviderCard).join('')}
+    <div class="provider-grid" style="margin-top:4px">
+      ${_e10Providers.map(p => e10ProviderCard(p, _e10CalibrationData[p.participant] || {}, _e10PerfData[p.participant] || {})).join('')}
+    </div>
+    <div style="margin-top:20px">
+      <button onclick="document.getElementById('${expertId}').style.display=document.getElementById('${expertId}').style.display==='none'?'block':'none'"
+        style="font-size:11px;color:var(--dim2);background:none;border:none;cursor:pointer;padding:0;letter-spacing:.04em">
+        ⚙ Expert / Advanced ▾
+      </button>
+      <div id="${expertId}" style="display:none;margin-top:12px;border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;background:var(--bg2)">
+        <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2);margin-bottom:10px">Participant raw details</div>
+        ${_e10Providers.map(p => `
+          <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+            <div style="font-size:12px;font-weight:600;color:var(--fg);margin-bottom:4px">${x(p.label)} <span style="font-size:10px;color:var(--dim2);font-weight:400">(${x(p.provider_id)})</span></div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--dim2);line-height:1.8">
+              adapter: ${p.adapter_available ? '✓ installed' : '✗ missing'}<br>
+              model: ${x(p.default_model || '—')}<br>
+              credential: ${p.requires_credential ? (p.configured ? `✓ ${x(p.credential_scope || '')}` : '✗ none') : 'not required'}
+              ${p.ollama_server_running !== undefined ? `<br>ollama server: ${p.ollama_server_running ? '✓ running' : '✗ not running'}` : ''}
+              ${p.ollama_model_pulled !== undefined ? `<br>model pulled: ${p.ollama_model_pulled ? '✓ ready' : '✗ not pulled'}` : ''}
+              ${p.ollama_setup_action ? `<br><span style="color:var(--yellow)">Next step: ${x(p.ollama_setup_action)}</span>` : ''}
+            </div>
+            ${_e10CalibrationTestLog(p.participant)}
+          </div>
+        `).join('')}
+        <div style="font-size:11px;color:var(--dim2);margin-top:4px">
+          <strong>server memory</strong> — API keys are stored only in server RAM. Restarting the server clears all session keys.
+        </div>
+      </div>
     </div>`;
 }
 
-function e10ProviderCard(provider) {
+function _e10CalibrationTestLog(participant) {
+  const cal = _e10CalibrationData[participant] || {};
+  const tests = cal.calibration_tests || [];
+  if (!tests.length) return '<div style="font-size:11px;color:var(--dim2);margin-top:4px">No calibration tests recorded.</div>';
+  return `<div style="margin-top:8px">
+    <div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);margin-bottom:4px">Calibration history</div>
+    ${tests.slice().reverse().slice(0, 10).map(t => {
+      const sc = t.status === 'pass' ? 'var(--green)' : t.status === 'caution' ? 'var(--yellow)' : 'var(--red)';
+      return `<div style="font-family:var(--mono);font-size:10px;color:var(--dim2);display:flex;gap:8px;margin-bottom:2px;line-height:1.6">
+        <span style="color:${sc};flex-shrink:0">${t.status === 'pass' ? '✓' : t.status === 'caution' ? '!' : '✗'}</span>
+        <span style="flex-shrink:0;color:var(--fg2)">${x(t.role)}</span>
+        <span style="flex-shrink:0">${x(t.test_name || '')}</span>
+        ${t.latency_ms ? `<span>${Math.round(t.latency_ms)}ms</span>` : ''}
+        ${t.failure_reason ? `<span style="color:var(--red)">${x(t.failure_reason)}</span>` : ''}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function _suitabilityBadge(role, status) {
+  const colors = {
+    recommended: 'var(--green)', allowed: 'var(--accent)',
+    untested: 'var(--dim2)', rejected: 'var(--red)',
+  };
+  const color = colors[status] || 'var(--dim2)';
+  return `<span style="font-size:10px;padding:1px 7px;border-radius:10px;border:1px solid ${color};color:${color}">${role}</span>`;
+}
+
+function _e10CalibrationStatusBadge(status) {
+  const map = {
+    approved: { color: 'var(--green)', symbol: '✓', label: 'approved' },
+    rejected: { color: 'var(--red)', symbol: '✗', label: 'rejected' },
+    caution:  { color: 'var(--yellow)', symbol: '!', label: 'caution' },
+    untested: { color: 'var(--dim2)', symbol: '○', label: 'untested' },
+  };
+  const m = map[status] || map.untested;
+  return `<span style="color:${m.color};font-size:11px">${m.symbol} ${m.label}</span>`;
+}
+
+function e10ProviderCard(provider, cal, perf) {
   const displayStatus = provider.configured && !provider.adapter_available
     ? 'key_saved'
     : provider.status;
   const displayLabel = displayStatus === 'key_saved'
     ? 'key saved · adapter missing'
     : displayStatus === 'configured'
-    ? 'configured · test available'
-    : displayStatus;
+    ? 'ready'
+    : 'not connected';
   const notice = _e10ProviderNotices[provider.participant];
+  const suitability = provider.role_suitability || {};
+  const setup = provider.setup || {};
+  const isOllama = provider.provider_id && provider.provider_id.startsWith('ollama-');
+  const roleOrder = ['Explorer','Architect','Artist','Critic','Witness'];
+  const pk = JSON.stringify(provider.participant);
+
+  // Ollama readiness steps
+  let ollamaSteps = '';
+  if (isOllama && provider.adapter_available) {
+    const steps = [];
+    if (!provider.ollama_server_running) steps.push({ ok: false, label: 'Ollama server running', action: 'ollama serve' });
+    else steps.push({ ok: true, label: 'Ollama server running', action: null });
+    if (!provider.ollama_model_pulled) steps.push({ ok: false, label: `Model pulled (${x(provider.default_model)})`, action: `ollama pull ${x(provider.default_model)}` });
+    else steps.push({ ok: true, label: `Model pulled (${x(provider.default_model)})`, action: null });
+    ollamaSteps = `<div style="margin:8px 0 4px;font-size:11px;color:var(--dim2)">
+      ${steps.map(s => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+        <span style="color:${s.ok ? 'var(--green)' : 'var(--yellow)'}">${s.ok ? '✓' : '○'}</span>
+        <span style="color:${s.ok ? 'var(--fg2)' : 'var(--dim2)'}">${s.label}</span>
+        ${!s.ok && s.action ? `<code style="font-size:10px;background:var(--bg);padding:1px 6px;border-radius:3px;border:1px solid var(--border);color:var(--fg2)">${x(s.action)}</code>` : ''}
+      </div>`).join('')}
+    </div>`;
+  }
+
+  const setupSteps = (setup.setup_steps || []);
+  const credentialSection = provider.requires_credential
+    ? `<div style="font-size:11px;color:var(--dim2);margin-bottom:6px">
+        <span style="color:var(--fg2)">${x(setup.credential_name || provider.credential_source || '')}</span>
+        ${setup.credential_hint ? ` · <span>${x(setup.credential_hint)}</span>` : ''}
+       </div>`
+    : (setupSteps.length ? `<div style="font-size:11px;color:var(--dim2);margin-bottom:6px">${setupSteps.map(s => `<div>• ${x(s)}</div>`).join('')}</div>` : '');
+
+  // Role calibration matrix
+  const roleRows = roleOrder.map(role => {
+    const suitStatus = suitability[role] || 'untested';
+    const roleCalData = (cal.role_status || {})[role] || {};
+    const calStatus = roleCalData.status || 'untested';
+    const failReason = roleCalData.failure_reason || '';
+    const overrideId = `override-${x(provider.participant)}-${role}`;
+    return `<tr>
+      <td style="padding:5px 8px 5px 0;font-size:12px;color:var(--fg2);font-weight:500;white-space:nowrap">${role}</td>
+      <td style="padding:5px 8px;font-size:11px">${_suitabilityBadge('', suitStatus).replace('></span>', `>${suitStatus}</span>`)}</td>
+      <td style="padding:5px 8px;font-size:11px" title="${x(failReason)}">${_e10CalibrationStatusBadge(calStatus)}</td>
+      <td style="padding:5px 0 5px 8px;white-space:nowrap">
+        <button class="btn-trace" style="font-size:10px;padding:2px 8px" onclick="e10CalibrateRole(${pk},${JSON.stringify(role)},this)">Run test</button>
+        <button class="btn-trace" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="e10ToggleOverride(${JSON.stringify(overrideId)})">Override</button>
+        <div id="${overrideId}" style="display:none;margin-top:6px">
+          <select id="${overrideId}-status" style="font-size:11px;padding:2px 5px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg)">
+            <option value="approved">approved</option>
+            <option value="caution">caution</option>
+            <option value="rejected">rejected</option>
+            <option value="untested">reset to untested</option>
+          </select>
+          <input id="${overrideId}-note" type="text" placeholder="Steward note (required)" style="font-size:11px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);margin-left:4px;width:180px">
+          <button class="btn-trace" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="e10ApplyOverride(${pk},${JSON.stringify(role)},${JSON.stringify(overrideId)})">Apply</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Performance summary strip
+  let perfHtml = '';
+  if (perf && perf.calls > 0) {
+    const sr = perf.success_rate != null ? Math.round(perf.success_rate * 100) + '%' : '—';
+    const lat = perf.avg_latency_ms != null ? Math.round(perf.avg_latency_ms) + 'ms' : '—';
+    const po = perf.parse_ok_rate != null ? Math.round(perf.parse_ok_rate * 100) + '%' : '—';
+    perfHtml = `<div style="font-size:11px;color:var(--dim2);display:flex;gap:16px;margin:8px 0 4px;flex-wrap:wrap">
+      <span>Calls: <strong style="color:var(--fg2)">${perf.calls}</strong></span>
+      <span>Success: <strong style="color:var(--fg2)">${sr}</strong></span>
+      <span>Parse ok: <strong style="color:var(--fg2)">${po}</strong></span>
+      <span>Avg latency: <strong style="color:var(--fg2)">${lat}</strong></span>
+      ${perf.accepted != null ? `<span>Accepted: <strong style="color:var(--green)">${perf.accepted}</strong></span>` : ''}
+      ${perf.rejected != null ? `<span>Rejected: <strong style="color:var(--red)">${perf.rejected}</strong></span>` : ''}
+    </div>`;
+  }
+
+  // Calibration summary sentence
+  const approvedRoles = roleOrder.filter(r => ((cal.role_status || {})[r] || {}).status === 'approved');
+  const rejectedRoles = roleOrder.filter(r => ((cal.role_status || {})[r] || {}).status === 'rejected');
+  let calSummary = '';
+  if (approvedRoles.length || rejectedRoles.length) {
+    const parts = [];
+    if (approvedRoles.length) parts.push(`<span style="color:var(--green)">${approvedRoles.join(', ')} approved</span>`);
+    if (rejectedRoles.length) parts.push(`<span style="color:var(--red)">${rejectedRoles.join(', ')} rejected</span>`);
+    calSummary = `<div style="font-size:11px;margin-bottom:8px">${parts.join(' · ')}</div>`;
+  }
+
   return `<div class="provider-card ${x(displayStatus)}">
     <div class="provider-title">
       <div class="provider-name">${x(provider.label)}</div>
       <div class="provider-status ${x(displayStatus)}">${x(displayLabel)}</div>
     </div>
-    <div class="provider-kv">
-      <div class="provider-k">Provider</div><div class="provider-v">${x(provider.provider_id)}</div>
-      <div class="provider-k">API Key</div><div class="provider-v">${provider.credential_source ? x(provider.credential_source) : 'No environment variable configured'}</div>
-      <div class="provider-k">Key Present</div><div class="provider-v">${provider.requires_credential ? (provider.configured ? 'yes' : 'no') : 'not required'}</div>
-      <div class="provider-k">Key Scope</div><div class="provider-v">${x(provider.credential_scope || 'none')}</div>
-      <div class="provider-k">Adapter</div><div class="provider-v">${provider.adapter_available ? 'available' : 'missing'}</div>
-      <div class="provider-k">Model</div><div class="provider-v">${x(provider.default_model || '')}</div>
-      <div class="provider-k">Execution</div><div class="provider-v">${x(provider.execution_mode)}</div>
-    </div>
+    ${setup.about ? `<div style="font-size:12px;color:var(--dim2);margin-bottom:8px;line-height:1.5">${x(setup.about)}</div>` : ''}
+    ${credentialSection}
+    ${ollamaSteps}
+    ${perfHtml}
+    ${calSummary}
+    <table style="width:100%;border-collapse:collapse;margin-bottom:6px">
+      <thead>
+        <tr>
+          <th style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);text-align:left;padding-bottom:4px;padding-right:8px">Role</th>
+          <th style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);text-align:left;padding-bottom:4px;padding-right:8px">Suitability</th>
+          <th style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);text-align:left;padding-bottom:4px;padding-right:8px">Calibration</th>
+          <th style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);text-align:left;padding-bottom:4px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>${roleRows}</tbody>
+    </table>
     <div class="provider-note">${x(provider.message)}</div>
     ${notice ? `<div class="provider-key-panel"><div class="provider-key-title">${x(notice)}</div></div>` : ''}
     <div class="e10-actions">
@@ -3436,6 +4814,45 @@ function e10ProviderCard(provider) {
     </div>
     <div id="key-panel-${x(provider.participant)}"></div>
   </div>`;
+}
+
+function e10ToggleOverride(panelId) {
+  const el = document.getElementById(panelId);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function e10CalibrateRole(participant, role, btn) {
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Testing…';
+  try {
+    const r = await fetch(`/api/e10/providers/${encodeURIComponent(participant)}/calibrate/${encodeURIComponent(role)}`, { method: 'POST' });
+    const d = await r.json();
+    btn.textContent = d.status === 'pass' ? '✓ pass' : d.status === 'caution' ? '! caution' : '✗ fail';
+    btn.style.color = d.status === 'pass' ? 'var(--green)' : d.status === 'caution' ? 'var(--yellow)' : 'var(--red)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.disabled = false; e10LoadProviders(); }, 2000);
+  } catch(e) {
+    btn.textContent = '✗ error';
+    btn.style.color = 'var(--red)';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; btn.disabled = false; }, 2000);
+  }
+}
+
+async function e10ApplyOverride(participant, role, panelId) {
+  const statusEl = document.getElementById(`${panelId}-status`);
+  const noteEl = document.getElementById(`${panelId}-note`);
+  if (!statusEl || !noteEl) return;
+  const note = noteEl.value.trim();
+  if (!note) { noteEl.style.borderColor = 'var(--red)'; return; }
+  noteEl.style.borderColor = '';
+  try {
+    await fetch(`/api/e10/providers/${encodeURIComponent(participant)}/roles/${encodeURIComponent(role)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: statusEl.value, note }),
+    });
+    e10LoadProviders();
+  } catch(e) { showAppError(e.message); }
 }
 
 async function renderScopeBannerInto(hostId) {
@@ -3485,10 +4902,13 @@ async function e10LoadDocumentScope() {
               `<option value="${r}"${doc.source_role===r?' selected':''}>${roleLabels[r]}</option>`
             ).join('')}
           </select>
-          <button onclick="docToggleExclude('${x(doc.id)}', ${doc.excluded})"
-            style="font-size:11px;padding:3px 10px;border-radius:var(--r);cursor:pointer;border:1px solid ${active ? 'var(--green)' : 'var(--red)'};color:${active ? 'var(--green)' : 'var(--red)'};background:none;white-space:nowrap">
-            ${active ? '✓ In scope' : '✗ Excluded'}
-          </button>
+          ${doc.source_role === 'primary'
+            ? `<span style="font-size:11px;padding:3px 10px;border-radius:var(--r);border:1px solid var(--green);color:var(--green);background:none;white-space:nowrap;opacity:0.6" title="Primary corpus cannot be excluded">✓ Primary</span>`
+            : `<button onclick="docToggleExclude('${x(doc.id)}', ${doc.excluded})"
+                style="font-size:11px;padding:3px 10px;border-radius:var(--r);cursor:pointer;border:1px solid ${active ? 'var(--green)' : 'var(--red)'};color:${active ? 'var(--green)' : 'var(--red)'};background:none;white-space:nowrap">
+                ${active ? '✓ In scope' : '✗ Excluded'}
+              </button>`
+          }
         </div>
       </div>`;
     }).join('');
@@ -3662,10 +5082,13 @@ function renderReaderDetail(d, panel) {
         <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
           <div class="reader-side-title">Narrative Stewardship</div>
           <div id="narrative-status-label" style="font-size:13px;color:${statusColor[currentStatus]};margin-bottom:10px">${statusLabel[currentStatus]}</div>
-          <textarea id="narrative-rationale-input" rows="3"
-            placeholder="Rationale required — why accept or reject this report?"
-            style="width:100%;box-sizing:border-box;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font-size:13px;font-family:var(--sans);resize:vertical;margin-bottom:8px"
-          >${x(currentRationale)}</textarea>
+          <div class="dict-wrap">
+            <textarea id="narrative-rationale-input" rows="3"
+              placeholder="Rationale required — why accept or reject this report?"
+              style="width:100%;box-sizing:border-box;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font-size:13px;font-family:var(--sans);resize:vertical;margin-bottom:8px"
+            >${x(currentRationale)}</textarea>
+            ${sttMakeBtn('narrative-rationale-input')}
+          </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="reader-action" style="color:var(--green);border-color:var(--green);flex:1"
               onclick="narrativeSteward('${nid}','accepted')">Accept →</button>
@@ -3721,6 +5144,759 @@ async function copyReaderText() {
 async function e10OpenReaderLineage(narrativeId) {
   e10Go('lineage');
   await e10LoadLineageGraph(narrativeId);
+}
+
+// ── Close Reading Workspace ───────────────────────────────────────────────────
+
+let _crDocId = null;
+let _crPage  = 1;
+let _crTotalPages = 1;
+let _crDocs  = [];
+let _crPages = [];   // [{page, extractions, highlights}]
+let _crHighlights = [];
+let _crSelText = '';
+let _crSelToolbar = null;
+let _crRelevance = 'unclear';
+
+async function e10LoadCloseReader() {
+  const ws = document.getElementById('reader-workspace');
+  ws.innerHTML = '<div class="e10-empty">Loading corpus…</div>';
+  try {
+    const data = await get('/api/reader/documents');
+    _crDocs = data.documents || [];
+    if (_crDocs.length === 0) {
+      ws.innerHTML = '<div class="e10-empty">No source documents found. Upload a corpus first.</div>';
+      return;
+    }
+    // Default to first primary doc
+    const primary = _crDocs.find(d => d.source_role === 'primary') || _crDocs[0];
+    _crRenderDocPicker(ws);
+    await _crOpenDoc(primary.id);
+  } catch(e) {
+    ws.innerHTML = `<div class="e10-empty" style="color:var(--red)">Error loading corpus: ${x(e.message)}</div>`;
+  }
+}
+
+function _crRenderDocPicker(ws) {
+  const pills = _crDocs.map(d => {
+    const roleClass = `cr-role-${d.source_role || 'primary'}`;
+    const pct = Math.round(d.percent_read || 0);
+    return `<button class="cr-doc-btn" id="cr-doc-${d.id}" onclick="_crOpenDoc('${x(d.id)}')">
+      <span class="cr-role-badge ${roleClass}">${x(d.source_role || 'primary')}</span>
+      ${x(d.filename)}
+      ${pct > 0 ? `<span style="font-size:9px;color:var(--dim2)">${pct}%</span>` : ''}
+    </button>`;
+  }).join('');
+  ws.innerHTML = `
+    <div class="cr-doc-picker" id="cr-doc-picker">${pills}</div>
+    <div class="cr-layout">
+      <div>
+        <div id="cr-role-warning"></div>
+        <div class="cr-page-view" id="cr-page-view">
+          <div class="e10-empty">Select a document above.</div>
+        </div>
+        <div class="cr-progress-bar"><div class="cr-progress-fill" id="cr-progress-fill" style="width:0%"></div></div>
+        <div class="cr-nav-bar">
+          <button class="cr-nav-btn" id="cr-prev-btn" onclick="_crPrevPage()" disabled>← Prev</button>
+          <div class="cr-progress" id="cr-progress-label">—</div>
+          <button class="cr-nav-btn" id="cr-next-btn" onclick="_crNextPage()" disabled>Next →</button>
+        </div>
+      </div>
+      <div class="cr-side">
+        <div class="cr-side-panel" id="cr-trail-panel">
+          <div class="cr-side-title" style="display:flex;justify-content:space-between;align-items:center">
+            Reading Trail
+            <button onclick="_crToggleTrailDetail()" id="cr-trail-toggle" style="font-size:10px;background:none;border:none;color:var(--dim2);cursor:pointer;padding:0">Details ▾</button>
+          </div>
+          <div id="cr-trail-summary"><div style="font-size:12px;color:var(--dim2)">Loading trail…</div></div>
+          <div id="cr-trail-detail" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px"></div>
+        </div>
+        <div class="cr-side-panel" id="cr-capture-panel">
+          <div class="cr-side-title">Highlight Inspector</div>
+          <div id="cr-sel-prompt" style="font-size:12px;color:var(--dim2);line-height:1.6">
+            Select any passage in the text to highlight it, write a note, ask a question, or create an observation candidate.
+          </div>
+          <div id="cr-sel-form" style="display:none"></div>
+        </div>
+        <div class="cr-side-panel" id="cr-highlights-panel">
+          <div class="cr-side-title">Saved Highlights <span id="cr-hl-count" style="color:var(--dim2)"></span></div>
+          <div class="cr-highlight-list" id="cr-highlight-list">
+            <div style="font-size:12px;color:var(--dim2)">No highlights yet.</div>
+          </div>
+        </div>
+        <div class="cr-side-panel" id="cr-related-panel">
+          <div class="cr-side-title">Machine Observations — This Page</div>
+          <div class="cr-related-obs" id="cr-related-obs">
+            <div style="font-size:12px;color:var(--dim2)">Navigate to a page to see related observations.</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  // Selection listener
+  document.getElementById('cr-page-view').addEventListener('mouseup', _crHandleSelection);
+  document.addEventListener('selectionchange', _crHandleSelectionChange);
+}
+
+async function _crOpenDoc(docId) {
+  _crDocId = docId;
+  _crPage  = 1;
+  _crSelText = '';
+
+  // Highlight active picker button
+  document.querySelectorAll('.cr-doc-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`cr-doc-${docId}`)?.classList.add('active');
+
+  // Role warning
+  const doc = _crDocs.find(d => d.id === docId);
+  const warn = document.getElementById('cr-role-warning');
+  if (warn && doc && doc.source_role !== 'primary') {
+    warn.innerHTML = `<div class="cr-non-primary-warning">
+      This document is <strong>${doc.source_role}</strong> — not primary evidence. Highlights from this source will be labelled accordingly and must not be treated as primary observations.
+    </div>`;
+  } else if (warn) {
+    warn.innerHTML = '';
+  }
+
+  const view = document.getElementById('cr-page-view');
+  view.innerHTML = '<div class="e10-empty">Loading pages…</div>';
+
+  try {
+    const data = await get(`/api/reader/documents/${encodeURIComponent(docId)}/pages`);
+    _crPages = data.pages || [];
+    _crTotalPages = data.total_pages || _crPages.length || 1;
+
+    // Restore last page
+    const docMeta = _crDocs.find(d => d.id === docId);
+    if (docMeta?.last_page) _crPage = docMeta.last_page;
+
+    _crRenderPage();
+    await _crLoadHighlightList();
+    _crRefreshTrail();
+  } catch(e) {
+    view.innerHTML = `<div class="e10-empty" style="color:var(--red)">Error: ${x(e.message)}</div>`;
+  }
+}
+
+function _crRenderPage() {
+  const view = document.getElementById('cr-page-view');
+  const pageData = _crPages.find(p => p.page === _crPage) || _crPages[_crPage - 1];
+
+  if (!pageData) {
+    view.innerHTML = `<div class="e10-empty">No extracted text for page ${_crPage}.</div>`;
+  } else {
+    const blocks = (pageData.extractions || []).map(ex =>
+      `<div class="cr-page-region">${x(ex.region || '')} ${ex.source_locator ? '· ' + x(ex.source_locator) : ''}</div>
+       <div class="cr-page-text">${x(ex.text)}</div>`
+    ).join('');
+    view.innerHTML = `
+      <div class="cr-page-header">
+        <span>Page ${_crPage} of ${_crTotalPages}</span>
+      </div>
+      ${blocks || '<div class="e10-empty">No text extracted for this page.</div>'}`;
+  }
+
+  // Nav controls
+  const prev = document.getElementById('cr-prev-btn');
+  const next = document.getElementById('cr-next-btn');
+  const label = document.getElementById('cr-progress-label');
+  const fill = document.getElementById('cr-progress-fill');
+  if (prev) prev.disabled = _crPage <= 1;
+  if (next) next.disabled = _crPage >= _crTotalPages;
+  if (label) label.textContent = `Page ${_crPage} / ${_crTotalPages}`;
+
+  const pct = Math.round(_crPage / _crTotalPages * 100);
+  if (fill) fill.style.width = pct + '%';
+
+  // Record progress
+  if (_crDocId) {
+    fetch(`/api/reader/progress`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document_id: _crDocId, page: _crPage }),
+    }).then(() => _crRefreshTrail()).catch(() => {});
+  }
+
+  // Load related machine observations
+  _crLoadRelated();
+}
+
+function _crPrevPage() {
+  if (_crPage > 1) { _crPage--; _crRenderPage(); window.scrollTo({top: document.getElementById('cr-page-view').offsetTop - 80, behavior: 'smooth'}); }
+}
+
+function _crNextPage() {
+  if (_crPage < _crTotalPages) { _crPage++; _crRenderPage(); window.scrollTo({top: document.getElementById('cr-page-view').offsetTop - 80, behavior: 'smooth'}); }
+}
+
+async function _crLoadRelated() {
+  if (!_crDocId) return;
+  const panel = document.getElementById('cr-related-obs');
+  if (!panel) return;
+  panel.innerHTML = '<div style="font-size:12px;color:var(--dim2)">Loading…</div>';
+  try {
+    const data = await get(`/api/reader/documents/${encodeURIComponent(_crDocId)}/related-observations?page=${_crPage}`);
+    const obs = data.observations || [];
+    if (obs.length === 0) {
+      panel.innerHTML = '<div style="font-size:12px;color:var(--dim2)">No machine observations on this page.</div>';
+      return;
+    }
+    panel.innerHTML = obs.map(o =>
+      `<div class="cr-rel-obs-item">
+        <div style="font-size:10px;color:var(--dim2);margin-bottom:3px;font-family:var(--mono)">p.${o.page} · ${x(o.source_locator || '')}</div>
+        ${x((o.raw_text || '').slice(0, 160))}${o.raw_text?.length > 160 ? '…' : ''}
+      </div>`
+    ).join('');
+  } catch(e) {
+    panel.innerHTML = `<div style="font-size:12px;color:var(--red)">${x(e.message)}</div>`;
+  }
+}
+
+async function _crLoadHighlightList() {
+  if (!_crDocId) return;
+  const list = document.getElementById('cr-highlight-list');
+  const count = document.getElementById('cr-hl-count');
+  if (!list) return;
+  try {
+    const data = await get(`/api/reader/documents/${encodeURIComponent(_crDocId)}/highlights`);
+    _crHighlights = data.highlights || [];
+    if (count) count.textContent = _crHighlights.length ? `(${_crHighlights.length})` : '';
+    if (_crHighlights.length === 0) {
+      list.innerHTML = '<div style="font-size:12px;color:var(--dim2)">No highlights yet.</div>';
+      return;
+    }
+    list.innerHTML = _crHighlights.map(h => {
+      const candidateBadge = h.status === 'observation_candidate' || h.status === 'promoted_to_observation'
+        ? `<span class="cr-candidate-badge">${h.status === 'promoted_to_observation' ? 'promoted' : 'candidate'}</span>` : '';
+      const relColor = { supports: 'var(--green)', complicates: '#e0a800', contradicts: 'var(--red)', background: 'var(--dim2)', unclear: 'var(--border2)' };
+      return `<div class="cr-highlight-item" onclick="_crShowHighlightDetail('${x(h.id)}')">
+        <div class="cr-highlight-quote">"${x((h.selected_text||'').slice(0,100))}${h.selected_text?.length > 100 ? '…' : ''}"</div>
+        <div class="cr-highlight-meta">
+          p.${h.page || '?'}
+          ${h.relevance ? `<span style="color:${relColor[h.relevance]||'var(--dim2)'};margin-left:6px">${h.relevance}</span>` : ''}
+          ${candidateBadge}
+        </div>
+        ${h.note_text ? `<div style="font-size:11px;color:var(--dim2);margin-top:3px;line-height:1.4">${x(h.note_text.slice(0,80))}${h.note_text.length>80?'…':''}</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = `<div style="font-size:12px;color:var(--red)">${x(e.message)}</div>`;
+  }
+}
+
+// Selection toolbar
+function _crHandleSelection(e) {
+  const sel = window.getSelection();
+  const text = sel?.toString().trim();
+  if (!text || text.length < 3) { _crHideToolbar(); return; }
+  _crSelText = text;
+  _crShowToolbar(e.clientX, e.clientY);
+}
+
+function _crHandleSelectionChange() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) _crHideToolbar();
+}
+
+function _crShowToolbar(cx, cy) {
+  _crHideToolbar();
+  const tb = document.createElement('div');
+  tb.className = 'cr-sel-toolbar';
+  tb.id = 'cr-sel-toolbar';
+  tb.innerHTML = `
+    <button class="cr-sel-btn" onclick="_crHighlightSelected()">Highlight</button>
+    <button class="cr-sel-btn" onclick="_crHighlightSelected('note')">+ Note</button>
+    <button class="cr-sel-btn" onclick="_crHighlightSelected('question')">? Question</button>
+    <button class="cr-sel-btn" onclick="_crHighlightSelected('candidate')" style="color:var(--accent)">→ Observation</button>
+    <button class="cr-sel-btn" onclick="ttsSpeak(_crSelText)" title="Read aloud">▶ Read</button>`;
+  document.body.appendChild(tb);
+  _crSelToolbar = tb;
+  // Position just above the cursor
+  const left = Math.min(cx, window.innerWidth - 340);
+  const top  = cy - 52 + window.scrollY;
+  tb.style.left = Math.max(8, left) + 'px';
+  tb.style.top  = Math.max(8, top) + 'px';
+}
+
+function _crHideToolbar() {
+  if (_crSelToolbar) { _crSelToolbar.remove(); _crSelToolbar = null; }
+}
+
+function _crHighlightSelected(focus) {
+  _crHideToolbar();
+  const sel = window.getSelection();
+  const text = _crSelText || sel?.toString().trim();
+  if (!text) return;
+  _crSelText = text;
+  _crRelevance = 'unclear';
+  window.getSelection()?.removeAllRanges();
+
+  const form = document.getElementById('cr-sel-form');
+  const prompt = document.getElementById('cr-sel-prompt');
+  if (!form || !prompt) return;
+  prompt.style.display = 'none';
+  form.style.display = 'block';
+
+  const isCandidate = focus === 'candidate';
+  const focusNote = focus === 'note' || focus === 'candidate';
+  const focusQ    = focus === 'question';
+
+  form.innerHTML = `
+    <div class="cr-saved-passage">${x(text.slice(0, 280))}${text.length > 280 ? '…' : ''}</div>
+    <div class="cr-highlight-form" style="margin-top:12px">
+      <div class="cr-form-row">
+        <div class="cr-form-label">Why this matters</div>
+        <textarea id="cr-note-input" rows="3" placeholder="Your reading note…" style="margin-top:4px">${isCandidate ? 'Candidate for observation.' : ''}</textarea>
+      </div>
+      <div class="cr-form-row">
+        <div class="cr-form-label">Question this raises</div>
+        <textarea id="cr-q-input" rows="2" placeholder="What does this open up?…" style="margin-top:4px"></textarea>
+      </div>
+      <div class="cr-form-row">
+        <div class="cr-form-label">Relevance to thesis</div>
+        <div class="cr-relevance-btns">
+          ${['supports','complicates','contradicts','background','unclear'].map(r =>
+            `<button class="cr-rel-btn cr-rel-${r} ${r==='unclear'?'active':''}" onclick="_crSetRelevance('${r}',this)">${r}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn-primary" style="flex:1;padding:8px" onclick="_crSaveHighlight(false)">Save Highlight</button>
+        <button class="btn-primary" style="flex:1;padding:8px;background:var(--accent2);color:var(--accent);border-color:var(--accent)" onclick="_crSaveHighlight(true)">→ Observation Candidate</button>
+      </div>
+      <button style="margin-top:8px;width:100%;padding:6px;background:none;border:1px solid var(--border2);border-radius:var(--r);color:var(--dim2);cursor:pointer;font:inherit;font-size:12px" onclick="_crCancelHighlight()">Cancel</button>
+    </div>`;
+
+  if (focusNote) setTimeout(() => document.getElementById('cr-note-input')?.focus(), 50);
+  if (focusQ)    setTimeout(() => document.getElementById('cr-q-input')?.focus(), 50);
+
+  form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function _crSetRelevance(val, btn) {
+  _crRelevance = val;
+  btn.closest('.cr-relevance-btns')?.querySelectorAll('.cr-rel-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function _crCancelHighlight() {
+  _crSelText = '';
+  _crRelevance = 'unclear';
+  const form = document.getElementById('cr-sel-form');
+  const prompt = document.getElementById('cr-sel-prompt');
+  if (form) { form.style.display = 'none'; form.innerHTML = ''; }
+  if (prompt) prompt.style.display = '';
+}
+
+async function _crSaveHighlight(asCandidate) {
+  const note = document.getElementById('cr-note-input')?.value?.trim() || '';
+  const question = document.getElementById('cr-q-input')?.value?.trim() || '';
+
+  // Get surrounding context from page text
+  const pageView = document.getElementById('cr-page-view');
+  const fullText = pageView?.innerText || '';
+  const idx = fullText.indexOf(_crSelText);
+  const contextBefore = idx > 0 ? fullText.slice(Math.max(0, idx - 100), idx).trim() : '';
+  const contextAfter  = idx > -1 ? fullText.slice(idx + _crSelText.length, idx + _crSelText.length + 100).trim() : '';
+
+  const payload = {
+    source_document_id: _crDocId,
+    page: _crPage,
+    selected_text: _crSelText,
+    context_before: contextBefore,
+    context_after: contextAfter,
+    note_text: note || null,
+    question_text: question || null,
+    relevance: _crRelevance,
+  };
+
+  try {
+    const res = await fetch('/api/reader/highlights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Save failed');
+
+    if (asCandidate) {
+      await fetch(`/api/reader/highlights/${encodeURIComponent(d.id)}/promote`, { method: 'POST' });
+    }
+
+    _crCancelHighlight();
+    await _crLoadHighlightList();
+    _crRefreshTrail();
+
+    // Brief confirmation
+    const form = document.getElementById('cr-sel-form');
+    const prompt = document.getElementById('cr-sel-prompt');
+    if (prompt) {
+      prompt.style.display = '';
+      prompt.innerHTML = `<div style="color:var(--green);font-size:12px;margin-bottom:8px">✓ ${asCandidate ? 'Saved as observation candidate.' : 'Highlight saved.'}</div>
+        <div style="font-size:12px;color:var(--dim2);line-height:1.6">Select another passage to continue.</div>`;
+      setTimeout(() => {
+        if (prompt) prompt.innerHTML = 'Select any passage in the text to highlight it, write a note, ask a question, or create an observation candidate.';
+      }, 4000);
+    }
+  } catch(e) {
+    const form = document.getElementById('cr-sel-form');
+    if (form) form.insertAdjacentHTML('afterbegin', `<div style="color:var(--red);font-size:12px;margin-bottom:8px">Error: ${x(e.message)}</div>`);
+  }
+}
+
+async function _crShowHighlightDetail(highlightId) {
+  const h = _crHighlights.find(h => h.id === highlightId);
+  if (!h) return;
+  const form = document.getElementById('cr-sel-form');
+  const prompt = document.getElementById('cr-sel-prompt');
+  if (!form || !prompt) return;
+  prompt.style.display = 'none';
+  form.style.display = 'block';
+
+  const relColor = { supports: 'cr-rel-supports', complicates: 'cr-rel-complicates', contradicts: 'cr-rel-contradicts', background: 'cr-rel-background', unclear: 'cr-rel-unclear' };
+  const statusLabel = { saved_highlight: 'Saved', observation_candidate: 'Observation Candidate', promoted_to_observation: 'Promoted', dismissed: 'Dismissed' };
+
+  form.innerHTML = `
+    <div style="font-size:10px;color:var(--dim2);font-family:var(--mono);margin-bottom:8px">p.${h.page || '?'} · ${statusLabel[h.status] || h.status}</div>
+    <div class="cr-saved-passage">${x(h.selected_text)}</div>
+    <div class="cr-highlight-form" style="margin-top:12px">
+      <div class="cr-form-row">
+        <div class="cr-form-label">Note</div>
+        <textarea id="cr-edit-note" rows="3" style="margin-top:4px">${x(h.note_text || '')}</textarea>
+      </div>
+      <div class="cr-form-row">
+        <div class="cr-form-label">Question</div>
+        <textarea id="cr-edit-q" rows="2" style="margin-top:4px">${x(h.question_text || '')}</textarea>
+      </div>
+      <div class="cr-form-row">
+        <div class="cr-form-label">Relevance</div>
+        <div class="cr-relevance-btns">
+          ${['supports','complicates','contradicts','background','unclear'].map(r =>
+            `<button class="cr-rel-btn cr-rel-${r} ${h.relevance===r?'active':''}" onclick="_crSetRelevance('${r}',this)">${r}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn-primary" style="flex:1;padding:8px" onclick="_crUpdateHighlight('${x(h.id)}')">Save Changes</button>
+        ${h.status === 'saved_highlight' ? `<button class="btn-primary" style="flex:1;padding:8px;background:var(--accent2);color:var(--accent);border-color:var(--accent)" onclick="_crPromoteHighlight('${x(h.id)}')">→ Observation Candidate</button>` : ''}
+      </div>
+      <button style="margin-top:8px;width:100%;padding:6px;background:none;border:1px solid var(--red);border-radius:var(--r);color:var(--red);cursor:pointer;font:inherit;font-size:12px" onclick="_crDismissHighlight('${x(h.id)}')">Dismiss Highlight</button>
+      <button style="margin-top:6px;width:100%;padding:6px;background:none;border:1px solid var(--border2);border-radius:var(--r);color:var(--dim2);cursor:pointer;font:inherit;font-size:12px" onclick="_crCancelHighlight()">← Back</button>
+      <div id="cr-edit-msg" style="font-size:12px;margin-top:6px"></div>
+    </div>`;
+
+  _crRelevance = h.relevance || 'unclear';
+  form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function _crUpdateHighlight(id) {
+  const note = document.getElementById('cr-edit-note')?.value?.trim() || '';
+  const question = document.getElementById('cr-edit-q')?.value?.trim() || '';
+  const msg = document.getElementById('cr-edit-msg');
+  if (msg) { msg.textContent = 'Saving…'; msg.style.color = 'var(--dim2)'; }
+  try {
+    const res = await fetch(`/api/reader/highlights/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note_text: note, question_text: question, relevance: _crRelevance }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || 'Update failed');
+    if (msg) { msg.textContent = '✓ Saved'; msg.style.color = 'var(--green)'; }
+    await _crLoadHighlightList();
+    _crRefreshTrail();
+    setTimeout(() => _crCancelHighlight(), 1200);
+  } catch(e) {
+    if (msg) { msg.textContent = e.message; msg.style.color = 'var(--red)'; }
+  }
+}
+
+async function _crPromoteHighlight(id) {
+  const msg = document.getElementById('cr-edit-msg');
+  try {
+    await fetch(`/api/reader/highlights/${encodeURIComponent(id)}/promote`, { method: 'POST' });
+    if (msg) { msg.textContent = '✓ Marked as observation candidate'; msg.style.color = 'var(--green)'; }
+    await _crLoadHighlightList();
+    _crRefreshTrail();
+    setTimeout(() => _crCancelHighlight(), 1500);
+  } catch(e) {
+    if (msg) { msg.textContent = e.message; msg.style.color = 'var(--red)'; }
+  }
+}
+
+async function _crDismissHighlight(id) {
+  if (!confirm('Dismiss this highlight? It will be hidden from the list.')) return;
+  try {
+    await fetch(`/api/reader/highlights/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    _crCancelHighlight();
+    await _crLoadHighlightList();
+    _crRefreshTrail();
+  } catch(e) { alert(e.message); }
+}
+
+// ── Reading Trail Summary ─────────────────────────────────────────────────────
+
+let _crTrailDetailOpen = false;
+
+async function _crRefreshTrail() {
+  if (!_crDocId) return;
+  const panel = document.getElementById('cr-trail-summary');
+  if (!panel) return;
+  try {
+    const s = await get(`/api/reader/documents/${encodeURIComponent(_crDocId)}/summary`);
+    panel.innerHTML = _crTrailSummaryHtml(s);
+    const detail = document.getElementById('cr-trail-detail');
+    if (detail) detail.innerHTML = _crTrailDetailHtml(s);
+    if (_crTrailDetailOpen && detail) detail.style.display = '';
+  } catch(e) {
+    panel.innerHTML = `<div style="font-size:12px;color:var(--red)">${x(e.message)}</div>`;
+  }
+}
+
+function _crTrailSummaryHtml(s) {
+  if (s.empty) {
+    return `<div style="font-size:12px;color:var(--dim2);line-height:1.65">
+      <div style="margin-bottom:6px;color:var(--fg2)">A map of attention, not a report card.</div>
+      You have not started a human reading pass yet. Open a page, highlight passages, and record questions to begin building your reading trail.
+    </div>`;
+  }
+
+  const prog = s.reading_progress;
+  const hl   = s.highlight_trail;
+  const qt   = s.question_trail;
+  const cand = s.observation_candidates;
+
+  // Reading progress line
+  const pct = Math.round(prog.percent_read || 0);
+  const progLine = prog.pages_read > 0
+    ? `You have read <strong>${prog.pages_read}</strong> of <strong>${prog.total_pages}</strong> pages (${pct}%).`
+    : `You have not yet read any pages of this document.`;
+  const lastPageLine = prog.last_page
+    ? `<div style="font-size:11px;color:var(--dim2)">Last page read: <strong>${prog.last_page}</strong>.</div>`
+    : '';
+
+  // Continue reading cue
+  const continueCue = prog.next_unread_page && !prog.complete
+    ? `<div style="margin-top:8px">
+        <button class="cr-nav-btn" style="font-size:11px;padding:4px 10px" onclick="_crJumpToPage(${prog.next_unread_page})">
+          Continue reading — page ${prog.next_unread_page} →
+        </button>
+       </div>`
+    : prog.complete
+    ? `<div style="font-size:11px;color:var(--green);margin-top:4px">✓ Reading pass complete.</div>`
+    : '';
+
+  // Highlight line
+  const hlLine = hl.total_active > 0
+    ? `You saved <strong>${hl.total_active}</strong> highlight${hl.total_active !== 1 ? 's' : ''}.`
+    : `No highlights saved yet.`;
+
+  // Relevance breakdown — only show if there's something to show
+  const relMap = hl.by_relevance || {};
+  const relParts = [];
+  if (relMap.supports)    relParts.push(`<span style="color:var(--green)">${relMap.supports} support${relMap.supports>1?'s':''} thesis</span>`);
+  if (relMap.complicates) relParts.push(`<span style="color:#e0a800">${relMap.complicates} complicate${relMap.complicates>1?'s':''} thesis</span>`);
+  if (relMap.contradicts) relParts.push(`<span style="color:var(--red)">${relMap.contradicts} contradict${relMap.contradicts>1?'s':''} thesis</span>`);
+  if (relMap.background)  relParts.push(`<span style="color:var(--dim2)">${relMap.background} background</span>`);
+  if (relMap.unclear)     relParts.push(`<span style="color:var(--dim2)">${relMap.unclear} unclear</span>`);
+  const relLine = relParts.length
+    ? `<div style="font-size:11px;margin-top:4px;line-height:1.8">${relParts.join(' · ')}</div>`
+    : '';
+
+  const statusMap = hl.by_status || {};
+  const statusParts = [];
+  if (statusMap.saved_highlight) statusParts.push(`${statusMap.saved_highlight} saved`);
+  if (statusMap.observation_candidate) statusParts.push(`${statusMap.observation_candidate} candidate${statusMap.observation_candidate!==1?'s':''}`);
+  if (statusMap.promoted_to_observation) statusParts.push(`${statusMap.promoted_to_observation} previously promoted`);
+  const statusLine = statusParts.length
+    ? `<div style="font-size:11px;color:var(--dim2);margin-top:2px">Status: ${statusParts.join(' · ')}</div>`
+    : '';
+
+  // Non-primary warning
+  const npCount = hl.non_primary_count || 0;
+  const npWarn = npCount > 0
+    ? `<div style="font-size:11px;color:#e0a800;margin-top:4px">${npCount} highlight${npCount>1?'s':''} from non-primary material — label as supporting evidence, not primary-text evidence.</div>`
+    : '';
+
+  // Question line
+  const qLine = qt.total_questions > 0
+    ? `You raised <strong>${qt.total_questions}</strong> question${qt.total_questions !== 1 ? 's' : ''}.`
+    : '';
+  const noteCount = s.notes?.total_notes || 0;
+  const noteLine = noteCount > 0
+    ? `You recorded <strong>${noteCount}</strong> note${noteCount !== 1 ? 's' : ''}.`
+    : '';
+
+  // Question cluster cue
+  const topQPages = (qt.pages_with_most_questions || []).slice(0, 2);
+  const qCluster = topQPages.length
+    ? `<div style="font-size:11px;color:var(--dim2);margin-top:2px">Questions cluster around page${topQPages.length>1?'s':''} ${topQPages.map(p=>`<strong>${p.page}</strong>`).join(' and ')}.</div>`
+    : '';
+
+  // Observation candidates
+  const candLine = cand.count > 0
+    ? `<div style="font-size:12px;margin-top:6px;color:var(--accent)"><strong>${cand.count}</strong> observation candidate${cand.count!==1?'s':''} marked for review.</div>`
+    : '';
+
+  // Machine coverage note
+  const mc = s.machine_coverage || {};
+  const mcNote = `<div style="font-size:10px;color:var(--dim2);margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+    Machine coverage: <strong>${mc.observation_count || 0}</strong> observations extracted. Human reading progress is tracked separately.
+  </div>`;
+
+  return `
+    <div style="font-size:12px;line-height:1.7">
+      <div style="color:var(--fg2);margin-bottom:6px">A map of attention, not a report card.</div>
+      <div>${progLine}</div>
+      ${lastPageLine}
+      ${continueCue}
+      <div style="margin-top:8px">${hlLine}</div>
+      ${statusLine}
+      ${relLine}
+      ${npWarn}
+      ${qLine ? `<div style="margin-top:4px">${qLine}</div>` : ''}
+      ${noteLine ? `<div style="margin-top:2px">${noteLine}</div>` : ''}
+      ${qCluster}
+      ${candLine}
+    </div>
+    ${mcNote}`;
+}
+
+function _crTrailDetailHtml(s) {
+  const clusters = s.attention_clusters || [];
+  const recent   = s.recent_highlights || [];
+  const recentQuestions = s.question_trail?.recent_questions || [];
+  const cands    = s.observation_candidates?.items || [];
+  const topPages = s.highlight_trail?.top_pages || [];
+  const topQuestionPages = s.question_trail?.pages_with_most_questions || [];
+  const byRole = s.highlight_trail?.by_source_role || {};
+  const byStatus = s.highlight_trail?.by_status || {};
+
+  let html = '';
+
+  // Highlight provenance and status are labels, not scores.
+  if (Object.keys(byRole).length || Object.values(byStatus).some(Boolean)) {
+    const roleRows = Object.entries(byRole)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([role, count]) =>
+        `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--fg2);padding:2px 0">
+          <span>${x(role)}${role === 'primary' ? '' : ' · non-primary'}</span><span>${count}</span>
+        </div>`
+      ).join('');
+    const statusRows = [
+      ['saved_highlight', 'Saved highlight'],
+      ['observation_candidate', 'Observation candidate'],
+      ['promoted_to_observation', 'Previously promoted'],
+    ].filter(([key]) => byStatus[key]).map(([key, label]) =>
+      `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--fg2);padding:2px 0">
+        <span>${label}</span><span>${byStatus[key]}</span>
+      </div>`
+    ).join('');
+    html += `<div style="margin-bottom:14px">
+      <div class="cr-form-label" style="margin-bottom:6px">Highlights by Source Role</div>
+      ${roleRows || '<div style="font-size:11px;color:var(--dim2)">No source-role counts yet.</div>'}
+      <div class="cr-form-label" style="margin:10px 0 6px">Highlights by Status</div>
+      ${statusRows || '<div style="font-size:11px;color:var(--dim2)">No status counts yet.</div>'}
+    </div>`;
+  }
+
+  // Attention clusters
+  if (clusters.length) {
+    const maxHl = Math.max(...clusters.map(c => c.highlights), 1);
+    const bars = clusters.map(c => {
+      const w = Math.round(c.highlights / maxHl * 100);
+      const qDot = c.questions > 0 ? `<span style="color:var(--accent);font-size:9px"> ·${c.questions}?</span>` : '';
+      return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <div style="font-size:9px;color:var(--dim2);font-family:var(--mono);width:52px;flex-shrink:0">p.${c.start}–${c.end}</div>
+        <div style="flex:1;background:var(--border2);border-radius:2px;height:6px;overflow:hidden">
+          <div style="width:${w}%;height:100%;background:var(--accent);border-radius:2px"></div>
+        </div>
+        <div style="font-size:9px;color:var(--dim2);width:20px;text-align:right">${c.highlights}${qDot}</div>
+      </div>`;
+    }).join('');
+    html += `<div style="margin-bottom:14px">
+      <div class="cr-form-label" style="margin-bottom:8px">Attention Clusters</div>
+      ${bars}
+      <div style="font-size:9px;color:var(--dim2);margin-top:4px">Bar = highlight density · ? = questions in range</div>
+    </div>`;
+  }
+
+  // Top pages
+  if (topPages.length) {
+    const questionsByPage = Object.fromEntries(topQuestionPages.map(p => [p.page, p.count]));
+    const rows = topPages.map(p =>
+      `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--fg2);padding:2px 0">
+        <span>Page ${p.page}</span><span style="color:var(--accent)">${p.count} highlight${p.count>1?'s':''}${questionsByPage[p.page] ? ` · ${questionsByPage[p.page]} question${questionsByPage[p.page]!==1?'s':''}` : ''}</span>
+      </div>`
+    ).join('');
+    html += `<div style="margin-bottom:14px">
+      <div class="cr-form-label" style="margin-bottom:6px">Pages with Most Attention</div>
+      ${rows}
+    </div>`;
+  }
+
+  // Observation candidates
+  if (cands.length) {
+    const items = cands.map(c =>
+      `<div style="font-size:11px;border:1px solid var(--accent);border-radius:var(--r);padding:6px 8px;margin-bottom:6px">
+        <div style="font-size:9px;color:var(--dim2);margin-bottom:3px">p.${c.page || '?'} · ${c.source_role}</div>
+        <div style="color:var(--fg2);line-height:1.5;font-style:italic">"${x((c.text_preview||'').slice(0,100))}${(c.text_preview||'').length>100?'…':''}"</div>
+      </div>`
+    ).join('');
+    html += `<div style="margin-bottom:14px">
+      <div class="cr-form-label" style="margin-bottom:6px">Observation Candidates</div>
+      ${items}
+    </div>`;
+  }
+
+  // Recent highlights
+  if (recent.length) {
+    const items = recent.map(h => {
+      const relColor = { supports:'var(--green)', complicates:'#e0a800', contradicts:'var(--red)', background:'var(--dim2)', unclear:'var(--border2)' };
+      return `<div style="font-size:11px;margin-bottom:8px;line-height:1.6">
+        <div style="font-size:9px;color:var(--dim2);margin-bottom:2px">p.${h.page||'?'} · ${x(h.source_role || 'primary')}${h.is_primary_source === false ? ' · non-primary' : ''}${h.relevance ? ` · <span style="color:${relColor[h.relevance]||'var(--dim2)'}">${h.relevance}</span>` : ''}</div>
+        <div style="color:var(--fg2);font-style:italic">"${x((h.selected_text||'').slice(0,100))}${(h.selected_text||'').length>100?'…':''}"</div>
+        ${h.note_text ? `<div style="color:var(--dim2);margin-top:2px">${x(h.note_text.slice(0,80))}${h.note_text.length>80?'…':''}</div>` : ''}
+        ${h.question_text ? `<div style="color:var(--accent);margin-top:2px">? ${x(h.question_text.slice(0,80))}${h.question_text.length>80?'…':''}</div>` : ''}
+      </div>`;
+    }).join('');
+    html += `<div>
+      <div class="cr-form-label" style="margin-bottom:6px">Recent Highlights</div>
+      ${items}
+    </div>`;
+  }
+
+  if (recentQuestions.length) {
+    const items = recentQuestions.map(q =>
+      `<div style="font-size:11px;margin-bottom:8px;line-height:1.5">
+        <div style="font-size:9px;color:var(--dim2)">p.${q.page || '?'} · ${x(q.source_role || 'primary')}${q.is_primary_source === false ? ' · non-primary' : ''}</div>
+        <div style="color:var(--accent)">? ${x((q.question_text || '').slice(0,120))}${(q.question_text || '').length > 120 ? '…' : ''}</div>
+      </div>`
+    ).join('');
+    html += `<div style="margin-top:14px">
+      <div class="cr-form-label" style="margin-bottom:6px">Recent Questions</div>
+      ${items}
+    </div>`;
+  }
+
+  if (!html) {
+    html = `<div style="font-size:11px;color:var(--dim2)">Trail details will appear as you read and highlight.</div>`;
+  }
+
+  return html;
+}
+
+function _crToggleTrailDetail() {
+  _crTrailDetailOpen = !_crTrailDetailOpen;
+  const detail = document.getElementById('cr-trail-detail');
+  const toggle = document.getElementById('cr-trail-toggle');
+  if (detail) detail.style.display = _crTrailDetailOpen ? '' : 'none';
+  if (toggle) toggle.textContent = _crTrailDetailOpen ? 'Details ▴' : 'Details ▾';
+}
+
+function _crJumpToPage(pg) {
+  _crPage = pg;
+  _crRenderPage();
+  document.getElementById('cr-page-view')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function e10ManageKey(participant) {
@@ -3783,47 +5959,207 @@ async function e10SelectObservation(id) {
   _e10Selected = id;
   _e10Detail = await get(`/api/e10/observations/${encodeURIComponent(id)}`);
   _e10ActiveProposal = (_e10Detail.proposals || []).find(p => p.status === 'pending') || null;
-  e10RenderSelected();
+  await e10RenderSelected();
   e10RenderReview();
   e10RenderCritic();
   await e10LoadObservations();
   e10Go('lab');
 }
 
-function e10RenderSelected() {
+let _e10Review = null;      // current observation's review record
+let _e10InquiryNotes = [];  // current observation's inquiry notes
+
+async function e10RenderSelected() {
   const host = document.getElementById('selected-observation');
   if (!_e10Detail) {
     host.className = 'e10-empty';
     host.textContent = 'Select an observation from the corpus.';
+    _e10Review = null; _e10InquiryNotes = [];
     return;
   }
   const o = _e10Detail.observation;
+  // Load existing review + notes
+  try {
+    const rd = await get(`/api/observations/${encodeURIComponent(o.id)}/review`);
+    _e10Review = rd.review || null;
+    _e10InquiryNotes = rd.inquiry_notes || [];
+  } catch(_) {
+    _e10Review = null; _e10InquiryNotes = [];
+  }
   host.className = 'e10-card';
   host.innerHTML = `
-    <div class="e10-meta">OBS-${o.obs_index} · ${x(o.source_locator || '')}</div>
+    <div class="e10-meta">OBS-${o.obs_index} · ${x(o.source_locator || '')}
+      <span style="margin-left:auto">${ttsMakeBtn('selected-obs', o.raw_text)}</span>
+    </div>
     <div class="e10-text">"${x(o.raw_text)}"</div>
     <div class="e10-badges">
       <span class="e10-badge">Observation</span>
       <span class="e10-badge">SourceExtraction ${shortId(o.source_extraction_id)}</span>
       <span class="e10-badge">Document ${shortId(o.source_document_id)}</span>
+    </div>
+    <div id="obs-inquiry-panel">${_obsInquiryPanelHtml(o.id)}</div>`;
+}
+
+const _QUESTION_TYPES = [
+  ['evidence_needed',        'Evidence needed'],
+  ['meaning_unclear',        'Meaning unclear'],
+  ['classification_unclear', 'Classification unclear'],
+  ['contradiction',          'Contradiction'],
+  ['connection_possible',    'Connection possible'],
+  ['overreach_suspected',    'Overreach suspected'],
+  ['sequence_question',      'Sequence question'],
+  ['unclassified',           'Unclassified'],
+];
+
+function _obsInquiryPanelHtml(obsId) {
+  const r = _e10Review;
+  const status = r?.review_status || null;
+  const statusColors = { approved: 'var(--green)', rejected: 'var(--red)', unsure: 'var(--accent)' };
+  const statusSymbols = { approved: '✓', rejected: '✗', unsure: '?' };
+  const qeid = `iq-${obsId.slice(0,8)}`;
+
+  const judgeRow = `<div style="display:flex;gap:8px;align-items:center;margin-top:12px;margin-bottom:4px">
+    <span style="font-size:11px;color:var(--dim2);letter-spacing:.06em;text-transform:uppercase">Steward judgment</span>
+    <span style="margin-left:auto;display:flex;gap:6px">
+      ${['approved','unsure','rejected'].map(s => `
+        <button class="btn-trace${status === s ? ' e10-review-active-'+s : ''}"
+          style="font-size:11px;padding:3px 10px;${status===s?`border-color:${statusColors[s]};color:${statusColors[s]};font-weight:700`:''}"
+          onclick="e10SetReviewStatus(${JSON.stringify(obsId)},${JSON.stringify(s)})">
+          ${statusSymbols[s]} ${s.charAt(0).toUpperCase()+s.slice(1)}
+        </button>`).join('')}
+    </span>
+  </div>`;
+
+  const detailRows = status ? `
+    <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+      <textarea id="${qeid}-reason" placeholder="Why? (optional)" rows="2"
+        style="font-size:12px;width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);padding:6px 8px;resize:vertical"
+        oninput="e10SaveReviewDebounced(${JSON.stringify(obsId)})">${x(r?.reason_for_status || '')}</textarea>
+      <textarea id="${qeid}-note" placeholder="Steward note (optional)" rows="2"
+        style="font-size:12px;width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);padding:6px 8px;resize:vertical"
+        oninput="e10SaveReviewDebounced(${JSON.stringify(obsId)})">${x(r?.steward_note || '')}</textarea>
+      <label style="font-size:11px;color:var(--dim2);display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="${qeid}-fup" onchange="e10SaveReviewDebounced(${JSON.stringify(obsId)})"
+          ${r?.follow_up_needed ? 'checked' : ''}> Mark for follow-up
+      </label>
+    </div>` : '';
+
+  const notesHtml = _e10InquiryNotes.length ? `
+    <div style="margin-top:10px;display:flex;flex-direction:column;gap:4px">
+      ${_e10InquiryNotes.map(n => `
+        <div style="display:flex;align-items:flex-start;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:6px 10px">
+          <span style="font-size:10px;color:var(--dim2);white-space:nowrap;margin-top:2px;flex-shrink:0">${x(n.question_type.replace(/_/g,' '))}</span>
+          <span style="font-size:12px;color:var(--fg);flex:1;line-height:1.5">${x(n.question_text)}</span>
+          <button onclick="e10DeleteInquiryNote(${JSON.stringify(obsId)},${JSON.stringify(n.id)})"
+            style="font-size:10px;color:var(--dim2);background:none;border:none;cursor:pointer;padding:0;flex-shrink:0">✕</button>
+        </div>`).join('')}
+    </div>` : '';
+
+  const addNoteForm = `
+    <div style="margin-top:8px;display:flex;gap:6px;align-items:flex-start">
+      <select id="${qeid}-qtype" style="font-size:11px;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);flex-shrink:0">
+        ${_QUESTION_TYPES.map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
+      </select>
+      <input id="${qeid}-qtext" type="text" placeholder="What question does this raise?"
+        style="font-size:12px;flex:1;padding:4px 8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg)"
+        onkeydown="if(event.key==='Enter'){e10AddInquiryNote(${JSON.stringify(obsId)},${JSON.stringify(qeid)})}">
+      <button class="btn-trace" style="font-size:11px;padding:3px 10px;flex-shrink:0"
+        onclick="e10AddInquiryNote(${JSON.stringify(obsId)},${JSON.stringify(qeid)})">+ Add</button>
     </div>`;
+
+  return `<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
+    <div style="font-size:11px;color:var(--dim2);letter-spacing:.07em;text-transform:uppercase;margin-bottom:2px">Inquiry Notes</div>
+    ${judgeRow}
+    ${detailRows}
+    <div style="font-size:11px;color:var(--dim2);letter-spacing:.06em;text-transform:uppercase;margin-top:12px;margin-bottom:4px">Questions</div>
+    ${notesHtml}
+    ${addNoteForm}
+  </div>`;
+}
+
+let _e10ReviewSaveTimer = null;
+function e10SaveReviewDebounced(obsId) {
+  clearTimeout(_e10ReviewSaveTimer);
+  _e10ReviewSaveTimer = setTimeout(() => e10SaveReview(obsId), 600);
+}
+
+async function e10SetReviewStatus(obsId, status) {
+  const qeid = `iq-${obsId.slice(0,8)}`;
+  const reason = document.getElementById(`${qeid}-reason`)?.value || '';
+  const note = document.getElementById(`${qeid}-note`)?.value || '';
+  const fup = document.getElementById(`${qeid}-fup`)?.checked || false;
+  const payload = { review_status: status, reason_for_status: reason, steward_note: note, follow_up_needed: fup };
+  const d = await post(`/api/observations/${encodeURIComponent(obsId)}/review`, payload);
+  _e10Review = d.review;
+  document.getElementById('obs-inquiry-panel').innerHTML = _obsInquiryPanelHtml(obsId);
+}
+
+async function e10SaveReview(obsId) {
+  if (!_e10Review) return;
+  const qeid = `iq-${obsId.slice(0,8)}`;
+  const reason = document.getElementById(`${qeid}-reason`)?.value || '';
+  const note = document.getElementById(`${qeid}-note`)?.value || '';
+  const fup = document.getElementById(`${qeid}-fup`)?.checked || false;
+  await post(`/api/observations/${encodeURIComponent(obsId)}/review`, {
+    review_status: _e10Review.review_status, reason_for_status: reason,
+    steward_note: note, follow_up_needed: fup,
+  }).catch(() => {});
+}
+
+async function e10AddInquiryNote(obsId, qeid) {
+  const textEl = document.getElementById(`${qeid}-qtext`);
+  const typeEl = document.getElementById(`${qeid}-qtype`);
+  const text = textEl?.value.trim();
+  if (!text) { textEl?.focus(); return; }
+  const d = await post(`/api/observations/${encodeURIComponent(obsId)}/inquiry`, {
+    question_text: text, question_type: typeEl?.value || 'unclassified',
+  });
+  _e10InquiryNotes.push(d.inquiry_note);
+  textEl.value = '';
+  document.getElementById('obs-inquiry-panel').innerHTML = _obsInquiryPanelHtml(obsId);
+}
+
+async function e10DeleteInquiryNote(obsId, noteId) {
+  await fetch(`/api/observations/${encodeURIComponent(obsId)}/inquiry/${encodeURIComponent(noteId)}`,
+    { method: 'DELETE' });
+  _e10InquiryNotes = _e10InquiryNotes.filter(n => n.id !== noteId);
+  document.getElementById('obs-inquiry-panel').innerHTML = _obsInquiryPanelHtml(obsId);
 }
 
 async function e10GenerateInterpretations() {
-  if (!_e10Selected) return;
+  if (!_e10Selected) {
+    showAppError('Select an observation first — click any observation card in the corpus view.');
+    return;
+  }
   const participants = [...document.querySelectorAll('.e10-check-input:checked')].map(i => i.value);
+  if (!participants.length) {
+    showAppError('No providers selected. Check at least one provider in the Lab panel.');
+    return;
+  }
   const host = document.getElementById('lab-results');
-  host.innerHTML = '<div class="e10-empty">Generating proposals...</div>';
-  const data = await post('/api/e10/interpretations/generate', {
-    observation_id: _e10Selected,
-    participants,
-  });
-  host.innerHTML = data.proposals.map(e10ProposalCard).join('');
+  host.innerHTML = '<div class="e10-empty">Generating proposals…</div>';
+  let data;
+  try {
+    const resp = await fetch('/api/e10/interpretations/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ observation_id: _e10Selected, participants, response_mode: _labResponseMode }),
+    });
+    data = await resp.json();
+    if (!resp.ok) {
+      host.innerHTML = `<div class="e10-empty" style="color:var(--red)">✗ ${x(data.error || 'Generation failed')}</div>`;
+      return;
+    }
+  } catch(err) {
+    host.innerHTML = `<div class="e10-empty" style="color:var(--red)">✗ ${x(err.message)}</div>`;
+    return;
+  }
+  host.innerHTML = (data.proposals || []).map(e10ProposalCard).join('') || '<div class="e10-empty">No proposals returned.</div>';
   _e10Detail = await get(`/api/e10/observations/${encodeURIComponent(_e10Selected)}`);
-  _e10ActiveProposal = data.proposals[0] || null;
+  _e10ActiveProposal = (data.proposals || [])[0] || null;
   e10RenderReview();
   e10RenderCritic();
-  e10Go('review');
+  e10Go('review', 'review-panel');
 }
 
 function e10RenderReview() {
@@ -3849,25 +6185,81 @@ function e10RenderReview() {
     </div>`;
 }
 
+function _evidenceBadge(p) {
+  const role = p.obs_source_role;
+  if (!role || role === 'primary') return '';
+  return `<span class="obs-provenance role-${x(role)}" style="margin-left:6px" title="Derived from ${x(role)} corpus — not primary evidence">${x(role)} source</span>`;
+}
+
 function e10ProposalCard(p) {
   return `<div class="e10-card">
-    <div class="e10-meta">${x(p.perspective)} · ${x(p.status)}</div>
+    <div class="e10-meta">${x(p.perspective)} · ${x(p.status)}${_evidenceBadge(p)}</div>
     <div class="e10-text">${x(p.text)}</div>
   </div>`;
 }
 
+function _parseTriageText(text) {
+  const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean);
+  return {
+    confidence: lines[0] || '',
+    pattern:    lines[1] || '',
+    reason:     lines[2] || '',
+    full:       text,
+  };
+}
+
+function _confidenceColor(conf) {
+  const c = (conf || '').toLowerCase();
+  if (c === 'high')   return 'var(--green)';
+  if (c === 'medium') return 'var(--accent)';
+  if (c === 'low')    return 'var(--dim2)';
+  return 'var(--fg2)';
+}
+
 function e10ReviewCard(p) {
   const terminal = p.status !== 'pending';
-  return `<div class="e10-card">
-    <div class="e10-meta">${x(p.perspective)} · ${x(p.status)} · ${shortId(p.id)}</div>
+  const nonPrimary = p.obs_source_role && p.obs_source_role !== 'primary';
+  const isTriage = (p.response_mode || 'interpretive') === 'triage';
+  const modeTag = p.response_mode && p.response_mode !== 'interpretive'
+    ? `<span style="font-size:9px;padding:1px 6px;border-radius:10px;border:1px solid var(--border);color:var(--dim2);margin-left:6px;text-transform:uppercase;letter-spacing:.05em">${x(p.response_mode)}</span>`
+    : '';
+
+  const sourceWarn = nonPrimary
+    ? `<div style="font-size:11px;color:var(--yellow,#f4c542);margin-bottom:6px;padding:4px 8px;background:rgba(244,197,66,.08);border-radius:4px;border-left:2px solid var(--yellow,#f4c542)">⚠ Derived from <strong>${x(p.obs_source_role)}</strong> — not primary evidence.</div>`
+    : '';
+
+  const actions = `<div class="e10-actions">
+    <button class="btn-trace" onclick="e10ChooseProposal('${x(p.id)}')">Select for Critic</button>
+    <button class="btn-trace" ${terminal ? 'disabled' : ''} onclick="e10Accept('${x(p.id)}')">Accept / Promote</button>
+    <button class="btn-trace" ${terminal ? 'disabled' : ''} onclick="e10Reject('${x(p.id)}')">Reject</button>
+    <button class="btn-trace" onclick="e10InterpretationLineage('${x(p.id)}')">Lineage</button>
+  </div>`;
+
+  if (isTriage) {
+    const t = _parseTriageText(p.text);
+    const cc = _confidenceColor(t.confidence);
+    const expandId = `triage-expand-${x(p.id)}`;
+    return `<div class="e10-card${nonPrimary ? ' e10-card-supporting' : ''}">
+      <div class="e10-meta">${x(p.perspective)} · ${x(p.status)} · ${shortId(p.id)}${modeTag}${_evidenceBadge(p)}</div>
+      ${sourceWarn}
+      <div class="triage-card">
+        <div class="triage-confidence" style="color:${cc}">● ${x(t.confidence) || '—'}</div>
+        <div class="triage-pattern">${x(t.pattern)}</div>
+        <div class="triage-reason">${x(t.reason)}</div>
+        <button class="triage-expand" onclick="document.getElementById('${expandId}').style.display=document.getElementById('${expandId}').style.display==='none'?'block':'none';this.textContent=this.textContent.includes('Show')?'Hide full text':'Show full text'">Show full text</button>
+        <div id="${expandId}" style="display:none;margin-top:6px" class="e10-text">${x(p.text)}</div>
+      </div>
+      <div class="dict-wrap" style="margin-top:8px"><textarea class="e10-comment" id="comment-${x(p.id)}" placeholder="Steward comment">${x(p.steward_rationale || '')}</textarea>${sttMakeBtn('comment-' + p.id)}</div>
+      ${actions}
+    </div>`;
+  }
+
+  return `<div class="e10-card${nonPrimary ? ' e10-card-supporting' : ''}">
+    <div class="e10-meta">${x(p.perspective)} · ${x(p.status)} · ${shortId(p.id)}${modeTag}${_evidenceBadge(p)}</div>
+    ${sourceWarn}
     <div class="e10-text">${x(p.text)}</div>
-    <textarea class="e10-comment" id="comment-${x(p.id)}" placeholder="Steward comment">${x(p.steward_rationale || '')}</textarea>
-    <div class="e10-actions">
-      <button class="btn-trace" onclick="e10ChooseProposal('${x(p.id)}')">Select for Critic</button>
-      <button class="btn-trace" ${terminal ? 'disabled' : ''} onclick="e10Accept('${x(p.id)}')">Accept / Promote</button>
-      <button class="btn-trace" ${terminal ? 'disabled' : ''} onclick="e10Reject('${x(p.id)}')">Reject</button>
-      <button class="btn-trace" onclick="e10InterpretationLineage('${x(p.id)}')">Lineage</button>
-    </div>
+    <div class="dict-wrap"><textarea class="e10-comment" id="comment-${x(p.id)}" placeholder="Steward comment">${x(p.steward_rationale || '')}</textarea>${sttMakeBtn('comment-' + p.id)}</div>
+    ${actions}
   </div>`;
 }
 
@@ -3975,7 +6367,7 @@ async function e10InterpretationLineage(proposalId) {
   fp.style.display = 'block';
   fp.innerHTML = `<div class="e10-card">
     <div class="e10-meta">Canonical interpretation lineage</div>
-    <div class="e10-lineage">${graph.nodes.map((n, i) => `${i ? '<div class="e10-lineage-arrow">↓</div>' : ''}${e10LineageRow(n.class, n.id, e10NodeSummary(n))}`).join('')}</div>
+    <div class="e10-lineage">${graph.nodes.map((n, i) => `${i ? '<div class="e10-lineage-arrow">↓</div>' : ''}${e10LineageNodeHtml(n)}`).join('')}</div>
   </div>`;
   e10Go('lineage');
 }
@@ -3987,6 +6379,26 @@ function e10LineageRow(cls, id, summary) {
 function e10NodeSummary(node) {
   const d = node.data || {};
   return d.text || d.raw_text || d.title || d.original_filename || d.source_locator || '';
+}
+
+function e10LineageNodeHtml(node) {
+  const d = node.data || {};
+  const isObs = node.class === 'Observation' || node.class === 'SourceExtraction';
+  if (isObs && (d.source_locator || d.page)) {
+    const loc = d.source_locator || `p.${d.page}`;
+    const obsId = node.id;
+    const linkHtml = obsId
+      ? `<span class="e10-lineage-loc" onclick="e10SelectObservation(${JSON.stringify(obsId)});e10Go('lab','selected-observation')" title="Open in Lab" style="cursor:pointer;color:var(--accent);font-weight:600;font-size:12px;text-decoration:underline;text-underline-offset:3px">${x(loc)}</span>`
+      : `<span style="font-size:12px;font-weight:600;color:var(--fg2)">${x(loc)}</span>`;
+    const preview = d.raw_text
+      ? `<div class="e10-text" style="margin-top:4px;font-size:12px;color:var(--dim2)">"${x(d.raw_text.length > 200 ? d.raw_text.slice(0,200)+'…' : d.raw_text)}"</div>`
+      : '';
+    return `<div class="e10-lineage-row">
+      <div class="e10-meta">${x(node.class)} · ${shortId(node.id)}</div>
+      ${linkHtml}${preview}
+    </div>`;
+  }
+  return e10LineageRow(node.class, node.id, e10NodeSummary(node));
 }
 
 // ── Utilities ──────────────────────────────────────────
@@ -4127,8 +6539,8 @@ async function e10LoadReview() {
               <summary style="cursor:pointer;list-style:none;color:var(--dim2)">Source observation ↓</summary>
               <div style="margin-top:6px;padding:8px;background:var(--bg);border-radius:4px;font-style:italic;line-height:1.5">"${x((i.obs_text||'').slice(0,220))}…"</div>
             </details>
-            <textarea id="note-${eid}" placeholder="Steward note (optional)"
-              style="width:100%;box-sizing:border-box;font-size:12px;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg2);resize:vertical;min-height:52px;margin-bottom:8px;font-family:inherit">${x(i.steward_note || '')}</textarea>
+            <div class="dict-wrap"><textarea id="note-${eid}" placeholder="Steward note (optional)"
+              style="width:100%;box-sizing:border-box;font-size:12px;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg2);resize:vertical;min-height:52px;margin-bottom:8px;font-family:inherit">${x(i.steward_note || '')}</textarea>${sttMakeBtn('note-' + eid)}</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
               <button onclick="stewardAct('${x(i.id)}','established')" style="padding:5px 11px;font-size:12px;border-radius:4px;cursor:pointer;background:var(--green-dim,#1a2e1a);border:1px solid var(--green,#4caf50);color:var(--green,#4caf50)">✓ Establish</button>
               <button onclick="stewardAct('${x(i.id)}','contested')"  style="padding:5px 11px;font-size:12px;border-radius:4px;cursor:pointer;background:var(--surface2);border:1px solid var(--yellow,#f4c542);color:var(--yellow,#f4c542)">◎ Contest</button>
@@ -4338,7 +6750,7 @@ async function runArtistFromReview() {
       if (!resp.ok) {
         const msg = data.error || 'Unknown error';
         const errType = data.error_type || '';
-        const hint = isOllama ? ' (Ollama not running?)' : /connection|api.?key|auth|credential|invalid/i.test(msg) ? ' (check API key in Expert)' : '';
+        const hint = isOllama ? ' (Ollama not running?)' : /connection|api.?key|auth|credential|invalid/i.test(msg) ? ' (check API key in Connections)' : '';
         results.push({ prov, prof, ok: false, msg: (errType ? `[${errType}] ` : '') + msg + hint });
       } else {
         results.push({ prov, prof, ok: true, id: data.id });
@@ -4358,7 +6770,7 @@ async function runArtistFromReview() {
 
   const lastOk = results.filter(r => r.ok).pop();
   status.innerHTML = summary + (lastOk
-    ? ` <button onclick="e10Go('reader')" style="margin-left:10px;background:var(--accent2);border:1px solid var(--accent);color:var(--accent);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">Read Report →</button>
+    ? ` <button onclick="e10Go('reports')" style="margin-left:10px;background:var(--accent2);border:1px solid var(--accent);color:var(--accent);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">Read Report →</button>
         <button onclick="e10Go('lineage')" style="margin-left:6px;background:none;border:1px solid var(--border);color:var(--fg2);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px">View Lineage</button>`
     : '');
 
@@ -4847,7 +7259,7 @@ function renderArchitectList(data, panel) {
 
       <div id="arc-panel-generate" style="padding:20px">
         <div style="font-size:13px;color:var(--fg2);margin-bottom:12px">Enter your research question or essay directive. The Architect will synthesize a blueprint from the accepted interpretations in the corpus, evidence-first.</div>
-        <textarea id="arc-directive" rows="3" placeholder="e.g. Analyze the metaphors in The Great Gatsby and how they shape meaning. 10-page essay with citations." style="width:100%;box-sizing:border-box;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font-size:14px;font-family:var(--sans);resize:vertical;margin-bottom:10px"></textarea>
+        <div class="dict-wrap"><textarea id="arc-directive" rows="3" placeholder="e.g. Analyze the metaphors in The Great Gatsby and how they shape meaning. 10-page essay with citations." style="width:100%;box-sizing:border-box;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font-size:14px;font-family:var(--sans);resize:vertical;margin-bottom:10px"></textarea>${sttMakeBtn('arc-directive')}</div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <select id="arc-gen-provider" style="padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font-size:13px">
             <option value="">Loading providers…</option>
@@ -4859,12 +7271,12 @@ function renderArchitectList(data, panel) {
 
       <div id="arc-panel-import" style="padding:20px;display:none">
         <div style="font-size:13px;color:var(--fg2);margin-bottom:12px">Paste or write your own blueprint. Each section is one analytical claim. OBS-N references are optional — link specific observations or leave blank.</div>
-        <input id="arc-import-title" type="text" placeholder="Blueprint title" style="width:100%;box-sizing:border-box;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font-size:14px;margin-bottom:8px">
-        <textarea id="arc-import-thesis" rows="2" placeholder="One-sentence thesis" style="width:100%;box-sizing:border-box;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font-size:14px;font-family:var(--sans);resize:vertical;margin-bottom:12px"></textarea>
+        <div class="dict-wrap"><input id="arc-import-title" type="text" placeholder="Blueprint title" style="width:100%;box-sizing:border-box;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font-size:14px;margin-bottom:8px">${sttMakeBtn('arc-import-title')}</div>
+        <div class="dict-wrap"><textarea id="arc-import-thesis" rows="2" placeholder="One-sentence thesis" style="width:100%;box-sizing:border-box;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font-size:14px;font-family:var(--sans);resize:vertical;margin-bottom:12px"></textarea>${sttMakeBtn('arc-import-thesis')}</div>
         <div style="font-size:11px;color:var(--dim2);margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase">Sections — one per line block, blank line between sections</div>
-        <textarea id="arc-import-sections" rows="10"
+        <div class="dict-wrap"><textarea id="arc-import-sections" rows="10"
           placeholder="Section 1 claim here&#10;OBS-6, OBS-19&#10;&#10;Section 2 claim here&#10;OBS-23, OBS-24&#10;&#10;Section 3 claim here&#10;(no observations needed)"
-          style="width:100%;box-sizing:border-box;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font-size:13px;font-family:var(--mono);resize:vertical;margin-bottom:10px"></textarea>
+          style="width:100%;box-sizing:border-box;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font-size:13px;font-family:var(--mono);resize:vertical;margin-bottom:10px"></textarea>${sttMakeBtn('arc-import-sections')}</div>
         <div style="display:flex;gap:10px;align-items:center">
           <button class="btn-primary" onclick="e10ImportBlueprint()" style="padding:7px 18px">Import Blueprint →</button>
           <span id="arc-import-status" style="font-size:13px;color:var(--dim2)"></span>
@@ -5235,12 +7647,13 @@ function e10LoadGuide() {
       <div style="margin-bottom:40px;padding:24px 28px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2)">
         <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim2);margin-bottom:14px">What category is this?</div>
         <div style="font-size:17px;font-weight:700;color:var(--fg);margin-bottom:6px">
-          Hermeneia is a LILM — a Large Interpretation Language Model.
+          Hermeneia is a constitutional investigation architecture.
         </div>
         <div style="font-size:13px;color:var(--fg2);line-height:1.7;max-width:600px;margin-bottom:20px">
-          Traditional LLMs model language. A LILM models the <em>lifecycle of interpretation</em> —
-          treating interpretations, not raw text, as first-class objects, and tracking their maturation
-          through evidence, critique, revision, and ratification over time.
+          A governed system for the disciplined evolution and preservation of understanding.
+          Hermeneia is not a language model — it is an architecture for governing how language,
+          evidence, models, and human judgment participate together.
+          Language models are <em>participants inside</em> Hermeneia, not the system itself.
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;max-width:560px">
@@ -5249,17 +7662,16 @@ function e10LoadGuide() {
             <div style="font-family:var(--mono);font-size:12px;color:var(--dim2);line-height:1.8">Text<br>↓<br>Text</div>
           </div>
           <div style="padding:14px 16px;border:1px solid var(--accent);border-radius:var(--r);background:var(--accent2)">
-            <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px">LILM</div>
-            <div style="font-family:var(--mono);font-size:12px;color:var(--fg2);line-height:1.8">Text<br>↓<br>Interpretation<br>↓<br>Lineage</div>
+            <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px">Constitutional Architecture</div>
+            <div style="font-family:var(--mono);font-size:12px;color:var(--fg2);line-height:1.8">Corpus<br>↓<br>Interpretation<br>↓<br>Lineage</div>
           </div>
         </div>
 
         <div style="font-size:13px;color:var(--fg2);line-height:1.7;max-width:600px;margin-bottom:16px">
-          An LLM sees more text. A LILM sees more survived criticism.
           A 33rd-edition textbook is not valuable because it is longer —
           it is valuable because the interpretations inside it have been
           challenged, corrected, and refined across many generations of scrutiny.
-          That process is what Hermeneia tracks.
+          Hermeneia makes that process explicit, accountable, and reproducible.
         </div>
 
         <div style="font-size:13px;color:var(--fg2);line-height:1.7;max-width:600px;margin-bottom:6px">
@@ -5272,9 +7684,13 @@ function e10LoadGuide() {
         </div>
 
         <div style="padding:14px 16px;border-left:3px solid var(--accent);background:var(--bg2);border-radius:0 var(--r) var(--r) 0;font-size:13px;color:var(--fg2);line-height:1.65;max-width:580px">
-          A LILM treats interpretations as first-class objects and tracks their maturation
+          Hermeneia treats interpretations as first-class objects and tracks their maturation
           through evidence, critique, revision, and ratification — recording what each interpretation
           withstood to get there.
+        </div>
+
+        <div style="margin-top:16px;padding:12px 16px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg2);font-size:12px;color:var(--dim2);line-height:1.6;max-width:580px">
+          <strong style="color:var(--fg2)">Lineage:</strong> Hermeneia descends from the LILM concept — a Large Interpretation Language Model that models the lifecycle of interpretation rather than raw language. An LLM sees more text. A LILM sees more survived criticism. That lineage remains accurate as a description of what Hermeneia does; "constitutional architecture" names how it does it.
         </div>
       </div>
 
@@ -5330,7 +7746,7 @@ function e10LoadGuide() {
         <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn-primary" onclick="e10Go('constitution')">Read the Constitution</button>
           <button class="btn-trace"   onclick="e10Go('corpus')">Open Corpus</button>
-          <button class="btn-trace"   onclick="e10Go('reader')">Read Report</button>
+          <button class="btn-trace"   onclick="e10Go('reports')">Read Report</button>
           <button class="btn-trace"   onclick="e10Go('lineage')">Inspect Lineage</button>
         </div>
       </div>

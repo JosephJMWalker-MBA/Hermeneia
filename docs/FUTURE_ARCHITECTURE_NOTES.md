@@ -3788,3 +3788,108 @@ Hermeneia's greatest contribution is not which world model it reconstructs. It i
 The interpretations will be superseded. The provenance trail that enables this audit persists.
 
 **The constitutional discipline applies to the research program itself.** One execution of one corpus (Gatsby) is evidence, not proof. "That is a bold hypothesis, not a conclusion" — Hermeneia's own standards require treating it that way. The empirical program is: run the full pipeline on radically different corpora and see whether the same decomposition emerges without forcing it.
+
+---
+
+## Epistemic Kernel Exploration *(Research Hypothesis — 2026-07-01)*
+
+*Recorded: 2026-07-01*
+
+**Status:** Research Hypothesis. Nothing in this section is a settled conclusion, and none of it licenses changes to the working architecture. This note preserves the intellectual journey — the rounds and their reversals — rather than only the endpoint, because interpretations should retain their provenance.
+
+**Origin:** A four-round theoretical dialogue (Joseph ↔ Claude Fable 5, 2026-07-01) testing whether Hermeneia's architecture can be rederived from first principles in philosophy of science, hermeneutics, knowledge representation, compiler theory, distributed systems, and category theory.
+
+**Goal:** Determine whether Hermeneia's current concepts are fundamental primitives or higher-level patterns emerging from a smaller kernel.
+
+### Round 1 — Can Hermeneia be reduced to immutable artifacts and governed interpretation?
+
+Candidate primitives: **Artifact, Endorsement, Agent, Justification, Frame, Constitution.**
+
+The derivation was forced from six principles: fallibilism (Peirce), accountability, theory-ladenness (Gadamer, Hanson), warrant (Toulmin, truth-maintenance systems), agency, legitimacy.
+
+Major insights:
+
+- The observation/interpretation boundary is likely a **pragmatic freeze point, not an ontological joint**. Observation = an assertion made in a frame of minimal declared interpretive freedom — a gradient with a declared position on it.
+- Central formulation: **the record grows monotonically; endorsement moves non-monotonically over it.** "Interpretations evolve. Observations endure." is the informal projection of this split.
+- The Continuity Principle reduces to a single invariant: groundedness of the justification DAG.
+- All seven stable names survive the rederivation — but as **roles** (capability bundles) and **patterns** (Blueprint = pre-registration of a reading), not as primitives.
+- Federation for free: monotone records always merge; endorsements legitimately don't. "Shared evidence, sovereign interpretation" becomes a mathematical property.
+- Correction adopted along the way: "artifacts never mutate, relationships evolve" → nothing mutates except endorsement refs; relationship-assertions are immutable too.
+- Speculative (flagged as such): frames as a site, adjudication as sheaf gluing, disagreement as a gluing obstruction.
+
+### Round 2 — Are computational primitives the correct foundation?
+
+Pushback (Joseph): Round 1 derived *computational* primitives, not *epistemic* ones. Knowledge exists as verbs; artifacts are the residue verbs leave behind. Candidate deeper primitives: Question, Commitment, Evidence, Relation, Agent, Constitution.
+
+Resolution: the two sets are **semantics vs. implementation**, not rivals. Verbs are the semantics; residue is the conformance surface — an implementation can only be tested by the trace its verbs leave.
+
+Kernel reduced to four: **Question, Commitment, Agent, Constitution.** Record = the trace commitment is forced to leave (by accountability); Evidence = commitment at minimal frame freedom; Relation = the type structure of commitment.
+
+Major insights:
+
+- **Commitment** — not belief, not truth, not confidence — as the central concept. Prior work: Brandom (*Making It Explicit*: assertion as undertaking commitment, deontic scorekeeping), Hamblin (dialogue games with literal commitment stores), Walton & Krabbe (*Commitment in Dialogue*), L. J. Cohen (belief vs. acceptance).
+- Guardrail: commitment must pair with **entitlement** (Brandom) or the system becomes an audited echo chamber. Hermeneia's entitlement = groundedness + constitutional admissibility.
+- **Question as primitive fixes the coverage problem**: coverage, gaps, relevance, and stopping conditions are question-relative, not corpus-relative (partition semantics — Groenendijk & Stokhof; Hintikka's interrogative model of inquiry; inquisitive semantics; Roberts' Question Under Discussion).
+- The corpus boundary is itself a commitment — governed and contestable. Consistent with the P0 "corpus boundary integrity" item.
+- Triad of managed resources: monotone **memory** (Record), revisable **acceptance** (Commitment), scarce **attention** (Inquiry — which is the scheduler).
+
+### Round 3 — What would a POSIX standard for epistemic systems require?
+
+Candidate insight: Hermeneia resembles an operating system more than a document-processing framework. Compilation, retrieval, debate, simulation, and experiment planning become subsystems over one constitutional kernel.
+
+The mapping: everything is **citable** (files); inquiries are **processes** (fork = question decomposition; orphaned inquiries are reaped into the Witness — negative results preserved); commitment verbs are **syscalls**; capabilities over transitions (**permissions**); the inquiry agenda (**scheduler**); evidence interrupts with staleness propagation (**signals**); corpus attachment with `source_role` as a mount option (**mounts**); rendered narrative vs. Critic findings as **stdout vs. stderr — never merged**.
+
+Sharpest formulation produced:
+
+> **Current AI systems run everything in kernel mode — generation is commitment. Hermeneia is ring separation for knowledge: draft freely in user space; nothing enters the shared record except through a constitutional syscall.**
+
+Conformance tiers: *forced* (append-only record; commitment frontier with entitlement; question objects with resolution semantics; the syscall boundary; capabilities; self-amendable constitution) / *strongly suggested* (scheduler, signals, mounts, stream separation) / *implementation freedom* (storage, addressing, which models play which roles, the pipeline as one admissible evaluation order).
+
+Standards caution: POSIX standardized *existing, competing practice*. Sequence: spec → conformance tests → a deliberately different second implementation (a flat-file, git-backed toy would be ideal) before claiming "reference model." If the spec is ever vague, let it be vague about storage — never about endorsement and adjudication semantics.
+
+### Round 4 — Two kernels, and commitment as event
+
+Joseph's synthesis: there are **two kernels at different abstraction levels**, and neither derivation is wrong.
+
+- **Behavioral kernel** ("what must happen") — verbs: Question, Commit, Justify, Challenge, Revise, Endorse.
+- **Implementation kernel** ("what survives") — nouns: Record, Agent, Constitution, Provenance, Capability.
+
+Formal note: this is the structure of a labeled transition system / operational semantics — the behavioral kernel supplies the transition labels; the implementation kernel is the configuration they act upon.
+
+**The Unix insight** (Joseph): Unix was revolutionary for small composable operations, not for files. Epistemic analogue: syscalls that each do almost nothing, composed into investigations. Additions from the dialogue: composition requires **closure under citation** (every operation's output must be a valid input/ground for any other — the pipe is the justification edge); investigative protocols become **shell scripts** — shareable, rerunnable, and committable before execution (a registered report is a script committed before it runs); epistemic pipes should be **typed from day one** (Unix's untyped text streams cost decades of fragile parsing).
+
+**The event hypothesis** (Joseph): commitment is an *event*, not a state. Git is fundamentally a history of commits, not a database. Candidate event kernel: Question, Commit, Reason, Review — with all state reconstructed from event history.
+
+If correct, this is the terminal reduction: even endorsement movement is an event (Git records ref updates in the reflog). Then there is **no mutable state anywhere** — only the event log and folds over it. "Current commitments" = fold(history) under a constitution. **The constitution is the fold plus its admissibility rules.**
+
+Consequence: two communities can share an identical event log and differ only in their fold. **Disagreement = different folds over shared history. Adjudication = comparing folds.** This strengthens the Round 1 federation result.
+
+Supporting alignment: speech act theory (assertion is an act — Austin; in Brandom the undertaking is the act, the score is derived state), legal precedent (law = fold over case-events), scientific literature (the record is the event log; "consensus" is a contested fold).
+
+### The whiteboard sentence
+
+> Hermeneia is an operating system for governed epistemic events. Knowledge is not stored as truth but reconstructed from an immutable history of constitutionally governed commitments made in response to explicit questions.
+
+Stress-test result: survives, with one amendment noted — "reconstructed" hides a plural. Reconstruction is a fold; folds are community-relative; the fold itself must be governed and contestable. Candidate variant: "…reconstructed — by each community, according to its constitution — from an immutable history…". The sentence also delegates world-contact (evidence, entitlement) entirely to "constitutionally governed"; the sentence may do that, but the specification must not.
+
+### Open Questions
+
+- Is Commitment a primitive or an event? (Current leaning: event; the status is derived by fold.)
+- Which events are primitive and which composite? (Revise = retract + commit + supersedes-link? Review = a sequence of challenge/endorse events? Publish = endorse at community scope?)
+- Is Evidence a primitive or a specialization of Commitment?
+- Does Inquiry belong in the kernel, or emerge from Questions plus scheduling?
+- Is the system fundamentally event-sourced — and is the fold unique or community-relative?
+- Can the kernel be reduced below four primitives?
+- Are these epistemic primitives or implementation primitives — and is the two-kernel split itself stable?
+- Where does world-contact enter the whiteboard sentence? Is "constitutionally governed" sufficient to prevent the audited-echo-chamber failure mode?
+- Does the sheaf-gluing formalization of adjudication (Round 1, speculative) survive contact with the event formulation?
+
+### Relationship to the existing architecture
+
+If this research direction proves correct, the existing Hermeneia architecture (Observation, Interpretation, Perspective, Narrative Blueprint, Architect, Artist, Critic) should be viewed as the **standard library built atop a smaller epistemic kernel** rather than as the kernel itself. The implementation remains stable while the theoretical foundation continues evolving — the same separation Hermeneia encourages in knowledge systems themselves.
+
+Nothing in this note changes Validation Phase P0 work.
+
+### Reading list handed over during the dialogue
+
+Hirsch (*Validity in Interpretation*); Gadamer (as the strongest adversary of the clean observation layer); Collingwood (logic of question and answer); Peirce (fallibilism, fixation of belief); Popper (conjecture; critique of observationalism); Toulmin (warrant); Brandom (*Making It Explicit* — commitment/entitlement scorekeeping); Hamblin, Walton & Krabbe (commitment stores in dialogue logic); L. J. Cohen (belief vs. acceptance); Hintikka (interrogative model of inquiry); Groenendijk & Stokhof (partition semantics); Ciardelli/Groenendijk/Roelofsen (inquisitive semantics); Roberts (Question Under Discussion); Heuer (Analysis of Competing Hypotheses); Wigmore (evidence charts); Doyle and de Kleer (TMS/ATMS); AGM belief revision; W3C PROV; nanopublications; Dung/ASPIC+ argumentation; Hearsay-II (blackboard architectures); Abramsky (sheaf-theoretic contextuality — speculative).

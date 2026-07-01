@@ -994,6 +994,89 @@ END""")
     from ..narrative.profiles import seed_built_in_profiles
     seed_built_in_profiles(conn)
 
+    # CI-016: response_mode on proposed_interpretations (triage / interpretive / skeptical)
+    pi_cols = {r[1] for r in conn.execute("PRAGMA table_info(proposed_interpretations)").fetchall()}
+    if "response_mode" not in pi_cols:
+        conn.execute("ALTER TABLE proposed_interpretations ADD COLUMN response_mode TEXT DEFAULT 'interpretive'")
+    conn.commit()
+
+    # CI-015: Inquiry Notes — steward observation review + structured questions
+    conn.executescript("""
+CREATE TABLE IF NOT EXISTS observation_reviews (
+    id            TEXT PRIMARY KEY,
+    observation_id TEXT NOT NULL REFERENCES observations(id),
+    review_status TEXT NOT NULL CHECK(review_status IN ('approved','rejected','unsure')),
+    steward_note  TEXT,
+    reason_for_status TEXT,
+    follow_up_needed  INTEGER NOT NULL DEFAULT 0,
+    pass_id       TEXT,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_obs_review_obs
+    ON observation_reviews(observation_id);
+
+CREATE TABLE IF NOT EXISTS inquiry_notes (
+    id             TEXT PRIMARY KEY,
+    observation_id TEXT NOT NULL REFERENCES observations(id),
+    review_id      TEXT REFERENCES observation_reviews(id),
+    question_text  TEXT NOT NULL CHECK(length(trim(question_text)) > 0),
+    question_type  TEXT NOT NULL DEFAULT 'unclassified',
+    created_at     TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_inquiry_obs
+    ON inquiry_notes(observation_id);
+""")
+    conn.commit()
+
+    # CI-017: Close Reading Workspace — human highlights + reading progress
+    conn.executescript("""
+CREATE TABLE IF NOT EXISTS reader_highlights (
+    id                  TEXT PRIMARY KEY,
+    source_document_id  TEXT NOT NULL REFERENCES source_documents(id),
+    source_role         TEXT NOT NULL DEFAULT 'primary',
+    page                INTEGER,
+    source_locator      TEXT,
+    selected_text       TEXT NOT NULL CHECK(length(trim(selected_text)) > 0),
+    context_before      TEXT,
+    context_after       TEXT,
+    note_text           TEXT,
+    question_text       TEXT,
+    question_type       TEXT NOT NULL DEFAULT 'unclassified',
+    relevance           TEXT NOT NULL DEFAULT 'unclear'
+        CHECK(relevance IN ('supports','complicates','contradicts','background','unclear')),
+    tags                TEXT NOT NULL DEFAULT '[]',
+    status              TEXT NOT NULL DEFAULT 'saved_highlight'
+        CHECK(status IN ('saved_highlight','observation_candidate','promoted_to_observation','dismissed')),
+    observation_id      TEXT REFERENCES observations(id),
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_highlight_doc
+    ON reader_highlights(source_document_id);
+
+CREATE INDEX IF NOT EXISTS idx_highlight_status
+    ON reader_highlights(status);
+
+CREATE TABLE IF NOT EXISTS reading_progress (
+    id              TEXT PRIMARY KEY,
+    document_id     TEXT NOT NULL UNIQUE REFERENCES source_documents(id),
+    pages_read      TEXT NOT NULL DEFAULT '[]',
+    last_page       INTEGER NOT NULL DEFAULT 1,
+    total_pages     INTEGER NOT NULL DEFAULT 1,
+    percent_read    REAL NOT NULL DEFAULT 0.0,
+    completed_at    TEXT,
+    updated_at      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_reading_progress_doc
+    ON reading_progress(document_id);
+""")
+    conn.commit()
+
 
 # Backwards-compat alias used by CLI commands written before v9
 ensure_artist_tables = ensure_profile_tables
@@ -1542,14 +1625,29 @@ class SQLiteStore:
         return self.get_source_document(doc_id)
 
     def all_ordered_observation_ids(self) -> list[str]:
-        """Return all observation IDs ordered by (page, paragraph, sentence)."""
+        """Return active observation IDs ordered by (page, paragraph, sentence)."""
         cur = self._conn.execute(
-            "SELECT id FROM observations ORDER BY page, paragraph, sentence"
+            """
+            SELECT o.id
+            FROM observations o
+            JOIN source_documents sd ON sd.id = o.source_document_id
+            WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
+            ORDER BY o.page, o.paragraph, o.sentence
+            """
         )
         return [r[0] for r in cur.fetchall()]
 
     def get_observation_by_id(self, obs_id: str) -> dict | None:
-        cur = self._conn.execute("SELECT * FROM observations WHERE id = ?", (obs_id,))
+        cur = self._conn.execute(
+            """
+            SELECT o.*
+            FROM observations o
+            JOIN source_documents sd ON sd.id = o.source_document_id
+            WHERE o.id = ?
+              AND COALESCE(sd.excluded_from_analysis, 0) = 0
+            """,
+            (obs_id,),
+        )
         row = cur.fetchone()
         return dict(row) if row else None
 

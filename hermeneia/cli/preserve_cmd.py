@@ -633,6 +633,32 @@ def cmd_preserve_verify(
         console.print("  [dim]preservation_report.json written.[/]")
         console.print("  [dim]preservation_report.md written.[/]")
         console.print()
+
+        if overall != "fail":
+            # Advisory: show edition cycle eligibility status
+            try:
+                from hermeneia.cli.edition_cmd import _load_cycles, _edition_status, _check_cycle_qualification
+                pub_dir = output_dir_ if output_dir_ else project_root / "publication"
+                store = _load_cycles(pub_dir)
+                est = _edition_status(store)
+                qual, _, _ = _check_cycle_qualification(pub_dir)
+                if qual:
+                    console.print(
+                        f"  [dim]Edition:[/] {est['status_label']} "
+                        f"({est['cycle_count']}/{est['minimum_required']} cycles)"
+                    )
+                    console.print(
+                        "  [dim]Preservation is qualified. Run: herm edition record[/]"
+                    )
+                else:
+                    console.print(
+                        f"  [dim]Edition:{est['status_label']} — "
+                        "not all pipeline stages are complete for edition cycle recording.[/]"
+                    )
+            except Exception:
+                pass  # Edition advisory is non-blocking
+
+        console.print()
         console.print(Rule(style="dim"))
 
         if overall == "fail":

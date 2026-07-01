@@ -18,7 +18,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, make_response, request, send_from_directory
 
 from ..cli.health import (
     blueprint_count,
@@ -79,8 +79,147 @@ def create_app(
     runtime_provider_keys: dict[str, str] = {}
     runtime_provider_keys_lock = threading.RLock()
 
+    # ── Calibration store ──────────────────────────────────────────────────────
+    # Persisted to calibration.json alongside the DB; loaded once at startup.
+    _calibration_path: Path = db_path.parent / "calibration.json"
+    _calibration_lock = threading.RLock()
+
+    def _load_calibration_store() -> dict:
+        if not _calibration_path.exists():
+            return {"calibration_schema": "1.0", "records": {}}
+        try:
+            return json.loads(_calibration_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            return {"calibration_schema": "1.0", "records": {}}
+
+    def _save_calibration_store(store: dict) -> None:
+        try:
+            _calibration_path.parent.mkdir(parents=True, exist_ok=True)
+            _calibration_path.write_text(json.dumps(store, indent=2, ensure_ascii=False))
+        except OSError:
+            pass
+
+    runtime_calibration: dict = _load_calibration_store()
+    # In-memory performance log — capped at 500 events per session
+    _perf_log: list[dict] = []
+    _PERF_LOG_MAX = 500
+
+    _CALIBRATION_ROLES = ["Explorer", "Architect", "Artist", "Critic", "Witness"]
+
+    # Structured-output calibration prompt for Explorer Bucketing
+    _EXPLORER_CALIBRATION_PROMPT = (
+        "You are an Explorer for Hermeneia. Assign this observation to exactly one thematic bucket.\n\n"
+        "Observation: \"The green light burned at the end of the dock, visible across the water.\"\n\n"
+        "Respond with ONLY valid JSON — no explanation, no markdown, no text outside the JSON:\n"
+        "{\"bucket\": \"<name>\", \"confidence\": \"<high|medium|low>\", \"rationale\": \"<one sentence>\"}\n\n"
+        "Valid bucket names: symbol_and_imagery, character_behavior, social_commentary, "
+        "setting_and_atmosphere, plot_event"
+    )
+
+    # Narrative-generation calibration prompt for Artist
+    _ARTIST_CALIBRATION_PROMPT = (
+        "Write a single paragraph (3-5 sentences) interpreting the following observation. "
+        "Write in clear, literary prose. Do not use bullet points or headers.\n\n"
+        "Observation: \"He stretched out his arms toward the dark water in a trembling way.\""
+    )
+
+    def _get_participant_calibration(participant_key: str) -> dict:
+        """Return the calibration record for a participant, initialised if absent."""
+        with _calibration_lock:
+            store = runtime_calibration
+            if participant_key not in store.get("records", {}):
+                store.setdefault("records", {})[participant_key] = {
+                    "participant": participant_key,
+                    "role_status": {
+                        role: {"status": "untested", "last_updated": None, "steward_note": None}
+                        for role in _CALIBRATION_ROLES
+                    },
+                    "calibration_tests": [],
+                }
+            return store["records"][participant_key]
+
+    def _record_calibration_result(
+        participant_key: str,
+        role: str,
+        test_name: str,
+        status: str,
+        latency_ms: int | None,
+        failure_reason: str | None,
+        recommendation: str,
+    ) -> None:
+        with _calibration_lock:
+            rec = _get_participant_calibration(participant_key)
+            now = datetime.now(timezone.utc).isoformat()
+            test_id = f"t-{now[:10].replace('-','')}-{len(rec['calibration_tests'])+1:03d}"
+            rec["calibration_tests"].append({
+                "test_id": test_id,
+                "timestamp": now,
+                "role": role,
+                "test_name": test_name,
+                "status": status,
+                "latency_ms": latency_ms,
+                "failure_reason": failure_reason,
+                "recommendation": recommendation,
+            })
+            # Update role_status based on result
+            new_role_status = "allowed" if status == "pass" else (
+                "rejected" if status == "fail" else "caution"
+            )
+            rec["role_status"][role] = {
+                "status": new_role_status,
+                "last_updated": now,
+                "steward_note": None,
+            }
+            _save_calibration_store(runtime_calibration)
+
+    def _log_performance_event(event: dict) -> None:
+        """Append a lightweight performance event to the in-memory log."""
+        _perf_log.append(event)
+        if len(_perf_log) > _PERF_LOG_MAX:
+            del _perf_log[0]
+
+    def _performance_summary() -> dict[str, dict]:
+        """Aggregate in-memory perf log by participant."""
+        summary: dict[str, dict] = {}
+        for ev in _perf_log:
+            p = ev.get("participant", "unknown")
+            if p not in summary:
+                summary[p] = {
+                    "calls": 0, "success": 0, "parse_ok": 0,
+                    "total_latency_ms": 0, "errors": [],
+                    "accepted": 0, "rejected": 0, "latencies": [],
+                }
+            s = summary[p]
+            s["calls"] += 1
+            if ev.get("success"):
+                s["success"] += 1
+            if ev.get("parse_ok"):
+                s["parse_ok"] += 1
+            lat = ev.get("latency_ms")
+            if lat is not None:
+                s["total_latency_ms"] += lat
+                s["latencies"].append(lat)
+            if ev.get("accepted"):
+                s["accepted"] += 1
+            if ev.get("rejected"):
+                s["rejected"] += 1
+            if ev.get("error"):
+                s["errors"] = s["errors"][-4:] + [ev["error"]]
+        # Compute averages
+        for p, s in summary.items():
+            n = len(s["latencies"])
+            s["avg_latency_ms"] = round(s["total_latency_ms"] / n) if n else None
+            del s["total_latency_ms"]
+            del s["latencies"]
+        return summary
+
     class _LineageError(Exception):
         pass
+
+    class _ScopeAccessError(Exception):
+        def __init__(self, message: str, status_code: int = 403) -> None:
+            super().__init__(message)
+            self.status_code = status_code
 
     _CONSTITUTIONAL_PROFILE_KEYS = {
         "constitution_version",
@@ -117,6 +256,82 @@ def create_app(
         "local": ("Local Model", "ollama-local", "qwen3:4b"),
     }
 
+    # Static role suitability: "recommended" | "allowed" | "untested" | "rejected"
+    _ROLE_SUITABILITY: dict[str, dict[str, str]] = {
+        "gpt": {
+            "Explorer": "recommended", "Architect": "recommended",
+            "Artist": "recommended", "Critic": "recommended", "Witness": "allowed",
+        },
+        "claude": {
+            "Explorer": "recommended", "Architect": "recommended",
+            "Artist": "recommended", "Critic": "recommended", "Witness": "allowed",
+        },
+        "gemini": {
+            "Explorer": "allowed", "Architect": "allowed",
+            "Artist": "allowed", "Critic": "allowed", "Witness": "allowed",
+        },
+        "grok": {
+            "Explorer": "untested", "Architect": "untested",
+            "Artist": "untested", "Critic": "untested", "Witness": "untested",
+        },
+        "meta": {
+            "Explorer": "untested", "Architect": "untested",
+            "Artist": "allowed", "Critic": "untested", "Witness": "allowed",
+        },
+        "local": {
+            # Qwen3:4b failed strict JSON structured output during Explorer bucketing
+            "Explorer": "rejected", "Architect": "untested",
+            "Artist": "allowed", "Critic": "untested", "Witness": "allowed",
+        },
+    }
+
+    _PROVIDER_SETUP: dict[str, dict] = {
+        "gpt": {
+            "about": "OpenAI GPT-4o. Strong reasoning, reliable structured output.",
+            "credential_name": "OPENAI_API_KEY",
+            "credential_hint": "Get a key at platform.openai.com/api-keys",
+            "setup_steps": [],
+        },
+        "claude": {
+            "about": "Anthropic Claude. Strong semantic precision and constitutional reasoning.",
+            "credential_name": "ANTHROPIC_API_KEY",
+            "credential_hint": "Get a key at console.anthropic.com",
+            "setup_steps": [],
+        },
+        "gemini": {
+            "about": "Google Gemini. Capable across roles. Not yet calibrated for Explorer.",
+            "credential_name": "GEMINI_API_KEY",
+            "credential_hint": "Get a key at aistudio.google.com/app/apikey",
+            "setup_steps": [],
+        },
+        "grok": {
+            "about": "xAI Grok. All roles untested within Hermeneia.",
+            "credential_name": "GROK_API_KEY",
+            "credential_hint": "Get a key at console.x.ai",
+            "setup_steps": [],
+        },
+        "meta": {
+            "about": "Meta Llama 3.2 running locally via Ollama. Private, no API key needed. Artist role verified.",
+            "credential_name": None,
+            "credential_hint": None,
+            "setup_steps": [
+                "Install Ollama from ollama.com",
+                "Run: ollama pull llama3.2:3b",
+                "Run: ollama serve",
+            ],
+        },
+        "local": {
+            "about": "Custom local model via Ollama (default: qwen3:4b). Explorer role rejected: failed structured JSON output.",
+            "credential_name": None,
+            "credential_hint": None,
+            "setup_steps": [
+                "Install Ollama from ollama.com",
+                "Run: ollama pull qwen3:4b",
+                "Run: ollama serve",
+            ],
+        },
+    }
+
     def _conn() -> sqlite3.Connection:
         uri = db_path.resolve().as_uri() + "?mode=ro"
         conn = sqlite3.connect(uri, uri=True)
@@ -132,6 +347,76 @@ def create_app(
 
     def _store() -> SQLiteStore:
         return SQLiteStore(db_path)
+
+    def _scope_error_response(exc: _ScopeAccessError):
+        payload = {"error": str(exc)}
+        if exc.status_code == 403:
+            payload["scope"] = "excluded_from_analysis"
+        return jsonify(payload), exc.status_code
+
+    def require_active_document(conn: sqlite3.Connection, doc_id: str) -> sqlite3.Row:
+        row = conn.execute(
+            "SELECT * FROM source_documents WHERE id = ?",
+            (doc_id,),
+        ).fetchone()
+        if row is None:
+            raise _ScopeAccessError("document not found", 404)
+        if int(row["excluded_from_analysis"] or 0):
+            raise _ScopeAccessError("document is excluded_from_analysis", 403)
+        return row
+
+    def require_active_observation(conn: sqlite3.Connection, obs_id: str) -> sqlite3.Row:
+        row = conn.execute(
+            """
+            SELECT o.*, sd.original_filename, sd.file_hash,
+                   COALESCE(sd.source_role, 'primary') AS source_role,
+                   COALESCE(sd.excluded_from_analysis, 0) AS excluded_from_analysis
+            FROM observations o
+            JOIN source_documents sd ON sd.id = o.source_document_id
+            WHERE o.id = ?
+            """,
+            (obs_id,),
+        ).fetchone()
+        if row is None:
+            raise _ScopeAccessError("observation not found", 404)
+        if int(row["excluded_from_analysis"] or 0):
+            raise _ScopeAccessError("observation is excluded_from_analysis", 403)
+        return row
+
+    def active_observation_ids(conn: sqlite3.Connection) -> list[str]:
+        return [
+            r[0]
+            for r in conn.execute(
+                """
+                SELECT o.id
+                FROM observations o
+                JOIN source_documents sd ON sd.id = o.source_document_id
+                WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
+                ORDER BY o.page, o.paragraph, o.sentence
+                """
+            )
+        ]
+
+    def require_active_proposal_observations(
+        conn: sqlite3.Connection, proposal_id: str
+    ) -> sqlite3.Row:
+        row = conn.execute(
+            """
+            SELECT id, observation_id, evidence_observation_ids
+            FROM proposed_interpretations
+            WHERE id = ?
+            """,
+            (proposal_id,),
+        ).fetchone()
+        if row is None:
+            raise _ScopeAccessError("proposal not found", 404)
+        evidence_ids = _json_loads(row["evidence_observation_ids"], [])
+        scoped_ids = {row["observation_id"]}
+        if isinstance(evidence_ids, list):
+            scoped_ids.update(str(oid) for oid in evidence_ids)
+        for obs_id in scoped_ids:
+            require_active_observation(conn, obs_id)
+        return row
 
     def _json_loads(value: object, fallback: object) -> object:
         if value is None:
@@ -206,6 +491,35 @@ def create_app(
             return None
         return key, item[0], item[2]
 
+    def _ollama_readiness(model: str) -> dict:
+        """Check Ollama server reachability and model availability without raising."""
+        try:
+            import ollama as _ollama  # noqa: F401
+        except ImportError:
+            return {"server_running": False, "model_pulled": False,
+                    "setup_action": "Run: pip install ollama"}
+        try:
+            client = _ollama.Client()
+            result = client.list()
+            model_rows = getattr(result, "models", None)
+            if model_rows is None and isinstance(result, dict):
+                model_rows = result.get("models", [])
+            names = {
+                str(item.get("model", "") if isinstance(item, dict) else getattr(item, "model", ""))
+                for item in (model_rows or [])
+            }
+            if model in names:
+                return {"server_running": True, "model_pulled": True, "setup_action": None}
+            return {
+                "server_running": True, "model_pulled": False,
+                "setup_action": f"Run: ollama pull {model}",
+            }
+        except Exception:
+            return {
+                "server_running": False, "model_pulled": False,
+                "setup_action": "Run: ollama serve",
+            }
+
     def _e10_provider_statuses() -> list[dict]:
         ecology = active_provider_registry.ecology()
         providers = {
@@ -236,28 +550,50 @@ def create_app(
             adapter_available = bool(provider.get("adapter_available"))
             available = configured and adapter_available and provider.get("provider_type") == "artist"
             requires_credential = bool(provider.get("required_environment"))
-            if available and not requires_credential:
-                message = (
-                    "Local SDK is installed. Use Test Connection to verify "
-                    "the runtime and selected model."
+            is_ollama = provider_id.startswith("ollama-")
+            default_model = provider.get("default_model") or draft_model
+
+            # Ollama: check actual server + model readiness, not just package install
+            ollama_ready = None
+            if is_ollama and adapter_available:
+                ollama_ready = _ollama_readiness(default_model)
+                ollama_fully_ready = ollama_ready["server_running"] and ollama_ready["model_pulled"]
+            else:
+                ollama_fully_ready = True  # non-Ollama providers are governed by credential
+
+            if is_ollama and adapter_available and not ollama_fully_ready:
+                setup_action = ollama_ready["setup_action"] if ollama_ready else None
+                if not ollama_ready["server_running"]:
+                    message = f"Ollama package is installed, but the server is not running. {setup_action or 'Run: ollama serve'}"
+                else:
+                    message = f"Ollama server is running, but the model is not pulled. {setup_action or f'Run: ollama pull {default_model}'}"
+                effective_status = "not_connected"
+            elif available and not requires_credential:
+                message = "Ollama server is running and model is ready." if is_ollama else (
+                    "Local SDK is installed. Use Test Connection to verify the runtime and selected model."
                 )
+                effective_status = "configured"
             elif available:
                 message = "Credential is present and the Python adapter is available."
+                effective_status = "configured"
             elif configured:
                 message = (
                     "Credential is saved, but the Python adapter is missing. "
                     "Install the provider SDK before testing the configuration."
                 )
+                effective_status = "not_connected"
             else:
                 message = "No credential is configured."
-            rows.append({
+                effective_status = "not_connected"
+
+            row: dict = {
                 "participant": key,
                 "label": label,
                 "provider_id": provider_id,
                 "configured": configured,
                 "requires_credential": requires_credential,
                 "adapter_available": adapter_available,
-                "status": "configured" if available else "not_connected",
+                "status": effective_status,
                 "credential_source": provider.get("required_environment"),
                 "credential_scope": (
                     "server_session"
@@ -266,10 +602,17 @@ def create_app(
                     if provider.get("configured") and requires_credential
                     else None
                 ),
-                "default_model": provider.get("default_model") or draft_model,
+                "default_model": default_model,
                 "execution_mode": "deterministic_local_draft",
                 "message": message,
-            })
+                "role_suitability": _ROLE_SUITABILITY.get(key, {}),
+                "setup": _PROVIDER_SETUP.get(key, {}),
+            }
+            if is_ollama:
+                row["ollama_server_running"] = bool(ollama_ready and ollama_ready["server_running"])
+                row["ollama_model_pulled"] = bool(ollama_ready and ollama_ready["model_pulled"])
+                row["ollama_setup_action"] = ollama_ready["setup_action"] if ollama_ready else None
+            rows.append(row)
         return rows
 
     def _e10_critic_report_payload(row: sqlite3.Row | dict) -> dict:
@@ -306,12 +649,7 @@ def create_app(
         return data
 
     def _all_obs_ids(conn: sqlite3.Connection) -> list[str]:
-        return [
-            r[0]
-            for r in conn.execute(
-                "SELECT id FROM observations ORDER BY page, paragraph, sentence"
-            )
-        ]
+        return active_observation_ids(conn)
 
     def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
         return bool(
@@ -469,11 +807,7 @@ def create_app(
                 add_edge("Interpretation", row["id"], "Observation", oid, "evidence_observation_ids")
 
         def build_observation(oid: str) -> None:
-            row = one(
-                "SELECT * FROM observations WHERE id = ?",
-                (oid,),
-                f"Observation missing: {oid}",
-            )
+            row = require_active_observation(conn, oid)
             add_node("Observation", row, {
                 "source_document_id": row["source_document_id"],
                 "source_extraction_id": row["source_extraction_id"],
@@ -483,6 +817,7 @@ def create_app(
                 "page": row["page"],
                 "paragraph": row["paragraph"],
                 "sentence": row["sentence"],
+                "source_role": row["source_role"],
             })
             build_source_extraction(row["source_extraction_id"])
             add_edge("Observation", row["id"], "SourceExtraction", row["source_extraction_id"], "source_extraction_id")
@@ -508,17 +843,14 @@ def create_app(
             add_edge("SourceExtraction", row["id"], "SourceDocument", row["document_id"], "document_id")
 
         def build_source_document(did: str) -> None:
-            row = one(
-                "SELECT * FROM source_documents WHERE id = ?",
-                (did,),
-                f"SourceDocument missing: {did}",
-            )
+            row = require_active_document(conn, did)
             add_node("SourceDocument", row, {
                 "original_filename": row["original_filename"],
                 "file_hash": row["file_hash"],
                 "total_pages": row["total_pages"],
                 "registered_at": row["registered_at"],
                 "compiler_version": row["compiler_version"],
+                "source_role": row["source_role"],
             })
 
         builders = {
@@ -580,7 +912,7 @@ def create_app(
         graph = None
         try:
             graph = _lineage_graph(conn, "RenderedNarrative", narrative_id)
-        except (_LineageError, sqlite3.Error) as exc:
+        except (_LineageError, _ScopeAccessError, sqlite3.Error) as exc:
             lineage_error = str(exc)
 
         nodes = graph["nodes"] if graph else []
@@ -1437,7 +1769,10 @@ def create_app(
 
     @app.route("/")
     def index():
-        return send_from_directory(str(STATIC_DIR), "index.html")
+        resp = make_response(send_from_directory(str(STATIC_DIR), "index.html"))
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+        return resp
 
     # ── /api/health ──────────────────────────────────────────────────────────
 
@@ -1798,6 +2133,9 @@ def create_app(
         conn = _conn()
         try:
             graph = _lineage_graph(conn, root_class, object_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
         except _LineageError as exc:
             conn.close()
             message = str(exc)
@@ -1836,6 +2174,9 @@ def create_app(
                 object_id,
                 interface_profile,
             )
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
         except _LineageError as exc:
             conn.close()
             message = str(exc)
@@ -1886,6 +2227,9 @@ def create_app(
         conn = _conn()
         try:
             summary = _trust_summary(conn, object_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
         except _LineageError as exc:
             conn.close()
             return jsonify({"error": str(exc)}), 404
@@ -2350,7 +2694,13 @@ def create_app(
 
         conn = _conn()
         all_rows = conn.execute(
-            "SELECT id FROM observations ORDER BY page, paragraph, sentence"
+            """
+            SELECT o.id
+            FROM observations o
+            JOIN source_documents sd ON sd.id = o.source_document_id
+            WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
+            ORDER BY o.page, o.paragraph, o.sentence
+            """
         ).fetchall()
         id_to_index = {r["id"]: i + 1 for i, r in enumerate(all_rows)}
 
@@ -2469,6 +2819,49 @@ def create_app(
             "providers": _e10_provider_statuses(),
         })
 
+    @app.route("/api/e10/scope")
+    def api_e10_scope():
+        """Return the active corpus scope: primary, supporting, muted documents and observation counts."""
+        if not db_path.exists():
+            return jsonify({"documents": [], "primary_count": 0, "supporting_count": 0, "muted_count": 0})
+        conn = _conn()
+        rows = conn.execute(
+            """
+            SELECT sd.id, sd.original_filename, sd.total_pages, sd.registered_at,
+                   sd.excluded_from_analysis, sd.source_role,
+                   COUNT(DISTINCT o.id) AS observation_count
+            FROM source_documents sd
+            LEFT JOIN observations o ON o.source_document_id = sd.id
+            GROUP BY sd.id
+            ORDER BY sd.registered_at ASC
+            """
+        ).fetchall()
+        conn.close()
+        docs = [
+            {
+                "id": r["id"],
+                "filename": r["original_filename"],
+                "total_pages": r["total_pages"],
+                "observation_count": r["observation_count"],
+                "excluded": bool(r["excluded_from_analysis"]),
+                "source_role": r["source_role"] or "primary",
+            }
+            for r in rows
+        ]
+        primary   = [d for d in docs if not d["excluded"] and d["source_role"] == "primary"]
+        supporting = [d for d in docs if not d["excluded"] and d["source_role"] != "primary"]
+        muted     = [d for d in docs if d["excluded"]]
+        return jsonify({
+            "documents": docs,
+            "primary":   primary,
+            "supporting": supporting,
+            "muted":     muted,
+            "primary_count":   len(primary),
+            "supporting_count": len(supporting),
+            "muted_count":     len(muted),
+            "boundary_clear":  len(primary) > 0 and len(docs) > 0,
+        })
+
     @app.route("/api/e10/providers/<participant>/key", methods=["PUT", "DELETE"])
     def api_e10_provider_key(participant: str):
         participant_info = _e10_participant(participant)
@@ -2571,20 +2964,237 @@ def create_app(
             ),
         })
 
+    @app.route("/api/e10/calibration")
+    def api_e10_calibration():
+        """Return full calibration records for all participants."""
+        with _calibration_lock:
+            records = runtime_calibration.get("records", {})
+            perf = _performance_summary()
+            result = {}
+            for key in _E10_PARTICIPANTS:
+                rec = _get_participant_calibration(key)
+                result[key] = {
+                    **rec,
+                    "performance": perf.get(key, {
+                        "calls": 0, "success": 0, "parse_ok": 0,
+                        "avg_latency_ms": None, "errors": [], "accepted": 0, "rejected": 0,
+                    }),
+                }
+        return jsonify({"calibration": result, "roles": _CALIBRATION_ROLES})
+
+    @app.route("/api/e10/providers/<participant>/calibrate/<role>", methods=["POST"])
+    def api_e10_calibrate_role(participant: str, role: str):
+        """Run a calibration test for a provider/role combination."""
+        participant_info = _e10_participant(participant)
+        if participant_info is None:
+            return jsonify({"error": f"unsupported participant: {participant}"}), 400
+        if role not in _CALIBRATION_ROLES:
+            return jsonify({"error": f"unknown role: {role}. Valid: {_CALIBRATION_ROLES}"}), 400
+
+        key, label, _ = participant_info
+        provider_id = _E10_PARTICIPANTS[key][1]
+
+        # Check provider availability before attempting calibration
+        statuses = _e10_provider_statuses()
+        provider_status = next((p for p in statuses if p["participant"] == key), None)
+        if provider_status is None or not provider_status["adapter_available"]:
+            return jsonify({
+                "participant": key, "role": role,
+                "status": "error",
+                "message": f"{label}: adapter not available. Cannot run calibration.",
+            }), 400
+
+        # For Ollama providers, check server + model readiness
+        is_ollama = provider_id.startswith("ollama-")
+        if is_ollama:
+            model = provider_status.get("default_model", "")
+            readiness = _ollama_readiness(model)
+            if not (readiness["server_running"] and readiness["model_pulled"]):
+                action = readiness.get("setup_action", "Check Ollama setup")
+                return jsonify({
+                    "participant": key, "role": role,
+                    "status": "error",
+                    "message": f"Ollama not ready: {action}",
+                }), 400
+
+        # Select calibration prompt and validation by role
+        if role == "Explorer":
+            prompt = _EXPLORER_CALIBRATION_PROMPT
+            test_name = "structured_output"
+        elif role == "Artist":
+            prompt = _ARTIST_CALIBRATION_PROMPT
+            test_name = "narrative_generation"
+        else:
+            # For untested roles, do a basic connectivity test
+            prompt = "Respond with exactly the word: READY"
+            test_name = "connectivity"
+
+        with runtime_provider_keys_lock:
+            runtime_key = runtime_provider_keys.get(provider_id)
+
+        import time as _time
+        start = _time.monotonic()
+        raw_output = None
+        error_msg = None
+        try:
+            kwargs: dict = {"model": provider_status["default_model"]}
+            if runtime_key:
+                kwargs["api_key"] = runtime_key
+            adapter = active_provider_registry.create(provider_id, **kwargs)
+            raw_output = adapter.render(prompt)
+        except Exception as exc:
+            error_msg = str(exc)
+        latency_ms = int((_time.monotonic() - start) * 1000)
+
+        if error_msg:
+            _record_calibration_result(
+                key, role, test_name, "fail", latency_ms,
+                error_msg, f"Provider call failed: {error_msg}"
+            )
+            _log_performance_event({
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "participant": key, "role": role,
+                "success": False, "parse_ok": False,
+                "latency_ms": latency_ms, "error": error_msg,
+            })
+            return jsonify({
+                "participant": key, "role": role, "test_name": test_name,
+                "status": "fail",
+                "failure_reason": error_msg,
+                "latency_ms": latency_ms,
+                "recommendation": f"Provider call failed. Check connection and model availability.",
+                "role_status": "rejected",
+            })
+
+        # Validate output by role
+        parse_ok = False
+        failure_reason = None
+        if role == "Explorer":
+            try:
+                parsed = json.loads(raw_output.strip())
+                required = {"bucket", "confidence", "rationale"}
+                if isinstance(parsed, dict) and required.issubset(parsed.keys()):
+                    parse_ok = True
+                else:
+                    failure_reason = (
+                        f"JSON parsed but missing required keys. Got: {list(parsed.keys()) if isinstance(parsed, dict) else type(parsed).__name__}"
+                    )
+            except (json.JSONDecodeError, ValueError) as exc:
+                failure_reason = f"Response is not valid JSON: {exc}. Output begins: {raw_output[:120]!r}"
+        elif role == "Artist":
+            parse_ok = bool(raw_output and len(raw_output.strip()) > 30)
+            if not parse_ok:
+                failure_reason = f"Response too short or empty: {raw_output!r}"
+        else:
+            parse_ok = bool(raw_output and raw_output.strip())
+            if not parse_ok:
+                failure_reason = "Empty response"
+
+        status = "pass" if parse_ok else "fail"
+        recommendation = (
+            f"Passed {test_name} calibration. Approved for {role}." if parse_ok else
+            f"Failed {test_name}: {failure_reason}. Rejected for {role} until calibration passes."
+        )
+        _record_calibration_result(key, role, test_name, status, latency_ms, failure_reason, recommendation)
+        _log_performance_event({
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "participant": key, "role": role,
+            "success": parse_ok, "parse_ok": parse_ok,
+            "latency_ms": latency_ms, "error": failure_reason,
+        })
+
+        rec = _get_participant_calibration(key)
+        return jsonify({
+            "participant": key, "role": role, "test_name": test_name,
+            "status": status,
+            "failure_reason": failure_reason,
+            "latency_ms": latency_ms,
+            "raw_output_preview": (raw_output or "")[:200],
+            "recommendation": recommendation,
+            "role_status": rec["role_status"].get(role, {}).get("status", "untested"),
+        }), (201 if parse_ok else 200)
+
+    @app.route("/api/e10/providers/<participant>/roles/<role>", methods=["PATCH"])
+    def api_e10_set_role_status(participant: str, role: str):
+        """Steward manually sets role status: approved / rejected / untested."""
+        participant_info = _e10_participant(participant)
+        if participant_info is None:
+            return jsonify({"error": f"unsupported participant: {participant}"}), 400
+        if role not in _CALIBRATION_ROLES:
+            return jsonify({"error": f"unknown role: {role}"}), 400
+
+        payload = request.get_json(silent=True) or {}
+        status = payload.get("status", "").strip().lower()
+        note = str(payload.get("note", "")).strip() or None
+        valid_statuses = {"approved", "rejected", "untested", "caution"}
+        if status not in valid_statuses:
+            return jsonify({
+                "error": f"invalid status: {status!r}. Must be one of: {sorted(valid_statuses)}"
+            }), 400
+
+        key, label, _ = participant_info
+        now = datetime.now(timezone.utc).isoformat()
+        with _calibration_lock:
+            rec = _get_participant_calibration(key)
+            rec["role_status"][role] = {"status": status, "last_updated": now, "steward_note": note}
+            _save_calibration_store(runtime_calibration)
+
+        return jsonify({
+            "participant": key, "role": role,
+            "status": status, "steward_note": note, "updated_at": now,
+            "message": f"{label}: {role} role status set to '{status}' by Steward.",
+        })
+
+    @app.route("/api/e10/performance")
+    def api_e10_performance():
+        return jsonify({
+            "summary": _performance_summary(),
+            "event_count": len(_perf_log),
+            "session_only": True,
+        })
+
+    @app.route("/api/edition/cycles")
+    def api_edition_cycles():
+        from hermeneia.cli.edition_cmd import _load_cycles, _edition_status, EDITION_MIN_CYCLES
+        pub_dir = Path.cwd() / "publication"
+        try:
+            store = _load_cycles(pub_dir)
+            status = _edition_status(store)
+        except Exception:
+            status = {"cycle_count": 0, "eligible": False, "status_label": "Working Draft", "cycles_remaining": EDITION_MIN_CYCLES}
+        return jsonify({
+            "cycle_count": status["cycle_count"],
+            "eligible": status["eligible"],
+            "status_label": status["status_label"],
+            "cycles_remaining": status["cycles_remaining"],
+            "minimum_required": EDITION_MIN_CYCLES,
+        })
+
     @app.route("/api/e10/observations/<observation_id>")
     def api_e10_observation_detail(observation_id: str):
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
         conn = _conn()
+        try:
+            require_active_observation(conn, observation_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
         rows = conn.execute(
-            "SELECT id FROM observations ORDER BY page, paragraph, sentence"
+            """
+            SELECT o.id
+            FROM observations o
+            JOIN source_documents sd ON sd.id = o.source_document_id
+            WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
+            ORDER BY o.page, o.paragraph, o.sentence
+            """
         ).fetchall()
         id_to_index = {row["id"]: index + 1 for index, row in enumerate(rows)}
         obs = conn.execute(
             """
             SELECT o.*, sd.original_filename, sd.file_hash, se.raw_text AS extraction_raw_text,
-                   se.parser, se.parser_version
+                   se.parser, se.parser_version, sd.source_role
             FROM observations o
             JOIN source_documents sd ON sd.id = o.source_document_id
             JOIN source_extractions se ON se.id = o.source_extraction_id
@@ -2631,6 +3241,7 @@ def create_app(
                 "document": {
                     "original_filename": obs["original_filename"],
                     "file_hash": obs["file_hash"],
+                    "source_role": obs["source_role"] or "primary",
                 },
                 "extraction": {
                     "parser": obs["parser"],
@@ -2647,9 +3258,13 @@ def create_app(
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
+        from ..explorer.interpreter import VALID_RESPONSE_MODES
         payload = request.get_json(silent=True) or {}
         observation_id = str(payload.get("observation_id", "")).strip()
         raw_participants = payload.get("participants") or []
+        response_mode = str(payload.get("response_mode") or "interpretive").strip()
+        if response_mode not in VALID_RESPONSE_MODES:
+            response_mode = "interpretive"
         if not observation_id:
             return jsonify({"error": "observation_id is required"}), 400
         if not isinstance(raw_participants, list) or not raw_participants:
@@ -2662,15 +3277,14 @@ def create_app(
                 return jsonify({"error": f"unsupported participant: {raw}"}), 400
             participants.append(participant)
 
-        # Build corpus context so the prompt knows primary vs reference role
+        # Build corpus context so the prompt knows primary vs reference role.
+        # Direct IDs from excluded documents fail closed before any provider call.
         _ctx_conn = _conn()
-        obs_doc_row = _ctx_conn.execute(
-            """SELECT sd.original_filename, sd.source_role
-               FROM source_documents sd
-               JOIN observations o ON o.source_document_id = sd.id
-               WHERE o.id = ?""",
-            (observation_id,),
-        ).fetchone()
+        try:
+            obs_doc_row = require_active_observation(_ctx_conn, observation_id)
+        except _ScopeAccessError as exc:
+            _ctx_conn.close()
+            return _scope_error_response(exc)
         primary_doc_row = _ctx_conn.execute(
             """SELECT original_filename FROM source_documents
                WHERE COALESCE(excluded_from_analysis, 0) = 0
@@ -2697,15 +3311,44 @@ def create_app(
                     _adapter = active_provider_registry.create(_provider_id)
                 except Exception:
                     _adapter = active_provider_registry.create("null")
+                import time as _time
+                _gen_start = _time.monotonic()
+                _gen_error = None
                 try:
                     interp_text, prompt_used = generate_candidate_interpretation(
                         observation_text=observation["raw_text"],
                         perspective_label=label,
                         provider=_adapter,
                         corpus_context=corpus_context,
+                        response_mode=response_mode,
                     )
                 except ExplorerError as exc:
+                    _gen_error = str(exc)
+                    _log_performance_event({
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "participant": key, "role": "Explorer",
+                        "success": False, "parse_ok": False,
+                        "latency_ms": int((_time.monotonic() - _gen_start) * 1000),
+                        "error": _gen_error,
+                    })
                     raise StagingError(f"Explorer failed for participant {key!r}: {exc}") from exc
+                except Exception as exc:
+                    _gen_error = str(exc)
+                    _log_performance_event({
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "participant": key, "role": "Explorer",
+                        "success": False, "parse_ok": False,
+                        "latency_ms": int((_time.monotonic() - _gen_start) * 1000),
+                        "error": _gen_error,
+                    })
+                    raise StagingError(f"Provider error for participant {key!r}: {exc}") from exc
+                _log_performance_event({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "participant": key, "role": "Explorer",
+                    "success": True, "parse_ok": True,
+                    "latency_ms": int((_time.monotonic() - _gen_start) * 1000),
+                    "error": None,
+                })
                 proposal = propose_interpretation(
                     observation_id=observation_id,
                     perspective=label,
@@ -2721,6 +3364,9 @@ def create_app(
                         "surface": "E10 Interpretation Lab",
                         "participant": key,
                         "mode": "explorer-llm",
+                        "observation_source_role": corpus_context.get("observation_role", "primary"),
+                        "observation_source_document": corpus_context.get("observation_source"),
+                        "primary_document": corpus_context.get("primary_work"),
                     },
                     evidence_observation_ids=[observation_id],
                 )
@@ -2730,17 +3376,39 @@ def create_app(
         finally:
             store.close()
 
+        # Write response_mode onto each proposal row
+        rw = _conn_rw()
+        for proposal in proposals:
+            rw.execute(
+                "UPDATE proposed_interpretations SET response_mode = ? WHERE id = ?",
+                (response_mode, proposal["id"]),
+            )
+        rw.commit()
+
         conn = _conn()
-        enriched = [
-            _e10_proposal_payload(
+        enriched = []
+        for proposal in proposals:
+            payload = _e10_proposal_payload(
                 conn,
                 conn.execute(
                     "SELECT * FROM proposed_interpretations WHERE id = ?",
                     (proposal["id"],),
                 ).fetchone(),
             )
-            for proposal in proposals
-        ]
+            # Fetch generation_parameters from ai_provenance (not on proposal row)
+            prov_row = conn.execute(
+                "SELECT generation_parameters FROM ai_provenance WHERE staged_object_id = ?",
+                (proposal["id"],),
+            ).fetchone()
+            gen_params = _json_loads(
+                prov_row["generation_parameters"] if prov_row else None, {}
+            )
+            payload["generation_parameters"] = gen_params
+            payload["obs_source_role"] = gen_params.get("observation_source_role", "primary")
+            payload["obs_source_document"] = gen_params.get("observation_source_document")
+            payload["primary_document"] = gen_params.get("primary_document")
+            payload["response_mode"] = response_mode
+            enriched.append(payload)
         conn.close()
         return jsonify({"created_count": len(enriched), "proposals": enriched}), 201
 
@@ -2774,22 +3442,15 @@ def create_app(
         conn_ro = _conn()
         obs_rows = []
         for obs_id in raw_obs_ids:
-            row = conn_ro.execute(
-                "SELECT id, raw_text FROM observations WHERE id = ?", (obs_id,)
-            ).fetchone()
-            if row is None:
+            try:
+                row = require_active_observation(conn_ro, str(obs_id))
+            except _ScopeAccessError as exc:
                 conn_ro.close()
-                return jsonify({"error": f"observation not found: {obs_id}"}), 404
+                return _scope_error_response(exc)
             obs_rows.append({"id": row["id"], "raw_text": row["raw_text"]})
 
         # Corpus context from first observation's source document
-        obs_doc_row = conn_ro.execute(
-            """SELECT sd.original_filename, sd.source_role
-               FROM source_documents sd
-               JOIN observations o ON o.source_document_id = sd.id
-               WHERE o.id = ?""",
-            (raw_obs_ids[0],),
-        ).fetchone()
+        obs_doc_row = require_active_observation(conn_ro, str(raw_obs_ids[0]))
         primary_doc_row = conn_ro.execute(
             """SELECT original_filename FROM source_documents
                WHERE COALESCE(excluded_from_analysis, 0) = 0
@@ -2919,6 +3580,14 @@ def create_app(
         if not rationale:
             rationale = "Accepted in E10 Steward Review."
 
+        conn = _conn()
+        try:
+            require_active_proposal_observations(conn, proposal_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+        conn.close()
+
         store = _store()
         try:
             canonical = accept_proposed_interpretation(
@@ -2973,6 +3642,14 @@ def create_app(
                 "error": f"unknown policies: {', '.join(unknown)}",
                 "valid_policies": sorted(VALID_POLICIES),
             }), 400
+
+        conn = _conn()
+        try:
+            require_active_proposal_observations(conn, proposal_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+        conn.close()
 
         store = _store()
         reports = []
@@ -3039,7 +3716,7 @@ def create_app(
                 "RenderedNarrative",
                 finding["rendered_narrative_id"],
             )
-        except _LineageError:
+        except (_LineageError, _ScopeAccessError):
             graph = None
         conn.close()
         return jsonify({"finding": finding, "lineage": graph})
@@ -3171,6 +3848,11 @@ def create_app(
         # Fetch text for referenced observations (normalized_text preferred)
         obs_texts: dict[str, str] = {}
         for oid in all_obs_ids:
+            try:
+                scoped_obs = require_active_observation(conn, oid)
+            except _ScopeAccessError as exc:
+                conn.close()
+                return _scope_error_response(exc)
             row = conn.execute(
                 """
                 SELECT COALESCE(od.normalized_text, o.raw_text) AS text,
@@ -3188,19 +3870,54 @@ def create_app(
                     "paragraph": row["paragraph"],
                     "sentence": row["sentence"],
                     "source_locator": row["source_locator"],
+                    "source_role": scoped_obs["source_role"],
                 }
 
         # Fetch text for referenced interpretations
         interp_texts: dict[str, str] = {}
         for iid in all_interp_ids:
             row = conn.execute(
-                "SELECT text, perspective, evidential_status FROM interpretations WHERE id = ?", (iid,)
+                """
+                SELECT i.text, i.perspective, i.evidential_status,
+                       i.observation_id, i.evidence_observation_ids,
+                       COALESCE(sd.source_role, 'primary') AS source_role
+                FROM interpretations i
+                JOIN observations o ON o.id = i.observation_id
+                JOIN source_documents sd ON sd.id = o.source_document_id
+                WHERE i.id = ?
+                  AND COALESCE(sd.excluded_from_analysis, 0) = 0
+                """,
+                (iid,)
             ).fetchone()
+            if row is None:
+                stale = conn.execute(
+                    "SELECT observation_id, evidence_observation_ids FROM interpretations WHERE id = ?",
+                    (iid,),
+                ).fetchone()
+                if stale is not None:
+                    try:
+                        require_active_observation(conn, stale["observation_id"])
+                        evidence_ids = _json_loads(stale["evidence_observation_ids"], [])
+                        if isinstance(evidence_ids, list):
+                            for oid in evidence_ids:
+                                require_active_observation(conn, str(oid))
+                    except _ScopeAccessError as exc:
+                        conn.close()
+                        return _scope_error_response(exc)
             if row:
+                evidence_ids = _json_loads(row["evidence_observation_ids"], [])
+                if isinstance(evidence_ids, list):
+                    for oid in evidence_ids:
+                        try:
+                            require_active_observation(conn, str(oid))
+                        except _ScopeAccessError as exc:
+                            conn.close()
+                            return _scope_error_response(exc)
                 interp_texts[iid] = {
                     "text": row["text"],
                     "perspective": row["perspective"],
                     "evidential_status": row["evidential_status"],
+                    "source_role": row["source_role"],
                 }
 
         # Build enriched sections
@@ -3310,25 +4027,52 @@ def create_app(
         try:
             # ── Build OBS-N index ──────────────────────────────────────────
             all_obs = conn.execute(
-                "SELECT id, raw_text, page FROM observations ORDER BY page, paragraph, sentence"
+                """
+                SELECT o.id, o.raw_text, o.page,
+                       COALESCE(sd.source_role, 'primary') AS source_role,
+                       sd.original_filename
+                FROM observations o
+                JOIN source_documents sd ON sd.id = o.source_document_id
+                WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
+                ORDER BY o.page, o.paragraph, o.sentence
+                """
             ).fetchall()
             id_to_n = {r["id"]: i + 1 for i, r in enumerate(all_obs)}
             n_to_id = {i + 1: r["id"] for i, r in enumerate(all_obs)}
+            active_ids = set(id_to_n)
 
             # ── Accepted interpretations ───────────────────────────────────
-            interps = conn.execute(
-                """SELECT i.id, i.observation_id, i.text, i.evidential_status
+            raw_interps = conn.execute(
+                """SELECT i.id, i.observation_id, i.text, i.evidential_status,
+                          i.evidence_observation_ids,
+                          COALESCE(sd.source_role, 'primary') AS source_role,
+                          sd.original_filename
                    FROM interpretations i
+                   JOIN observations o ON o.id = i.observation_id
+                   JOIN source_documents sd ON sd.id = o.source_document_id
                    WHERE i.evidential_status IN ('established','accepted','speculative')
+                     AND COALESCE(sd.excluded_from_analysis, 0) = 0
                    ORDER BY i.created_at"""
             ).fetchall()
+            interps = []
+            for interp in raw_interps:
+                evidence_ids = _json_loads(interp["evidence_observation_ids"], [])
+                if isinstance(evidence_ids, list) and any(str(oid) not in active_ids for oid in evidence_ids):
+                    continue
+                interps.append(interp)
 
             interp_lines = []
             for i in interps:
                 n = id_to_n.get(i["id"]) or id_to_n.get(i["observation_id"], "?")
                 obs_n = id_to_n.get(i["observation_id"], "?")
+                role = i["source_role"] or "primary"
+                role_note = (
+                    "primary evidence"
+                    if role == "primary"
+                    else f"NON-PRIMARY {role} evidence from {i['original_filename']}; do not treat as primary"
+                )
                 interp_lines.append(
-                    f"INTERP-{i['id'][:8]} [OBS-{obs_n}] [{i['evidential_status']}]: {i['text']}"
+                    f"INTERP-{i['id'][:8]} [OBS-{obs_n}] [{i['evidential_status']}] [{role_note}]: {i['text']}"
                 )
 
             # ── Sample observations (spread across corpus) ─────────────────
@@ -3336,7 +4080,15 @@ def create_app(
             sample_obs = all_obs[::step][:40]
             obs_lines = []
             for r in sample_obs:
-                obs_lines.append(f"OBS-{id_to_n[r['id']]} (p.{r['page']}): {r['raw_text'][:200]}")
+                role = r["source_role"] or "primary"
+                role_note = (
+                    "primary evidence"
+                    if role == "primary"
+                    else f"NON-PRIMARY {role} evidence from {r['original_filename']}; do not treat as primary"
+                )
+                obs_lines.append(
+                    f"OBS-{id_to_n[r['id']]} (p.{r['page']}) [{role_note}]: {r['raw_text'][:200]}"
+                )
 
             # ── Build prompt ───────────────────────────────────────────────
             prompt = f"""You are the Hermeneia Architect. Your job is evidence-first research design, not thesis generation.
@@ -3347,6 +4099,11 @@ RESEARCH DIRECTIVE:
 CRITICAL INSTRUCTION — READ BEFORE PROCEEDING:
 Do NOT start from a thesis and find supporting evidence.
 Start from the evidence and let the structure emerge.
+
+SOURCE ROLE RULE:
+Excluded documents are absent from this prompt. If a line is labelled NON-PRIMARY,
+preserve that role in reasoning and do not treat commentary, reference, notes, or
+exploratory material as primary evidence.
 
 Your process must be:
 1. Survey the observations and interpretations for everything relevant to the directive
@@ -3543,10 +4300,8 @@ Return ONLY valid JSON, no markdown, no explanation:
 
         conn = _conn_rw()
         try:
-            all_obs = conn.execute(
-                "SELECT id FROM observations ORDER BY page, paragraph, sentence"
-            ).fetchall()
-            n_to_id = {i + 1: r[0] for i, r in enumerate(all_obs)}
+            all_obs = active_observation_ids(conn)
+            n_to_id = {i + 1: oid for i, oid in enumerate(all_obs)}
 
             sections_data = []
             for sec in raw_sections:
@@ -3677,6 +4432,14 @@ Return ONLY valid JSON, no markdown, no explanation:
         try:
             excluded = payload["excluded"] if "excluded" in payload else None
             source_role = str(payload["source_role"]).strip() if "source_role" in payload else None
+            # Primary corpus documents cannot be excluded — they are the evidentiary foundation.
+            if excluded:
+                conn = _conn()
+                row = conn.execute(
+                    "SELECT source_role FROM source_documents WHERE id = ?", (doc_id,)
+                ).fetchone()
+                if row and (row["source_role"] or "primary") == "primary":
+                    return jsonify({"error": "Primary corpus documents cannot be excluded. Change the document's role first if you intend to demote it."}), 400
             try:
                 updated = store.set_document_scope(
                     doc_id,
@@ -3696,13 +4459,199 @@ Return ONLY valid JSON, no markdown, no explanation:
         finally:
             store.close()
 
+    # ── Inquiry Notes (/api/observations/<id>/review, /api/observations/<id>/inquiry) ──
+
+    _VALID_REVIEW_STATUSES = {"approved", "rejected", "unsure"}
+    _VALID_QUESTION_TYPES = {
+        "evidence_needed", "meaning_unclear", "classification_unclear",
+        "contradiction", "connection_possible", "overreach_suspected",
+        "sequence_question", "unclassified",
+    }
+
+    def _now_iso() -> str:
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc).isoformat()
+
+    @app.route("/api/observations/<observation_id>/review", methods=["GET"])
+    def api_obs_review_get(observation_id: str):
+        if not db_path.exists():
+            return jsonify({"review": None, "inquiry_notes": []}), 200
+        conn = _conn_rw()
+        try:
+            require_active_observation(conn, observation_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+        review = conn.execute(
+            "SELECT * FROM observation_reviews WHERE observation_id = ?", (observation_id,)
+        ).fetchone()
+        notes = conn.execute(
+            "SELECT * FROM inquiry_notes WHERE observation_id = ? ORDER BY created_at",
+            (observation_id,),
+        ).fetchall()
+        conn.close()
+        return jsonify({
+            "review": dict(review) if review else None,
+            "inquiry_notes": [dict(n) for n in notes],
+        })
+
+    @app.route("/api/observations/<observation_id>/review", methods=["POST"])
+    def api_obs_review_post(observation_id: str):
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(silent=True) or {}
+        status = payload.get("review_status", "")
+        if status not in _VALID_REVIEW_STATUSES:
+            return jsonify({"error": f"review_status must be one of {sorted(_VALID_REVIEW_STATUSES)}"}), 400
+        conn = _conn_rw()
+        try:
+            require_active_observation(conn, observation_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+        obs = conn.execute("SELECT id FROM observations WHERE id = ?", (observation_id,)).fetchone()
+        if not obs:
+            return jsonify({"error": "observation not found"}), 404
+        now = _now_iso()
+        review_id = str(__import__("uuid").uuid4())
+        existing = conn.execute(
+            "SELECT id FROM observation_reviews WHERE observation_id = ?", (observation_id,)
+        ).fetchone()
+        if existing:
+            review_id = existing["id"]
+            conn.execute(
+                """UPDATE observation_reviews
+                   SET review_status=?, steward_note=?, reason_for_status=?,
+                       follow_up_needed=?, pass_id=?, updated_at=?
+                   WHERE id=?""",
+                (
+                    status,
+                    payload.get("steward_note") or None,
+                    payload.get("reason_for_status") or None,
+                    1 if payload.get("follow_up_needed") else 0,
+                    payload.get("pass_id") or None,
+                    now,
+                    review_id,
+                ),
+            )
+        else:
+            conn.execute(
+                """INSERT INTO observation_reviews
+                   (id, observation_id, review_status, steward_note, reason_for_status,
+                    follow_up_needed, pass_id, created_at, updated_at)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                (
+                    review_id,
+                    observation_id,
+                    status,
+                    payload.get("steward_note") or None,
+                    payload.get("reason_for_status") or None,
+                    1 if payload.get("follow_up_needed") else 0,
+                    payload.get("pass_id") or None,
+                    now,
+                    now,
+                ),
+            )
+        conn.commit()
+        review = conn.execute(
+            "SELECT * FROM observation_reviews WHERE id = ?", (review_id,)
+        ).fetchone()
+        return jsonify({"review": dict(review)})
+
+    @app.route("/api/observations/<observation_id>/inquiry", methods=["POST"])
+    def api_obs_inquiry_post(observation_id: str):
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(silent=True) or {}
+        question_text = (payload.get("question_text") or "").strip()
+        if not question_text:
+            return jsonify({"error": "question_text is required"}), 400
+        question_type = payload.get("question_type") or "unclassified"
+        if question_type not in _VALID_QUESTION_TYPES:
+            question_type = "unclassified"
+        conn = _conn_rw()
+        try:
+            require_active_observation(conn, observation_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+        obs = conn.execute("SELECT id FROM observations WHERE id = ?", (observation_id,)).fetchone()
+        if not obs:
+            return jsonify({"error": "observation not found"}), 404
+        review = conn.execute(
+            "SELECT id FROM observation_reviews WHERE observation_id = ?", (observation_id,)
+        ).fetchone()
+        now = _now_iso()
+        note_id = str(__import__("uuid").uuid4())
+        conn.execute(
+            """INSERT INTO inquiry_notes
+               (id, observation_id, review_id, question_text, question_type, created_at)
+               VALUES (?,?,?,?,?,?)""",
+            (note_id, observation_id, review["id"] if review else None,
+             question_text, question_type, now),
+        )
+        conn.commit()
+        note = conn.execute("SELECT * FROM inquiry_notes WHERE id = ?", (note_id,)).fetchone()
+        return jsonify({"inquiry_note": dict(note)}), 201
+
+    @app.route("/api/observations/<observation_id>/inquiry/<note_id>", methods=["DELETE"])
+    def api_obs_inquiry_delete(observation_id: str, note_id: str):
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        conn = _conn_rw()
+        try:
+            require_active_observation(conn, observation_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+        conn.execute(
+            "DELETE FROM inquiry_notes WHERE id = ? AND observation_id = ?",
+            (note_id, observation_id),
+        )
+        conn.commit()
+        return jsonify({"deleted": note_id})
+
+    @app.route("/api/observations/reviews/summary")
+    def api_obs_reviews_summary():
+        if not db_path.exists():
+            return jsonify({"total": 0, "approved": 0, "rejected": 0, "unsure": 0,
+                            "questions": 0, "follow_up_needed": 0, "by_question_type": {}}), 200
+        conn = _conn_rw()
+        rows = conn.execute(
+            """SELECT review_status, COUNT(*) as cnt, SUM(follow_up_needed) as fup
+               FROM observation_reviews GROUP BY review_status"""
+        ).fetchall()
+        counts = {"approved": 0, "rejected": 0, "unsure": 0, "follow_up_needed": 0}
+        for r in rows:
+            counts[r["review_status"]] = r["cnt"]
+            counts["follow_up_needed"] += r["fup"] or 0
+        total = counts["approved"] + counts["rejected"] + counts["unsure"]
+        qtypes = conn.execute(
+            "SELECT question_type, COUNT(*) as cnt FROM inquiry_notes GROUP BY question_type"
+        ).fetchall()
+        by_type = {r["question_type"]: r["cnt"] for r in qtypes}
+        total_questions = sum(by_type.values())
+        return jsonify({
+            "total": total,
+            "approved": counts["approved"],
+            "rejected": counts["rejected"],
+            "unsure": counts["unsure"],
+            "questions": total_questions,
+            "follow_up_needed": counts["follow_up_needed"],
+            "by_question_type": by_type,
+        })
+
     # ── /api/upload ────────────────────────────────────────────────────────────
+
+    _VALID_SOURCE_ROLES = {"primary", "reference", "commentary", "notes", "exploratory"}
 
     @app.route("/api/upload", methods=["POST"])
     def api_upload():
         """Accept a PDF upload, compile it into the corpus, return observation counts.
 
         Multipart form-data with field name 'file'.
+        Optional form field 'role': primary (default), reference, commentary, notes, exploratory.
+        Optional form field 'label': human-readable label for the document.
         Idempotent: recompiling the same PDF (same SHA-256) inserts nothing.
         """
         from ..compiler.compiler import Compiler
@@ -3714,6 +4663,10 @@ Return ONLY valid JSON, no markdown, no explanation:
             return jsonify({"error": "Empty filename"}), 400
         if not f.filename.lower().endswith(".pdf"):
             return jsonify({"error": "Only PDF files are supported"}), 415
+
+        source_role = request.form.get("role", "primary").strip().lower()
+        if source_role not in _VALID_SOURCE_ROLES:
+            source_role = "primary"
 
         build_dir = db_path.parent
         uploads_dir = build_dir / "uploads"
@@ -3744,6 +4697,11 @@ Return ONLY valid JSON, no markdown, no explanation:
         obs_count = 0
         term_count = 0
         if doc:
+            # Apply the requested source role via the storage layer (not raw SQL)
+            if source_role != "primary":
+                _upload_store = _store()
+                _upload_store.set_document_scope(doc["id"], source_role=source_role)
+                _upload_store.close()
             obs_count = conn.execute(
                 "SELECT COUNT(*) FROM observations WHERE source_document_id = ?", (doc["id"],)
             ).fetchone()[0]
@@ -3773,6 +4731,7 @@ Return ONLY valid JSON, no markdown, no explanation:
             "total_pages": doc["total_pages"] if doc else None,
             "observation_count": obs_count,
             "term_count": term_count,
+            "source_role": source_role,
         })
 
     @app.route("/api/project/summary")
@@ -4133,9 +5092,7 @@ Return ONLY valid JSON, no markdown, no explanation:
             elif obs_ref:
                 n_str = obs_ref.upper().replace("OBS-", "")
                 n = int(n_str)
-                all_ids = [r[0] for r in conn.execute(
-                    "SELECT id FROM observations ORDER BY page, paragraph, sentence"
-                ).fetchall()]
+                all_ids = active_observation_ids(conn)
             else:
                 return jsonify({"error": "narrative_id or obs_ref required"}), 400
 
@@ -4222,6 +5179,8 @@ Return ONLY valid JSON, no markdown, no explanation:
                    o.raw_text, o.page, o.paragraph
             FROM interpretations i
             JOIN observations o ON o.id = i.observation_id
+            JOIN source_documents sd ON sd.id = o.source_document_id
+            WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
             ORDER BY i.created_at DESC
         """).fetchall()
         conn.close()
@@ -4251,7 +5210,14 @@ Return ONLY valid JSON, no markdown, no explanation:
             return jsonify({"error": "database not found"}), 404
         conn = _conn()
         row = conn.execute(
-            "SELECT id, evidential_status, steward_note FROM interpretations WHERE id=?",
+            """
+            SELECT i.id, i.evidential_status, i.steward_note
+            FROM interpretations i
+            JOIN observations o ON o.id = i.observation_id
+            JOIN source_documents sd ON sd.id = o.source_document_id
+            WHERE i.id=?
+              AND COALESCE(sd.excluded_from_analysis, 0) = 0
+            """,
             (interpretation_id,),
         ).fetchone()
         conn.close()
@@ -4264,7 +5230,14 @@ Return ONLY valid JSON, no markdown, no explanation:
             return jsonify({"error": "database not found"}), 404
         conn = _conn()
         row = conn.execute(
-            "SELECT id FROM interpretations WHERE id=?",
+            """
+            SELECT i.id
+            FROM interpretations i
+            JOIN observations o ON o.id = i.observation_id
+            JOIN source_documents sd ON sd.id = o.source_document_id
+            WHERE i.id=?
+              AND COALESCE(sd.excluded_from_analysis, 0) = 0
+            """,
             (interpretation_id,),
         ).fetchone()
         conn.close()
@@ -4370,5 +5343,974 @@ Return ONLY valid JSON, no markdown, no explanation:
             "unsupported_claims": json.loads(vr["unsupported_claims"] or "[]"),
             "warnings": json.loads(vr["warnings"] or "[]"),
         })
+
+    # ── Close Reading Workspace ───────────────────────────────────────────────
+
+    @app.route("/api/reader/documents")
+    def api_reader_documents():
+        """List source documents with their reading progress."""
+        if not db_path.exists():
+            return jsonify({"documents": []}), 200
+        conn = _conn_rw()
+        docs = conn.execute(
+            """SELECT sd.id, sd.original_filename, sd.source_role, sd.total_pages,
+                      sd.excluded_from_analysis,
+                      rp.last_page, rp.percent_read, rp.pages_read, rp.completed_at
+               FROM source_documents sd
+               LEFT JOIN reading_progress rp ON rp.document_id = sd.id
+               WHERE sd.excluded_from_analysis = 0
+               ORDER BY sd.source_role = 'primary' DESC, sd.original_filename"""
+        ).fetchall()
+        result = []
+        for d in docs:
+            result.append({
+                "id": d["id"],
+                "filename": d["original_filename"],
+                "source_role": d["source_role"] or "primary",
+                "total_pages": d["total_pages"] or 1,
+                "excluded": bool(d["excluded_from_analysis"]),
+                "last_page": d["last_page"] or 1,
+                "percent_read": d["percent_read"] or 0.0,
+                "pages_read": json.loads(d["pages_read"] or "[]"),
+                "completed_at": d["completed_at"],
+            })
+        conn.close()
+        return jsonify({"documents": result})
+
+    @app.route("/api/reader/documents/<doc_id>/pages")
+    def api_reader_document_pages(doc_id: str):
+        """Return extracted text pages for a document, grouped by page number."""
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        conn = _conn_rw()
+        try:
+            doc = require_active_document(conn, doc_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+        extractions = conn.execute(
+            """SELECT page, region, raw_text, source_locator
+               FROM source_extractions
+               WHERE document_id = ?
+               ORDER BY page, source_locator""",
+            (doc_id,)
+        ).fetchall()
+
+        # Group by page
+        pages: dict[int, list] = {}
+        for ex in extractions:
+            pg = ex["page"] or 1
+            pages.setdefault(pg, []).append({
+                "region": ex["region"],
+                "text": ex["raw_text"],
+                "source_locator": ex["source_locator"],
+            })
+
+        # Fetch highlights for this doc
+        highlights = conn.execute(
+            "SELECT id, page, selected_text, note_text, question_text, relevance, status, created_at "
+            "FROM reader_highlights WHERE source_document_id = ? AND status != 'dismissed' "
+            "ORDER BY page, created_at",
+            (doc_id,)
+        ).fetchall()
+        highlights_by_page: dict[int, list] = {}
+        for h in highlights:
+            pg = h["page"] or 0
+            highlights_by_page.setdefault(pg, []).append(dict(h))
+
+        conn.close()
+        return jsonify({
+            "document": {
+                "id": doc["id"],
+                "filename": doc["original_filename"],
+                "source_role": doc["source_role"] or "primary",
+                "total_pages": doc["total_pages"] or 1,
+                "excluded": bool(doc["excluded_from_analysis"]),
+            },
+            "pages": [
+                {"page": pg, "extractions": texts, "highlights": highlights_by_page.get(pg, [])}
+                for pg, texts in sorted(pages.items())
+            ],
+            "total_pages": doc["total_pages"] or 1,
+        })
+
+    @app.route("/api/reader/highlights", methods=["POST"])
+    def api_reader_save_highlight():
+        """Save a human highlight from the Close Reading workspace."""
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(force=True) or {}
+        doc_id = str(payload.get("source_document_id") or "").strip()
+        selected_text = str(payload.get("selected_text") or "").strip()
+        if not doc_id or not selected_text:
+            return jsonify({"error": "source_document_id and selected_text required"}), 400
+
+        conn = _conn_rw()
+        try:
+            doc = require_active_document(conn, doc_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+
+        import uuid
+        highlight_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        relevance = str(payload.get("relevance") or "unclear").strip()
+        valid_relevance = {"supports", "complicates", "contradicts", "background", "unclear"}
+        if relevance not in valid_relevance:
+            relevance = "unclear"
+
+        conn.execute(
+            """INSERT INTO reader_highlights
+               (id, source_document_id, source_role, page, source_locator,
+                selected_text, context_before, context_after,
+                note_text, question_text, question_type, relevance, tags,
+                status, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                highlight_id,
+                doc_id,
+                doc["source_role"] or "primary",
+                payload.get("page"),
+                payload.get("source_locator"),
+                selected_text,
+                payload.get("context_before"),
+                payload.get("context_after"),
+                payload.get("note_text"),
+                payload.get("question_text"),
+                payload.get("question_type") or "unclassified",
+                relevance,
+                json.dumps(payload.get("tags") or []),
+                "saved_highlight",
+                now,
+                now,
+            )
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"id": highlight_id, "status": "saved_highlight"}), 201
+
+    @app.route("/api/reader/highlights/<highlight_id>", methods=["PATCH"])
+    def api_reader_update_highlight(highlight_id: str):
+        """Update note, question, relevance, status, or tags on a highlight."""
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(force=True) or {}
+        conn = _conn_rw()
+        row = conn.execute(
+            "SELECT id, source_document_id FROM reader_highlights WHERE id = ?",
+            (highlight_id,)
+        ).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"error": "not found"}), 404
+        try:
+            require_active_document(conn, row["source_document_id"])
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+
+        allowed = {"note_text", "question_text", "question_type", "relevance", "tags", "status", "page", "source_locator"}
+        valid_status = {"saved_highlight", "observation_candidate", "promoted_to_observation", "dismissed"}
+        valid_relevance = {"supports", "complicates", "contradicts", "background", "unclear"}
+        sets, vals = [], []
+        for key, val in payload.items():
+            if key not in allowed:
+                continue
+            if key == "status" and val not in valid_status:
+                continue
+            if key == "relevance" and val not in valid_relevance:
+                continue
+            if key == "tags":
+                val = json.dumps(val if isinstance(val, list) else [])
+            sets.append(f"{key} = ?")
+            vals.append(val)
+
+        if sets:
+            sets.append("updated_at = ?")
+            vals.append(datetime.now(timezone.utc).isoformat())
+            vals.append(highlight_id)
+            conn.execute(f"UPDATE reader_highlights SET {', '.join(sets)} WHERE id = ?", vals)
+            conn.commit()
+        conn.close()
+        return jsonify({"ok": True})
+
+    @app.route("/api/reader/highlights/<highlight_id>", methods=["DELETE"])
+    def api_reader_delete_highlight(highlight_id: str):
+        """Dismiss (soft-delete) a highlight."""
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        conn = _conn_rw()
+        row = conn.execute(
+            "SELECT id, source_document_id FROM reader_highlights WHERE id = ?",
+            (highlight_id,),
+        ).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"error": "not found"}), 404
+        try:
+            require_active_document(conn, row["source_document_id"])
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            "UPDATE reader_highlights SET status = 'dismissed', updated_at = ? WHERE id = ?",
+            (now, highlight_id)
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True})
+
+    @app.route("/api/reader/documents/<doc_id>/highlights")
+    def api_reader_document_highlights(doc_id: str):
+        """All non-dismissed highlights for a document."""
+        if not db_path.exists():
+            return jsonify({"highlights": []}), 200
+        conn = _conn_rw()
+        try:
+            require_active_document(conn, doc_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+        rows = conn.execute(
+            """SELECT * FROM reader_highlights
+               WHERE source_document_id = ? AND status != 'dismissed'
+               ORDER BY page, created_at""",
+            (doc_id,)
+        ).fetchall()
+        conn.close()
+        result = []
+        for h in rows:
+            d = dict(h)
+            d["tags"] = json.loads(d.get("tags") or "[]")
+            result.append(d)
+        return jsonify({"highlights": result})
+
+    @app.route("/api/reader/progress", methods=["POST"])
+    def api_reader_update_progress():
+        """Upsert reading progress for a document."""
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(force=True) or {}
+        doc_id = str(payload.get("document_id") or "").strip()
+        page = int(payload.get("page") or 1)
+        if not doc_id:
+            return jsonify({"error": "document_id required"}), 400
+
+        conn = _conn_rw()
+        try:
+            doc = require_active_document(conn, doc_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+
+        total_pages = max(int(doc["total_pages"] or 1), 1)
+        import uuid as _uuid
+
+        existing = conn.execute(
+            "SELECT id, pages_read FROM reading_progress WHERE document_id = ?", (doc_id,)
+        ).fetchone()
+
+        now = datetime.now(timezone.utc).isoformat()
+        if existing:
+            pages_read: list = json.loads(existing["pages_read"] or "[]")
+            if page not in pages_read:
+                pages_read.append(page)
+            percent = round(len(pages_read) / total_pages * 100, 1)
+            completed_at = now if percent >= 100 else None
+            conn.execute(
+                """UPDATE reading_progress
+                   SET pages_read = ?, last_page = ?, percent_read = ?,
+                       completed_at = COALESCE(completed_at, ?), updated_at = ?
+                   WHERE document_id = ?""",
+                (json.dumps(pages_read), page, percent, completed_at, now, doc_id)
+            )
+        else:
+            pages_read = [page]
+            percent = round(1 / total_pages * 100, 1)
+            conn.execute(
+                """INSERT INTO reading_progress
+                   (id, document_id, pages_read, last_page, total_pages, percent_read, updated_at)
+                   VALUES (?,?,?,?,?,?,?)""",
+                (_uuid.uuid4().hex, doc_id, json.dumps(pages_read), page, total_pages, percent, now)
+            )
+
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "pages_read": len(pages_read), "percent_read": percent})
+
+    @app.route("/api/reader/highlights/<highlight_id>/promote", methods=["POST"])
+    def api_reader_promote_highlight(highlight_id: str):
+        """Promote a highlight to observation_candidate status (does not create an Observation)."""
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        conn = _conn_rw()
+        row = conn.execute(
+            "SELECT * FROM reader_highlights WHERE id = ?", (highlight_id,)
+        ).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"error": "not found"}), 404
+        try:
+            require_active_document(conn, row["source_document_id"])
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            "UPDATE reader_highlights SET status = 'observation_candidate', updated_at = ? WHERE id = ?",
+            (now, highlight_id)
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "status": "observation_candidate"})
+
+    @app.route("/api/reader/documents/<doc_id>/summary")
+    def api_reader_document_summary(doc_id: str):
+        """Deterministic reading trail summary for one document. No AI. No scoring."""
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        conn = _conn()
+
+        try:
+            doc = require_active_document(conn, doc_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+
+        # Reading progress
+        prog = conn.execute(
+            "SELECT last_page, percent_read, pages_read, total_pages, completed_at, updated_at "
+            "FROM reading_progress WHERE document_id = ?", (doc_id,)
+        ).fetchone()
+        total_pages = doc["total_pages"] or 1
+        try:
+            stored_pages = json.loads(prog["pages_read"] or "[]") if prog else []
+        except (json.JSONDecodeError, TypeError):
+            stored_pages = []
+        pages_read_list = sorted({
+            int(page)
+            for page in stored_pages
+            if isinstance(page, (int, float)) and 1 <= int(page) <= total_pages
+        })
+        percent_read = round(len(pages_read_list) / total_pages * 100, 1)
+        stored_last_page = prog["last_page"] if prog else None
+        last_page = (
+            int(stored_last_page)
+            if isinstance(stored_last_page, (int, float))
+            and 1 <= int(stored_last_page) <= total_pages
+            else (pages_read_list[-1] if pages_read_list else None)
+        )
+        last_updated = prog["updated_at"] if prog else None
+        completed_at = prog["completed_at"] if prog else None
+
+        # Highlights — always fetch active separately; dismissed count via separate query
+        active_hl = conn.execute(
+            "SELECT * FROM reader_highlights WHERE source_document_id = ? AND status != 'dismissed' "
+            "ORDER BY page IS NULL, page, created_at, id",
+            (doc_id,)
+        ).fetchall()
+        dismissed_count = conn.execute(
+            "SELECT COUNT(*) FROM reader_highlights WHERE source_document_id = ? AND status = 'dismissed'",
+            (doc_id,)
+        ).fetchone()[0]
+
+        # Counts by status
+        by_status: dict[str, int] = {
+            "saved_highlight": 0,
+            "observation_candidate": 0,
+            "promoted_to_observation": 0,
+        }
+        for h in active_hl:
+            by_status[h["status"]] = by_status.get(h["status"], 0) + 1
+
+        # Counts by relevance
+        by_relevance: dict[str, int] = {
+            "supports": 0,
+            "complicates": 0,
+            "contradicts": 0,
+            "background": 0,
+            "unclear": 0,
+        }
+        for h in active_hl:
+            r = h["relevance"] or "unclear"
+            by_relevance[r] = by_relevance.get(r, 0) + 1
+
+        # Counts by source_role
+        by_role: dict[str, int] = {}
+        for h in active_hl:
+            sr = h["source_role"] or "primary"
+            by_role[sr] = by_role.get(sr, 0) + 1
+
+        # Question trail
+        questions = [
+            h for h in active_hl
+            if isinstance(h["question_text"], str) and h["question_text"].strip()
+        ]
+        pages_with_questions: dict[int, int] = {}
+        for h in questions:
+            if isinstance(h["page"], int) and h["page"] > 0:
+                pages_with_questions[h["page"]] = (
+                    pages_with_questions.get(h["page"], 0) + 1
+                )
+
+        # Notes
+        notes = [
+            h for h in active_hl
+            if isinstance(h["note_text"], str) and h["note_text"].strip()
+        ]
+        pages_with_notes = sorted({
+            h["page"] for h in notes
+            if isinstance(h["page"], int) and h["page"] > 0
+        })
+
+        # Observation candidates
+        candidates = [
+            h for h in active_hl if h["status"] == "observation_candidate"
+        ]
+        previously_promoted = [
+            h for h in active_hl if h["status"] == "promoted_to_observation"
+        ]
+
+        # Attention clusters — fixed 20-page windows
+        window = 20
+        clusters: dict[str, dict] = {}
+        for h in active_hl:
+            pg = h["page"]
+            if not isinstance(pg, int) or pg < 1:
+                continue
+            bucket_start = ((pg - 1) // window) * window + 1
+            bucket_end = min(bucket_start + window - 1, total_pages)
+            key = f"{bucket_start}–{bucket_end}"
+            if key not in clusters:
+                clusters[key] = {"start": bucket_start, "end": bucket_end, "highlights": 0, "questions": 0, "pages": set()}
+            clusters[key]["highlights"] += 1
+            clusters[key]["pages"].add(pg)
+            if h["question_text"]:
+                clusters[key]["questions"] += 1
+
+        cluster_list = sorted(
+            [{"range": k, "start": v["start"], "end": v["end"],
+              "highlights": v["highlights"], "questions": v["questions"],
+              "page_count": len(v["pages"])}
+             for k, v in clusters.items()],
+            key=lambda c: c["start"]
+        )
+
+        # Top pages by highlight density
+        pages_by_hl: dict[int, int] = {}
+        for h in active_hl:
+            pg = h["page"]
+            if isinstance(pg, int) and pg > 0:
+                pages_by_hl[pg] = pages_by_hl.get(pg, 0) + 1
+        top_pages = sorted(
+            pages_by_hl.items(), key=lambda item: (-item[1], item[0])
+        )[:5]
+
+        # Machine observation count for comparison — no content exposed
+        machine_obs_count = conn.execute(
+            "SELECT COUNT(*) FROM observations WHERE source_document_id = ?", (doc_id,)
+        ).fetchone()[0]
+
+        # Next unread page
+        read_set = set(pages_read_list)
+        next_unread = None
+        for pg in range(1, total_pages + 1):
+            if pg not in read_set:
+                next_unread = pg
+                break
+
+        # Recent attention records, with a stable ID tie-breaker.
+        recent = sorted(
+            active_hl,
+            key=lambda h: (h["created_at"] or "", h["id"]),
+            reverse=True,
+        )[:5]
+        recent_questions = sorted(
+            questions,
+            key=lambda h: (h["created_at"] or "", h["id"]),
+            reverse=True,
+        )[:5]
+
+        conn.close()
+
+        non_primary_hl = [h for h in active_hl if (h["source_role"] or "primary") != "primary"]
+        complete = len(pages_read_list) >= total_pages
+        top_question_pages = sorted(
+            pages_with_questions.items(),
+            key=lambda item: (-item[1], item[0]),
+        )[:5]
+
+        return jsonify({
+            "document": {
+                "id": doc["id"],
+                "filename": doc["original_filename"],
+                "source_role": doc["source_role"] or "primary",
+                "is_primary_source": (doc["source_role"] or "primary") == "primary",
+                "total_pages": total_pages,
+            },
+            "reading_progress": {
+                "pages_read": len(pages_read_list),
+                "total_pages": total_pages,
+                "percent_read": percent_read,
+                "last_page": last_page,
+                "next_unread_page": next_unread,
+                "last_updated": last_updated,
+                "completed_at": completed_at,
+                "complete": complete,
+            },
+            "continue_reading": {
+                "available": next_unread is not None,
+                "page": next_unread,
+                "label": (
+                    f"Continue reading on page {next_unread}"
+                    if next_unread is not None
+                    else "All pages have been read"
+                ),
+            },
+            "highlight_trail": {
+                "total_active": len(active_hl),
+                "dismissed_count": dismissed_count,
+                "by_status": by_status,
+                "by_relevance": by_relevance,
+                "by_source_role": by_role,
+                "non_primary_count": len(non_primary_hl),
+                "unlocated_count": sum(
+                    1 for h in active_hl
+                    if not isinstance(h["page"], int) or h["page"] < 1
+                ),
+                "top_pages": [{"page": pg, "count": cnt} for pg, cnt in top_pages],
+            },
+            "question_trail": {
+                "total_questions": len(questions),
+                "pages_with_most_questions": [
+                    {"page": pg, "count": cnt}
+                    for pg, cnt in top_question_pages
+                ],
+                "recent_questions": [
+                    {
+                        "id": h["id"],
+                        "page": h["page"],
+                        "question_text": h["question_text"],
+                        "source_role": h["source_role"] or "primary",
+                        "is_primary_source": (
+                            h["source_role"] or "primary"
+                        ) == "primary",
+                        "created_at": h["created_at"],
+                    }
+                    for h in recent_questions
+                ],
+            },
+            "notes": {
+                "total_notes": len(notes),
+                "pages_with_notes": pages_with_notes,
+            },
+            "observation_candidates": {
+                "count": len(candidates),
+                "previously_promoted_count": len(previously_promoted),
+                "items": [
+                    {"id": h["id"], "page": h["page"], "source_role": h["source_role"] or "primary",
+                     "is_primary_source": (h["source_role"] or "primary") == "primary",
+                     "status": h["status"],
+                     "text_preview": (h["selected_text"] or "")[:120]}
+                    for h in candidates
+                ],
+            },
+            "attention_clusters": cluster_list,
+            "machine_coverage": {
+                "observation_count": machine_obs_count,
+                "note": "Machine coverage is separate from human reading progress.",
+            },
+            "recent_highlights": [
+                {"id": h["id"], "page": h["page"], "selected_text": (h["selected_text"] or "")[:160],
+                 "note_text": h["note_text"], "question_text": h["question_text"],
+                 "relevance": h["relevance"], "status": h["status"],
+                 "source_role": h["source_role"] or "primary",
+                 "is_primary_source": (h["source_role"] or "primary") == "primary",
+                 "created_at": h["created_at"]}
+                for h in recent
+            ],
+            "empty": len(active_hl) == 0 and len(pages_read_list) == 0,
+        })
+
+    @app.route("/api/reader/summary")
+    def api_reader_investigation_summary():
+        """Whole-investigation reading trail summary across all readable documents."""
+        if not db_path.exists():
+            return jsonify({
+                "reading_progress": {
+                    "total_pages": 0,
+                    "total_pages_read": 0,
+                    "overall_percent_read": 0.0,
+                },
+                "continue_reading": {
+                    "available": False,
+                    "document_id": None,
+                    "filename": None,
+                    "page": None,
+                },
+                "highlight_trail": {
+                    "total_active": 0,
+                    "dismissed_count": 0,
+                    "by_status": {
+                        "saved_highlight": 0,
+                        "observation_candidate": 0,
+                        "promoted_to_observation": 0,
+                    },
+                    "by_relevance": {
+                        "supports": 0,
+                        "complicates": 0,
+                        "contradicts": 0,
+                        "background": 0,
+                        "unclear": 0,
+                    },
+                    "by_source_role": {},
+                    "non_primary_count": 0,
+                },
+                "question_trail": {
+                    "total_questions": 0,
+                    "recent_questions": [],
+                },
+                "notes": {"total_notes": 0},
+                "observation_candidates": {
+                    "count": 0,
+                    "previously_promoted_count": 0,
+                },
+                "attention_clusters": [],
+                "top_pages": [],
+                "recent_highlights": [],
+                "documents": [],
+                "machine_coverage": {
+                    "observation_count": 0,
+                    "note": "Machine coverage is separate from human reading progress.",
+                },
+                "empty": True,
+            }), 200
+        conn = _conn()
+        docs = conn.execute(
+            "SELECT id, original_filename, source_role, total_pages "
+            "FROM source_documents WHERE excluded_from_analysis = 0 "
+            "ORDER BY source_role = 'primary' DESC, original_filename, id"
+        ).fetchall()
+
+        active_hl = conn.execute(
+            """SELECT rh.*, sd.original_filename
+               FROM reader_highlights rh
+               JOIN source_documents sd ON sd.id = rh.source_document_id
+               WHERE sd.excluded_from_analysis = 0
+                 AND rh.status != 'dismissed'
+               ORDER BY rh.created_at, rh.id"""
+        ).fetchall()
+        dismissed_count = conn.execute(
+            """SELECT COUNT(*)
+               FROM reader_highlights rh
+               JOIN source_documents sd ON sd.id = rh.source_document_id
+               WHERE sd.excluded_from_analysis = 0
+                 AND rh.status = 'dismissed'"""
+        ).fetchone()[0]
+
+        prog_rows = conn.execute(
+            """SELECT rp.document_id, rp.pages_read, rp.last_page,
+                      rp.completed_at, rp.updated_at
+               FROM reading_progress rp
+               JOIN source_documents sd ON sd.id = rp.document_id
+               WHERE sd.excluded_from_analysis = 0"""
+        ).fetchall()
+        progress_by_doc = {r["document_id"]: r for r in prog_rows}
+
+        doc_summaries = []
+        for d in docs:
+            prog = progress_by_doc.get(d["id"])
+            total_doc_pages = max(int(d["total_pages"] or 1), 1)
+            try:
+                stored_pages = json.loads(prog["pages_read"] or "[]") if prog else []
+            except (json.JSONDecodeError, TypeError):
+                stored_pages = []
+            pages_read = sorted({
+                int(page)
+                for page in stored_pages
+                if isinstance(page, (int, float))
+                and 1 <= int(page) <= total_doc_pages
+            })
+            next_unread = next(
+                (
+                    page for page in range(1, total_doc_pages + 1)
+                    if page not in set(pages_read)
+                ),
+                None,
+            )
+            stored_last_page = prog["last_page"] if prog else None
+            last_page = (
+                int(stored_last_page)
+                if isinstance(stored_last_page, (int, float))
+                and 1 <= int(stored_last_page) <= total_doc_pages
+                else (pages_read[-1] if pages_read else None)
+            )
+            doc_summaries.append({
+                "id": d["id"],
+                "filename": d["original_filename"],
+                "source_role": d["source_role"] or "primary",
+                "is_primary_source": (d["source_role"] or "primary") == "primary",
+                "total_pages": total_doc_pages,
+                "pages_read": len(pages_read),
+                "percent_read": round(
+                    len(pages_read) / total_doc_pages * 100, 1
+                ),
+                "last_page": last_page,
+                "next_unread_page": next_unread,
+                "last_updated": prog["updated_at"] if prog else None,
+                "complete": next_unread is None,
+            })
+
+        total_pages = sum(d["total_pages"] for d in doc_summaries)
+        total_pages_read = sum(d["pages_read"] for d in doc_summaries)
+        overall_pct = round(total_pages_read / total_pages * 100, 1) if total_pages else 0.0
+
+        doc_summary_by_id = {d["id"]: d for d in doc_summaries}
+        by_status: dict[str, int] = {
+            "saved_highlight": 0,
+            "observation_candidate": 0,
+            "promoted_to_observation": 0,
+        }
+        by_relevance: dict[str, int] = {
+            "supports": 0,
+            "complicates": 0,
+            "contradicts": 0,
+            "background": 0,
+            "unclear": 0,
+        }
+        by_role: dict[str, int] = {}
+        questions = []
+        notes = []
+        page_counts: dict[tuple[str, int], dict] = {}
+        clusters: dict[tuple[str, int], dict] = {}
+        for h in active_hl:
+            by_status[h["status"]] = by_status.get(h["status"], 0) + 1
+            relevance = h["relevance"] or "unclear"
+            by_relevance[relevance] = by_relevance.get(relevance, 0) + 1
+            source_role = h["source_role"] or "primary"
+            by_role[source_role] = by_role.get(source_role, 0) + 1
+
+            has_question = (
+                isinstance(h["question_text"], str)
+                and bool(h["question_text"].strip())
+            )
+            if has_question:
+                questions.append(h)
+            if isinstance(h["note_text"], str) and h["note_text"].strip():
+                notes.append(h)
+
+            page = h["page"]
+            if not isinstance(page, int) or page < 1:
+                continue
+            page_key = (h["source_document_id"], page)
+            if page_key not in page_counts:
+                page_counts[page_key] = {
+                    "document_id": h["source_document_id"],
+                    "filename": h["original_filename"],
+                    "source_role": source_role,
+                    "page": page,
+                    "highlight_count": 0,
+                    "question_count": 0,
+                }
+            page_counts[page_key]["highlight_count"] += 1
+            if has_question:
+                page_counts[page_key]["question_count"] += 1
+
+            window_start = ((page - 1) // 20) * 20 + 1
+            doc_meta = doc_summary_by_id[h["source_document_id"]]
+            window_end = min(window_start + 19, doc_meta["total_pages"])
+            cluster_key = (h["source_document_id"], window_start)
+            if cluster_key not in clusters:
+                clusters[cluster_key] = {
+                    "document_id": h["source_document_id"],
+                    "filename": h["original_filename"],
+                    "source_role": source_role,
+                    "start": window_start,
+                    "end": window_end,
+                    "highlights": 0,
+                    "questions": 0,
+                    "pages": set(),
+                }
+            clusters[cluster_key]["highlights"] += 1
+            clusters[cluster_key]["pages"].add(page)
+            if has_question:
+                clusters[cluster_key]["questions"] += 1
+
+        top_pages = sorted(
+            page_counts.values(),
+            key=lambda item: (
+                -item["highlight_count"],
+                -item["question_count"],
+                item["filename"],
+                item["page"],
+            ),
+        )[:10]
+        cluster_list = sorted(
+            [
+                {
+                    key: value
+                    for key, value in cluster.items()
+                    if key != "pages"
+                }
+                | {"page_count": len(cluster["pages"])}
+                for cluster in clusters.values()
+            ],
+            key=lambda item: (
+                item["filename"],
+                item["start"],
+                item["document_id"],
+            ),
+        )
+        recent_highlights = sorted(
+            active_hl,
+            key=lambda h: (h["created_at"] or "", h["id"]),
+            reverse=True,
+        )[:10]
+        recent_questions = sorted(
+            questions,
+            key=lambda h: (h["created_at"] or "", h["id"]),
+            reverse=True,
+        )[:10]
+
+        incomplete_docs = [d for d in doc_summaries if not d["complete"]]
+        progressed_docs = [d for d in incomplete_docs if d["last_updated"]]
+        continue_doc = (
+            sorted(
+                progressed_docs,
+                key=lambda d: (d["last_updated"], d["id"]),
+                reverse=True,
+            )[0]
+            if progressed_docs
+            else (incomplete_docs[0] if incomplete_docs else None)
+        )
+
+        machine_obs_count = conn.execute(
+            """SELECT COUNT(*)
+               FROM observations o
+               JOIN source_documents sd ON sd.id = o.source_document_id
+               WHERE sd.excluded_from_analysis = 0"""
+        ).fetchone()[0]
+        conn.close()
+
+        return jsonify({
+            "reading_progress": {
+                "total_pages": total_pages,
+                "total_pages_read": total_pages_read,
+                "overall_percent_read": overall_pct,
+            },
+            "continue_reading": {
+                "available": continue_doc is not None,
+                "document_id": continue_doc["id"] if continue_doc else None,
+                "filename": continue_doc["filename"] if continue_doc else None,
+                "source_role": (
+                    continue_doc["source_role"] if continue_doc else None
+                ),
+                "page": (
+                    continue_doc["next_unread_page"] if continue_doc else None
+                ),
+            },
+            "highlight_trail": {
+                "total_active": len(active_hl),
+                "dismissed_count": dismissed_count,
+                "by_status": by_status,
+                "by_relevance": by_relevance,
+                "by_source_role": by_role,
+                "non_primary_count": sum(
+                    count for role, count in by_role.items()
+                    if role != "primary"
+                ),
+            },
+            "question_trail": {
+                "total_questions": len(questions),
+                "recent_questions": [
+                    {
+                        "id": h["id"],
+                        "document_id": h["source_document_id"],
+                        "filename": h["original_filename"],
+                        "page": h["page"],
+                        "question_text": h["question_text"],
+                        "source_role": h["source_role"] or "primary",
+                        "is_primary_source": (
+                            h["source_role"] or "primary"
+                        ) == "primary",
+                        "created_at": h["created_at"],
+                    }
+                    for h in recent_questions
+                ],
+            },
+            "notes": {"total_notes": len(notes)},
+            "observation_candidates": {
+                "count": by_status["observation_candidate"],
+                "previously_promoted_count": by_status["promoted_to_observation"],
+            },
+            "attention_clusters": cluster_list,
+            "top_pages": top_pages,
+            "recent_highlights": [
+                {
+                    "id": h["id"],
+                    "document_id": h["source_document_id"],
+                    "filename": h["original_filename"],
+                    "page": h["page"],
+                    "selected_text": (h["selected_text"] or "")[:160],
+                    "note_text": h["note_text"],
+                    "question_text": h["question_text"],
+                    "relevance": h["relevance"],
+                    "status": h["status"],
+                    "source_role": h["source_role"] or "primary",
+                    "is_primary_source": (
+                        h["source_role"] or "primary"
+                    ) == "primary",
+                    "created_at": h["created_at"],
+                }
+                for h in recent_highlights
+            ],
+            "documents": doc_summaries,
+            "machine_coverage": {
+                "observation_count": machine_obs_count,
+                "note": "Machine coverage is separate from human reading progress.",
+            },
+            "empty": len(active_hl) == 0 and total_pages_read == 0,
+        })
+
+    @app.route("/api/reader/documents/<doc_id>/related-observations")
+    def api_reader_related_observations(doc_id: str):
+        """Find machine observations near a passage (by page) or from this document."""
+        if not db_path.exists():
+            return jsonify({"observations": []}), 200
+        page = request.args.get("page", type=int)
+        conn = _conn_rw()
+        try:
+            require_active_document(conn, doc_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+        if page is not None:
+            rows = conn.execute(
+                """SELECT o.id, o.raw_text, o.page, o.source_locator,
+                          sd.original_filename, sd.source_role
+                   FROM observations o
+                   JOIN source_documents sd ON sd.id = o.source_document_id
+                   WHERE o.source_document_id = ? AND ABS(o.page - ?) <= 1
+                     AND sd.excluded_from_analysis = 0
+                   ORDER BY ABS(o.page - ?), o.paragraph
+                   LIMIT 10""",
+                (doc_id, page, page)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT o.id, o.raw_text, o.page, o.source_locator,
+                          sd.original_filename, sd.source_role
+                   FROM observations o
+                   JOIN source_documents sd ON sd.id = o.source_document_id
+                   WHERE o.source_document_id = ?
+                     AND sd.excluded_from_analysis = 0
+                   ORDER BY o.page, o.paragraph
+                   LIMIT 20""",
+                (doc_id,)
+            ).fetchall()
+        conn.close()
+        return jsonify({"observations": [dict(r) for r in rows]})
 
     return app

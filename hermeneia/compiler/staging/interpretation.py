@@ -33,6 +33,26 @@ class StagingError(Exception):
     """Raised when a staging pre-condition is not satisfied."""
 
 
+def _require_active_observation(conn, observation_id: str) -> None:
+    row = conn._conn.execute(
+        """
+        SELECT 1
+        FROM observations o
+        JOIN source_documents sd ON sd.id = o.source_document_id
+        WHERE o.id = ?
+          AND COALESCE(sd.excluded_from_analysis, 0) = 0
+        """,
+        (observation_id,),
+    ).fetchone()
+    if row is None:
+        raise StagingError(f"Observation {observation_id!r} not found")
+
+
+def _require_active_observation_set(conn, observation_ids: list[str]) -> None:
+    for observation_id in sorted(set(observation_ids)):
+        _require_active_observation(conn, observation_id)
+
+
 def propose_interpretation(
     observation_id: str,
     perspective: str,
@@ -73,12 +93,8 @@ def propose_interpretation(
     if prompt_reference_type not in _VALID_PROMPT_REF_TYPES:
         raise StagingError(f"prompt_reference_type must be one of {sorted(_VALID_PROMPT_REF_TYPES)}")
 
-    # Validate observation exists
-    row = conn._conn.execute(
-        "SELECT 1 FROM observations WHERE id = ?", (observation_id,)
-    ).fetchone()
-    if row is None:
-        raise StagingError(f"Observation {observation_id!r} not found")
+    evidence_ids = [str(oid) for oid in (evidence_observation_ids or [])]
+    _require_active_observation_set(conn, [observation_id, *evidence_ids])
 
     now = datetime.now(timezone.utc).isoformat()
     gen_ts = generation_timestamp or now
@@ -113,7 +129,7 @@ def propose_interpretation(
         "perspective_id": perspective_id,
         "text": text,
         "evidential_status": evidential_status,
-        "evidence_observation_ids": json.dumps(evidence_observation_ids or []),
+        "evidence_observation_ids": json.dumps(evidence_ids),
         "ai_provenance_id": prov_id,
         "status": "pending",
         "steward_id": None,
@@ -161,6 +177,14 @@ def accept_proposed_interpretation(
         raise StagingError(
             f"ProposedInterpretation {proposal_id!r} is already {proposal['status']!r} — cannot accept"
         )
+
+    try:
+        evidence_ids = json.loads(proposal["evidence_observation_ids"] or "[]")
+    except (TypeError, json.JSONDecodeError):
+        evidence_ids = []
+    if not isinstance(evidence_ids, list):
+        evidence_ids = []
+    _require_active_observation_set(conn, [proposal["observation_id"], *[str(oid) for oid in evidence_ids]])
 
     now = datetime.now(timezone.utc).isoformat()
     ts = accepted_at or now

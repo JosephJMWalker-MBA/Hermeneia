@@ -1,0 +1,574 @@
+{
+  "coverage_engine_version": "0.1.0",
+  "build_id": "white-paper-rc-2-analytical-craftsmanship",
+  "generated_at": "2026-06-28T00:21:14.984905+00:00",
+  "manifest_path": "/Users/josephjmwalker-mba/Documents/GitHub/Hermeneia/docs/builds/white_paper.compile.yaml",
+  "blueprint_id": "000001",
+  "tag_index": {
+    "benchmark": [
+      "docs/papers/scf_position_paper.md"
+    ],
+    "blueprint": [
+      "docs/papers/blueprint_000001.md"
+    ],
+    "calibration": [
+      "docs/research/experiment_001_english.md",
+      "docs/research/experiment_002_spanish.md",
+      "docs/research/experiment_003_mandarin.md",
+      "docs/research/experiment_001_002_003_comparative_analysis.md",
+      "docs/research/experiment_matrix.md"
+    ],
+    "comparative": [
+      "docs/research/experiment_001_002_003_comparative_analysis.md"
+    ],
+    "dataset-1": [
+      "docs/papers/white_paper_methodological_provenance.md"
+    ],
+    "divergence": [
+      "docs/research/experiment_001_002_003_comparative_analysis.md"
+    ],
+    "english": [
+      "docs/research/experiment_001_english.md"
+    ],
+    "evidence": [
+      "docs/research/experiment_matrix.md"
+    ],
+    "experiment": [
+      "docs/research/experiment_001_english.md",
+      "docs/research/experiment_002_spanish.md",
+      "docs/research/experiment_003_mandarin.md"
+    ],
+    "figure": [
+      "docs/research/experiment_001_002_003_comparative_analysis.md"
+    ],
+    "forbidden-claims": [
+      "docs/papers/blueprint_000001.md"
+    ],
+    "future-work": [
+      "docs/research/research_hypotheses.md"
+    ],
+    "governing-question": [
+      "docs/papers/blueprint_000001.md",
+      "docs/research/experiment_001_english.md",
+      "docs/research/experiment_002_spanish.md",
+      "docs/research/experiment_003_mandarin.md",
+      "docs/research/experiment_001_002_003_comparative_analysis.md"
+    ],
+    "hypothesis": [
+      "docs/research/research_hypotheses.md"
+    ],
+    "mandarin": [
+      "docs/research/experiment_003_mandarin.md"
+    ],
+    "matrix": [
+      "docs/research/experiment_matrix.md"
+    ],
+    "measurement": [
+      "docs/papers/scf_position_paper.md"
+    ],
+    "methodology": [
+      "docs/research/experiment_matrix.md",
+      "docs/papers/white_paper_methodological_provenance.md",
+      "docs/papers/hermeneia_writing_protocol.md",
+      "docs/papers/scf_position_paper.md"
+    ],
+    "observations": [
+      "docs/research/experiment_001_english.md",
+      "docs/research/experiment_002_spanish.md",
+      "docs/research/experiment_003_mandarin.md"
+    ],
+    "process": [
+      "docs/papers/hermeneia_writing_protocol.md"
+    ],
+    "provenance": [
+      "docs/papers/white_paper_methodological_provenance.md"
+    ],
+    "replicated": [
+      "docs/research/experiment_001_english.md",
+      "docs/research/experiment_002_spanish.md",
+      "docs/research/experiment_003_mandarin.md",
+      "docs/research/experiment_001_002_003_comparative_analysis.md",
+      "docs/research/experiment_matrix.md"
+    ],
+    "required-claims": [
+      "docs/papers/blueprint_000001.md"
+    ],
+    "research-program": [
+      "docs/research/research_hypotheses.md"
+    ],
+    "scf": [
+      "docs/papers/scf_position_paper.md"
+    ],
+    "spanish": [
+      "docs/research/experiment_002_spanish.md"
+    ],
+    "structure": [
+      "docs/papers/blueprint_000001.md"
+    ],
+    "thesis": [
+      "docs/papers/blueprint_000001.md"
+    ],
+    "tone": [
+      "docs/papers/blueprint_000001.md"
+    ],
+    "writing-protocol": [
+      "docs/papers/white_paper_methodological_provenance.md",
+      "docs/papers/hermeneia_writing_protocol.md"
+    ]
+  },
+  "sections": [
+    {
+      "section": "abstract",
+      "status": "PASS",
+      "required_tags": [
+        "thesis",
+        "governing-question",
+        "calibration"
+      ],
+      "tag_results": [
+        {
+          "tag": "thesis",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/papers/blueprint_000001.md"
+          ]
+        },
+        {
+          "tag": "governing-question",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/papers/blueprint_000001.md",
+            "docs/research/experiment_001_english.md",
+            "docs/research/experiment_002_spanish.md",
+            "docs/research/experiment_003_mandarin.md",
+            "docs/research/experiment_001_002_003_comparative_analysis.md"
+          ]
+        },
+        {
+          "tag": "calibration",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_001_english.md",
+            "docs/research/experiment_002_spanish.md",
+            "docs/research/experiment_003_mandarin.md",
+            "docs/research/experiment_001_002_003_comparative_analysis.md",
+            "docs/research/experiment_matrix.md"
+          ]
+        }
+      ],
+      "required_claims": [
+        "AI collapses distinct cognitive responsibilities into one generative act",
+        "Separation makes inquiry more accountable",
+        "Calibration experiments produced observable findings"
+      ],
+      "claims_checkable": false,
+      "claims_note": "Programmatic claim evaluation deferred to Sprint 004 Critic integration"
+    },
+    {
+      "section": "1-introduction",
+      "status": "PASS",
+      "required_tags": [
+        "thesis",
+        "methodology"
+      ],
+      "tag_results": [
+        {
+          "tag": "thesis",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/papers/blueprint_000001.md"
+          ]
+        },
+        {
+          "tag": "methodology",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_matrix.md",
+            "docs/papers/white_paper_methodological_provenance.md",
+            "docs/papers/hermeneia_writing_protocol.md",
+            "docs/papers/scf_position_paper.md"
+          ]
+        }
+      ],
+      "required_claims": [
+        "Single prompt collapses discovery, interpretation, communication, evaluation",
+        "Hermeneia begins from a different premise"
+      ],
+      "claims_checkable": false,
+      "claims_note": "Programmatic claim evaluation deferred to Sprint 004 Critic integration"
+    },
+    {
+      "section": "2-problem",
+      "status": "PASS",
+      "required_tags": [
+        "methodology",
+        "thesis"
+      ],
+      "tag_results": [
+        {
+          "tag": "methodology",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_matrix.md",
+            "docs/papers/white_paper_methodological_provenance.md",
+            "docs/papers/hermeneia_writing_protocol.md",
+            "docs/papers/scf_position_paper.md"
+          ]
+        },
+        {
+          "tag": "thesis",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/papers/blueprint_000001.md"
+          ]
+        }
+      ],
+      "required_claims": [
+        "Failures in current AI are undiagnosable because responsibilities are collapsed",
+        "Separation is the mechanism; preservation of understanding is the goal"
+      ],
+      "claims_checkable": false,
+      "claims_note": "Programmatic claim evaluation deferred to Sprint 004 Critic integration"
+    },
+    {
+      "section": "3-analytical-craftsmanship",
+      "status": "PASS",
+      "required_tags": [
+        "thesis",
+        "methodology"
+      ],
+      "tag_results": [
+        {
+          "tag": "thesis",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/papers/blueprint_000001.md"
+          ]
+        },
+        {
+          "tag": "methodology",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_matrix.md",
+            "docs/papers/white_paper_methodological_provenance.md",
+            "docs/papers/hermeneia_writing_protocol.md",
+            "docs/papers/scf_position_paper.md"
+          ]
+        }
+      ],
+      "required_claims": [
+        "Hermeneia does not merely preserve conclusions. It preserves intellectual conduct.",
+        "How did this investigator reason when faced with a complex, ambiguous problem?",
+        "Reasoning auditable, not just output auditable",
+        "Evidentiary discipline, calibrated confidence, rigorous revision, transparent uncertainty"
+      ],
+      "claims_checkable": false,
+      "claims_note": "Programmatic claim evaluation deferred to Sprint 004 Critic integration"
+    },
+    {
+      "section": "4-architecture",
+      "status": "PASS",
+      "required_tags": [
+        "blueprint",
+        "methodology"
+      ],
+      "tag_results": [
+        {
+          "tag": "blueprint",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/papers/blueprint_000001.md"
+          ]
+        },
+        {
+          "tag": "methodology",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_matrix.md",
+            "docs/papers/white_paper_methodological_provenance.md",
+            "docs/papers/hermeneia_writing_protocol.md",
+            "docs/papers/scf_position_paper.md"
+          ]
+        }
+      ],
+      "required_claims": [
+        "Five named cognitive responsibilities: Explorer, Architect, Artist, Critic, Steward",
+        "LLM occupies exactly one box (Artist)",
+        "Architect is deterministic — no inference",
+        "Constitutional governance preserves conditions for honest maturation"
+      ],
+      "claims_checkable": false,
+      "claims_note": "Programmatic claim evaluation deferred to Sprint 004 Critic integration"
+    },
+    {
+      "section": "5-evidential-standards",
+      "status": "PASS",
+      "required_tags": [
+        "methodology",
+        "provenance"
+      ],
+      "tag_results": [
+        {
+          "tag": "methodology",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_matrix.md",
+            "docs/papers/white_paper_methodological_provenance.md",
+            "docs/papers/hermeneia_writing_protocol.md",
+            "docs/papers/scf_position_paper.md"
+          ]
+        },
+        {
+          "tag": "provenance",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/papers/white_paper_methodological_provenance.md"
+          ]
+        }
+      ],
+      "required_claims": [
+        "Demonstrated: implementation and automated tests",
+        "Empirical Finding: supported by one or more experiments",
+        "Research Hypothesis: candidate for investigation; not yet supported"
+      ],
+      "claims_checkable": false,
+      "claims_note": "Programmatic claim evaluation deferred to Sprint 004 Critic integration"
+    },
+    {
+      "section": "6-calibration",
+      "status": "PASS",
+      "required_tags": [
+        "calibration",
+        "replicated",
+        "observations",
+        "governing-question",
+        "figure"
+      ],
+      "tag_results": [
+        {
+          "tag": "calibration",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_001_english.md",
+            "docs/research/experiment_002_spanish.md",
+            "docs/research/experiment_003_mandarin.md",
+            "docs/research/experiment_001_002_003_comparative_analysis.md",
+            "docs/research/experiment_matrix.md"
+          ]
+        },
+        {
+          "tag": "replicated",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_001_english.md",
+            "docs/research/experiment_002_spanish.md",
+            "docs/research/experiment_003_mandarin.md",
+            "docs/research/experiment_001_002_003_comparative_analysis.md",
+            "docs/research/experiment_matrix.md"
+          ]
+        },
+        {
+          "tag": "observations",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_001_english.md",
+            "docs/research/experiment_002_spanish.md",
+            "docs/research/experiment_003_mandarin.md"
+          ]
+        },
+        {
+          "tag": "governing-question",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/papers/blueprint_000001.md",
+            "docs/research/experiment_001_english.md",
+            "docs/research/experiment_002_spanish.md",
+            "docs/research/experiment_003_mandarin.md",
+            "docs/research/experiment_001_002_003_comparative_analysis.md"
+          ]
+        },
+        {
+          "tag": "figure",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_001_002_003_comparative_analysis.md"
+          ]
+        }
+      ],
+      "required_claims": [
+        "RF-001: Observation stability across English, Spanish, Mandarin",
+        "RF-002: Classification stability across all three",
+        "RF-003: Governing question is primary culture-adaptive variable",
+        "RF-004: Evidence weighting is downstream from governing question",
+        "Divergence figure: same corpus → divergent governing questions"
+      ],
+      "claims_checkable": false,
+      "claims_note": "Programmatic claim evaluation deferred to Sprint 004 Critic integration"
+    },
+    {
+      "section": "7-discussion",
+      "status": "PASS",
+      "required_tags": [
+        "replicated",
+        "calibration",
+        "methodology"
+      ],
+      "tag_results": [
+        {
+          "tag": "replicated",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_001_english.md",
+            "docs/research/experiment_002_spanish.md",
+            "docs/research/experiment_003_mandarin.md",
+            "docs/research/experiment_001_002_003_comparative_analysis.md",
+            "docs/research/experiment_matrix.md"
+          ]
+        },
+        {
+          "tag": "calibration",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_001_english.md",
+            "docs/research/experiment_002_spanish.md",
+            "docs/research/experiment_003_mandarin.md",
+            "docs/research/experiment_001_002_003_comparative_analysis.md",
+            "docs/research/experiment_matrix.md"
+          ]
+        },
+        {
+          "tag": "methodology",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_matrix.md",
+            "docs/papers/white_paper_methodological_provenance.md",
+            "docs/papers/hermeneia_writing_protocol.md",
+            "docs/papers/scf_position_paper.md"
+          ]
+        }
+      ],
+      "required_claims": [
+        "Calibration, not validation — the distinction must be explicit",
+        "Semantic obligation failure localizes to Architect, not the model"
+      ],
+      "claims_checkable": false,
+      "claims_note": "Programmatic claim evaluation deferred to Sprint 004 Critic integration"
+    },
+    {
+      "section": "8-limitations",
+      "status": "PASS",
+      "required_tags": [
+        "hypothesis",
+        "calibration"
+      ],
+      "tag_results": [
+        {
+          "tag": "hypothesis",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/research_hypotheses.md"
+          ]
+        },
+        {
+          "tag": "calibration",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/experiment_001_english.md",
+            "docs/research/experiment_002_spanish.md",
+            "docs/research/experiment_003_mandarin.md",
+            "docs/research/experiment_001_002_003_comparative_analysis.md",
+            "docs/research/experiment_matrix.md"
+          ]
+        }
+      ],
+      "required_claims": [
+        "One corpus (Gatsby) cannot validate a universal methodology",
+        "Findings require domain-axis replication"
+      ],
+      "claims_checkable": false,
+      "claims_note": "Programmatic claim evaluation deferred to Sprint 004 Critic integration"
+    },
+    {
+      "section": "9-future-work",
+      "status": "PASS",
+      "required_tags": [
+        "research-program",
+        "hypothesis",
+        "future-work"
+      ],
+      "tag_results": [
+        {
+          "tag": "research-program",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/research_hypotheses.md"
+          ]
+        },
+        {
+          "tag": "hypothesis",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/research_hypotheses.md"
+          ]
+        },
+        {
+          "tag": "future-work",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/research/research_hypotheses.md"
+          ]
+        }
+      ],
+      "required_claims": [
+        "Explorer role: computational surface for candidate interpretations",
+        "Layer 4: Purpose — cross-domain recurrence",
+        "SCF benchmark as evaluation methodology"
+      ],
+      "claims_checkable": false,
+      "claims_note": "Programmatic claim evaluation deferred to Sprint 004 Critic integration"
+    },
+    {
+      "section": "10-conclusion",
+      "status": "PASS",
+      "required_tags": [
+        "governing-question",
+        "thesis"
+      ],
+      "tag_results": [
+        {
+          "tag": "governing-question",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/papers/blueprint_000001.md",
+            "docs/research/experiment_001_english.md",
+            "docs/research/experiment_002_spanish.md",
+            "docs/research/experiment_003_mandarin.md",
+            "docs/research/experiment_001_002_003_comparative_analysis.md"
+          ]
+        },
+        {
+          "tag": "thesis",
+          "status": "PASS",
+          "resolved_by": [
+            "docs/papers/blueprint_000001.md"
+          ]
+        }
+      ],
+      "required_claims": [
+        "Ends with the research program, not a sales pitch",
+        "Final question: what if we have been measuring outputs when we should measure evolution"
+      ],
+      "claims_checkable": false,
+      "claims_note": "Programmatic claim evaluation deferred to Sprint 004 Critic integration"
+    }
+  ],
+  "summary": {
+    "sections_evaluated": 11,
+    "pass": 11,
+    "warn": 0,
+    "fail": 0,
+    "overall_pct": 100
+  },
+  "outcome": "pass",
+  "claims_note": "Programmatic claim evaluation deferred to Sprint 004. Required claims are recorded in each section's required_claims field."
+}

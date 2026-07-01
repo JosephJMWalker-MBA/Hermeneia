@@ -54,6 +54,16 @@ def generate_critic_report(
     if observation is None:
         raise CriticError(f"Observation {proposal['observation_id']!r} not found")
 
+    try:
+        evidence_ids = json.loads(proposal["evidence_observation_ids"] or "[]")
+    except (TypeError, json.JSONDecodeError):
+        evidence_ids = []
+    if not isinstance(evidence_ids, list):
+        evidence_ids = []
+    for evidence_id in sorted({str(oid) for oid in evidence_ids}):
+        if conn.get_observation_by_id(evidence_id) is None:
+            raise CriticError(f"Observation {evidence_id!r} not found")
+
     now = datetime.now(timezone.utc).isoformat()
     ts = generated_at or now
     report_id = make_critic_report_id(proposal_id, policy, ts)

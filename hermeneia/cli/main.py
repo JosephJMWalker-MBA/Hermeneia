@@ -36,6 +36,7 @@ from hermeneia.cli.build_cmd import cmd_build
 from hermeneia.cli.coverage_cmd import cmd_coverage
 from hermeneia.cli.release_cmd import cmd_release
 from hermeneia.cli.preserve_cmd import cmd_preserve_verify, cmd_preserve_export
+from hermeneia.cli.edition_cmd import cmd_edition_status, cmd_edition_record, cmd_edition_designate
 
 
 def main() -> None:
@@ -126,6 +127,23 @@ def main() -> None:
                             help="Output directory (default: publication/)")
     p_coverage.add_argument("--verbose", action="store_true",
                             help="Print per-section tag resolution detail")
+
+    p_edition = sub.add_parser("edition", help="Edition eligibility governance — track qualified cycles toward Edition status")
+    edition_sub = p_edition.add_subparsers(dest="edition_command", required=True)
+
+    p_es = edition_sub.add_parser("status", help="Show current edition eligibility status and cycle history")
+    p_es.add_argument("--output", default=None, help="Publication directory (default: publication/)")
+
+    p_er = edition_sub.add_parser("record", help="Record a qualified cycle (requires all pipeline stages complete)")
+    p_er.add_argument("--output", default=None, help="Publication directory (default: publication/)")
+    p_er.add_argument("--reaffirmation", default=None,
+                      help="Steward note for cycles with no material change: explain why prior understanding is preserved")
+
+    p_ed = edition_sub.add_parser("designate", help="Human Steward designates a qualified work as an Edition")
+    p_ed.add_argument("--steward", required=True, help="Steward name or identifier (required)")
+    p_ed.add_argument("--label", default=None, help="Edition label (default: 'Edition N')")
+    p_ed.add_argument("--notes", default=None, help="Steward notes on this designation")
+    p_ed.add_argument("--output", default=None, help="Publication directory (default: publication/)")
 
     p_preserve = sub.add_parser("preserve", help="Verify lineage and continuation prerequisites, or export preservation package")
     preserve_sub = p_preserve.add_subparsers(dest="preserve_command", required=True)
@@ -235,6 +253,21 @@ def main() -> None:
                 model=args.model,
                 perspective=args.perspective,
                 bundle_or_db=db,
+            )
+    elif args.command == "edition":
+        if args.edition_command == "status":
+            cmd_edition_status(output_dir=args.output)
+        elif args.edition_command == "record":
+            cmd_edition_record(
+                output_dir=args.output,
+                steward_reaffirmation=args.reaffirmation,
+            )
+        elif args.edition_command == "designate":
+            cmd_edition_designate(
+                steward=args.steward,
+                edition_label=args.label,
+                notes=args.notes,
+                output_dir=args.output,
             )
     elif args.command == "preserve":
         if args.preserve_command == "verify":

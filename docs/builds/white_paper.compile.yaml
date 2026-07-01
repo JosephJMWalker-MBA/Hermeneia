@@ -10,7 +10,7 @@
 # Convention: white-paper-specific implementation of a general compile pattern.
 # Canonicalization deferred until repeated use across multiple publications warrants it.
 
-build_id: white-paper-rc-2
+build_id: white-paper-rc-2-analytical-craftsmanship
 compiled_artifact: docs/papers/hermeneia_white_paper.md
 blueprint: docs/papers/blueprint_000001.md
 blueprint_id: "000001"
@@ -102,7 +102,15 @@ sections:
       - "Failures in current AI are undiagnosable because responsibilities are collapsed"
       - "Separation is the mechanism; preservation of understanding is the goal"
 
-  - section: "3-architecture"
+  - section: "3-analytical-craftsmanship"
+    required_tags: [thesis, methodology]
+    required_claims:
+      - "Hermeneia does not merely preserve conclusions. It preserves intellectual conduct."
+      - "How did this investigator reason when faced with a complex, ambiguous problem?"
+      - "Reasoning auditable, not just output auditable"
+      - "Evidentiary discipline, calibrated confidence, rigorous revision, transparent uncertainty"
+
+  - section: "4-architecture"
     required_tags: [blueprint, methodology]
     required_claims:
       - "Five named cognitive responsibilities: Explorer, Architect, Artist, Critic, Steward"
@@ -110,14 +118,14 @@ sections:
       - "Architect is deterministic — no inference"
       - "Constitutional governance preserves conditions for honest maturation"
 
-  - section: "4-evidential-standards"
+  - section: "5-evidential-standards"
     required_tags: [methodology, provenance]
     required_claims:
       - "Demonstrated: implementation and automated tests"
       - "Empirical Finding: supported by one or more experiments"
       - "Research Hypothesis: candidate for investigation; not yet supported"
 
-  - section: "5-calibration"
+  - section: "6-calibration"
     required_tags: [calibration, replicated, observations, governing-question, figure]
     required_claims:
       - "RF-001: Observation stability across English, Spanish, Mandarin"
@@ -126,26 +134,26 @@ sections:
       - "RF-004: Evidence weighting is downstream from governing question"
       - "Divergence figure: same corpus → divergent governing questions"
 
-  - section: "6-discussion"
+  - section: "7-discussion"
     required_tags: [replicated, calibration, methodology]
     required_claims:
       - "Calibration, not validation — the distinction must be explicit"
       - "Semantic obligation failure localizes to Architect, not the model"
 
-  - section: "7-limitations"
+  - section: "8-limitations"
     required_tags: [hypothesis, calibration]
     required_claims:
       - "One corpus (Gatsby) cannot validate a universal methodology"
       - "Findings require domain-axis replication"
 
-  - section: "8-future-work"
+  - section: "9-future-work"
     required_tags: [research-program, hypothesis, future-work]
     required_claims:
       - "Explorer role: computational surface for candidate interpretations"
       - "Layer 4: Purpose — cross-domain recurrence"
       - "SCF benchmark as evaluation methodology"
 
-  - section: "9-conclusion"
+  - section: "10-conclusion"
     required_tags: [governing-question, thesis]
     required_claims:
       - "Ends with the research program, not a sales pitch"

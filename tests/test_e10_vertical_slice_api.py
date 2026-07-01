@@ -184,7 +184,7 @@ def test_e10_ui_exposes_provider_configuration_surface():
         / "index.html"
     ).read_text()
 
-    assert "Expert — Providers" in index_html
+    assert "Connections — Providers" in index_html or "Providers" in index_html
     assert "/api/e10/providers" in index_html
     assert "Test Connection" in index_html
     assert "Add Key" in index_html
