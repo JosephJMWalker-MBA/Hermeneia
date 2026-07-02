@@ -232,7 +232,9 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 /* ── Page header ──────────────────────────────────────── */
 .page-head { padding: 52px 0 40px; border-bottom: 1px solid var(--border); }
 .page-thesis-label { font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--dim2); margin-bottom: 8px; }
-.page-title { font-size: 30px; font-weight: 600; line-height: 1.15; letter-spacing: -.015em; margin-bottom: 12px; }
+.page-title { font-size: 24px; font-weight: 600; line-height: 1.25; letter-spacing: -.015em; margin-bottom: 12px; }
+.page-title.q-clamped { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+.page-title.q-clamped:hover { color: var(--fg2); }
 .page-file  { font-family: var(--mono); font-size: 11px; color: var(--dim2); letter-spacing: .04em; }
 
 /* ── Section chrome ───────────────────────────────────── */
@@ -1925,7 +1927,7 @@ function mount(h) {
   document.getElementById('root').innerHTML = `
 <header class="page-head">
   <div id="page-thesis-wrap" style="display:none">
-    <div class="page-thesis-label">Working Thesis</div>
+    <div class="page-thesis-label">Current Question</div>
     <div class="page-title" id="page-thesis"></div>
   </div>
   ${fn ? `<div class="page-file">${x(fn)}</div>` : ''}
@@ -3204,6 +3206,14 @@ function updatePageThesis() {
   const thesis = invLoad()?.thesis || '';
   el.textContent = thesis;
   wrap.style.display = thesis ? '' : 'none';
+  // Long questions clamp to two lines; click to expand/collapse.
+  el.classList.toggle('q-clamped', thesis.length > 90);
+  el.title = thesis.length > 90 ? 'Show full question' : '';
+  el.onclick = () => {
+    if (thesis.length <= 90) return;
+    el.classList.toggle('q-clamped');
+    el.title = el.classList.contains('q-clamped') ? 'Show full question' : 'Collapse';
+  };
 }
 
 function _groupByDoc(observations) {
