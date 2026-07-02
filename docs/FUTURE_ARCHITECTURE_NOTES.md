@@ -3949,3 +3949,48 @@ The reference rendering for textual corpora, recorded so the articles have one w
 Does not delete, but partially reframes: *Human Legibility Gap*, *Guided Onboarding*, *Three-Layer Onboarding*, *"How Hermeneia Works" Pipeline Map* (becomes the provenance view per Article 5), *Center of Gravity Shift* (resolved as question-first rather than report-first), *UI Vocabulary Toggle as ExpressionProfile* (generalized by the metaphor resolution above). Those notes remain the implementation backlog; this family is the constitutional layer above them.
 
 Nothing in this note changes Validation Phase P0 work. The candidate articles await ratification and should be tested against the P0 onboarding work ("bring a question worth investigating") as their first application.
+
+---
+
+## The Investigation Workspace & Dynamic Markup Layer *(Research Hypothesis — 2026-07-02)*
+
+*Recorded: 2026-07-02. Origin: design dialogue (Joseph ↔ Fable 5) following the full UI walkthrough audit. Not scheduled for the July 7 window; requires schema additions and is therefore explicitly **not freeze-safe** — recorded here per the freeze-lift terms until evidence and runway permit.*
+
+### Part 1 — The Investigation Workspace
+
+Direction (Joseph): stop thinking in pages, start thinking in **workspaces**. Hermeneia is not a collection of tools; it is an environment for disciplined understanding — closer to an IDE crossed with a research desk than to a menu of screens.
+
+- **Sidebar as states of thought**, not features: Question · Source · Notebook · Evidence · Interpretation · Publish · History. (Convergence note: this is the epistemic kernel wearing UI clothes — Inquiry, corpus, record, evidence, commitment, publication, Witness. Third independent rederivation of the same structure; see "Epistemic Kernel Exploration.")
+- **Toolbars as verbs**, organized around human intention, not implementation (Investigate / Notice / Compare / Trace / Publish). Candidate rule: UI verbs should be drawn from the kernel's syscall verbs so the menu *is* the behavioral kernel.
+- **Universal command palette** (⌘K or `/`): "Show every green light," "Find all contested interpretations," "Run fidelity audit." Already specified as the expert register in the reference interface sketch; this generalizes it to all registers.
+- **Context tools on selection**: Read · Highlight · Question · Compare · Trace · Interpret · Copy Citation — tools appear because the reader engaged the text, not because they live in a global menu. (Replaces/absorbs the Reading Tools dock direction.)
+- **Contextual sidebars** per workspace (Reader shows trail/highlights/questions; Review shows pending/established/contested) — navigation becomes contextual instead of permanent.
+- **Persistent Investigation Card** (question, text, status, Continue →) as the anchor everywhere — the question card grown up.
+- **Bottom dock** (Read · Notebook · Evidence · Interpretation · History); advanced surfaces (Architect, Critic, provider matrix, developer details) appear only when earned.
+- Guiding question for every surface: **"What is the next meaningful act in the formation of understanding?"** (extends the Interaction Constitution preamble from interactions to layout).
+- 8/80 note: the dock + Investigation Card + context toolbar form the 8/80-safe subset; the command palette is expert depth. The workspace must not become expert-only.
+
+### Part 2 — The Dynamic Markup Layer
+
+Direction (Joseph): **formatting becomes semantic markup.** Bold, italic, underline, color, and highlight become reader-created tags with stored intent — the reader's hand made visible to the system, on the reader's terms.
+
+Constitutional placement (this is why the idea is strong — it reuses existing machinery rather than adding new kinds):
+
+- A **markup event** (text, style, timestamp, location) is a Witness artifact — an append-only observation *of the reader*.
+- The **Markup Legend** — per-investigation, user-defined color/style variables ("Green = aspiration: wealth, longing, future promise") — is a **frame**: the reader's declared assumptions, explicit, versioned, editable. Color becomes a *reader-authored ontology*.
+- **Load-bearing rule (verbatim): "No color has universal meaning until the reader assigns it."** Observation Before Interpretation, applied to the system's model of the reader.
+- **AI suggestion lifecycle = the Explorer→Steward promotion pattern**, applied to the reader's hand: after a pattern of same-color highlights (never on the first — Earned Complexity applied to the AI's own speech), the system may propose designations ("Most of your green highlights concern wealth and pursuit — Aspiration? Desire? Performance?"). User accepts, renames, or ignores. Provenance retained: `created_by: AI suggestion, accepted_by: User, editable: true`.
+- **Design decision from dialogue: no confidence percentages** on suggestions ("Aspiration 64%") — precision theater. Ranked suggestions whose *grounds are inspectable* instead: each suggestion opens to the highlights that produced it.
+- **Article 8 requirement**: the variable registry is literally "The User May Read Their Own File" — it ships with its inspection/edit surface in the same change, or not at all.
+
+Downstream leverage once variables exist: "Show every Aspiration passage" / "Compare Aspiration with Disillusionment" / "Generate a motif report from passages tagged Aspiration" / "Find bolded claims without supporting evidence." Markup variables feed the Pattern View, the Question Constructor, and eventually Blueprint material — reader-authored structure entering the pipeline through stewardship, never silently.
+
+### Phasing
+
+1. **Now:** recorded here. Nothing in the July 7 window depends on it.
+2. **Post-demo prototype:** highlights already carry note/question/relevance; the minimal migration adds a style/variable column on highlights plus a small legend table (per-investigation). Deliberate schema change, small and reversible — outside the current no-schema discipline by design, not by accident.
+3. **Full layer:** context toolbar on selection, legend management UI, palette/variable queries, motif integration.
+
+### Relationship to existing notes
+
+Extends *Witness Cognitive Responsibility + Marginalia Interface* (P0 note) — the markup layer is Marginalia's vocabulary growing from highlight/label into a reader-authored ontology. Extends the Lineage direction from the walkthrough audit: Reader Lineage can show not just *what* was noticed but *under which reader-defined meaning* it was noticed. Absorbs the "Reading Tools" dock into context tools on selection.
