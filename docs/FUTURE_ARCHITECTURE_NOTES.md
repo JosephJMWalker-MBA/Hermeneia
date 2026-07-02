@@ -4114,3 +4114,70 @@ The purpose, verbatim: **"If you get stuck, go back to why you're doing the work
 2. Idle thesis (anytime — freeze-safe)
 3. Writing Workspace
 4. Overlap statistics, passage timeline (post-demo analytical layer)
+
+---
+
+## Question and Revision as First-Class Objects — the Product Correction *(Candidate Data-Model Change — 2026-07-03)*
+
+*Recorded: 2026-07-03, on Joseph's direction, against the Writing Threshold entry above — this is not a side note; it changes the data model. Origin: Joseph's review of the research program against the product.*
+
+### The correction
+
+Two objects have been hiding in plain sight:
+
+**1. Question is not metadata.** It has been treated as onboarding, a heading, a thesis field — and stored in localStorage. But the research program says questions *generate divergence* (the Critic review's own finding: "governing questions appear to be a primary driver of divergence"). Questions are productive objects:
+
+```
+Question
+  ├── text · scope · priority · frame (theological/critical/scientific)
+  ├── assumptions
+  ├── produces observations · attracts evidence
+  ├── generates interpretations
+  ├── is revised · branches into child questions
+  └── status: active / answered / superseded / unresolved
+```
+
+That is a graph node, not a note. The localStorage fragility flagged in the Writing Threshold audit and this correction are **the same work**: don't move the question blob into a DB column — give Question its schema. One migration closes the durability gap and the data-model gap together.
+
+**2. Revision is not version history.** Git stores *what* changed; Hermeneia stores *why understanding changed*:
+
+```
+Revision
+  cause: new observation | stronger counterargument | better question |
+         contradiction discovered | source correction | theological
+         constraint | reader feedback | Steward decision
+  evidence: linked observations
+  challenge: what was accepted or rejected
+  effect: interpretation narrowed / broadened / superseded
+```
+
+A revision is an epistemic event, not a file diff. This is what distinguishes Hermeneia from Notion, Obsidian, and Google Docs: it preserves **the evolutionary pressure that changed the content**, not just the content. The passage-timeline design lane (above) is powered by exactly this object.
+
+### Convergence evidence (why this is a correction, not a speculation)
+
+- **The kernel**: Question and Commitment are the two central primitives of the epistemic kernel (see Epistemic Kernel Exploration); Revision-with-cause is the reified transition — a recorded application of R in U(n+1) = R(U(n), E, Δ), with E and Δ captured per event. This is the **fourth independent rederivation** of the same structure (kernel dialogue, interaction constitution, workspace design, now the data model).
+- **The research program**: RF-003 ("governing question is the primary culture-adaptive variable") and RF-004 ("evidence weighting is downstream from the governing question") are replicated findings already pointing here; the *Question Constructor* note above is P0 for the same reason.
+- **RH-001 becomes instrumentable**: "disciplined revision may be the primitive operation" is currently a Low-confidence hypothesis with no measurement instrument. A Revision table with typed causes *is* the instrument — the schema that would let the hypothesis be tested rather than believed.
+
+### The complete product loop
+
+```
+Notice → Mark → Name → Question → Cluster → Interpret
+       → Challenge → Revise → Ratify → Render
+```
+
+"Notice" is human. "Mark" is the first artifact (the Dynamic Markup Layer is the *birth of an observation*, one step earlier than previously placed). **The editor is not the product; the marking-to-understanding pipeline is the product.** Google Docs competes on editing, Notion on organization, Obsidian on linking — Hermeneia competes on the loop.
+
+### The #C warning (preserved verbatim in spirit)
+
+The risk is overbuilding the constitution before the instrument has enough lived use. The system now has philosophy, constitution, white paper, pitch deck, preservation layer, release engineering, research program, methodology. **The next credibility jump will not come from another governing document.** It comes from a five-minute experience where someone can say:
+
+> "I marked this text. Hermeneia preserved what I meant by that mark, helped me revise my understanding, and showed me why the final interpretation changed."
+
+That loop is the proof-of-life. Not a PDF. Not a paper.
+
+Scripture anchor (Joseph): Proverbs 20:5 — *"The purpose in a man's heart is like deep water, but a man of understanding will draw it out."* Hermeneia's job: not to replace the reader — to help draw out what is buried, preserve the path, test the interpretation, and make the revision visible.
+
+### Sequencing consequence
+
+The post-demo queue reorders around the two migrations that matter: **Question object** (subsumes question-frame persistence from the Writing Threshold) and **Revision object** (powers the passage timeline and instruments RH-001). Markup Legend follows as the third. Everything else in the design lanes is views over these objects.
