@@ -2315,6 +2315,9 @@ function e10LoadSetup() {
   const host = document.getElementById('setup-panel');
   if (!host) return;
 
+  const secLabel = host.closest('section')?.querySelector('.sec-label');
+  if (secLabel) secLabel.textContent = _register === 'expert' ? 'Investigation Setup' : 'Your Question';
+
   const existing = invLoad();
   _setupTags = existing?.lenses ? [...existing.lenses] : [];
 
@@ -2332,7 +2335,7 @@ function e10LoadSetup() {
       </div>
 
       <div class="setup-field">
-        <div class="setup-label">Thesis</div>
+        ${_register === 'expert' ? '<div class="setup-label">Thesis</div>' : ''}
         <div class="setup-prompt">What are you trying to understand?</div>
         <div class="setup-example">Example: I want to understand the difference in interpretation of the metaphors in The Great Gatsby.</div>
         <div class="dict-wrap">
@@ -2340,11 +2343,11 @@ function e10LoadSetup() {
             placeholder="I want to understand…">${x(existing?.thesis || '')}</textarea>
           ${sttMakeBtn('setup-thesis')}
         </div>
-        <div id="setup-thesis-err" style="display:none;font-size:12px;color:var(--red);margin-top:4px">A thesis is required before beginning.</div>
+        <div id="setup-thesis-err" style="display:none;font-size:12px;color:var(--red);margin-top:4px">One sentence is enough — what are you trying to understand?</div>
       </div>
 
       <div class="setup-field">
-        <div class="setup-label">Purpose</div>
+        ${_register === 'expert' ? '<div class="setup-label">Purpose</div>' : ''}
         <div class="setup-prompt">Why does this matter?</div>
         <div class="setup-example">Example: So that I can discover lessons I may have missed from a literary masterpiece.</div>
         <div class="dict-wrap">
@@ -2355,7 +2358,7 @@ function e10LoadSetup() {
       </div>
 
       <div class="setup-field">
-        <div class="setup-label">Declared Lenses</div>
+        ${_register === 'expert' ? '<div class="setup-label">Declared Lenses</div>' : ''}
         <div class="setup-prompt">What perspectives are you bringing?</div>
         <div class="setup-example">Not demographics. Interpretive lenses. Every reader arrives with assumptions — Hermeneia makes them visible.<br>
           Examples: Christian · Business owner · First-time reader · Parent · Historian · Recovering addict</div>
@@ -2369,9 +2372,9 @@ function e10LoadSetup() {
       <hr class="setup-divider">
 
       <div class="setup-field">
-        <div class="setup-label">Falsifiability (optional)</div>
-        <div class="setup-prompt">What result would change your mind?</div>
-        <div class="setup-example">Turns the investigation from "prove my thesis" into "test my thesis."<br>
+        ${_register === 'expert' ? '<div class="setup-label">Falsifiability (optional)</div>' : ''}
+        <div class="setup-prompt">What result would change your mind? <span style="color:var(--dim2);font-weight:400">(optional)</span></div>
+        <div class="setup-example">Turns the investigation from "prove my idea" into "test my idea."<br>
           Example: I would reconsider if the evidence suggested Gatsby's metaphors are primarily about status rather than aspiration.</div>
         <div class="dict-wrap">
           <textarea id="setup-reconsider" class="setup-textarea" rows="2"
@@ -2381,7 +2384,7 @@ function e10LoadSetup() {
       </div>
 
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <button class="btn-primary" onclick="setupSubmit()">Begin Investigation ↺</button>
+        <button class="btn-primary" onclick="setupSubmit()">${_register === 'expert' ? 'Begin Investigation ↺' : 'Save my question →'}</button>
         ${existing ? `<button class="btn-trace" onclick="e10Go('onboarding')">Back to Dashboard</button>` : ''}
       </div>
 
