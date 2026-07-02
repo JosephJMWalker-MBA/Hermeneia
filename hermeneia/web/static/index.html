@@ -1606,8 +1606,8 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
 </div>
 
 <!-- Accessibility Dock v0.2 — fixed right-center, always visible -->
-<div id="a11y-dock" role="toolbar" aria-label="Accessibility tools">
-  <div class="dock-header">Access Tools</div>
+<div id="a11y-dock" role="toolbar" aria-label="Reading tools">
+  <div class="dock-header">Reading Tools</div>
   <div class="dock-inner">
     <button class="a11y-btn" id="a11y-btn-read" onclick="a11yClickRead()"
       aria-label="Read selected text" title="Enable: highlight text, then click Read in the popup">
@@ -1646,20 +1646,20 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
   <div class="a11y-status-bar" id="a11y-status">Reading off</div>
   <div class="a11y-collapse-row">
     <button class="a11y-collapse-btn" id="a11y-collapse" onclick="a11yCollapse()"
-      aria-label="Collapse accessibility dock">▾ hide</button>
+      aria-label="Collapse reading tools">▾ hide</button>
   </div>
 </div>
 
 <!-- Collapsed pill — replaces dock when collapsed -->
 <div id="a11y-dock-collapsed-pill" onclick="a11yCollapse()"
-  role="button" tabindex="0" aria-label="Expand accessibility tools"
+  role="button" tabindex="0" aria-label="Expand reading tools"
   title="Expand accessibility tools">
-  ♿ Access
+  Aa Reading
 </div>
 
 <!-- Floating Read toolbar — appears near highlighted text when Read is ON -->
 <div id="a11y-selection-tip" role="dialog" aria-label="Read selected text">
-  <button class="a11y-tip-btn" onclick="a11yReadSelection()">Read</button>
+  <button class="a11y-tip-btn" onclick="a11yReadSelection()">Read selected text</button>
   <button class="a11y-tip-stop" onclick="a11yDismissTip()" title="Cancel">✕</button>
 </div>
 
