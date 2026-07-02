@@ -2134,10 +2134,25 @@ function mount(h) {
   e10LoadFindings();
   e10LoadResearchBanner();
   // Fetch pipeline statuses for the nav mini cycle, then navigate
+  const bootDest = _bootDestination(h);
   refreshEditionCycleCount().then(() =>
-    refreshNavCycleStatuses().then(() => updateNavCycle(invLoad() ? 'onboarding' : 'setup'))
+    refreshNavCycleStatuses().then(() => updateNavCycle(bootDest))
   );
-  e10Go(invLoad() ? 'onboarding' : 'setup');
+  e10Go(bootDest);
+}
+
+// First-run routing: read before declare. Returning users (a saved
+// question exists) land on the dashboard; a fresh visitor with a corpus
+// lands in the Reader; with no corpus, on upload. If document state is
+// uncertain, fall back to the pre-existing behavior (Setup).
+function _bootDestination(h) {
+  try {
+    if (invLoad()) return 'onboarding';
+    if (h && h.document && typeof h.document === 'object') {
+      return h.document.filename ? 'reader' : 'corpus';
+    }
+  } catch {}
+  return 'setup';
 }
 
 // ── Research Question Banner ───────────────────────────
