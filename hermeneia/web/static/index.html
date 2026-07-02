@@ -1528,12 +1528,14 @@ body.a11y-focus-mode .nav { opacity: 0.35; transition: opacity .2s; }
 body.a11y-focus-mode #a11y-dock,
 body.a11y-focus-mode #a11y-dock-collapsed-pill { opacity: 1 !important; pointer-events: auto !important; }
 
-/* Text size override — broad enough for visible difference */
+/* Text size override — targets the reading surfaces (source text,
+   selected passages, saved highlights, observation/report text), not the
+   admin UI. Magnitudes are relative to the 18px body base. */
+body.a11y-text-lg .cr-page-text { font-size: 21px !important; line-height: 1.9 !important; }
+body.a11y-text-lg .cr-saved-passage { font-size: 18px !important; line-height: 1.8 !important; }
+body.a11y-text-lg .cr-highlight-list { font-size: 15px !important; line-height: 1.8 !important; }
 body.a11y-text-lg .e10-text,
-body.a11y-text-lg .obs-card p,
-body.a11y-text-lg .obs-raw-text,
-body.a11y-text-lg p { font-size: 15.5px !important; line-height: 1.85 !important; }
-body.a11y-text-lg .e10-card .e10-text { font-size: 15px !important; }
+body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 !important; }
 
 /* First-use hint */
 #a11y-hint {
