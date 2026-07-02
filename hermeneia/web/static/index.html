@@ -958,6 +958,57 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   font-size: 16px; line-height: 1.85; color: var(--fg);
   white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 20px;
 }
+
+/* ── Focus Scroll (issue #16) — attention-guided reading ─────────────
+   The current paragraph clarifies and brightens as it enters the focus
+   zone; surrounding text recedes. Not decoration: the page teaches the
+   reader to attend here and move one meaningful segment at a time. */
+.cr-page-view.focus-scroll {
+  background: #050706;
+  border-color: rgba(90, 255, 205, 0.10);
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px clamp(16px, 4vw, 40px) 22vh;
+}
+.cr-page-view.focus-scroll .cr-page-text {
+  --focus: 0;
+  font-size: clamp(1.05rem, 1.6vw, 1.35rem);
+  line-height: 1.85;
+  margin-bottom: 1.75rem;
+  color: color-mix(
+    in srgb,
+    rgba(90, 255, 205, 0.34) calc((1 - var(--focus)) * 100%),
+    rgba(248, 255, 252, 0.96) calc(var(--focus) * 100%)
+  );
+  text-shadow: 0 0 calc(var(--focus) * 18px) rgba(80, 255, 210, 0.18);
+  opacity: calc(0.38 + (var(--focus) * 0.62));
+  transform: translateY(calc((1 - var(--focus)) * 5px));
+  transition: color 420ms ease, opacity 420ms ease,
+              text-shadow 420ms ease, transform 420ms ease;
+}
+.cr-page-view.focus-scroll .cr-page-region { opacity: 0.35; }
+.cr-page-view.focus-scroll.warm {
+  background: #1b130b;
+  border-color: rgba(255, 180, 80, 0.12);
+}
+.cr-page-view.focus-scroll.warm .cr-page-text {
+  color: color-mix(
+    in srgb,
+    rgba(255, 178, 80, 0.38) calc((1 - var(--focus)) * 100%),
+    rgba(255, 245, 218, 0.96) calc(var(--focus) * 100%)
+  );
+  text-shadow: 0 0 calc(var(--focus) * 16px) rgba(255, 180, 80, 0.14);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cr-page-view.focus-scroll .cr-page-text { transition: none; transform: none; }
+}
+.fs-pill {
+  background: none; border: 1px solid var(--border); border-radius: 20px;
+  color: var(--dim2); cursor: pointer; font: inherit; font-size: 11px;
+  padding: 4px 12px; white-space: nowrap;
+}
+.fs-pill.fs-on { border-color: var(--accent); color: var(--accent); }
 .cr-nav-bar {
   display: flex; align-items: center; gap: 10px; margin-top: 18px;
 }
@@ -5336,6 +5387,56 @@ function _crKeepQuestion() {
   _crRenderQuestionCard();
 }
 
+// ── Focus Scroll (issue #16) ───────────────────────────
+// Attention-guided reading: score each text block by distance from the
+// focus zone (42% viewport height) and drive --focus. On by default;
+// the reader owns the toggle and the theme, both persisted.
+let _fsEnabled = (() => { try { return localStorage.getItem('hermeneia_focus_scroll') !== 'off'; } catch { return true; } })();
+let _fsTheme   = (() => { try { return localStorage.getItem('hermeneia_reader_theme') === 'warm' ? 'warm' : 'dark'; } catch { return 'dark'; } })();
+let _fsListening = false;
+
+function _fsUpdateFocus() {
+  const view = document.getElementById('cr-page-view');
+  if (!view || !view.classList.contains('focus-scroll')) return;
+  const viewportCenter = window.innerHeight * 0.42;
+  const maxDistance = window.innerHeight * 0.42;
+  view.querySelectorAll('.cr-page-text').forEach(p => {
+    const rect = p.getBoundingClientRect();
+    const center = rect.top + rect.height / 2;
+    const focus = Math.max(0, 1 - Math.abs(center - viewportCenter) / maxDistance);
+    p.style.setProperty('--focus', focus.toFixed(3));
+  });
+}
+
+function _fsApply() {
+  const view = document.getElementById('cr-page-view');
+  if (!view) return;
+  view.classList.toggle('focus-scroll', _fsEnabled);
+  view.classList.toggle('warm', _fsEnabled && _fsTheme === 'warm');
+  if (!_fsListening) {
+    window.addEventListener('scroll', _fsUpdateFocus, { passive: true });
+    window.addEventListener('resize', _fsUpdateFocus);
+    _fsListening = true;
+  }
+  if (_fsEnabled) requestAnimationFrame(_fsUpdateFocus);
+  const t1 = document.getElementById('fs-toggle');
+  const t2 = document.getElementById('fs-theme');
+  if (t1) { t1.classList.toggle('fs-on', _fsEnabled); t1.textContent = `◐ Focus Scroll ${_fsEnabled ? 'On' : 'Off'}`; }
+  if (t2) { t2.style.display = _fsEnabled ? '' : 'none'; t2.textContent = _fsTheme === 'warm' ? '☀ Paper' : '● Dark'; }
+}
+
+function fsToggle() {
+  _fsEnabled = !_fsEnabled;
+  try { localStorage.setItem('hermeneia_focus_scroll', _fsEnabled ? 'on' : 'off'); } catch {}
+  _fsApply();
+}
+
+function fsThemeToggle() {
+  _fsTheme = _fsTheme === 'warm' ? 'dark' : 'warm';
+  try { localStorage.setItem('hermeneia_reader_theme', _fsTheme); } catch {}
+  _fsApply();
+}
+
 function _crRenderDocPicker(ws) {
   const pills = _crDocs.map(d => {
     const roleClass = `cr-role-${d.source_role || 'primary'}`;
@@ -5347,7 +5448,11 @@ function _crRenderDocPicker(ws) {
     </button>`;
   }).join('');
   ws.innerHTML = `
-    <div class="cr-doc-picker" id="cr-doc-picker">${pills}</div>
+    <div class="cr-doc-picker" id="cr-doc-picker">${pills}
+      <span style="flex:1"></span>
+      <button class="fs-pill" id="fs-toggle" onclick="fsToggle()" title="The current paragraph brightens as it enters your focus zone; surrounding text recedes.">◐ Focus Scroll</button>
+      <button class="fs-pill" id="fs-theme" onclick="fsThemeToggle()" title="Switch between dark reading and warm paper reading.">● Dark</button>
+    </div>
     <div class="cr-layout">
       <div>
         <div id="cr-role-warning"></div>
@@ -5455,6 +5560,8 @@ function _crRenderPage() {
       </div>
       ${blocks || '<div class="e10-empty">No text extracted for this page.</div>'}`;
   }
+
+  _fsApply();
 
   // Nav controls
   const prev = document.getElementById('cr-prev-btn');
