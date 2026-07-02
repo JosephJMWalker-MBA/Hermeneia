@@ -4055,3 +4055,62 @@ Generate Audio Salon
 ```
 
 Sequencing: Generate Packet first (freeze-safe, immediate value) → Audio Salon script+diff (reuses existing Perspective/Blueprint/Artist/Critic machinery) → voices/audio rendering last.
+
+---
+
+## The Writing Threshold — Investigation Durability & the Writing Workspace *(Design Lane — 2026-07-03)*
+
+*Recorded: 2026-07-03. Origin: Joseph's pre-writing question — "if we start working on it, updating isn't going to undo anything I've worked through?" — plus four feature directions. The durability claims below were verified against the code, not asserted.*
+
+### The safety rule
+
+> **App code can change. Investigation data must persist.**
+
+Eventually visible in the app: *"Your work is preserved separately from the app interface. Updates may change how Hermeneia looks, but not the investigation record."*
+
+### Verified durability audit (2026-07-03)
+
+**Already safe:**
+- `build/` is gitignored — the database is fully separate from app code; git updates can never touch it.
+- Migrations are additive only: `CREATE TABLE IF NOT EXISTS` + `ALTER TABLE ... ADD COLUMN`; no `DROP` statements exist anywhere in the storage layer.
+- Highlights, observations, proposals, interpretations, steward decisions: all in the DB, append-only or status-transition (highlight "dismiss" is a status, not a delete).
+- `herm preserve export` already exists as the preservation package path.
+
+**Verified gaps (fix before serious writing):**
+1. **The Current Question lives only in browser localStorage** (`hermeneia_investigation_v1`: thesis, purpose, lenses, falsifiability). Clearing browser data, switching browsers, or switching machines loses the investigation's declared frame — the one part of the record stored in the most volatile place in the stack. Constitutionally ironic: the corpus boundary is a commitment, and the question-frame isn't in the investigation record at all. Fix: persist the declaration into the DB (small deliberate migration) — or, interim and freeze-safe, include it in Generate Packet plus a one-click "download my investigation" JSON export.
+2. **One hard delete exists**: `DELETE FROM inquiry_notes` (app.py, `api_obs_inquiry_delete`) — violates "dismiss/archive/status changes instead of deletion." Convert to status transition.
+3. **No pre-migration backup**: migrations run silently on server startup. Additive-only mitigates, but a timestamped DB copy before any migration is cheap insurance.
+4. Bookmarks, register, and active plan/blueprint selection are also localStorage-bound (acceptable for UI state; the question-frame is the one that matters).
+
+**The threshold rule:** serious long-form writing waits until gap 1 is closed and Generate Packet exists as the user-facing export.
+
+### The Writing Workspace (Google-Docs-like surface)
+
+A calmer writing room, not another pipeline screen: document canvas in the center; evidence / notes / questions / lineage in a side rail; **citations as source chips** (drag a highlight in, it carries its provenance); comments and marginalia; autosave; version history; export. This is where the report, packet, Salon script, or essay becomes editable without operating machinery. Version history here is the monotone record applied to drafts — every version kept, current draft = endorsement.
+
+### Corpus/commentary overlap statistics
+
+The analytical layer that protects source boundaries: what appears in the primary text vs. commentary vs. both; what commentary overemphasizes (the Pattern View's emphasis signal, generalized); what the primary text supports weakly or strongly; which motifs are primary-only or commentary-only. Supporting documents inform inquiry; the UI must never silently blend them into primary evidence.
+
+### Understanding-over-time (the passage timeline)
+
+For any passage: *"How has my understanding of this changed?"* — first highlight, first note, questions raised, AI proposals, steward decisions, revisions, current interpretation, and what changed and why. This is Reader Lineage becoming real: not only "where did this claim come from?" but **"how did my understanding form?"** Directly implements Article 6 (Every Interaction Preserves History) as a view, and the strikethrough-with-story pattern from the reference interface design.
+
+### Idle thesis grows *(smallest item — freeze-safe, ~30 lines of frontend)*
+
+If the screen is idle, no nagging, no modal — the Current Question gently returns to attention:
+
+```
+after ~45s idle:  Current Question grows slightly
+after ~90s idle:  it becomes more visually present
+any input:        returns instantly to normal
+```
+
+The purpose, verbatim: **"If you get stuck, go back to why you're doing the work to begin with."** Focus Mode becoming epistemic discipline rather than dimming. Buildable in one sitting whenever wanted, including before July 7.
+
+### Sequencing
+
+1. Generate Packet + investigation-declaration persistence (closes the writing threshold)
+2. Idle thesis (anytime — freeze-safe)
+3. Writing Workspace
+4. Overlap statistics, passage timeline (post-demo analytical layer)
