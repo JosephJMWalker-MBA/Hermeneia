@@ -4226,3 +4226,26 @@ A definition is an observation from a **reference source**, never ground truth. 
 ### Sequencing (Joseph's #C)
 
 Word Lens before Memory Renderings (songs, flashcards, study aids — the Salon's memory-oriented sibling of Reports): *"the song gets stronger when the vocabulary is already grounded."* Renderings inherit established meanings rather than re-deriving them.
+
+---
+
+## Formalization, Not Invention — and the Recursive Companion *(Positioning + Design Note — 2026-07-03)*
+
+*Recorded: 2026-07-03. Origin: live-use session. Two related observations.*
+
+### The identity correction (applied to the Guide in PR #8)
+
+Joseph: *"Hermeneia isn't something I made… the word means something."* The product must never sound like "I invented interpretation." It sounds like: **"I formalized and instrumented an ancient human practice."**
+
+Canonical framing language (approved, applied to the Guide's category card; also the white paper's positioning): Hermeneia is not the invention of interpretation. It is a formalization of the disciplined work of drawing meaning out of words, events, symbols, testimony, and evidence. The name carries the inheritance — *hermeneia*: interpretation, explanation, making meaning understandable. It does not replace the reader, scholar, teacher, theologian, lawyer, researcher, or student; it gives their interpretive work structure, memory, accountability, and lineage. **People have always interpreted. Hermeneia makes the process visible.**
+
+Shortest form: *"Hermeneia formalizes the ancient practice of interpretation into a modern, auditable system for preserving evidence, testing meaning, and tracing understanding from source to expression."*
+
+Scholarly note: this is the same humility the white paper's related-work section performs in academic form — naming Hirsch, Peirce, Collingwood, ACH, TMS et al. as ancestors *is* the "we didn't invent this" claim with citations. Posture anchor (Joseph): Proverbs 4 — wisdom is received, discerned, guarded, walked in; not invented.
+
+### The recursive companion & BYOP
+
+Observed in live use: Joseph runs a side chat bound to a corpus of understanding (the codebase itself) that informs the investigation — the process is recursive; the instrument is being investigated with its own method. Design implications:
+
+- **BYOP (Bring Your Own Provider)** is already Hermeneia's architecture (provider registry, local/Ollama) — but the observation extends it: the *conversational companion itself* is a participant pattern. A future Hermeneia companion is a chat surface bound to the investigation's corpus and record, governed like any participant (proposals speculative, commitments stewarded), swappable across providers or local models.
+- The codebase-as-corpus recursion is the same reflexivity as the white-paper-under-its-own-methodology: Hermeneia investigating Hermeneia is a legitimate validation corpus.
