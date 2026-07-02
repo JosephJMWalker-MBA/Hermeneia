@@ -5210,10 +5210,36 @@ async function e10LoadCloseReader() {
     // Default to first primary doc
     const primary = _crDocs.find(d => d.source_role === 'primary') || _crDocs[0];
     _crRenderDocPicker(ws);
+    _crMaybeShowReaderBanner(ws);
     await _crOpenDoc(primary.id);
   } catch(e) {
     ws.innerHTML = `<div class="e10-empty" style="color:var(--red)">Error loading corpus: ${x(e.message)}</div>`;
   }
+}
+
+// First-run invitation. Shown only before a question exists, dismissible,
+// never urgent — it invites reading, it does not demand setup.
+function _crMaybeShowReaderBanner(ws) {
+  let dismissed = false;
+  try { dismissed = localStorage.getItem('hermeneia_reader_banner_dismissed') === '1'; } catch {}
+  if (invLoad() || dismissed) return;
+  ws.insertAdjacentHTML('afterbegin', `
+    <div id="cr-firstrun-banner" style="display:flex;gap:14px;align-items:flex-start;justify-content:space-between;
+         border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--r);
+         padding:14px 18px;margin-bottom:16px;background:var(--surface)">
+      <div style="font-size:13px;color:var(--fg2);line-height:1.7">
+        <strong style="color:var(--fg)">Read first.</strong>
+        Select any passage that catches your eye — everything you notice is kept, nothing is summarized away.
+        When you're ready, we'll help you shape what you've noticed into a question worth investigating.
+      </div>
+      <button onclick="_crDismissReaderBanner()" style="flex-shrink:0;background:none;border:1px solid var(--border);
+              border-radius:var(--r);color:var(--dim2);cursor:pointer;font:inherit;font-size:12px;padding:4px 12px">Got it</button>
+    </div>`);
+}
+
+function _crDismissReaderBanner() {
+  try { localStorage.setItem('hermeneia_reader_banner_dismissed', '1'); } catch {}
+  document.getElementById('cr-firstrun-banner')?.remove();
 }
 
 function _crRenderDocPicker(ws) {
