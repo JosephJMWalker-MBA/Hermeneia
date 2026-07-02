@@ -232,7 +232,9 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 /* ── Page header ──────────────────────────────────────── */
 .page-head { padding: 52px 0 40px; border-bottom: 1px solid var(--border); }
 .page-thesis-label { font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em; color: var(--dim2); margin-bottom: 8px; }
-.page-title { font-size: 30px; font-weight: 600; line-height: 1.15; letter-spacing: -.015em; margin-bottom: 12px; }
+.page-title { font-size: 24px; font-weight: 600; line-height: 1.25; letter-spacing: -.015em; margin-bottom: 12px; }
+.page-title.q-clamped { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+.page-title.q-clamped:hover { color: var(--fg2); }
 .page-file  { font-family: var(--mono); font-size: 11px; color: var(--dim2); letter-spacing: .04em; }
 
 /* ── Section chrome ───────────────────────────────────── */
@@ -1528,12 +1530,14 @@ body.a11y-focus-mode .nav { opacity: 0.35; transition: opacity .2s; }
 body.a11y-focus-mode #a11y-dock,
 body.a11y-focus-mode #a11y-dock-collapsed-pill { opacity: 1 !important; pointer-events: auto !important; }
 
-/* Text size override — broad enough for visible difference */
+/* Text size override — targets the reading surfaces (source text,
+   selected passages, saved highlights, observation/report text), not the
+   admin UI. Magnitudes are relative to the 18px body base. */
+body.a11y-text-lg .cr-page-text { font-size: 21px !important; line-height: 1.9 !important; }
+body.a11y-text-lg .cr-saved-passage { font-size: 18px !important; line-height: 1.8 !important; }
+body.a11y-text-lg .cr-highlight-list { font-size: 15px !important; line-height: 1.8 !important; }
 body.a11y-text-lg .e10-text,
-body.a11y-text-lg .obs-card p,
-body.a11y-text-lg .obs-raw-text,
-body.a11y-text-lg p { font-size: 15.5px !important; line-height: 1.85 !important; }
-body.a11y-text-lg .e10-card .e10-text { font-size: 15px !important; }
+body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 !important; }
 
 /* First-use hint */
 #a11y-hint {
@@ -1604,8 +1608,8 @@ body.a11y-text-lg .e10-card .e10-text { font-size: 15px !important; }
 </div>
 
 <!-- Accessibility Dock v0.2 — fixed right-center, always visible -->
-<div id="a11y-dock" role="toolbar" aria-label="Accessibility tools">
-  <div class="dock-header">Access Tools</div>
+<div id="a11y-dock" role="toolbar" aria-label="Reading tools">
+  <div class="dock-header">Reading Tools</div>
   <div class="dock-inner">
     <button class="a11y-btn" id="a11y-btn-read" onclick="a11yClickRead()"
       aria-label="Read selected text" title="Enable: highlight text, then click Read in the popup">
@@ -1644,20 +1648,20 @@ body.a11y-text-lg .e10-card .e10-text { font-size: 15px !important; }
   <div class="a11y-status-bar" id="a11y-status">Reading off</div>
   <div class="a11y-collapse-row">
     <button class="a11y-collapse-btn" id="a11y-collapse" onclick="a11yCollapse()"
-      aria-label="Collapse accessibility dock">▾ hide</button>
+      aria-label="Collapse reading tools">▾ hide</button>
   </div>
 </div>
 
 <!-- Collapsed pill — replaces dock when collapsed -->
 <div id="a11y-dock-collapsed-pill" onclick="a11yCollapse()"
-  role="button" tabindex="0" aria-label="Expand accessibility tools"
+  role="button" tabindex="0" aria-label="Expand reading tools"
   title="Expand accessibility tools">
-  ♿ Access
+  Aa Reading
 </div>
 
 <!-- Floating Read toolbar — appears near highlighted text when Read is ON -->
 <div id="a11y-selection-tip" role="dialog" aria-label="Read selected text">
-  <button class="a11y-tip-btn" onclick="a11yReadSelection()">Read</button>
+  <button class="a11y-tip-btn" onclick="a11yReadSelection()">Read selected text</button>
   <button class="a11y-tip-stop" onclick="a11yDismissTip()" title="Cancel">✕</button>
 </div>
 
@@ -1923,7 +1927,7 @@ function mount(h) {
   document.getElementById('root').innerHTML = `
 <header class="page-head">
   <div id="page-thesis-wrap" style="display:none">
-    <div class="page-thesis-label">Working Thesis</div>
+    <div class="page-thesis-label">Current Question</div>
     <div class="page-title" id="page-thesis"></div>
   </div>
   ${fn ? `<div class="page-file">${x(fn)}</div>` : ''}
@@ -1948,7 +1952,7 @@ function mount(h) {
 </section>
 
 <section class="section e10-screen" id="corpus">
-  <div class="sec-label">Screen 1 — Corpus Explorer</div>
+  <div class="sec-label">Search the Text</div>
   <div id="corpus-document-scope"></div>
   <div id="research-question-banner"></div>
   <div class="e10-toolbar">
@@ -1978,7 +1982,7 @@ function mount(h) {
 </section>
 
 <section class="section e10-screen" id="lab">
-  <div class="sec-label">Screen 2 — Interpretation Lab</div>
+  <div class="sec-label">Interpret a Passage</div>
   <div id="lab-scope-banner"></div>
   <div id="selected-observation" class="e10-empty">Select an observation from the corpus.</div>
   <div id="lab-participants-host"></div>
@@ -2011,7 +2015,7 @@ function mount(h) {
 </section>
 
 <section class="section e10-screen" id="review">
-  <div class="sec-label">Screen 3 — Steward Review</div>
+  <div class="sec-label">Review Interpretations</div>
   <div id="review-canon-panel"></div>
   <div id="review-panel" class="e10-empty" style="display:none">Generated proposals will appear here.</div>
   <div class="screen-explainer" id="review-explainer">
@@ -2056,7 +2060,7 @@ function mount(h) {
 </section>
 
 <section class="section e10-screen" id="critic">
-  <div class="sec-label">Screen 4 — Critic</div>
+  <div class="sec-label">Fidelity Audit</div>
   <div id="critic-explorer-root">
     <div id="critic-picker-panel"></div>
     <div id="critic-detail-panel" style="display:none"></div>
@@ -2077,7 +2081,7 @@ function mount(h) {
 </section>
 
 <section class="section e10-screen" id="lineage">
-  <div class="sec-label">Screen 5 — Lineage Explorer</div>
+  <div class="sec-label">Trace Lineage</div>
   <div id="lineage-explorer"><div class="e10-empty">Loading…</div></div>
   <div id="finding-panel" class="e10-empty" style="display:none"></div>
   <div class="screen-explainer" id="lineage-explainer">
@@ -2091,7 +2095,7 @@ function mount(h) {
 </section>
 
 <section class="section e10-screen" id="architect">
-  <div class="sec-label">Screen 6 — Architect Explorer</div>
+  <div class="sec-label">Build the Argument</div>
   <div id="architect-panel">
     <div class="e10-empty">Loading blueprints…</div>
   </div>
@@ -2104,7 +2108,7 @@ function mount(h) {
     <p><strong>How to use it:</strong> Browse existing blueprints and plans here. Generate a new blueprint from a research directive, or import your own. Set a blueprint as active, then go to Review to run the Artist against it.</p>
     <div style="margin-top:16px;display:flex;gap:10px">
       <button onclick="e10Go('review')" style="padding:8px 16px;background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);cursor:pointer">← Review</button>
-      <button class="btn-primary" onclick="e10Go('reports')" style="padding:8px 20px">Next: Read →</button>
+      <button class="btn-primary" onclick="e10Go('reports')" style="padding:8px 20px">Next: Render →</button>
     </div>
   </div>
 </section>
@@ -2191,7 +2195,7 @@ function buildCycleDiagram(pipeline, activeScreenId) {
     { id: 'lab',       label: 'Lab',       angle: 60  },
     { id: 'review',    label: 'Review',    angle: 120 },
     { id: 'architect', label: 'Architect', angle: 180 },
-    { id: 'reader',    label: 'Read',      angle: 240 },
+    { id: 'reports',   label: 'Render',    angle: 240 },
     { id: 'critic',    label: 'Critic',    angle: 300 },
   ];
 
@@ -2422,7 +2426,7 @@ async function e10LoadOnboarding() {
     { key: "interpretations", label: "Interpret",  description: "Assign meaning to what was observed",                count: 0, status: "pending",  nav_target: "lab" },
     { key: "blueprints",      label: "Organize",   description: "Arrange interpretations into a coherent argument",   count: 0, status: "pending",  nav_target: "architect" },
     { key: "architect_plans", label: "Plan",       description: "Specify what the report must communicate",           count: 0, status: "pending",  nav_target: "architect" },
-    { key: "narratives",      label: "Read",       description: "Generate the report with an AI provider",            count: 0, status: "pending",  nav_target: "reader" },
+    { key: "narratives",      label: "Render",     description: "Generate the report with an AI provider",            count: 0, status: "pending",  nav_target: "reports" },
     { key: "audits",          label: "Audit",      description: "Measure how faithfully the report preserved the evidence", count: 0, status: "pending", nav_target: "critic" },
   ];
   const pipeline = d.pipeline?.length ? d.pipeline : fallbackPipeline;
@@ -2648,7 +2652,7 @@ async function e10LoadOnboarding() {
       </div>
       <div class="inv-triad">
         <div class="inv-triad-full">
-          <div class="inv-block-label">Thesis</div>
+          <div class="inv-block-label">${_register === 'expert' ? 'Thesis' : 'Question'}</div>
           <div class="inv-block-text">${x(inv.thesis)}</div>
         </div>
         ${inv.purpose ? `<div>
@@ -2670,8 +2674,8 @@ async function e10LoadOnboarding() {
       <button class="btn-primary" onclick="e10Go('setup')">Declare Investigation →</button>
     </div>`;
 
-  const cycleStages = ['corpus','lab','review','architect','reader','critic'];
-  const cycleNames  = { corpus:'Corpus', lab:'Lab', review:'Review', architect:'Architect', reader:'Read', critic:'Critic' };
+  const cycleStages = ['corpus','lab','review','architect','reports','critic'];
+  const cycleNames  = { corpus:'Corpus', lab:'Lab', review:'Review', architect:'Architect', reports:'Render', critic:'Critic' };
   const activeNav   = currentStage?.nav_target || 'corpus';
   const activeIdx   = cycleStages.indexOf(activeNav);
   const prevNav     = cycleStages[(activeIdx - 1 + cycleStages.length) % cycleStages.length];
@@ -3202,6 +3206,14 @@ function updatePageThesis() {
   const thesis = invLoad()?.thesis || '';
   el.textContent = thesis;
   wrap.style.display = thesis ? '' : 'none';
+  // Long questions clamp to two lines; click to expand/collapse.
+  el.classList.toggle('q-clamped', thesis.length > 90);
+  el.title = thesis.length > 90 ? 'Show full question' : '';
+  el.onclick = () => {
+    if (thesis.length <= 90) return;
+    el.classList.toggle('q-clamped');
+    el.title = el.classList.contains('q-clamped') ? 'Show full question' : 'Collapse';
+  };
 }
 
 function _groupByDoc(observations) {
@@ -4330,10 +4342,10 @@ async function traceFrom(n) {
 }
 
 // ── E10 workflow ──────────────────────────────────────
-const _STAGE_ORDER = ['corpus', 'lab', 'review', 'architect', 'reader', 'critic'];
+const _STAGE_ORDER = ['corpus', 'lab', 'review', 'architect', 'reports', 'critic'];
 const _STAGE_NAMES = {
   corpus: 'Corpus', lab: 'Lab', review: 'Review',
-  architect: 'Architect', reader: 'Read', critic: 'Critic',
+  architect: 'Architect', reports: 'Render', reader: 'Reader', critic: 'Critic',
   onboarding: 'Start', setup: 'Setup', guide: 'Guide',
   constitution: 'Constitution', lineage: 'Lineage',
 };
@@ -4808,13 +4820,14 @@ function e10ProviderCard(provider, cal, perf) {
       <td style="padding:5px 8px;font-size:11px" title="${x(failReason)}">${_e10CalibrationStatusBadge(calStatus)}</td>
       <td style="padding:5px 0 5px 8px;white-space:nowrap">
         <button class="btn-trace" style="font-size:10px;padding:2px 8px" onclick="e10CalibrateRole(${pk},${JSON.stringify(role)},this)">Run test</button>
-        <button class="btn-trace" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="e10ToggleOverride(${JSON.stringify(overrideId)})">Override</button>
+        <button class="btn-trace" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="e10ToggleOverride(${JSON.stringify(overrideId)})">Manual override</button>
         <div id="${overrideId}" style="display:none;margin-top:6px">
           <select id="${overrideId}-status" style="font-size:11px;padding:2px 5px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg)">
-            <option value="approved">approved</option>
-            <option value="caution">caution</option>
-            <option value="rejected">rejected</option>
-            <option value="untested">reset to untested</option>
+            <option value="" disabled selected>Choose override…</option>
+            <option value="approved">Approve for this role</option>
+            <option value="caution">Use with caution</option>
+            <option value="rejected">Reject for this role</option>
+            <option value="untested">Reset to untested</option>
           </select>
           <input id="${overrideId}-note" type="text" placeholder="Steward note (required)" style="font-size:11px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);margin-left:4px;width:180px">
           <button class="btn-trace" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="e10ApplyOverride(${pk},${JSON.stringify(role)},${JSON.stringify(overrideId)})">Apply</button>
@@ -4907,6 +4920,8 @@ async function e10ApplyOverride(participant, role, panelId) {
   const statusEl = document.getElementById(`${panelId}-status`);
   const noteEl = document.getElementById(`${panelId}-note`);
   if (!statusEl || !noteEl) return;
+  if (!statusEl.value) { statusEl.style.borderColor = 'var(--red)'; return; }
+  statusEl.style.borderColor = '';
   const note = noteEl.value.trim();
   if (!note) { noteEl.style.borderColor = 'var(--red)'; return; }
   noteEl.style.borderColor = '';

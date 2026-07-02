@@ -4797,11 +4797,11 @@ Return ONLY valid JSON, no markdown, no explanation:
             },
             {
                 "key": "narratives",
-                "label": "Read",
+                "label": "Render",
                 "description": "Generate the report with an AI provider",
                 "count": counts["narratives"],
                 "surface": "/api/reader/narratives",
-                "nav_target": "reader",
+                "nav_target": "reports",
             },
             {
                 "key": "audits",
