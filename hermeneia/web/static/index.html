@@ -1672,6 +1672,27 @@ body.a11y-text-lg .e10-card .e10-text { font-size: 15px !important; }
 // ── State ──────────────────────────────────────────────
 let _dbt = null, _activeBtn = null, _layers = [], _profiles = [], _lineageGraph = null;
 let _expert = false, _matrixOpen = false, _matrixData = null;
+
+// Vocabulary register — separate from the provider/settings overlay (_expert).
+// 'universal' shows plain-language labels; 'expert' shows researcher terms.
+// Persisted so the user's chosen depth survives navigation and reload.
+let _register = (() => {
+  try { return localStorage.getItem('hermeneia_register') === 'expert' ? 'expert' : 'universal'; }
+  catch { return 'universal'; }
+})();
+
+function setRegister(val) {
+  _register = val === 'expert' ? 'expert' : 'universal';
+  try { localStorage.setItem('hermeneia_register', _register); } catch {}
+  // Re-render whichever lineage surface is currently open
+  const host = document.getElementById('lineage-explorer');
+  if (host && _lineageExplorerGraph && document.getElementById('lineage-chain-col')) {
+    _lineageExplorerRenderGraph(_lineageExplorerGraph, host);
+  } else if (host && host.innerHTML.trim()) {
+    e10LoadLineageExplorer();
+  }
+  if (document.getElementById('setup-panel')?.innerHTML.trim()) e10LoadSetup();
+}
 let _activeCell = null, _covOpen = false;
 let _e10Selected = null, _e10Detail = null, _e10ActiveProposal = null;
 let _e10Providers = null;
@@ -3528,7 +3549,7 @@ function redrawLineage(animate = false) {
 
 function lineageHTML(graph) {
   if (!graph) return '';
-  const mode = _expert ? 'expert' : 'universal';
+  const mode = _expert ? 'expert' : _register;
   const byClass = new Map();
   for (const node of graph.nodes || []) {
     if (!byClass.has(node.class)) byClass.set(node.class, []);
@@ -6953,7 +6974,7 @@ function _lineageExplorerRenderPicker(data, host) {
     host.innerHTML = `<div class="e10-empty">No rendered narratives yet — run the Artist to generate the first.</div>`;
     return;
   }
-  const mode = _expert ? 'expert' : 'universal';
+  const mode = _register;
   const items = data.rendered_narratives.map(n => {
     const label = n.profile_slug || n.expression_profile_id?.slice(0,12) || '—';
     const bpTitle = n.blueprint_title || '—';
@@ -7001,7 +7022,7 @@ async function e10LoadLineageGraph(narrativeId) {
 }
 
 function _lineageExplorerRenderGraph(graph, host) {
-  const mode = _expert ? 'expert' : 'universal';
+  const mode = _register;
   const byClass = new Map();
   for (const node of graph.nodes || []) {
     if (!byClass.has(node.class)) byClass.set(node.class, []);
@@ -7043,6 +7064,14 @@ function _lineageExplorerRenderGraph(graph, host) {
     <div style="display:grid;grid-template-columns:260px 1fr;gap:24px;align-items:start">
       <div id="lineage-chain-col" style="position:sticky;top:72px">
         <div style="font-size:11px;color:var(--dim2);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px">Provenance Chain</div>
+        <div style="display:flex;gap:4px;margin-bottom:12px" title="Same chain, same evidence — only the words change.">
+          ${['universal','expert'].map(r => `<button onclick="setRegister('${r}')"
+            style="flex:1;padding:4px 8px;font:inherit;font-size:11px;border-radius:var(--r);cursor:pointer;
+                   border:1px solid ${_register === r ? 'var(--accent)' : 'var(--border)'};
+                   background:${_register === r ? 'rgba(95,207,212,0.12)' : 'none'};
+                   color:${_register === r ? 'var(--accent)' : 'var(--dim2)'}">
+            ${r === 'universal' ? 'Plain language' : 'Researcher terms'}</button>`).join('')}
+        </div>
         ${chainRows}
       </div>
       <div id="lineage-detail-col">
@@ -7077,7 +7106,7 @@ function _lineageExplorerSelectNode(key) {
   const panel  = document.getElementById('lineage-detail-col');
   if (!panel || !node) return;
 
-  const mode = _expert ? 'expert' : 'universal';
+  const mode = _register;
   const meta = (LINEAGE_VOCAB[mode] || LINEAGE_VOCAB.universal)[node.class]
              || { icon: '◈', title: node.class, subtitle: '' };
   const data = node.data || {};
