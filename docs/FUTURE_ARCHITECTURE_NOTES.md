@@ -4181,3 +4181,48 @@ Scripture anchor (Joseph): Proverbs 20:5 — *"The purpose in a man's heart is l
 ### Sequencing consequence
 
 The post-demo queue reorders around the two migrations that matter: **Question object** (subsumes question-frame persistence from the Writing Threshold) and **Revision object** (powers the passage timeline and instruments RH-001). Markup Legend follows as the third. Everything else in the design lanes is views over these objects.
+
+---
+
+## Word Lens & ConceptTerm *(Design Lane — 2026-07-03, first feature request from live use)*
+
+*Recorded: 2026-07-03. Origin: Joseph's first writing session in the instrument — selecting "aspiration" in his question surfaced only browser-level options (Copy / Search / Ask ChatGPT). "So much of interpretation can be helped just by looking up the real definition of something."*
+
+### The feature
+
+Selected text opens **Word Lens** — interpretive word tools, not a context menu:
+
+```
+Word Lens: aspiration
+  Definition            plain-English meaning
+  Etymology             where the word came from, how meaning developed
+  Semantic Neighbors    ambition · desire · dream · hope · longing · fantasy · idolatry
+  Corpus Usage          where the term and its neighbors appear across the investigation
+  Interpretive Risk     how this word is commonly flattened or misunderstood
+  Lens Notes            how the word shifts under Christian / rhetorical / literary /
+                        psychological / historical lenses
+  Add to Investigation  promote to a first-class concept
+```
+
+The distinguishing move (verbatim): a dictionary answers *"what does this word mean?"* — Hermeneia answers **"what does this word make possible or impossible in this interpretation?"** Demonstrated live: distinguishing aspiration from its neighbors sharpened the governing question itself — *"Is Gatsby's problem aspiration itself, or aspiration that refuses correction by reality?"* (Note: that is the Interaction Constitution's preamble functioning in the wild — the interaction left the investigator with a better question.)
+
+### ConceptTerm — the third object, and it already has an ancestor
+
+Product object (Joseph's schema): term · definitions · etymology · semantic neighbors · corpus occurrences · lens-specific notes · **user-selected meaning** · linked observations · linked questions · interpretive risks · status: proposed / established / contested.
+
+**Grounding (verified):** the schema already has `terms` (8,379 rows) and `observation_terms` (47,760 links) from the Hermeneutic Field layer. Corpus Usage and linked-observations facets are *views over existing data*; "Trace usage in corpus" is the already-shipped Pattern View invoked on the term. ConceptTerm = the existing terms table + an enrichment/promotion layer. This is the **third candidate migration** in the post-demo spine: Question, Revision, ConceptTerm — and the cheapest, because its core object exists.
+
+**Unification with the Markup Legend:** a legend variable ("green = aspiration") and a ConceptTerm ("aspiration") are the same object at different maturities. One lifecycle, not two features:
+
+```
+Mark → Name (legend variable) → Define / Distinguish (Word Lens)
+     → Promote (ConceptTerm) → Trace (Pattern View) → Interpret → Render
+```
+
+### Constitutional rule: definitions carry provenance
+
+A definition is an observation from a **reference source**, never ground truth. Dictionary/lexicon lookups enter as reference-role corpus material (`source_role` already exists for exactly this); an LLM-proposed definition or neighbor-distinction is speculative until stewarded; the **user-selected meaning is a commitment** — which sense of the word governs *this* investigation is a stewarded, revisable decision, and Reports, Salon outputs, and Critic audits then use the established meaning instead of guessing.
+
+### Sequencing (Joseph's #C)
+
+Word Lens before Memory Renderings (songs, flashcards, study aids — the Salon's memory-oriented sibling of Reports): *"the song gets stronger when the vocabulary is already grounded."* Renderings inherit established meanings rather than re-deriving them.
