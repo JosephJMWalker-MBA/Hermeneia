@@ -3306,12 +3306,14 @@ function renderMotifPanel(q, observations, host, totalCount = null) {
       : (_corpusTotalPages || Math.max(...pages, 1));
     const { bar, note } = _makeDistBar(pages, docMax);
 
-    const cards = rows.map(r => {
+    const CARD_CAP = 12;
+    const cards = rows.map((r, i) => {
       const safe = x(r.raw_text);
       const hi = safe.replace(new RegExp(`(${esc(x(q))})`, 'gi'), '<em>$1</em>');
       const oid = `pv-${x(r.id)}`;
+      const hidden = i >= CARD_CAP;
       return `
-        <div style="flex:1;min-width:220px;max-width:360px;border:1px solid var(--border);border-radius:6px;padding:14px 16px;background:var(--bg);display:flex;flex-direction:column;gap:8px">
+        <div ${hidden ? 'class="motif-extra"' : ''} style="flex:1;min-width:220px;max-width:360px;border:1px solid var(--border);border-radius:6px;padding:14px 16px;background:var(--bg);display:${hidden ? 'none' : 'flex'};flex-direction:column;gap:8px">
           <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
             <input type="radio" name="motif-pick" id="${oid}" value="${x(r.id)}" ${r.id === defaultPick ? 'checked' : ''} style="margin-top:3px;flex-shrink:0">
             <div style="flex:1;min-width:0">
@@ -3344,7 +3346,10 @@ function renderMotifPanel(q, observations, host, totalCount = null) {
             <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--dim2);margin-top:2px;font-family:var(--mono)"><span>p.1</span><span>p.${docMax}</span></div>
           </div>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start">${cards}</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start">${cards}${rows.length > CARD_CAP
+          ? `<button onclick="[...this.parentElement.querySelectorAll('.motif-extra')].forEach(el => el.style.display = 'flex'); this.remove()"
+               style="align-self:center;background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--dim2);cursor:pointer;font:inherit;font-size:12px;padding:6px 14px">Show all ${rows.length} ▾</button>`
+          : ''}</div>
       </div>`;
   }).join('');
 
