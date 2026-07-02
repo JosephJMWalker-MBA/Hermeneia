@@ -3223,7 +3223,13 @@ function renderResults(q, { count, observations }) {
   // ── Motif Panel: show when search has 2+ results ──────
   const motifHost = document.getElementById('motif-panel');
   if (q && count >= 2 && motifHost) {
-    renderMotifPanel(q, observations, motifHost);
+    if (count <= observations.length) {
+      renderMotifPanel(q, observations, motifHost);
+    } else {
+      // Result set is capped: never present truncated counts or
+      // distributions as complete. The uncapped fetch renders instead.
+      motifHost.innerHTML = '';
+    }
   } else if (motifHost) {
     motifHost.innerHTML = '';
     _motifViewActive = false;
@@ -3280,9 +3286,10 @@ function _makeDistBar(pages, totalPages, BAR = 52) {
   return { bar: bar.join(''), note, totalPages };
 }
 
-function renderMotifPanel(q, observations, host) {
+function renderMotifPanel(q, observations, host, totalCount = null) {
   const groups = _groupByDoc(observations);
   const multiDoc = groups.length > 1;
+  const truncated = totalCount != null && totalCount > observations.length;
 
   // Exactly one passage is sent to the AI, so exactly one is selectable.
   // Default to the first primary-corpus occurrence: grounding starts primary.
@@ -3411,7 +3418,9 @@ function renderMotifPanel(q, observations, host) {
         <div>
           <span style="font-size:10px;letter-spacing:.1em;color:var(--dim2);font-weight:600;text-transform:uppercase">Pattern View</span>
           <span style="font-size:16px;font-weight:600;color:var(--fg);margin-left:10px">"${x(q)}"</span>
-          ${multiDoc ? `<span style="font-size:12px;color:var(--dim2);margin-left:8px">· ${observations.length} total across ${groups.length} corpora</span>` : ''}
+          ${multiDoc && !truncated ? `<span style="font-size:12px;color:var(--dim2);margin-left:8px">· ${observations.length} total across ${groups.length} corpora</span>` : ''}
+          ${truncated ? `<span style="font-size:12px;color:var(--dim2);margin-left:8px">· showing the first ${observations.length} of ${totalCount.toLocaleString()} occurrences</span>` : ''}
+          ${truncated ? `<div style="font-size:12px;color:var(--yellow,#f4c542);margin-top:4px">Counts and distribution below reflect only these ${observations.length} — the full pattern is larger.</div>` : ''}
           <div style="font-size:12px;color:var(--dim2);margin-top:4px">Choose the passage to interpret first — the rest stay here for comparison.</div>
         </div>
         <button onclick="sendPatternToLab(${x(JSON.stringify(q))})"
@@ -4539,13 +4548,22 @@ async function e10LoadObservations(q = null) {
   // For the motif/pattern panel, fetch the full result set separately so
   // distribution counts are accurate (display list stays capped at 60).
   if (query) {
+    const stillCurrent = () => (document.getElementById('q')?.value || '').trim() === query;
     get(`/api/e10/observations?q=${encodeURIComponent(query)}&filter=${encodeURIComponent(filter)}&limit=5000`)
       .then(full => {
+        if (!stillCurrent()) return; // a slow response must not overwrite a newer search
         const motifHost = document.getElementById('motif-panel');
         if (motifHost && (full.observations || []).length >= 2) {
-          renderMotifPanel(query, full.observations, motifHost);
+          // The server clamps limit to 100; pass the true total so the
+          // panel can disclose truncation instead of presenting it as complete.
+          renderMotifPanel(query, full.observations, motifHost, data.count);
         }
-      }).catch(() => {});
+      }).catch(() => {
+        // Never leave a truncated panel standing as if it were complete
+        if (!stillCurrent()) return;
+        const motifHost = document.getElementById('motif-panel');
+        if (motifHost) motifHost.innerHTML = '';
+      });
   }
 
   renderResults(query, data);
