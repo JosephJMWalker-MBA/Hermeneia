@@ -3284,6 +3284,10 @@ function renderMotifPanel(q, observations, host) {
   const groups = _groupByDoc(observations);
   const multiDoc = groups.length > 1;
 
+  // Exactly one passage is sent to the AI, so exactly one is selectable.
+  // Default to the first primary-corpus occurrence: grounding starts primary.
+  const defaultPick = (observations.find(r => !r.source_role || r.source_role === 'primary') || observations[0])?.id;
+
   const docSections = groups.map(({ docName, rows }) => {
     const role = rows[0]?.source_role || 'primary';
     const label = docName ? docName.replace(/\.pdf$/i, '') : 'Untitled';
@@ -3302,7 +3306,7 @@ function renderMotifPanel(q, observations, host) {
       return `
         <div style="flex:1;min-width:220px;max-width:360px;border:1px solid var(--border);border-radius:6px;padding:14px 16px;background:var(--bg);display:flex;flex-direction:column;gap:8px">
           <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
-            <input type="checkbox" id="${oid}" value="${x(r.id)}" checked style="margin-top:3px;flex-shrink:0">
+            <input type="radio" name="motif-pick" id="${oid}" value="${x(r.id)}" ${r.id === defaultPick ? 'checked' : ''} style="margin-top:3px;flex-shrink:0">
             <div style="flex:1;min-width:0">
               <div style="font-size:10px;letter-spacing:.08em;color:var(--dim2);font-family:var(--mono);margin-bottom:5px">p.${r.page} §${r.paragraph}</div>
               <div style="font-size:13px;color:var(--fg2);line-height:1.6">"${hi}"</div>
@@ -3408,6 +3412,7 @@ function renderMotifPanel(q, observations, host) {
           <span style="font-size:10px;letter-spacing:.1em;color:var(--dim2);font-weight:600;text-transform:uppercase">Pattern View</span>
           <span style="font-size:16px;font-weight:600;color:var(--fg);margin-left:10px">"${x(q)}"</span>
           ${multiDoc ? `<span style="font-size:12px;color:var(--dim2);margin-left:8px">· ${observations.length} total across ${groups.length} corpora</span>` : ''}
+          <div style="font-size:12px;color:var(--dim2);margin-top:4px">Choose the passage to interpret first — the rest stay here for comparison.</div>
         </div>
         <button onclick="sendPatternToLab(${x(JSON.stringify(q))})"
           style="padding:7px 16px;font-size:13px;font-weight:600;border-radius:5px;cursor:pointer;background:var(--accent2,rgba(0,229,255,.08));border:1px solid var(--accent,#00e5ff);color:var(--accent,#00e5ff);white-space:nowrap">
@@ -3420,45 +3425,43 @@ function renderMotifPanel(q, observations, host) {
 }
 
 async function sendPatternToLab(q) {
-  // Read which checkboxes are checked in the Pattern View
-  const checked = [...document.querySelectorAll('#motif-panel input[type=checkbox]:checked')].map(cb => cb.value);
-  if (!checked.length) return;
+  // Exactly one passage is selectable in the Pattern View (radio),
+  // matching what the generate endpoint actually receives.
+  const radios = [...document.querySelectorAll('#motif-panel input[name=motif-pick]')];
+  const picked = document.querySelector('#motif-panel input[name=motif-pick]:checked')?.value;
+  if (!picked) return;
 
   _motifQuery = q;
-  _motifObsIds = checked;
+  _motifObsIds = radios.map(r => r.value);
 
   e10Go('lab');
 
+  const others = radios.length - 1;
   const labHost = document.getElementById('selected-observation');
   if (!labHost) return;
   labHost.className = '';
   labHost.innerHTML = `
     <div style="border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:12px;background:var(--surface)">
       <div style="font-size:10px;letter-spacing:.1em;color:var(--dim2);font-weight:600;margin-bottom:10px;text-transform:uppercase">Pattern View — "${x(q)}"</div>
-      <div style="font-size:12px;color:var(--dim2);margin-bottom:14px">${checked.length} occurrence${checked.length !== 1 ? 's' : ''} selected. The first selected passage will be sent as evidence. The others remain visible here so you can compare the pattern before interpreting it.</div>
+      <div style="font-size:12px;color:var(--dim2);margin-bottom:14px">The passage below will be sent as evidence.${others > 0 ? ` The other ${others} occurrence${others !== 1 ? 's' : ''} remain in the Pattern View for comparison.` : ''}</div>
       <div id="pattern-obs-list" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>`;
 
+  const detail = await get(`/api/e10/observations/${encodeURIComponent(picked)}`).catch(() => null);
   const listHost = document.getElementById('pattern-obs-list');
-  const details = await Promise.all(checked.map(id => get(`/api/e10/observations/${encodeURIComponent(id)}`).catch(() => null)));
-  if (listHost) {
-    listHost.innerHTML = details.filter(Boolean).map(d => {
-      const o = d.observation || d;
-      const safe = x(o.raw_text || '');
-      const hi = safe.replace(new RegExp(`(${esc(x(q))})`, 'gi'), '<em>$1</em>');
-      return `<div style="padding:10px 12px;background:var(--bg);border-radius:4px;font-size:12px;color:var(--fg2);line-height:1.6;border-left:2px solid var(--border)">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--dim2);margin-bottom:3px">p.${o.page} §${o.paragraph}</div>
-        <div>"${hi}"</div>
-      </div>`;
-    }).join('');
+  if (listHost && detail) {
+    const o = detail.observation || detail;
+    const safe = x(o.raw_text || '');
+    const hi = safe.replace(new RegExp(`(${esc(x(q))})`, 'gi'), '<em>$1</em>');
+    listHost.innerHTML = `<div style="padding:10px 12px;background:var(--bg);border-radius:4px;font-size:12px;color:var(--fg2);line-height:1.6;border-left:2px solid var(--accent)">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--dim2);margin-bottom:3px">p.${o.page} §${o.paragraph}</div>
+      <div>"${hi}"</div>
+    </div>`;
   }
 
-  // Prime the E10 selection with the first obs so Generate Interpretations fires
-  if (checked.length > 0) {
-    _e10Selected = checked[0];
-    const first = details.find(Boolean);
-    if (first) _e10Detail = first;
-  }
+  // Prime the E10 selection so Generate Interpretations fires on the pick
+  _e10Selected = picked;
+  if (detail) _e10Detail = detail;
 }
 
 let _motifQuery = null;
