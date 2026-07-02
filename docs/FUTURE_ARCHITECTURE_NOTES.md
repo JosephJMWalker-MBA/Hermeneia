@@ -3994,3 +3994,64 @@ Downstream leverage once variables exist: "Show every Aspiration passage" / "Com
 ### Relationship to existing notes
 
 Extends *Witness Cognitive Responsibility + Marginalia Interface* (P0 note) — the markup layer is Marginalia's vocabulary growing from highlight/label into a reader-authored ontology. Extends the Lineage direction from the walkthrough audit: Reader Lineage can show not just *what* was noticed but *under which reader-defined meaning* it was noticed. Absorbs the "Reading Tools" dock into context tools on selection.
+
+---
+
+## Hermeneia Salon & Generate Packet *(Design Lane — 2026-07-02)*
+
+*Recorded: 2026-07-02. Origin: design dialogue (Joseph) following PR #5. Post-cleanup design lane — sits beside TTS/Reading Tools, not buried under it. Joseph's attempt to log this on the PR was tool-blocked; recorded here so it does not live only in chat.*
+
+### The name and the distinction
+
+**Hermeneia Salon** — "a room where the investigation becomes discussable, listenable, teachable, and revisable."
+
+> NotebookLM: Upload sources → generate study media.
+> Hermeneia Salon: **Governed investigation → generate study media with provenance.**
+
+**Governing rule (verbatim):** *Study media must be generated from traceable investigation artifacts, not from an ungrounded summary of the source.* The Salon is the investigation speaking back in study form — never generic AI content.
+
+Salon outputs: **Audio Salon** (guided discussion of the question, notes, motifs, unresolved tensions), **Study Guide** (from highlights, questions, accepted interpretations, source passages), **Flashcards/Quiz** (from reader-defined variables, motifs, established claims), **Socratic Session** (Hermeneia asks questions from what was noticed and what remains unresolved), **Witness Recap** (a spoken history of the reading journey — read, highlighted, questioned, revised, established).
+
+### Generate Packet — the V1 bridge (near-term, freeze-safe)
+
+Decision: don't build the media stack first. Build **Generate Packet** — export the investigation as a clean study bundle and let NotebookLM / ChatGPT / Claude / local models be downstream renderers.
+
+> Downstream tools may transform the packet, but Hermeneia preserves the governed investigation.
+
+Packet contents: current question · sources with roles (primary/commentary/excluded) · primary excerpts · reader highlights with notes and questions · accepted interpretations · contested/unresolved interpretations · motif summaries · (later) markup legend/variables · citation index · suggested study prompts. Formats: **Markdown first** (NotebookLM ingests it directly), JSON, ZIP bundle. Export presets: "For NotebookLM," "For ChatGPT/Claude," "Raw JSON," "Markdown study bundle."
+
+Implementation note: Generate Packet is **read-only over existing artifacts** — no schema, no new ontology; it composes what the constitution already preserves, and it pairs naturally with the existing `herm preserve export` machinery. Cheapest Salon-value item; candidate for the first post-demo build.
+
+### The Salon architecture: build first, compare second, disagree third
+
+Joseph's systems-thinking meeting pattern is the real architecture, and it is bigger than audio:
+
+> Participants divide into subgroups (buckets). Subgroups may only **build** — disagreement waits until a bucket has finished building what it agrees on. Differences are shared at the end, and others may join a difference-bucket until it too is fully explored. The insight: the process reveals both sides agree on most things — and AI can hold buckets apart in parallel far better than humans can.
+
+**Constitutional rule (verbatim):** *Perspectives must build their strongest evidence-grounded case before comparison or disagreement is introduced.* This prevents the Salon from becoming performative debate; it becomes disciplined inquiry.
+
+Structure — recursive reuse of the Blueprint step:
+
+```
+Salon Blueprint → perspective buckets → speaker turns → comparison/diff
+```
+
+Each speaker carries: perspective · topic · evidence boundary · turn limit · voice · tone · allowed claims · forbidden claims. User controls perspectives and topic; **Mix Perspectives** assigns a balanced spread (textual, moral/theological, social/historical, skeptical, practical) and explains why each was chosen.
+
+**The diff is the payoff**, not the audio: where all perspectives agreed · where only some agreed · which evidence each bucket emphasized · which claims were unsupported · which tensions remain unresolved · what to investigate next.
+
+Kernel note: this is "disagreement = different folds over a shared record" (Epistemic Kernel Exploration, Round 4) operationalized as a product surface — the Salon diff *is* comparing folds, and the build-first rule is what keeps the folds clean enough to compare. It inherits the ACH lineage (evidence-vs-hypotheses discipline) already cited in the kernel note.
+
+### V1 shape (Joseph's sketch, preserved)
+
+```
+Generate Audio Salon
+  Topic: What is Gatsby asking us to believe about aspiration?
+  Evidence: current packet / selected highlights / selected motif
+  Perspectives: [Mix Perspectives] or choose manually
+  Turn limit: 500 characters per speaker
+  Mode: build first, compare after
+  Output: script · audio · perspective diff · source index
+```
+
+Sequencing: Generate Packet first (freeze-safe, immediate value) → Audio Salon script+diff (reuses existing Perspective/Blueprint/Artist/Critic machinery) → voices/audio rendering last.
