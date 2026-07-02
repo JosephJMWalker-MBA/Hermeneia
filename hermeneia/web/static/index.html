@@ -2108,7 +2108,7 @@ function mount(h) {
     <p><strong>How to use it:</strong> Browse existing blueprints and plans here. Generate a new blueprint from a research directive, or import your own. Set a blueprint as active, then go to Review to run the Artist against it.</p>
     <div style="margin-top:16px;display:flex;gap:10px">
       <button onclick="e10Go('review')" style="padding:8px 16px;background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);cursor:pointer">← Review</button>
-      <button class="btn-primary" onclick="e10Go('reports')" style="padding:8px 20px">Next: Read →</button>
+      <button class="btn-primary" onclick="e10Go('reports')" style="padding:8px 20px">Next: Render →</button>
     </div>
   </div>
 </section>
@@ -2195,7 +2195,7 @@ function buildCycleDiagram(pipeline, activeScreenId) {
     { id: 'lab',       label: 'Lab',       angle: 60  },
     { id: 'review',    label: 'Review',    angle: 120 },
     { id: 'architect', label: 'Architect', angle: 180 },
-    { id: 'reader',    label: 'Read',      angle: 240 },
+    { id: 'reports',   label: 'Render',    angle: 240 },
     { id: 'critic',    label: 'Critic',    angle: 300 },
   ];
 
@@ -2426,7 +2426,7 @@ async function e10LoadOnboarding() {
     { key: "interpretations", label: "Interpret",  description: "Assign meaning to what was observed",                count: 0, status: "pending",  nav_target: "lab" },
     { key: "blueprints",      label: "Organize",   description: "Arrange interpretations into a coherent argument",   count: 0, status: "pending",  nav_target: "architect" },
     { key: "architect_plans", label: "Plan",       description: "Specify what the report must communicate",           count: 0, status: "pending",  nav_target: "architect" },
-    { key: "narratives",      label: "Read",       description: "Generate the report with an AI provider",            count: 0, status: "pending",  nav_target: "reader" },
+    { key: "narratives",      label: "Render",     description: "Generate the report with an AI provider",            count: 0, status: "pending",  nav_target: "reports" },
     { key: "audits",          label: "Audit",      description: "Measure how faithfully the report preserved the evidence", count: 0, status: "pending", nav_target: "critic" },
   ];
   const pipeline = d.pipeline?.length ? d.pipeline : fallbackPipeline;
@@ -2652,7 +2652,7 @@ async function e10LoadOnboarding() {
       </div>
       <div class="inv-triad">
         <div class="inv-triad-full">
-          <div class="inv-block-label">Thesis</div>
+          <div class="inv-block-label">${_register === 'expert' ? 'Thesis' : 'Question'}</div>
           <div class="inv-block-text">${x(inv.thesis)}</div>
         </div>
         ${inv.purpose ? `<div>
@@ -2674,8 +2674,8 @@ async function e10LoadOnboarding() {
       <button class="btn-primary" onclick="e10Go('setup')">Declare Investigation →</button>
     </div>`;
 
-  const cycleStages = ['corpus','lab','review','architect','reader','critic'];
-  const cycleNames  = { corpus:'Corpus', lab:'Lab', review:'Review', architect:'Architect', reader:'Read', critic:'Critic' };
+  const cycleStages = ['corpus','lab','review','architect','reports','critic'];
+  const cycleNames  = { corpus:'Corpus', lab:'Lab', review:'Review', architect:'Architect', reports:'Render', critic:'Critic' };
   const activeNav   = currentStage?.nav_target || 'corpus';
   const activeIdx   = cycleStages.indexOf(activeNav);
   const prevNav     = cycleStages[(activeIdx - 1 + cycleStages.length) % cycleStages.length];
@@ -4342,10 +4342,10 @@ async function traceFrom(n) {
 }
 
 // ── E10 workflow ──────────────────────────────────────
-const _STAGE_ORDER = ['corpus', 'lab', 'review', 'architect', 'reader', 'critic'];
+const _STAGE_ORDER = ['corpus', 'lab', 'review', 'architect', 'reports', 'critic'];
 const _STAGE_NAMES = {
   corpus: 'Corpus', lab: 'Lab', review: 'Review',
-  architect: 'Architect', reader: 'Read', critic: 'Critic',
+  architect: 'Architect', reports: 'Render', reader: 'Reader', critic: 'Critic',
   onboarding: 'Start', setup: 'Setup', guide: 'Guide',
   constitution: 'Constitution', lineage: 'Lineage',
 };
