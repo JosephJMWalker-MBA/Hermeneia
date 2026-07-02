@@ -3372,7 +3372,7 @@ function renderMotifPanel(q, observations, host) {
         </div>
         <button onclick="sendPatternToLab(${x(JSON.stringify(q))})"
           style="padding:7px 16px;font-size:13px;font-weight:600;border-radius:5px;cursor:pointer;background:var(--accent2,rgba(0,229,255,.08));border:1px solid var(--accent,#00e5ff);color:var(--accent,#00e5ff);white-space:nowrap">
-          Send All to Lab →
+          Send to Lab →
         </button>
       </div>
       ${corpusComparisonHtml}
@@ -3396,7 +3396,7 @@ async function sendPatternToLab(q) {
   labHost.innerHTML = `
     <div style="border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:12px;background:var(--surface)">
       <div style="font-size:10px;letter-spacing:.1em;color:var(--dim2);font-weight:600;margin-bottom:10px;text-transform:uppercase">Pattern View — "${x(q)}"</div>
-      <div style="font-size:12px;color:var(--dim2);margin-bottom:14px">${checked.length} occurrence${checked.length !== 1 ? 's' : ''} selected. The AI will receive all passages as evidence.</div>
+      <div style="font-size:12px;color:var(--dim2);margin-bottom:14px">${checked.length} occurrence${checked.length !== 1 ? 's' : ''} selected. The first selected passage will be sent as evidence. The others remain visible here so you can compare the pattern before interpreting it.</div>
       <div id="pattern-obs-list" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>`;
 
