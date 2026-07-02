@@ -3223,7 +3223,13 @@ function renderResults(q, { count, observations }) {
   // ── Motif Panel: show when search has 2+ results ──────
   const motifHost = document.getElementById('motif-panel');
   if (q && count >= 2 && motifHost) {
-    renderMotifPanel(q, observations, motifHost);
+    if (count <= observations.length) {
+      renderMotifPanel(q, observations, motifHost);
+    } else {
+      // Result set is capped: never present truncated counts or
+      // distributions as complete. The uncapped fetch renders instead.
+      motifHost.innerHTML = '';
+    }
   } else if (motifHost) {
     motifHost.innerHTML = '';
     _motifViewActive = false;
@@ -3280,9 +3286,14 @@ function _makeDistBar(pages, totalPages, BAR = 52) {
   return { bar: bar.join(''), note, totalPages };
 }
 
-function renderMotifPanel(q, observations, host) {
+function renderMotifPanel(q, observations, host, totalCount = null) {
   const groups = _groupByDoc(observations);
   const multiDoc = groups.length > 1;
+  const truncated = totalCount != null && totalCount > observations.length;
+
+  // Exactly one passage is sent to the AI, so exactly one is selectable.
+  // Default to the first primary-corpus occurrence: grounding starts primary.
+  const defaultPick = (observations.find(r => !r.source_role || r.source_role === 'primary') || observations[0])?.id;
 
   const docSections = groups.map(({ docName, rows }) => {
     const role = rows[0]?.source_role || 'primary';
@@ -3295,14 +3306,16 @@ function renderMotifPanel(q, observations, host) {
       : (_corpusTotalPages || Math.max(...pages, 1));
     const { bar, note } = _makeDistBar(pages, docMax);
 
-    const cards = rows.map(r => {
+    const CARD_CAP = 12;
+    const cards = rows.map((r, i) => {
       const safe = x(r.raw_text);
       const hi = safe.replace(new RegExp(`(${esc(x(q))})`, 'gi'), '<em>$1</em>');
       const oid = `pv-${x(r.id)}`;
+      const hidden = i >= CARD_CAP;
       return `
-        <div style="flex:1;min-width:220px;max-width:360px;border:1px solid var(--border);border-radius:6px;padding:14px 16px;background:var(--bg);display:flex;flex-direction:column;gap:8px">
+        <div ${hidden ? 'class="motif-extra"' : ''} style="flex:1;min-width:220px;max-width:360px;border:1px solid var(--border);border-radius:6px;padding:14px 16px;background:var(--bg);display:${hidden ? 'none' : 'flex'};flex-direction:column;gap:8px">
           <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
-            <input type="checkbox" id="${oid}" value="${x(r.id)}" checked style="margin-top:3px;flex-shrink:0">
+            <input type="radio" name="motif-pick" id="${oid}" value="${x(r.id)}" ${r.id === defaultPick ? 'checked' : ''} style="margin-top:3px;flex-shrink:0">
             <div style="flex:1;min-width:0">
               <div style="font-size:10px;letter-spacing:.08em;color:var(--dim2);font-family:var(--mono);margin-bottom:5px">p.${r.page} §${r.paragraph}</div>
               <div style="font-size:13px;color:var(--fg2);line-height:1.6">"${hi}"</div>
@@ -3333,7 +3346,10 @@ function renderMotifPanel(q, observations, host) {
             <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--dim2);margin-top:2px;font-family:var(--mono)"><span>p.1</span><span>p.${docMax}</span></div>
           </div>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start">${cards}</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start">${cards}${rows.length > CARD_CAP
+          ? `<button onclick="[...this.parentElement.querySelectorAll('.motif-extra')].forEach(el => el.style.display = 'flex'); this.remove()"
+               style="align-self:center;background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--dim2);cursor:pointer;font:inherit;font-size:12px;padding:6px 14px">Show all ${rows.length} ▾</button>`
+          : ''}</div>
       </div>`;
   }).join('');
 
@@ -3407,7 +3423,10 @@ function renderMotifPanel(q, observations, host) {
         <div>
           <span style="font-size:10px;letter-spacing:.1em;color:var(--dim2);font-weight:600;text-transform:uppercase">Pattern View</span>
           <span style="font-size:16px;font-weight:600;color:var(--fg);margin-left:10px">"${x(q)}"</span>
-          ${multiDoc ? `<span style="font-size:12px;color:var(--dim2);margin-left:8px">· ${observations.length} total across ${groups.length} corpora</span>` : ''}
+          ${multiDoc && !truncated ? `<span style="font-size:12px;color:var(--dim2);margin-left:8px">· ${observations.length} total across ${groups.length} corpora</span>` : ''}
+          ${truncated ? `<span style="font-size:12px;color:var(--dim2);margin-left:8px">· showing the first ${observations.length} of ${totalCount.toLocaleString()} occurrences</span>` : ''}
+          ${truncated ? `<div style="font-size:12px;color:var(--yellow,#f4c542);margin-top:4px">Counts and distribution below reflect only these ${observations.length} — the full pattern is larger.</div>` : ''}
+          <div style="font-size:12px;color:var(--dim2);margin-top:4px">Choose the passage to interpret first — the rest stay here for comparison.</div>
         </div>
         <button onclick="sendPatternToLab(${x(JSON.stringify(q))})"
           style="padding:7px 16px;font-size:13px;font-weight:600;border-radius:5px;cursor:pointer;background:var(--accent2,rgba(0,229,255,.08));border:1px solid var(--accent,#00e5ff);color:var(--accent,#00e5ff);white-space:nowrap">
@@ -3420,45 +3439,43 @@ function renderMotifPanel(q, observations, host) {
 }
 
 async function sendPatternToLab(q) {
-  // Read which checkboxes are checked in the Pattern View
-  const checked = [...document.querySelectorAll('#motif-panel input[type=checkbox]:checked')].map(cb => cb.value);
-  if (!checked.length) return;
+  // Exactly one passage is selectable in the Pattern View (radio),
+  // matching what the generate endpoint actually receives.
+  const radios = [...document.querySelectorAll('#motif-panel input[name=motif-pick]')];
+  const picked = document.querySelector('#motif-panel input[name=motif-pick]:checked')?.value;
+  if (!picked) return;
 
   _motifQuery = q;
-  _motifObsIds = checked;
+  _motifObsIds = radios.map(r => r.value);
 
   e10Go('lab');
 
+  const others = radios.length - 1;
   const labHost = document.getElementById('selected-observation');
   if (!labHost) return;
   labHost.className = '';
   labHost.innerHTML = `
     <div style="border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:12px;background:var(--surface)">
       <div style="font-size:10px;letter-spacing:.1em;color:var(--dim2);font-weight:600;margin-bottom:10px;text-transform:uppercase">Pattern View — "${x(q)}"</div>
-      <div style="font-size:12px;color:var(--dim2);margin-bottom:14px">${checked.length} occurrence${checked.length !== 1 ? 's' : ''} selected. The first selected passage will be sent as evidence. The others remain visible here so you can compare the pattern before interpreting it.</div>
+      <div style="font-size:12px;color:var(--dim2);margin-bottom:14px">The passage below will be sent as evidence.${others > 0 ? ` The other ${others} occurrence${others !== 1 ? 's' : ''} remain in the Pattern View for comparison.` : ''}</div>
       <div id="pattern-obs-list" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>`;
 
+  const detail = await get(`/api/e10/observations/${encodeURIComponent(picked)}`).catch(() => null);
   const listHost = document.getElementById('pattern-obs-list');
-  const details = await Promise.all(checked.map(id => get(`/api/e10/observations/${encodeURIComponent(id)}`).catch(() => null)));
-  if (listHost) {
-    listHost.innerHTML = details.filter(Boolean).map(d => {
-      const o = d.observation || d;
-      const safe = x(o.raw_text || '');
-      const hi = safe.replace(new RegExp(`(${esc(x(q))})`, 'gi'), '<em>$1</em>');
-      return `<div style="padding:10px 12px;background:var(--bg);border-radius:4px;font-size:12px;color:var(--fg2);line-height:1.6;border-left:2px solid var(--border)">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--dim2);margin-bottom:3px">p.${o.page} §${o.paragraph}</div>
-        <div>"${hi}"</div>
-      </div>`;
-    }).join('');
+  if (listHost && detail) {
+    const o = detail.observation || detail;
+    const safe = x(o.raw_text || '');
+    const hi = safe.replace(new RegExp(`(${esc(x(q))})`, 'gi'), '<em>$1</em>');
+    listHost.innerHTML = `<div style="padding:10px 12px;background:var(--bg);border-radius:4px;font-size:12px;color:var(--fg2);line-height:1.6;border-left:2px solid var(--accent)">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--dim2);margin-bottom:3px">p.${o.page} §${o.paragraph}</div>
+      <div>"${hi}"</div>
+    </div>`;
   }
 
-  // Prime the E10 selection with the first obs so Generate Interpretations fires
-  if (checked.length > 0) {
-    _e10Selected = checked[0];
-    const first = details.find(Boolean);
-    if (first) _e10Detail = first;
-  }
+  // Prime the E10 selection so Generate Interpretations fires on the pick
+  _e10Selected = picked;
+  if (detail) _e10Detail = detail;
 }
 
 let _motifQuery = null;
@@ -4536,13 +4553,22 @@ async function e10LoadObservations(q = null) {
   // For the motif/pattern panel, fetch the full result set separately so
   // distribution counts are accurate (display list stays capped at 60).
   if (query) {
+    const stillCurrent = () => (document.getElementById('q')?.value || '').trim() === query;
     get(`/api/e10/observations?q=${encodeURIComponent(query)}&filter=${encodeURIComponent(filter)}&limit=5000`)
       .then(full => {
+        if (!stillCurrent()) return; // a slow response must not overwrite a newer search
         const motifHost = document.getElementById('motif-panel');
         if (motifHost && (full.observations || []).length >= 2) {
-          renderMotifPanel(query, full.observations, motifHost);
+          // The server clamps limit to 100; pass the true total so the
+          // panel can disclose truncation instead of presenting it as complete.
+          renderMotifPanel(query, full.observations, motifHost, data.count);
         }
-      }).catch(() => {});
+      }).catch(() => {
+        // Never leave a truncated panel standing as if it were complete
+        if (!stillCurrent()) return;
+        const motifHost = document.getElementById('motif-panel');
+        if (motifHost) motifHost.innerHTML = '';
+      });
   }
 
   renderResults(query, data);
