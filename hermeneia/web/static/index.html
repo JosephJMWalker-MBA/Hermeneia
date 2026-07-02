@@ -4810,13 +4810,14 @@ function e10ProviderCard(provider, cal, perf) {
       <td style="padding:5px 8px;font-size:11px" title="${x(failReason)}">${_e10CalibrationStatusBadge(calStatus)}</td>
       <td style="padding:5px 0 5px 8px;white-space:nowrap">
         <button class="btn-trace" style="font-size:10px;padding:2px 8px" onclick="e10CalibrateRole(${pk},${JSON.stringify(role)},this)">Run test</button>
-        <button class="btn-trace" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="e10ToggleOverride(${JSON.stringify(overrideId)})">Override</button>
+        <button class="btn-trace" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="e10ToggleOverride(${JSON.stringify(overrideId)})">Manual override</button>
         <div id="${overrideId}" style="display:none;margin-top:6px">
           <select id="${overrideId}-status" style="font-size:11px;padding:2px 5px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg)">
-            <option value="approved">approved</option>
-            <option value="caution">caution</option>
-            <option value="rejected">rejected</option>
-            <option value="untested">reset to untested</option>
+            <option value="" disabled selected>Choose override…</option>
+            <option value="approved">Approve for this role</option>
+            <option value="caution">Use with caution</option>
+            <option value="rejected">Reject for this role</option>
+            <option value="untested">Reset to untested</option>
           </select>
           <input id="${overrideId}-note" type="text" placeholder="Steward note (required)" style="font-size:11px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);margin-left:4px;width:180px">
           <button class="btn-trace" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="e10ApplyOverride(${pk},${JSON.stringify(role)},${JSON.stringify(overrideId)})">Apply</button>
@@ -4909,6 +4910,8 @@ async function e10ApplyOverride(participant, role, panelId) {
   const statusEl = document.getElementById(`${panelId}-status`);
   const noteEl = document.getElementById(`${panelId}-note`);
   if (!statusEl || !noteEl) return;
+  if (!statusEl.value) { statusEl.style.borderColor = 'var(--red)'; return; }
+  statusEl.style.borderColor = '';
   const note = noteEl.value.trim();
   if (!note) { noteEl.style.borderColor = 'var(--red)'; return; }
   noteEl.style.borderColor = '';
