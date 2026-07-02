@@ -3893,3 +3893,59 @@ Nothing in this note changes Validation Phase P0 work.
 ### Reading list handed over during the dialogue
 
 Hirsch (*Validity in Interpretation*); Gadamer (as the strongest adversary of the clean observation layer); Collingwood (logic of question and answer); Peirce (fallibilism, fixation of belief); Popper (conjecture; critique of observationalism); Toulmin (warrant); Brandom (*Making It Explicit* — commitment/entitlement scorekeeping); Hamblin, Walton & Krabbe (commitment stores in dialogue logic); L. J. Cohen (belief vs. acceptance); Hintikka (interrogative model of inquiry); Groenendijk & Stokhof (partition semantics); Ciardelli/Groenendijk/Roelofsen (inquisitive semantics); Roberts (Question Under Discussion); Heuer (Analysis of Competing Hypotheses); Wigmore (evidence charts); Doyle and de Kleer (TMS/ATMS); AGM belief revision; W3C PROV; nanopublications; Dung/ASPIC+ argumentation; Hearsay-II (blackboard architectures); Abramsky (sheaf-theoretic contextuality — speculative).
+
+---
+
+## The Interaction Constitution *(Candidate Constitutional Family — 2026-07-02)*
+
+*Recorded: 2026-07-02*
+
+**Status:** Candidate for constitutional ratification. Emerged from a design dialogue (Joseph ↔ Claude Fable 5, 2026-07-01/02) that followed the Epistemic Kernel Exploration above. The project has had constitutional constraints for knowledge evolution; this is the first constitutional family for *interaction*. These principles prescribe the behavior any Hermeneia interface must exhibit — they do not prescribe a specific UI.
+
+### Preamble
+
+> **Every interaction should leave the user with a better question than the one they arrived with.**
+
+This is the telos the articles below serve. It is not decoration: questions spawning better subquestions is what a healthy epistemic process does (see the kernel exploration's Inquiry dynamic), so an interface that consistently produces this is exhibiting the kernel, not styling it. The felt criterion for success is **reverent curiosity** — the museum, not the feed: pace (never rushed), silence (the interface does not speak without grounds), invitation (every element hints at depth without demanding it).
+
+### Articles
+
+1. **The 8/80 Principle.** A first-time user should be able to complete a genuine act of inquiry — notice something, say why it matters, and see it preserved — without prior training. This standard holds across generations and levels of technical experience. No capability available to experts may be removed to achieve it. *(Rationale: an interface that requires a manual is a claim without provenance — the UI held to the system's own epistemic standard.)*
+
+2. **Observation Before Interpretation.** The interface learns from user behavior before labeling or guiding it. No assumptions, no forced workflows, no premature categorization, no asking for information before it is useful. Observe, then infer, then gently introduce. The interface practices the system's own epistemology on its user.
+
+3. **Earned Complexity.** Concepts appear only when the user's actions make them relevant. A concept's name is never shown before the user has performed the concept ("earned vocabulary": name the behavior after the behavior exists). Measurable test: *has this concept been earned?* If not, do not expose it.
+
+4. **Progressive Disclosure Without Capability Loss.** Advanced functionality is never removed, only revealed when appropriate. A "show me everything" override must always exist — gating an impatient expert is as much an 8/80 failure as overwhelming a novice. Depth changes labels, vocabulary, and prose — never data, never capability (per the established UI Expression Principle: "Same system. Different depth.").
+
+5. **Provenance Over Procedure.** Architecture explains outcomes but does not dictate navigation. The pipeline is never the menu; it is the answer to "how was this made?" Users navigate by what they are trying to accomplish; the stages appear as explanation, on demand.
+
+6. **Every Interaction Preserves History.** Changing your mind enriches the record rather than erasing it. Revision is rendered as growth (strikethrough-with-story), never as deletion. This teaches the monotone-record / non-monotone-commitment split without vocabulary.
+
+7. **Attention Stewardship.** The interface must never manufacture urgency, reward compulsion, or engineer retention — no streaks, no badges, no engagement mechanics. Attention is the scarce resource of the epistemic kernel; an interface that harvests it embezzles the resource the system exists to steward. Hermeneia optimizes the quality of attention spent, not the quantity captured.
+
+8. **The User May Read Their Own File.** Whatever the interface has observed and inferred about a user — pace, earned concepts, readiness — is part of the record: visible, inspectable, contestable, owned by the user. The Witness applies to the interface's model of the user. *(Guardrail for Article 2: without this clause, "observe before interpreting" is surveillance with good manners.)*
+
+### Metaphors are ExpressionProfiles, not constitution
+
+Resolution of a design pushback (Joseph): the desk/book/notebook/pencil/ink metaphor family from the reference interface design is excellent for readers of texts but must not become constitutional, because Hermeneia must eventually serve legal cases, genomes, network traces, satellite imagery, financial records, video, sensor streams.
+
+Constitutional statement: **the interface employs metaphors immediately understandable to its audience while preserving a consistent underlying interaction model.** The interaction kernel (the verbs — notice, ground, commit, challenge, revise, publish — and the articles above) is invariant; the metaphor binding is an ExpressionProfile. Books may become timelines, timelines maps, maps canvases; pencil/ink generalizes to any domain's native rendering of *draft* vs. *committed-with-grounds*. The desk is the **reference rendering** — the same relationship the white paper bears to the publication methodology. This generalizes the earlier "UI Vocabulary Toggle as ExpressionProfile" note from vocabulary to the entire metaphor layer.
+
+### Reference interface sketch (2026-07-01 dialogue, summarized)
+
+The reference rendering for textual corpora, recorded so the articles have one worked example:
+
+- **Three spaces** mapping the kernel's three resources: Book (attention), Notebook (record), Findings (commitment). The governing Question is always visible and always editable. Home is a shelf of inquiries, question-first — not pipeline-first, not report-first.
+- **Pencil and ink:** hunches are free and never rejected (pencil); claims require pointing at evidence (ink). Promotion = entitlement made tactile. Nothing in pencil enters a published reading. The generation/commitment syscall boundary as an interaction grammar.
+- **Gaps as a map with fog:** coverage is question-relative territory that fills in as you read; the map is the inquiry agenda (scheduler) surfaced as invitation.
+- **Comparison = two notebooks over one book:** shared citations glow; divergence is localized ("the disagreement begins here") — adjudication as comparing folds, rendered literally.
+- **Publication = binding** an edition of the trail (question, inked claims with evidence, optionally the crossed-out turns — preserved negative results); readers pull threads (every claim opens to its passages) and challenges arrive as pointed questions.
+- **Expert depth:** lenses (investigative frameworks), Critic findings as margin annotations in a distinct voice (stderr never interleaved with stdout), Blueprint shown as a promise before rendering, investigations saved as repeatable recipes, and a command palette where the syscalls become literal verbs.
+- **Rewarding curiosity within a single unit** (the Genesis 1:1 pattern): hover reveals a small door, each click opens one room — root word, occurrences, historical context, competing views — each answer arriving with its next question. Earned complexity applied fractally, down to a single verse.
+
+### What this supersedes or reframes
+
+Does not delete, but partially reframes: *Human Legibility Gap*, *Guided Onboarding*, *Three-Layer Onboarding*, *"How Hermeneia Works" Pipeline Map* (becomes the provenance view per Article 5), *Center of Gravity Shift* (resolved as question-first rather than report-first), *UI Vocabulary Toggle as ExpressionProfile* (generalized by the metaphor resolution above). Those notes remain the implementation backlog; this family is the constitutional layer above them.
+
+Nothing in this note changes Validation Phase P0 work. The candidate articles await ratification and should be tested against the P0 onboarding work ("bring a question worth investigating") as their first application.
