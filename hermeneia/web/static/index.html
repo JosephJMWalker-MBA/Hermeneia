@@ -1672,6 +1672,27 @@ body.a11y-text-lg .e10-card .e10-text { font-size: 15px !important; }
 // ── State ──────────────────────────────────────────────
 let _dbt = null, _activeBtn = null, _layers = [], _profiles = [], _lineageGraph = null;
 let _expert = false, _matrixOpen = false, _matrixData = null;
+
+// Vocabulary register — separate from the provider/settings overlay (_expert).
+// 'universal' shows plain-language labels; 'expert' shows researcher terms.
+// Persisted so the user's chosen depth survives navigation and reload.
+let _register = (() => {
+  try { return localStorage.getItem('hermeneia_register') === 'expert' ? 'expert' : 'universal'; }
+  catch { return 'universal'; }
+})();
+
+function setRegister(val) {
+  _register = val === 'expert' ? 'expert' : 'universal';
+  try { localStorage.setItem('hermeneia_register', _register); } catch {}
+  // Re-render whichever lineage surface is currently open
+  const host = document.getElementById('lineage-explorer');
+  if (host && _lineageExplorerGraph && document.getElementById('lineage-chain-col')) {
+    _lineageExplorerRenderGraph(_lineageExplorerGraph, host);
+  } else if (host && host.innerHTML.trim()) {
+    e10LoadLineageExplorer();
+  }
+  if (document.getElementById('setup-panel')?.innerHTML.trim()) e10LoadSetup();
+}
 let _activeCell = null, _covOpen = false;
 let _e10Selected = null, _e10Detail = null, _e10ActiveProposal = null;
 let _e10Providers = null;
@@ -2113,10 +2134,25 @@ function mount(h) {
   e10LoadFindings();
   e10LoadResearchBanner();
   // Fetch pipeline statuses for the nav mini cycle, then navigate
+  const bootDest = _bootDestination(h);
   refreshEditionCycleCount().then(() =>
-    refreshNavCycleStatuses().then(() => updateNavCycle(invLoad() ? 'onboarding' : 'setup'))
+    refreshNavCycleStatuses().then(() => updateNavCycle(bootDest))
   );
-  e10Go(invLoad() ? 'onboarding' : 'setup');
+  e10Go(bootDest);
+}
+
+// First-run routing: read before declare. Returning users (a saved
+// question exists) land on the dashboard; a fresh visitor with a corpus
+// lands in the Reader; with no corpus, on upload. If document state is
+// uncertain, fall back to the pre-existing behavior (Setup).
+function _bootDestination(h) {
+  try {
+    if (invLoad()) return 'onboarding';
+    if (h && h.document && typeof h.document === 'object') {
+      return h.document.filename ? 'reader' : 'corpus';
+    }
+  } catch {}
+  return 'setup';
 }
 
 // ── Research Question Banner ───────────────────────────
@@ -2294,6 +2330,9 @@ function e10LoadSetup() {
   const host = document.getElementById('setup-panel');
   if (!host) return;
 
+  const secLabel = host.closest('section')?.querySelector('.sec-label');
+  if (secLabel) secLabel.textContent = _register === 'expert' ? 'Investigation Setup' : 'Your Question';
+
   const existing = invLoad();
   _setupTags = existing?.lenses ? [...existing.lenses] : [];
 
@@ -2311,7 +2350,7 @@ function e10LoadSetup() {
       </div>
 
       <div class="setup-field">
-        <div class="setup-label">Thesis</div>
+        ${_register === 'expert' ? '<div class="setup-label">Thesis</div>' : ''}
         <div class="setup-prompt">What are you trying to understand?</div>
         <div class="setup-example">Example: I want to understand the difference in interpretation of the metaphors in The Great Gatsby.</div>
         <div class="dict-wrap">
@@ -2319,11 +2358,11 @@ function e10LoadSetup() {
             placeholder="I want to understand…">${x(existing?.thesis || '')}</textarea>
           ${sttMakeBtn('setup-thesis')}
         </div>
-        <div id="setup-thesis-err" style="display:none;font-size:12px;color:var(--red);margin-top:4px">A thesis is required before beginning.</div>
+        <div id="setup-thesis-err" style="display:none;font-size:12px;color:var(--red);margin-top:4px">One sentence is enough — what are you trying to understand?</div>
       </div>
 
       <div class="setup-field">
-        <div class="setup-label">Purpose</div>
+        ${_register === 'expert' ? '<div class="setup-label">Purpose</div>' : ''}
         <div class="setup-prompt">Why does this matter?</div>
         <div class="setup-example">Example: So that I can discover lessons I may have missed from a literary masterpiece.</div>
         <div class="dict-wrap">
@@ -2334,7 +2373,7 @@ function e10LoadSetup() {
       </div>
 
       <div class="setup-field">
-        <div class="setup-label">Declared Lenses</div>
+        ${_register === 'expert' ? '<div class="setup-label">Declared Lenses</div>' : ''}
         <div class="setup-prompt">What perspectives are you bringing?</div>
         <div class="setup-example">Not demographics. Interpretive lenses. Every reader arrives with assumptions — Hermeneia makes them visible.<br>
           Examples: Christian · Business owner · First-time reader · Parent · Historian · Recovering addict</div>
@@ -2348,9 +2387,9 @@ function e10LoadSetup() {
       <hr class="setup-divider">
 
       <div class="setup-field">
-        <div class="setup-label">Falsifiability (optional)</div>
-        <div class="setup-prompt">What result would change your mind?</div>
-        <div class="setup-example">Turns the investigation from "prove my thesis" into "test my thesis."<br>
+        ${_register === 'expert' ? '<div class="setup-label">Falsifiability (optional)</div>' : ''}
+        <div class="setup-prompt">What result would change your mind? <span style="color:var(--dim2);font-weight:400">(optional)</span></div>
+        <div class="setup-example">Turns the investigation from "prove my idea" into "test my idea."<br>
           Example: I would reconsider if the evidence suggested Gatsby's metaphors are primarily about status rather than aspiration.</div>
         <div class="dict-wrap">
           <textarea id="setup-reconsider" class="setup-textarea" rows="2"
@@ -2360,7 +2399,7 @@ function e10LoadSetup() {
       </div>
 
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <button class="btn-primary" onclick="setupSubmit()">Begin Investigation ↺</button>
+        <button class="btn-primary" onclick="setupSubmit()">${_register === 'expert' ? 'Begin Investigation ↺' : 'Save my question →'}</button>
         ${existing ? `<button class="btn-trace" onclick="e10Go('onboarding')">Back to Dashboard</button>` : ''}
       </div>
 
@@ -3372,7 +3411,7 @@ function renderMotifPanel(q, observations, host) {
         </div>
         <button onclick="sendPatternToLab(${x(JSON.stringify(q))})"
           style="padding:7px 16px;font-size:13px;font-weight:600;border-radius:5px;cursor:pointer;background:var(--accent2,rgba(0,229,255,.08));border:1px solid var(--accent,#00e5ff);color:var(--accent,#00e5ff);white-space:nowrap">
-          Send All to Lab →
+          Send to Lab →
         </button>
       </div>
       ${corpusComparisonHtml}
@@ -3396,7 +3435,7 @@ async function sendPatternToLab(q) {
   labHost.innerHTML = `
     <div style="border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:12px;background:var(--surface)">
       <div style="font-size:10px;letter-spacing:.1em;color:var(--dim2);font-weight:600;margin-bottom:10px;text-transform:uppercase">Pattern View — "${x(q)}"</div>
-      <div style="font-size:12px;color:var(--dim2);margin-bottom:14px">${checked.length} occurrence${checked.length !== 1 ? 's' : ''} selected. The AI will receive all passages as evidence.</div>
+      <div style="font-size:12px;color:var(--dim2);margin-bottom:14px">${checked.length} occurrence${checked.length !== 1 ? 's' : ''} selected. The first selected passage will be sent as evidence. The others remain visible here so you can compare the pattern before interpreting it.</div>
       <div id="pattern-obs-list" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>`;
 
@@ -3528,7 +3567,7 @@ function redrawLineage(animate = false) {
 
 function lineageHTML(graph) {
   if (!graph) return '';
-  const mode = _expert ? 'expert' : 'universal';
+  const mode = _expert ? 'expert' : _register;
   const byClass = new Map();
   for (const node of graph.nodes || []) {
     if (!byClass.has(node.class)) byClass.set(node.class, []);
@@ -5171,10 +5210,89 @@ async function e10LoadCloseReader() {
     // Default to first primary doc
     const primary = _crDocs.find(d => d.source_role === 'primary') || _crDocs[0];
     _crRenderDocPicker(ws);
+    _crMaybeShowReaderBanner(ws);
+    _crRenderQuestionCard();
     await _crOpenDoc(primary.id);
   } catch(e) {
     ws.innerHTML = `<div class="e10-empty" style="color:var(--red)">Error loading corpus: ${x(e.message)}</div>`;
   }
+}
+
+// First-run invitation. Shown only before a question exists, dismissible,
+// never urgent — it invites reading, it does not demand setup.
+function _crMaybeShowReaderBanner(ws) {
+  let dismissed = false;
+  try { dismissed = localStorage.getItem('hermeneia_reader_banner_dismissed') === '1'; } catch {}
+  if (invLoad() || dismissed) return;
+  ws.insertAdjacentHTML('afterbegin', `
+    <div id="cr-firstrun-banner" style="display:flex;gap:14px;align-items:flex-start;justify-content:space-between;
+         border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--r);
+         padding:14px 18px;margin-bottom:16px;background:var(--surface)">
+      <div style="font-size:13px;color:var(--fg2);line-height:1.7">
+        <strong style="color:var(--fg)">Read first.</strong>
+        Select any passage that catches your eye — everything you notice is kept, nothing is summarized away.
+        When you're ready, we'll help you shape what you've noticed into a question worth investigating.
+      </div>
+      <button onclick="_crDismissReaderBanner()" style="flex-shrink:0;background:none;border:1px solid var(--border);
+              border-radius:var(--r);color:var(--dim2);cursor:pointer;font:inherit;font-size:12px;padding:4px 12px">Got it</button>
+    </div>`);
+}
+
+function _crDismissReaderBanner() {
+  try { localStorage.setItem('hermeneia_reader_banner_dismissed', '1'); } catch {}
+  document.getElementById('cr-firstrun-banner')?.remove();
+}
+
+// The question card. Always present, quiet, static — the ask follows the
+// noticing. The only adaptive display is the highlight count, which the
+// user can already see in their own trail; there is no readiness scoring.
+function _crRenderQuestionCard(editing = false) {
+  const panel = document.getElementById('cr-question-panel');
+  if (!panel) return;
+  // Never stomp a question the user is in the middle of typing
+  if (!editing) {
+    const live = document.getElementById('cr-question-input');
+    if (live && (document.activeElement === live || live.value.trim())) return;
+  }
+  const inv = invLoad();
+
+  if (inv?.thesis && !editing) {
+    panel.innerHTML = `
+      <div class="cr-side-title">Your Question</div>
+      <div style="font-size:13px;color:var(--fg);line-height:1.6;margin-bottom:10px">${x(inv.thesis)}</div>
+      <div style="display:flex;gap:14px">
+        <button onclick="e10Go('setup')" style="background:none;border:none;padding:0;color:var(--accent);cursor:pointer;font:inherit;font-size:12px">Sharpen it →</button>
+        <button onclick="_crRenderQuestionCard(true)" style="background:none;border:none;padding:0;color:var(--dim2);cursor:pointer;font:inherit;font-size:12px">Edit</button>
+      </div>`;
+    return;
+  }
+
+  const n = (_crHighlights || []).length;
+  const noticed = n >= 2 ? `You've noticed ${n} passages. ` : '';
+  panel.innerHTML = `
+    <div class="cr-side-title">Your Question</div>
+    <div style="font-size:12px;color:var(--dim2);line-height:1.6;margin-bottom:8px">${noticed}What are you trying to understand about this text? You can answer now, or keep reading until a question forms.</div>
+    <textarea id="cr-question-input" rows="2" placeholder="I want to understand…"
+      style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font-size:13px;font-family:var(--sans);line-height:1.6;padding:8px 10px;resize:vertical">${x(inv?.thesis || '')}</textarea>
+    <button class="btn-primary" style="width:100%;margin-top:8px;padding:7px" onclick="_crKeepQuestion()">Keep this question</button>`;
+}
+
+function _crKeepQuestion() {
+  const text = document.getElementById('cr-question-input')?.value.trim();
+  if (!text) { document.getElementById('cr-question-input')?.focus(); return; }
+  const existing = invLoad() || {};
+  invSave({
+    thesis: text,
+    purpose: existing.purpose || '',
+    lenses: existing.lenses || [],
+    reconsider: existing.reconsider || '',
+    created: existing.created || new Date().toISOString(),
+  });
+  updatePageThesis();
+  document.getElementById('cr-firstrun-banner')?.remove();
+  const input = document.getElementById('cr-question-input');
+  if (input) input.value = '';  // clear so the re-render guard doesn't hold the form open
+  _crRenderQuestionCard();
 }
 
 function _crRenderDocPicker(ws) {
@@ -5211,6 +5329,7 @@ function _crRenderDocPicker(ws) {
           <div id="cr-trail-summary"><div style="font-size:12px;color:var(--dim2)">Loading trail…</div></div>
           <div id="cr-trail-detail" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px"></div>
         </div>
+        <div class="cr-side-panel" id="cr-question-panel"></div>
         <div class="cr-side-panel" id="cr-capture-panel">
           <div class="cr-side-title">Highlight Inspector</div>
           <div id="cr-sel-prompt" style="font-size:12px;color:var(--dim2);line-height:1.6">
@@ -5532,7 +5651,7 @@ async function _crSaveHighlight(asCandidate) {
     const prompt = document.getElementById('cr-sel-prompt');
     if (prompt) {
       prompt.style.display = '';
-      prompt.innerHTML = `<div style="color:var(--green);font-size:12px;margin-bottom:8px">✓ ${asCandidate ? 'Saved as observation candidate.' : 'Highlight saved.'}</div>
+      prompt.innerHTML = `<div style="color:var(--green);font-size:12px;margin-bottom:8px">✓ ${asCandidate ? 'Kept as an observation candidate.' : 'Kept — added to your trail.'}</div>
         <div style="font-size:12px;color:var(--dim2);line-height:1.6">Select another passage to continue.</div>`;
       setTimeout(() => {
         if (prompt) prompt.innerHTML = 'Select any passage in the text to highlight it, write a note, ask a question, or create an observation candidate.';
@@ -5639,6 +5758,7 @@ let _crTrailDetailOpen = false;
 
 async function _crRefreshTrail() {
   if (!_crDocId) return;
+  _crRenderQuestionCard();
   const panel = document.getElementById('cr-trail-summary');
   if (!panel) return;
   try {
@@ -6953,7 +7073,7 @@ function _lineageExplorerRenderPicker(data, host) {
     host.innerHTML = `<div class="e10-empty">No rendered narratives yet — run the Artist to generate the first.</div>`;
     return;
   }
-  const mode = _expert ? 'expert' : 'universal';
+  const mode = _register;
   const items = data.rendered_narratives.map(n => {
     const label = n.profile_slug || n.expression_profile_id?.slice(0,12) || '—';
     const bpTitle = n.blueprint_title || '—';
@@ -7001,7 +7121,7 @@ async function e10LoadLineageGraph(narrativeId) {
 }
 
 function _lineageExplorerRenderGraph(graph, host) {
-  const mode = _expert ? 'expert' : 'universal';
+  const mode = _register;
   const byClass = new Map();
   for (const node of graph.nodes || []) {
     if (!byClass.has(node.class)) byClass.set(node.class, []);
@@ -7043,6 +7163,14 @@ function _lineageExplorerRenderGraph(graph, host) {
     <div style="display:grid;grid-template-columns:260px 1fr;gap:24px;align-items:start">
       <div id="lineage-chain-col" style="position:sticky;top:72px">
         <div style="font-size:11px;color:var(--dim2);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px">Provenance Chain</div>
+        <div style="display:flex;gap:4px;margin-bottom:12px" title="Same chain, same evidence — only the words change.">
+          ${['universal','expert'].map(r => `<button onclick="setRegister('${r}')"
+            style="flex:1;padding:4px 8px;font:inherit;font-size:11px;border-radius:var(--r);cursor:pointer;
+                   border:1px solid ${_register === r ? 'var(--accent)' : 'var(--border)'};
+                   background:${_register === r ? 'rgba(95,207,212,0.12)' : 'none'};
+                   color:${_register === r ? 'var(--accent)' : 'var(--dim2)'}">
+            ${r === 'universal' ? 'Plain language' : 'Researcher terms'}</button>`).join('')}
+        </div>
         ${chainRows}
       </div>
       <div id="lineage-detail-col">
@@ -7077,7 +7205,7 @@ function _lineageExplorerSelectNode(key) {
   const panel  = document.getElementById('lineage-detail-col');
   if (!panel || !node) return;
 
-  const mode = _expert ? 'expert' : 'universal';
+  const mode = _register;
   const meta = (LINEAGE_VOCAB[mode] || LINEAGE_VOCAB.universal)[node.class]
              || { icon: '◈', title: node.class, subtitle: '' };
   const data = node.data || {};
