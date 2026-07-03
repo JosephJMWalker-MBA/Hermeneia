@@ -73,7 +73,53 @@ body.x .ho { display: none !important; }
   text-transform: uppercase;
   flex-shrink: 0;
 }
-.nav-right { display: flex; align-items: center; gap: 4px; }
+.nav-right { display: flex; align-items: center; gap: 8px; }
+
+.reader-home-btn {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 64%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.reader-home-btn:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: var(--accent);
+}
+.reader-home-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #03110d;
+}
+.return-reader-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 86;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 72%, transparent);
+  background: rgba(10, 16, 14, .94);
+  box-shadow: 0 12px 28px rgba(0,0,0,.38);
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+.return-reader-fab:hover {
+  background: color-mix(in srgb, var(--accent) 16%, rgba(10,16,14,.94));
+}
+.return-reader-fab.hidden { display: none; }
 
 .nav-cycle-wrap {
   position: absolute;
@@ -919,7 +965,7 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 .reader-action:hover { color: var(--accent); border-color: var(--accent); }
 /* ── Close Reading Workspace ─────────────────────────── */
 .cr-layout {
-  display: grid; grid-template-columns: minmax(0,1fr) 300px;
+  display: grid; grid-template-columns: minmax(520px,1fr) minmax(280px,340px);
   gap: 20px; align-items: start;
 }
 .cr-doc-picker {
@@ -945,6 +991,8 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   border: 1px solid var(--border); border-radius: var(--r);
   background: var(--surface); padding: 28px 32px;
   min-height: 400px; user-select: text; cursor: text;
+  max-width: 860px;
+  margin: 0 auto;
 }
 .cr-page-header {
   font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
@@ -953,11 +1001,72 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 .cr-page-region {
   font-size: 10px; color: var(--dim2); font-family: var(--mono);
   text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px;
+  user-select: none;
 }
 .cr-page-text {
   font-size: 16px; line-height: 1.85; color: var(--fg);
   white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 20px;
 }
+.cr-text-block {
+  position: relative;
+  padding-top: 18px;
+}
+.cr-block-capture {
+  position: absolute;
+  right: 0;
+  top: -6px;
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  background: rgba(10,10,10,.72);
+  color: var(--dim2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  padding: 3px 9px;
+  opacity: .72;
+}
+.cr-text-block:hover .cr-block-capture,
+.cr-block-capture:focus {
+  opacity: 1;
+  border-color: var(--accent);
+  color: var(--accent);
+  outline: none;
+}
+.cr-inline-highlight {
+  background: rgba(90, 255, 205, .16);
+  border-bottom: 1px solid rgba(90, 255, 205, .55);
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 1px 2px;
+}
+.cr-inline-highlight.important {
+  background: rgba(255, 202, 92, .22);
+  border-bottom-color: rgba(255, 202, 92, .72);
+}
+.cr-inline-highlight.candidate {
+  background: rgba(111, 176, 207, .18);
+  border-bottom-color: rgba(111, 176, 207, .72);
+}
+.cr-tag-chip {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border2);
+  color: var(--dim2);
+  font-size: 9px;
+  letter-spacing: .04em;
+}
+.cr-important-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: var(--fg2);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.cr-important-row input { margin-top: 2px; }
 
 /* ── Focus Scroll (issue #16) — attention-guided reading ─────────────
    The current paragraph clarifies and brightens as it enters the focus
@@ -1102,18 +1211,46 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   background: #2a220a; border: 1px solid #e0a800; border-radius: var(--r);
   padding: 8px 12px; font-size: 12px; color: #e0a800; margin-bottom: 14px;
 }
-/* selection toolbar */
+/* passage-attached capture surface */
 .cr-sel-toolbar {
   position: fixed; z-index: 9999;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r); box-shadow: 0 4px 16px rgba(0,0,0,.4);
-  padding: 6px 8px; display: flex; gap: 6px; align-items: center;
+  padding: 8px; display: flex; gap: 6px; align-items: center;
+  max-width: calc(100vw - 24px);
+}
+.cr-sel-toolbar.capture-open {
+  width: min(390px, calc(100vw - 24px));
+  padding: 12px;
+  display: block;
 }
 .cr-sel-btn {
   padding: 4px 10px; border-radius: 3px; border: 1px solid var(--border2);
   background: var(--bg); color: var(--fg2); cursor: pointer; font: inherit; font-size: 11px;
 }
 .cr-sel-btn:hover { border-color: var(--accent); color: var(--accent); }
+.cr-sel-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.cr-selection-preview {
+  font-size: 12px; color: var(--fg);
+  background: var(--accent2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 9px 10px;
+  line-height: 1.55;
+  max-height: 90px;
+  overflow: auto;
+  font-style: italic;
+}
+.cr-capture-help {
+  font-size: 11px;
+  color: var(--dim2);
+  line-height: 1.45;
+  margin-top: 8px;
+}
+@media (max-width: 980px) {
+  .cr-layout { grid-template-columns: 1fr; }
+  .cr-side { position: static; }
+}
 /* ── Investigation Setup ─────────────────────────────── */
 .setup-wrap { max-width: 640px; }
 .setup-preamble { font-size: 14px; color: var(--fg2); line-height: 1.75; margin-bottom: 28px; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); }
@@ -1655,12 +1792,15 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
     </div>
   </div>
   <div class="nav-right">
+    <button class="reader-home-btn" id="reader-home-btn" onclick="e10Go('reader')" title="Return to the book">Read</button>
     <button class="nav-btn" onclick="e10Go('guide')" style="font-size:13px">Guide</button>
     <button class="nav-btn" onclick="e10Go('constitution')" style="font-size:13px">Constitution</button>
     <button class="nav-btn" onclick="e10Go('lineage')" style="font-size:13px">Lineage</button>
     <button class="expert-btn" onclick="toggleExpert()">⚙ Connections</button>
   </div>
 </nav>
+
+<button class="return-reader-fab hidden" id="return-reader-fab" onclick="e10Go('reader')">Return to Reading</button>
 
 <div class="stage-nav-bar" id="stage-nav-bar">
   <button class="stage-nav-arrow" id="stage-nav-prev" onclick="stageNavStep(-1)">
@@ -4689,6 +4829,14 @@ function updateNavCycle(activeId, statuses) {
   }
 }
 
+function _updateReaderReturnUI(activeId) {
+  const readBtn = document.getElementById('reader-home-btn');
+  const fab = document.getElementById('return-reader-fab');
+  const onReader = activeId === 'reader';
+  readBtn?.classList.toggle('active', onReader);
+  if (fab) fab.classList.toggle('hidden', onReader);
+}
+
 function e10Go(id, scrollTarget) {
   _expert = false;
   document.body.classList.remove('x');
@@ -4703,6 +4851,7 @@ function e10Go(id, scrollTarget) {
   updateNavCycle(id);
   refreshNavCycleStatuses().then(() => updateNavCycle(id));
   _updateStageNavBar(id);
+  _updateReaderReturnUI(id);
   if (scrollTarget) {
     requestAnimationFrame(() => {
       const el = typeof scrollTarget === 'string' ? document.getElementById(scrollTarget) : scrollTarget;
@@ -5424,6 +5573,8 @@ let _crSelToolbar = null;
 let _crRelevance = 'unclear';
 let _crSelRange = null;   // cloned Range of the pending selection
 let _crConcept = '';      // concept name when capturing via the Concept action
+let _crCaptureOpen = false;
+let _crSelectionRect = null;
 
 // The passage being captured stays visibly marked while the inspector
 // form is open — the selection is never lost mid-thought. Uses the CSS
@@ -5923,6 +6074,7 @@ function _crRenderDocPicker(ws) {
 
   // Selection listener
   document.getElementById('cr-page-view').addEventListener('mouseup', _crHandleSelection);
+  document.removeEventListener('selectionchange', _crHandleSelectionChange);
   document.addEventListener('selectionchange', _crHandleSelectionChange);
 }
 
@@ -5930,6 +6082,10 @@ async function _crOpenDoc(docId) {
   _crDocId = docId;
   _crPage  = 1;
   _crSelText = '';
+  _crCaptureOpen = false;
+  _crHideToolbar(true);
+  _crClearPending();
+  _crSelectionRect = null;
 
   // Highlight active picker button
   document.querySelectorAll('.cr-doc-btn').forEach(b => b.classList.remove('active'));
@@ -5958,12 +6114,63 @@ async function _crOpenDoc(docId) {
     const docMeta = _crDocs.find(d => d.id === docId);
     if (docMeta?.last_page) _crPage = docMeta.last_page;
 
-    _crRenderPage();
     await _crLoadHighlightList();
+    _crRenderPage();
     _crRefreshTrail();
   } catch(e) {
     view.innerHTML = `<div class="e10-empty" style="color:var(--red)">Error: ${x(e.message)}</div>`;
   }
+}
+
+function _crHighlightTags(h) {
+  return Array.isArray(h?.tags) ? h.tags.filter(t => typeof t === 'string') : [];
+}
+
+function _crInlineHighlightClass(h) {
+  const tags = _crHighlightTags(h);
+  const parts = ['cr-inline-highlight'];
+  if (tags.includes('important')) parts.push('important');
+  if (h?.status === 'observation_candidate' || h?.status === 'promoted_to_observation') parts.push('candidate');
+  return parts.join(' ');
+}
+
+function _crRenderTextWithHighlights(text, highlights) {
+  if (!text) return '';
+  const active = (highlights || []).filter(h =>
+    h && h.status !== 'dismissed' && typeof h.selected_text === 'string' && h.selected_text.trim().length
+  );
+  if (active.length === 0) return x(text);
+
+  const ranges = [];
+  active.forEach(h => {
+    const selected = h.selected_text;
+    let start = text.indexOf(selected);
+    while (start >= 0) {
+      const end = start + selected.length;
+      const overlaps = ranges.some(r => start < r.end && end > r.start);
+      if (!overlaps) {
+        ranges.push({ start, end, highlight: h });
+        break;
+      }
+      start = text.indexOf(selected, start + 1);
+    }
+  });
+  if (ranges.length === 0) return x(text);
+
+  ranges.sort((a, b) => a.start - b.start || a.end - b.end);
+  let cursor = 0;
+  let html = '';
+  ranges.forEach(r => {
+    html += x(text.slice(cursor, r.start));
+    const titleParts = [`p.${r.highlight.page || '?'}`];
+    if (r.highlight.relevance) titleParts.push(r.highlight.relevance);
+    if (_crHighlightTags(r.highlight).includes('important')) titleParts.push('important');
+    if (r.highlight.status === 'observation_candidate') titleParts.push('observation candidate');
+    html += `<span class="${_crInlineHighlightClass(r.highlight)}" data-highlight-id="${x(r.highlight.id || '')}" title="${x(titleParts.join(' · '))}">${x(text.slice(r.start, r.end))}</span>`;
+    cursor = r.end;
+  });
+  html += x(text.slice(cursor));
+  return html;
 }
 
 function _crRenderPage() {
@@ -5973,9 +6180,13 @@ function _crRenderPage() {
   if (!pageData) {
     view.innerHTML = `<div class="e10-empty">No extracted text for page ${_crPage}.</div>`;
   } else {
-    const blocks = (pageData.extractions || []).map(ex =>
-      `<div class="cr-page-region">${x(ex.region || '')} ${ex.source_locator ? '· ' + x(ex.source_locator) : ''}</div>
-       <div class="cr-page-text">${x(ex.text)}</div>`
+    const pageHighlights = (_crHighlights || []).filter(h => Number(h.page || 0) === Number(_crPage));
+    const blocks = (pageData.extractions || []).map((ex, idx) =>
+      `<div class="cr-text-block" data-cr-block="${idx}">
+         <button class="cr-block-capture" onclick="_crCaptureBlock(${idx})" title="Capture this passage if text selection is unreliable">Capture this passage</button>
+         <div class="cr-page-region">${x(ex.region || '')} ${ex.source_locator ? '· ' + x(ex.source_locator) : ''}</div>
+         <div class="cr-page-text">${_crRenderTextWithHighlights(ex.text || '', pageHighlights)}</div>
+       </div>`
     ).join('');
     view.innerHTML = `
       <div class="cr-page-header">
@@ -6061,6 +6272,10 @@ async function _crLoadHighlightList() {
     list.innerHTML = _crHighlights.map(h => {
       const candidateBadge = h.status === 'observation_candidate' || h.status === 'promoted_to_observation'
         ? `<span class="cr-candidate-badge">${h.status === 'promoted_to_observation' ? 'promoted' : 'candidate'}</span>` : '';
+      const tags = _crHighlightTags(h);
+      const importantBadge = tags.includes('important') ? '<span class="cr-candidate-badge" style="background:#2a220a;color:#e0a800">important</span>' : '';
+      const typedTagBadges = tags.filter(t => t.startsWith('tag:')).map(t =>
+        `<span class="cr-tag-chip">${x(t.slice(4))}</span>`).join('');
       const relColor = { supports: 'var(--green)', complicates: '#e0a800', contradicts: 'var(--red)', background: 'var(--dim2)', unclear: 'var(--border2)' };
       return `<div class="cr-highlight-item" onclick="_crShowHighlightDetail('${x(h.id)}')">
         <div class="cr-highlight-quote">"${x((h.selected_text||'').slice(0,100))}${h.selected_text?.length > 100 ? '…' : ''}"</div>
@@ -6068,8 +6283,10 @@ async function _crLoadHighlightList() {
           p.${h.page || '?'}
           ${h.relevance ? `<span style="color:${relColor[h.relevance]||'var(--dim2)'};margin-left:6px">${h.relevance}</span>` : ''}
           ${candidateBadge}
-          ${(Array.isArray(h.tags) ? h.tags : []).filter(t => typeof t === 'string' && t.startsWith('concept:')).map(t =>
+          ${importantBadge}
+          ${tags.filter(t => t.startsWith('concept:')).map(t =>
             `<span class="cr-concept-chip">✦ ${x(t.slice(8))}</span>`).join('')}
+          ${typedTagBadges}
         </div>
         ${h.note_text ? `<div style="font-size:11px;color:var(--dim2);margin-top:3px;line-height:1.4">${x(h.note_text.slice(0,80))}${h.note_text.length>80?'…':''}</div>` : ''}
       </div>`;
@@ -6079,64 +6296,137 @@ async function _crLoadHighlightList() {
   }
 }
 
-// Selection toolbar
+// Selection capture
+function _crCaptureBlock(blockIndex) {
+  const block = document.querySelector(`[data-cr-block="${blockIndex}"]`);
+  const textEl = block?.querySelector('.cr-page-text');
+  const text = _crCleanSelectionText(textEl?.textContent || '');
+  if (!block || !text) return;
+  _crCaptureOpen = false;
+  _crHideToolbar(true);
+  _crClearPending();
+  _crSelText = text;
+  _crSelRange = null;
+  _crSelectionRect = textEl.getBoundingClientRect();
+  _crShowToolbar(_crSelectionRect);
+  _crHighlightSelected('note');
+}
+
+function _crNodeElement(node) {
+  return node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+}
+
+function _crSelectionInsideReader(range) {
+  const pageView = document.getElementById('cr-page-view');
+  const startEl = _crNodeElement(range?.startContainer);
+  const endEl = _crNodeElement(range?.endContainer);
+  return !!(
+    pageView &&
+    range &&
+    pageView.contains(range.commonAncestorContainer) &&
+    startEl?.closest('.cr-page-text') &&
+    endEl?.closest('.cr-page-text')
+  );
+}
+
+function _crCleanSelectionText(text) {
+  return (text || '').trim();
+}
+
 function _crHandleSelection(e) {
   const sel = window.getSelection();
-  const text = sel?.toString().trim();
-  if (!text || text.length < 3) { _crHideToolbar(); return; }
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+    if (!_crCaptureOpen) _crHideToolbar();
+    return;
+  }
+  const range = sel.getRangeAt(0);
+  if (!_crSelectionInsideReader(range)) {
+    if (!_crCaptureOpen) _crHideToolbar();
+    return;
+  }
+  const text = _crCleanSelectionText(sel.toString());
+  if (!text || text.length < 3) {
+    if (!_crCaptureOpen) _crHideToolbar();
+    return;
+  }
   _crSelText = text;
-  _crSelRange = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
-  _crShowToolbar(e.clientX, e.clientY);
+  _crSelRange = range.cloneRange();
+  _crSelectionRect = range.getBoundingClientRect();
+  _crShowToolbar(_crSelectionRect, e?.clientX, e?.clientY);
 }
 
 function _crHandleSelectionChange() {
+  if (_crCaptureOpen) return;
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed) _crHideToolbar();
 }
 
-function _crShowToolbar(cx, cy) {
-  _crHideToolbar();
+function _crPlaceToolbar(tb, rect, fallbackX, fallbackY) {
+  const pad = 12;
+  const width = tb.offsetWidth || 390;
+  const height = tb.offsetHeight || 120;
+  const anchorLeft = Number.isFinite(rect?.left) ? rect.left : (fallbackX || pad);
+  const anchorTop = Number.isFinite(rect?.top) ? rect.top : (fallbackY || pad);
+  const anchorBottom = Number.isFinite(rect?.bottom) ? rect.bottom : anchorTop;
+  const desiredLeft = Math.min(Math.max(pad, anchorLeft), Math.max(pad, window.innerWidth - width - pad));
+  const below = anchorBottom + 10;
+  const above = anchorTop - height - 10;
+  const desiredTop = below + height < window.innerHeight
+    ? below
+    : Math.max(pad, above);
+  tb.style.left = `${desiredLeft}px`;
+  tb.style.top = `${desiredTop}px`;
+}
+
+function _crShowToolbar(rect, fallbackX, fallbackY) {
+  _crHideToolbar(true);
+  _crCaptureOpen = false;
   const tb = document.createElement('div');
   tb.className = 'cr-sel-toolbar';
   tb.id = 'cr-sel-toolbar';
   tb.innerHTML = `
-    <button class="cr-sel-btn" onclick="_crHighlightSelected()">Highlight</button>
-    <button class="cr-sel-btn" onclick="_crHighlightSelected('note')">+ Note</button>
-    <button class="cr-sel-btn" onclick="_crHighlightSelected('question')">? Question</button>
-    <button class="cr-sel-btn" onclick="_crHighlightSelected('concept')">✦ Concept</button>
-    <button class="cr-sel-btn" onclick="_crHighlightSelected('candidate')" style="color:var(--accent)">→ Observation</button>
-    <button class="cr-sel-btn" onclick="_crAskCompanion()" title="Ask the Companion about only this passage">⁘ Ask</button>
-    <button class="cr-sel-btn" onclick="ttsSpeak(_crSelText)" title="Read aloud">▶ Read</button>`;
+    <div class="cr-sel-actions">
+      <button class="cr-sel-btn" onclick="_crHighlightSelected()">Highlight</button>
+      <button class="cr-sel-btn" onclick="_crHighlightSelected('note')">+ Note</button>
+      <button class="cr-sel-btn" onclick="_crHighlightSelected('question')">? Question</button>
+      <button class="cr-sel-btn" onclick="_crHighlightSelected('concept')">✦ Concept</button>
+      <button class="cr-sel-btn" onclick="_crHighlightSelected('candidate')" style="color:var(--accent)">→ Observation</button>
+      <button class="cr-sel-btn" onclick="_crAskCompanion()" title="Ask the Companion about only this passage">⁘ Ask</button>
+      <button class="cr-sel-btn" onclick="ttsSpeak(_crSelText)" title="Read aloud">▶ Read</button>
+    </div>`;
   document.body.appendChild(tb);
   _crSelToolbar = tb;
-  // Position just above the cursor
-  const left = Math.min(cx, window.innerWidth - 430);
-  const top  = cy - 52 + window.scrollY;
-  tb.style.left = Math.max(8, left) + 'px';
-  tb.style.top  = Math.max(8, top) + 'px';
+  _crPlaceToolbar(tb, rect, fallbackX, fallbackY);
 }
 
-function _crHideToolbar() {
+function _crHideToolbar(force = false) {
+  if (_crCaptureOpen && !force) return;
   if (_crSelToolbar) { _crSelToolbar.remove(); _crSelToolbar = null; }
 }
 
 function _crHighlightSelected(focus) {
-  _crHideToolbar();
   const sel = window.getSelection();
-  const text = _crSelText || sel?.toString().trim();
+  const text = _crSelText || _crCleanSelectionText(sel?.toString());
   if (!text) return;
   _crSelText = text;
   _crRelevance = 'unclear';
   _crConcept = focus === 'concept' ? text.length <= 48 ? text : '' : '';
-  // The selection is never cleared here — the passage stays marked
-  // until the capture is saved or cancelled.
+  _crCaptureOpen = true;
   _crMarkPending();
+
+  if (!_crSelToolbar) _crShowToolbar(_crSelectionRect);
+  const tb = _crSelToolbar;
+  if (!tb) return;
+  _crCaptureOpen = true;
+  tb.classList.add('capture-open');
 
   const form = document.getElementById('cr-sel-form');
   const prompt = document.getElementById('cr-sel-prompt');
-  if (!form || !prompt) return;
-  prompt.style.display = 'none';
-  form.style.display = 'block';
+  if (prompt) {
+    prompt.style.display = '';
+    prompt.innerHTML = 'Capture is attached to the selected passage. Saved artifacts will appear here and in the Reading Trail.';
+  }
+  if (form) { form.style.display = 'none'; form.innerHTML = ''; }
 
   const isCandidate = focus === 'candidate';
   const isConcept  = focus === 'concept';
@@ -6144,28 +6434,37 @@ function _crHighlightSelected(focus) {
   const focusQ    = focus === 'question';
   const thesis = invLoad()?.thesis || '';
 
-  form.innerHTML = `
-    <div class="cr-saved-passage">${x(text.slice(0, 280))}${text.length > 280 ? '…' : ''}</div>
-    ${thesis ? `<div style="font-size:11px;color:var(--dim2);margin-top:8px;line-height:1.5">For your question: <em>${x(thesis.slice(0, 90))}${thesis.length > 90 ? '…' : ''}</em></div>` : ''}
+  tb.innerHTML = `
+    <div class="cr-selection-preview">${x(text.slice(0, 260))}${text.length > 260 ? '…' : ''}</div>
+    ${thesis ? `<div class="cr-capture-help">For your question: <em>${x(thesis.slice(0, 90))}${thesis.length > 90 ? '…' : ''}</em></div>` : ''}
     <div class="cr-highlight-form" style="margin-top:12px">
       ${isConcept ? `<div class="cr-form-row">
         <div class="cr-form-label">Concept name</div>
-        <input id="cr-concept-input" value="${x(_crConcept)}" placeholder="e.g. aspiration"
-          style="margin-top:4px;width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;padding:7px 10px">
+        <input id="cr-concept-input" value="${x(_crConcept)}" placeholder="e.g. aspiration">
       </div>` : ''}
       <div class="cr-form-row">
-        <div class="cr-form-label">${isConcept ? 'What this concept means in this investigation' : 'Why this matters'}</div>
-        <textarea id="cr-note-input" rows="3" placeholder="${isConcept ? 'Working definition, distinctions from neighboring terms…' : 'Your reading note…'}" style="margin-top:4px">${isCandidate ? 'Candidate for observation.' : ''}</textarea>
+        <label class="cr-important-row">
+          <input id="cr-important-input" type="checkbox" ${isCandidate ? 'checked' : ''}>
+          <span><strong>Mark important</strong><br><span style="color:var(--dim2)">Keeps this as human attention metadata, not a score.</span></span>
+        </label>
       </div>
       <div class="cr-form-row">
-        <div class="cr-form-label">Question this raises</div>
-        <textarea id="cr-q-input" rows="2" placeholder="What does this open up?…" style="margin-top:4px"></textarea>
+        <div class="cr-form-label">Tags</div>
+        <input id="cr-tags-input" type="text" placeholder="theme, tension, term">
+      </div>
+      <div class="cr-form-row">
+        <div class="cr-form-label">${isConcept ? 'What this concept means in this investigation' : 'Note'}</div>
+        <textarea id="cr-note-input" rows="3" placeholder="${isConcept ? 'Working definition, distinctions from neighboring terms…' : 'Your reading note…'}">${isCandidate ? 'Candidate for observation.' : ''}</textarea>
+      </div>
+      <div class="cr-form-row">
+        <div class="cr-form-label">Question</div>
+        <textarea id="cr-q-input" rows="2" placeholder="What does this open up?…"></textarea>
       </div>
       <div class="cr-form-row">
         <div class="cr-form-label">Relevance to thesis</div>
         <div class="cr-relevance-btns">
           ${['supports','complicates','contradicts','background','unclear'].map(r =>
-            `<button class="cr-rel-btn cr-rel-${r} ${r==='unclear'?'active':''}" onclick="_crSetRelevance('${r}',this)">${r}</button>`
+            `<button class="cr-rel-btn cr-rel-${r} ${r==='unclear'?'active':''}" onclick="_crSetRelevance('${r}',this);return false">${r}</button>`
           ).join('')}
         </div>
       </div>
@@ -6174,13 +6473,13 @@ function _crHighlightSelected(focus) {
         <button class="btn-primary" style="flex:1;padding:8px;background:var(--accent2);color:var(--accent);border-color:var(--accent)" onclick="_crSaveHighlight(true)">→ Observation Candidate</button>
       </div>
       <button style="margin-top:8px;width:100%;padding:6px;background:none;border:1px solid var(--border2);border-radius:var(--r);color:var(--dim2);cursor:pointer;font:inherit;font-size:12px" onclick="_crCancelHighlight()">Cancel</button>
+      <div id="cr-capture-msg" style="font-size:12px;margin-top:6px"></div>
     </div>`;
 
+  requestAnimationFrame(() => _crPlaceToolbar(tb, _crSelectionRect));
   if (focusNote) setTimeout(() => document.getElementById('cr-note-input')?.focus(), 50);
   if (focusQ)    setTimeout(() => document.getElementById('cr-q-input')?.focus(), 50);
   if (isConcept) setTimeout(() => document.getElementById('cr-concept-input')?.focus(), 50);
-
-  form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function _crSetRelevance(val, btn) {
@@ -6190,28 +6489,58 @@ function _crSetRelevance(val, btn) {
 }
 
 function _crCancelHighlight() {
+  _crCaptureOpen = false;
+  _crHideToolbar(true);
   _crClearPending();
   _crSelText = '';
   _crConcept = '';
   _crRelevance = 'unclear';
+  _crSelectionRect = null;
   const form = document.getElementById('cr-sel-form');
   const prompt = document.getElementById('cr-sel-prompt');
   if (form) { form.style.display = 'none'; form.innerHTML = ''; }
-  if (prompt) prompt.style.display = '';
+  if (prompt) {
+    prompt.style.display = '';
+    prompt.innerHTML = 'Select any passage in the text to highlight it, write a note, ask a question, or create an observation candidate.';
+  }
+}
+
+function _crPageReadingText() {
+  return Array.from(document.querySelectorAll('#cr-page-view .cr-page-text'))
+    .map(el => el.textContent || '')
+    .join('\n\n');
+}
+
+function _crParseTypedTags(raw) {
+  return (raw || '')
+    .split(',')
+    .map(t => t.trim().replace(/\s+/g, ' '))
+    .filter(Boolean)
+    .map(t => (t.includes(':') || t === 'important') ? t : `tag:${t}`);
+}
+
+function _crUniqueTags(tags) {
+  return Array.from(new Set((tags || []).filter(t => typeof t === 'string' && t.trim()).map(t => t.trim())));
 }
 
 async function _crSaveHighlight(asCandidate) {
   const note = document.getElementById('cr-note-input')?.value?.trim() || '';
   const question = document.getElementById('cr-q-input')?.value?.trim() || '';
+  const important = !!document.getElementById('cr-important-input')?.checked;
+  const typedTags = _crParseTypedTags(document.getElementById('cr-tags-input')?.value || '');
 
   // Get surrounding context from page text
-  const pageView = document.getElementById('cr-page-view');
-  const fullText = pageView?.innerText || '';
+  const fullText = _crPageReadingText();
   const idx = fullText.indexOf(_crSelText);
   const contextBefore = idx > 0 ? fullText.slice(Math.max(0, idx - 100), idx).trim() : '';
   const contextAfter  = idx > -1 ? fullText.slice(idx + _crSelText.length, idx + _crSelText.length + 100).trim() : '';
 
   const conceptName = document.getElementById('cr-concept-input')?.value?.trim() || '';
+  const tags = _crUniqueTags([
+    ...(conceptName ? [`concept:${conceptName}`] : []),
+    ...(important ? ['important'] : []),
+    ...typedTags,
+  ]);
   const payload = {
     source_document_id: _crDocId,
     page: _crPage,
@@ -6221,10 +6550,12 @@ async function _crSaveHighlight(asCandidate) {
     note_text: note || null,
     question_text: question || null,
     relevance: _crRelevance,
-    tags: conceptName ? [`concept:${conceptName}`] : [],
+    tags,
   };
 
   try {
+    const msg = document.getElementById('cr-capture-msg');
+    if (msg) { msg.textContent = 'Saving…'; msg.style.color = 'var(--dim2)'; }
     const res = await fetch('/api/reader/highlights', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -6234,17 +6565,23 @@ async function _crSaveHighlight(asCandidate) {
     if (!res.ok) throw new Error(d.error || 'Save failed');
 
     if (asCandidate) {
-      await fetch(`/api/reader/highlights/${encodeURIComponent(d.id)}/promote`, { method: 'POST' });
+      const promote = await fetch(`/api/reader/highlights/${encodeURIComponent(d.id)}/promote`, { method: 'POST' });
+      if (!promote.ok) throw new Error((await promote.json()).error || 'Promotion failed');
     }
 
-    _crClearPending();
-    _crCancelHighlight();
     await _crLoadHighlightList();
+    _crRenderPage();
     _crRefreshTrail();
+    _crCaptureOpen = false;
+    _crHideToolbar(true);
+    _crClearPending();
+    _crSelText = '';
+    _crConcept = '';
+    _crSelectionRect = null;
     _flnActivityTick();
+    _crShowHighlightDetail(d.id);
 
     // Brief confirmation
-    const form = document.getElementById('cr-sel-form');
     const prompt = document.getElementById('cr-sel-prompt');
     if (prompt) {
       prompt.style.display = '';
@@ -6255,8 +6592,8 @@ async function _crSaveHighlight(asCandidate) {
       }, 4000);
     }
   } catch(e) {
-    const form = document.getElementById('cr-sel-form');
-    if (form) form.insertAdjacentHTML('afterbegin', `<div style="color:var(--red);font-size:12px;margin-bottom:8px">Error: ${x(e.message)}</div>`);
+    const msg = document.getElementById('cr-capture-msg');
+    if (msg) { msg.textContent = e.message; msg.style.color = 'var(--red)'; }
   }
 }
 
@@ -6271,11 +6608,23 @@ async function _crShowHighlightDetail(highlightId) {
 
   const relColor = { supports: 'cr-rel-supports', complicates: 'cr-rel-complicates', contradicts: 'cr-rel-contradicts', background: 'cr-rel-background', unclear: 'cr-rel-unclear' };
   const statusLabel = { saved_highlight: 'Saved', observation_candidate: 'Observation Candidate', promoted_to_observation: 'Promoted', dismissed: 'Dismissed' };
+  const tags = _crHighlightTags(h);
+  const typedTags = tags.filter(t => t.startsWith('tag:')).map(t => t.slice(4)).join(', ');
 
   form.innerHTML = `
     <div style="font-size:10px;color:var(--dim2);font-family:var(--mono);margin-bottom:8px">p.${h.page || '?'} · ${statusLabel[h.status] || h.status}</div>
     <div class="cr-saved-passage">${x(h.selected_text)}</div>
     <div class="cr-highlight-form" style="margin-top:12px">
+      <div class="cr-form-row">
+        <label class="cr-important-row">
+          <input id="cr-edit-important" type="checkbox" ${tags.includes('important') ? 'checked' : ''}>
+          <span><strong>Mark important</strong><br><span style="color:var(--dim2)">Human attention metadata only.</span></span>
+        </label>
+      </div>
+      <div class="cr-form-row">
+        <div class="cr-form-label">Tags</div>
+        <input id="cr-edit-tags" type="text" value="${x(typedTags)}" placeholder="theme, tension, term">
+      </div>
       <div class="cr-form-row">
         <div class="cr-form-label">Note</div>
         <textarea id="cr-edit-note" rows="3" style="margin-top:4px">${x(h.note_text || '')}</textarea>
@@ -6308,17 +6657,27 @@ async function _crShowHighlightDetail(highlightId) {
 async function _crUpdateHighlight(id) {
   const note = document.getElementById('cr-edit-note')?.value?.trim() || '';
   const question = document.getElementById('cr-edit-q')?.value?.trim() || '';
+  const important = !!document.getElementById('cr-edit-important')?.checked;
+  const typedTags = _crParseTypedTags(document.getElementById('cr-edit-tags')?.value || '');
+  const existing = _crHighlights.find(h => h.id === id);
+  const conceptTags = _crHighlightTags(existing).filter(t => t.startsWith('concept:'));
+  const tags = _crUniqueTags([
+    ...conceptTags,
+    ...(important ? ['important'] : []),
+    ...typedTags,
+  ]);
   const msg = document.getElementById('cr-edit-msg');
   if (msg) { msg.textContent = 'Saving…'; msg.style.color = 'var(--dim2)'; }
   try {
     const res = await fetch(`/api/reader/highlights/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note_text: note, question_text: question, relevance: _crRelevance }),
+      body: JSON.stringify({ note_text: note, question_text: question, relevance: _crRelevance, tags }),
     });
     if (!res.ok) throw new Error((await res.json()).error || 'Update failed');
     if (msg) { msg.textContent = '✓ Saved'; msg.style.color = 'var(--green)'; }
     await _crLoadHighlightList();
+    _crRenderPage();
     _crRefreshTrail();
     setTimeout(() => _crCancelHighlight(), 1200);
   } catch(e) {
@@ -6332,6 +6691,7 @@ async function _crPromoteHighlight(id) {
     await fetch(`/api/reader/highlights/${encodeURIComponent(id)}/promote`, { method: 'POST' });
     if (msg) { msg.textContent = '✓ Marked as observation candidate'; msg.style.color = 'var(--green)'; }
     await _crLoadHighlightList();
+    _crRenderPage();
     _crRefreshTrail();
     setTimeout(() => _crCancelHighlight(), 1500);
   } catch(e) {
@@ -6345,6 +6705,7 @@ async function _crDismissHighlight(id) {
     await fetch(`/api/reader/highlights/${encodeURIComponent(id)}`, { method: 'DELETE' });
     _crCancelHighlight();
     await _crLoadHighlightList();
+    _crRenderPage();
     _crRefreshTrail();
   } catch(e) { alert(e.message); }
 }

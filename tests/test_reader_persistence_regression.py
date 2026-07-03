@@ -198,3 +198,61 @@ def test_concept_tag_round_trip_through_api(tmp_path):
     rows = _highlights_by_id(client, doc_id)
     tags = list(rows.values())[0]["tags"]
     assert isinstance(tags, list) and tags == ["concept:aspiration"]
+
+
+def test_reader_shell_keeps_return_to_reading_visible():
+    """Issue #21 regression guard: Reader must remain the obvious home,
+    not a hidden stop inside the pipeline shell."""
+    index_html = (
+        Path(__file__).parent.parent
+        / "hermeneia"
+        / "web"
+        / "static"
+        / "index.html"
+    ).read_text()
+
+    assert 'id="reader-home-btn"' in index_html
+    assert "Return to Reading" in index_html
+    assert "_updateReaderReturnUI(id)" in index_html
+    assert "reader-home-btn.active" in index_html
+
+
+def test_reader_capture_ui_is_passage_attached_and_records_attention_metadata():
+    """The live loop must support passage selection -> important/tag/note/
+    question/candidate capture without depending on a detached side panel."""
+    index_html = (
+        Path(__file__).parent.parent
+        / "hermeneia"
+        / "web"
+        / "static"
+        / "index.html"
+    ).read_text()
+
+    assert "cr-selection-preview" in index_html
+    assert "cr-important-input" in index_html
+    assert "cr-tags-input" in index_html
+    assert "Capture this passage" in index_html
+    assert "_crCaptureBlock" in index_html
+    assert "_crParseTypedTags" in index_html
+    assert "_crSaveHighlight(true)" in index_html
+    assert "Capture is attached to the selected passage" in index_html
+
+
+def test_reader_saved_highlights_render_inline_after_reload():
+    """Saved Reader artifacts must be visible back in the book after the
+    highlight list reloads; the persisted view cannot rely only on native
+    selection or CSS Custom Highlight state."""
+    index_html = (
+        Path(__file__).parent.parent
+        / "hermeneia"
+        / "web"
+        / "static"
+        / "index.html"
+    ).read_text()
+
+    assert "cr-inline-highlight" in index_html
+    assert "_crRenderTextWithHighlights" in index_html
+    assert "_crHighlightTags" in index_html
+    assert "_crRenderPage();" in index_html
+    assert "CSS.highlights.set('hermeneia-pending'" in index_html
+    assert "user-select: none" in index_html
