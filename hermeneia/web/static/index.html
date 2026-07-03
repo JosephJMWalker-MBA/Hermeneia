@@ -5341,6 +5341,7 @@ async function e10LoadCloseReader() {
     _crRenderDocPicker(ws);
     _crMaybeShowReaderBanner(ws);
     _crRenderQuestionCard();
+    _flnRender();
     _cmpRender();
     await _crOpenDoc(primary.id);
   } catch(e) {
@@ -5376,6 +5377,145 @@ function _crDismissReaderBanner() {
 // The question card. Always present, quiet, static — the ask follows the
 // noticing. The only adaptive display is the highlight count, which the
 // user can already see in their own trail; there is no readiness scoring.
+// ── Investigation Log / Field Notes (issue #18) ────────
+// Append-only snapshots of evolving understanding, in two lanes:
+// 'corpus' (what I am learning about the text) and 'instrument'
+// (what I am learning about Hermeneia while using it). A gentle,
+// dismissible footer prompt appears after reading activity — an
+// attention-stewardship pattern, never a nag: fixed disclosed rule,
+// snoozable, and it only ever points here.
+let _flnLane = 'corpus';
+let _flnActivity = 0;                 // reading actions since last prompt/entry
+const _FLN_ACTIVITY_THRESHOLD = 6;    // page turns + saves before the prompt may appear
+const _FLN_MIN_INTERVAL_MS = 8 * 60 * 1000;
+
+function _flnLastMark() {
+  try { return parseInt(localStorage.getItem('hermeneia_fieldnotes_last') || '0', 10); } catch { return 0; }
+}
+function _flnMark() {
+  try { localStorage.setItem('hermeneia_fieldnotes_last', String(Date.now())); } catch {}
+  _flnActivity = 0;
+}
+
+function flnSetLane(lane) {
+  _flnLane = lane === 'instrument' ? 'instrument' : 'corpus';
+  document.querySelectorAll('.fln-lane').forEach(b =>
+    b.classList.toggle('fs-on', b.dataset.lane === _flnLane));
+}
+
+async function _flnRender() {
+  const panel = document.getElementById('cr-fieldnotes-panel');
+  if (!panel) return;
+  panel.innerHTML = `
+    <div class="cr-side-title">Field Notes</div>
+    <div style="display:flex;gap:4px;margin-bottom:8px">
+      <button class="fs-pill fln-lane fs-on" data-lane="corpus" onclick="flnSetLane('corpus')"
+        title="What I am learning about the text">About the text</button>
+      <button class="fs-pill fln-lane" data-lane="instrument" onclick="flnSetLane('instrument')"
+        title="What I am learning about Hermeneia while using it">About Hermeneia</button>
+    </div>
+    <div class="cr-form-label">What is your current understanding?</div>
+    <textarea id="fln-understanding" rows="3" placeholder="Pause for a moment. What has the reading helped you understand so far?"
+      style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:12px;line-height:1.6;padding:7px 9px;resize:vertical;margin:4px 0 8px"></textarea>
+    <div class="cr-form-label">What are your most pressing questions? <span style="color:var(--dim2);font-weight:400">(optional)</span></div>
+    <textarea id="fln-questions" rows="2" placeholder="What do you need to investigate next?"
+      style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:12px;line-height:1.6;padding:7px 9px;resize:vertical;margin:4px 0 8px"></textarea>
+    <button class="btn-primary" id="fln-save" style="width:100%;padding:6px" onclick="flnSave()">Keep this entry</button>
+    <div id="fln-entries" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto"></div>`;
+  _flnLoadEntries();
+}
+
+async function _flnLoadEntries() {
+  const host = document.getElementById('fln-entries');
+  if (!host) return;
+  try {
+    const d = await get('/api/investigation-log?limit=12');
+    const entries = d.entries || [];
+    if (!entries.length) {
+      host.innerHTML = '<div style="font-size:11px;color:var(--dim2)">No entries yet. Your understanding, as it forms, belongs in the record too.</div>';
+      return;
+    }
+    host.innerHTML = entries.map(e => `
+      <div style="border-left:2px solid ${e.lane === 'instrument' ? 'var(--yellow,#f4c542)' : 'var(--accent)'};padding-left:8px">
+        <div style="font-size:10px;color:var(--dim2);margin-bottom:2px">
+          ${e.lane === 'instrument' ? 'About Hermeneia' : 'About the text'}
+          · ${x((e.created_at || '').slice(0, 16).replace('T', ' '))}${e.page ? ` · p.${e.page}` : ''}
+        </div>
+        ${e.understanding ? `<div style="font-size:12px;color:var(--fg2);line-height:1.5">${x(e.understanding.slice(0, 220))}${e.understanding.length > 220 ? '…' : ''}</div>` : ''}
+        ${e.pressing_questions ? `<div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-top:3px">? ${x(e.pressing_questions.slice(0, 160))}${e.pressing_questions.length > 160 ? '…' : ''}</div>` : ''}
+      </div>`).join('');
+  } catch (err) {
+    host.innerHTML = `<div style="font-size:11px;color:var(--red)">${x(err.message)}</div>`;
+  }
+}
+
+async function flnSave() {
+  const uEl = document.getElementById('fln-understanding');
+  const qEl = document.getElementById('fln-questions');
+  const understanding = uEl?.value.trim() || '';
+  const pressing = qEl?.value.trim() || '';
+  if (!understanding && !pressing) { uEl?.focus(); return; }
+  const btn = document.getElementById('fln-save');
+  btn?.setAttribute('disabled', 'disabled');
+  try {
+    const resp = await fetch('/api/investigation-log', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lane: _flnLane,
+        understanding,
+        pressing_questions: pressing,
+        source_document_id: _crDocId || null,
+        page: _crPage || null,
+        governing_question: invLoad()?.thesis || '',
+      }),
+    });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || 'save failed');
+    if (uEl) uEl.value = '';
+    if (qEl) qEl.value = '';
+    _flnMark();
+    _flnHidePrompt();
+    if (btn) btn.textContent = '✓ Kept';
+    setTimeout(() => { if (btn) btn.textContent = 'Keep this entry'; }, 2500);
+    _flnLoadEntries();
+  } catch (err) {
+    showAppError(err.message);
+  }
+  btn?.removeAttribute('disabled');
+}
+
+// The gentle footer. Fixed rule, fully disclosed: appears after ~6
+// reading actions and no sooner than 8 minutes since the last entry
+// or prompt. It never blocks reading and never returns after "Later"
+// until the rule is satisfied again.
+function _flnActivityTick() {
+  _flnActivity += 1;
+  if (_flnActivity < _FLN_ACTIVITY_THRESHOLD) return;
+  if (Date.now() - _flnLastMark() < _FLN_MIN_INTERVAL_MS) return;
+  if (document.querySelector('.e10-screen.active')?.id !== 'reader') return;
+  _flnShowPrompt();
+}
+
+function _flnShowPrompt() {
+  if (document.getElementById('fln-footer')) return;
+  const bar = document.createElement('div');
+  bar.id = 'fln-footer';
+  bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:60;display:flex;align-items:center;justify-content:center;gap:14px;padding:10px 16px;background:var(--surface);border-top:1px solid var(--border);font-size:13px;color:var(--fg2)';
+  bar.innerHTML = `
+    <span>What is your current understanding?</span>
+    <button class="fs-pill fs-on" onclick="_flnOpenFromPrompt()">Write it down</button>
+    <button class="fs-pill" onclick="_flnSnooze()">Later</button>`;
+  document.body.appendChild(bar);
+}
+
+function _flnHidePrompt() { document.getElementById('fln-footer')?.remove(); }
+function _flnSnooze() { _flnMark(); _flnHidePrompt(); }
+function _flnOpenFromPrompt() {
+  _flnHidePrompt();
+  document.getElementById('cr-fieldnotes-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => document.getElementById('fln-understanding')?.focus(), 350);
+}
+
 // ── Companion (issue #10) ──────────────────────────────
 // A reading participant beside the Reader, never replacing it. Context
 // is explicit: only checked sections are sent, and every reply reports
@@ -5641,6 +5781,7 @@ function _crRenderDocPicker(ws) {
           <div id="cr-trail-detail" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px"></div>
         </div>
         <div class="cr-side-panel" id="cr-question-panel"></div>
+        <div class="cr-side-panel" id="cr-fieldnotes-panel"></div>
         <div class="cr-side-panel" id="cr-companion-panel"></div>
         <div class="cr-side-panel" id="cr-capture-panel">
           <div class="cr-side-title">Highlight Inspector</div>
@@ -5730,6 +5871,7 @@ function _crRenderPage() {
   _fsApply();
   // Locator metadata is register-gated: stored always, shown to researchers
   document.getElementById('cr-page-view')?.classList.toggle('show-regions', _register === 'expert');
+  _flnActivityTick();
 
   // Nav controls
   const prev = document.getElementById('cr-prev-btn');
@@ -5983,6 +6125,7 @@ async function _crSaveHighlight(asCandidate) {
     _crCancelHighlight();
     await _crLoadHighlightList();
     _crRefreshTrail();
+    _flnActivityTick();
 
     // Brief confirmation
     const form = document.getElementById('cr-sel-form');

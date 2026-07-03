@@ -1077,6 +1077,36 @@ CREATE INDEX IF NOT EXISTS idx_reading_progress_doc
 """)
     conn.commit()
 
+    # Issue #18: Investigation Log / Field Notes — snapshots of the
+    # investigator's evolving understanding, captured live. Two lanes:
+    # 'corpus' (what I am learning about the text) and 'instrument'
+    # (what I am learning about Hermeneia while using it). Entries are
+    # append-only: each is a moment in the evolution of understanding —
+    # later understanding supersedes, it never rewrites.
+    conn.executescript("""
+CREATE TABLE IF NOT EXISTS investigation_log (
+    id                  TEXT PRIMARY KEY,
+    lane                TEXT NOT NULL DEFAULT 'corpus'
+        CHECK(lane IN ('corpus','instrument')),
+    understanding       TEXT,
+    pressing_questions  TEXT,
+    source_document_id  TEXT REFERENCES source_documents(id),
+    page                INTEGER,
+    governing_question  TEXT,
+    created_at          TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_invlog_lane
+    ON investigation_log(lane, created_at);
+
+CREATE TRIGGER IF NOT EXISTS investigation_log_no_update
+BEFORE UPDATE ON investigation_log
+BEGIN
+    SELECT RAISE(ABORT, 'investigation_log entries are immutable');
+END;
+""")
+    conn.commit()
+
 
 # Backwards-compat alias used by CLI commands written before v9
 ensure_artist_tables = ensure_profile_tables

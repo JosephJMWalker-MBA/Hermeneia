@@ -5832,6 +5832,77 @@ Return ONLY valid JSON, no markdown, no explanation:
             "context_used": context_used,
         })
 
+    # ── Investigation Log / Field Notes (issue #18) ───────────────────
+    # Append-only snapshots of the investigator's evolving understanding.
+    # Two lanes: 'corpus' (learning about the text) and 'instrument'
+    # (learning about Hermeneia while using it). These are the raw
+    # material of U(n) — captured live, never rewritten.
+    @app.route("/api/investigation-log", methods=["POST"])
+    def api_investigation_log_create():
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(silent=True) or {}
+        lane = str(payload.get("lane") or "corpus").strip().lower()
+        if lane not in ("corpus", "instrument"):
+            return jsonify({"error": "lane must be 'corpus' or 'instrument'"}), 400
+        understanding = str(payload.get("understanding") or "").strip()
+        pressing = str(payload.get("pressing_questions") or "").strip()
+        if not understanding and not pressing:
+            return jsonify({"error": "an entry needs an understanding, pressing questions, or both"}), 400
+
+        import uuid
+        entry_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        conn = _conn_rw()
+        doc_id = str(payload.get("source_document_id") or "").strip() or None
+        if doc_id:
+            row = conn.execute(
+                "SELECT id FROM source_documents WHERE id = ?", (doc_id,)
+            ).fetchone()
+            if not row:
+                doc_id = None
+        conn.execute(
+            """INSERT INTO investigation_log
+               (id, lane, understanding, pressing_questions,
+                source_document_id, page, governing_question, created_at)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (entry_id, lane, understanding or None, pressing or None,
+             doc_id, payload.get("page"),
+             str(payload.get("governing_question") or "").strip() or None, now),
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"id": entry_id, "created_at": now}), 201
+
+    @app.route("/api/investigation-log")
+    def api_investigation_log_list():
+        if not db_path.exists():
+            return jsonify({"entries": []}), 200
+        lane = str(request.args.get("lane") or "").strip().lower()
+        try:
+            limit = min(max(int(request.args.get("limit", 50)), 1), 200)
+        except ValueError:
+            limit = 50
+        conn = _conn()
+        if lane in ("corpus", "instrument"):
+            rows = conn.execute(
+                """SELECT il.*, sd.original_filename
+                   FROM investigation_log il
+                   LEFT JOIN source_documents sd ON sd.id = il.source_document_id
+                   WHERE il.lane = ? ORDER BY il.created_at DESC LIMIT ?""",
+                (lane, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT il.*, sd.original_filename
+                   FROM investigation_log il
+                   LEFT JOIN source_documents sd ON sd.id = il.source_document_id
+                   ORDER BY il.created_at DESC LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        conn.close()
+        return jsonify({"entries": [dict(r) for r in rows]})
+
     @app.route("/api/reader/documents/<doc_id>/summary")
     def api_reader_document_summary(doc_id: str):
         """Deterministic reading trail summary for one document. No AI. No scoring."""
