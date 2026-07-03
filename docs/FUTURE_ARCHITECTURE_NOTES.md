@@ -4058,27 +4058,194 @@ Sequencing: Generate Packet first (freeze-safe, immediate value) → Audio Salon
 
 ---
 
-## The Workflow-Cycle Shell — Wireframe v4 *(Design Target — 2026-07-03)*
+## The Writing Threshold — Investigation Durability & the Writing Workspace *(Design Lane — 2026-07-03)*
 
-*Recorded: 2026-07-03. The target shell, preserved at `docs/design/reading_first_wireframe_v4_workflow_cycle.svg`. Joseph: "this is really what we are aiming for… but the reader much bigger, and all of the features and navigation for pipeline being like options with settings controls."*
+*Recorded: 2026-07-03. Origin: Joseph's pre-writing question — "if we start working on it, updating isn't going to undo anything I've worked through?" — plus four feature directions. The durability claims below were verified against the code, not asserted.*
 
-### The shell
+### The safety rule
 
-- **Reader center stage, warm paper, Focus Scroll** — with the governing question above it ("Refine" / "Fork" actions on the thesis card). Joseph's amendment to v4: the reader even bigger than drawn; pipeline features live as *options with settings controls*, not navigation.
-- **Bottom: the clickable workflow cycle** — `Question → Read → Segment → Ask → Compare → Steward → Build → Render → Audit → Trace` — with the load-bearing rule in the wireframe's own words: **"CLICK A STEP TO CHANGE TOOLS, NOT TO MOVE THE BOOK."** Clicking a cycle node swaps the surrounding panels (the Step Panel); the book never leaves center. The cycle repeats as the thesis changes.
-- **Left rail: Session / Record / Field Notes / Current Step** — the Investigation Status panel (issue #9) in its final position.
-- **Companion side chat** — "bound to this investigation; proposes only," with attach/dismiss chips on its proposals (proposals become record only through the reader's hand). Joseph's framing: *like Clippy, but smarter and connected to the lineage of the project* — see issue #10's Project Lineage / Constitutional Memory comment.
-- **Instrument Run Viewer right rail** (issue #19) — Visual + Terminal registers of the local pipeline's work, including steward flags ("492 obs · 31 likely artifacts").
-- **Field Note capture as the Reader's footer** ("What is your current understanding?" / toggle: pressing questions) — confirmed by the follow-up direction: Field Notes is a footnote tray at the bottom of the Reader, where the keyboard naturally lives on mobile and the same orientation on desktop (routed to Codex against issue #12).
+> **App code can change. Investigation data must persist.**
 
-### Companion direction (routed to #10)
+Eventually visible in the app: *"Your work is preserved separately from the app interface. Updates may change how Hermeneia looks, but not the investigation record."*
 
-Project Lineage (UI) / Constitutional Memory (doctrine): durable memory of the project's own development decisions with provenance — the recursion made explicit: *Hermeneia is built through governed interpretation, therefore it preserves the lineage of its own becoming.* Same constitutional discipline as the shipped Companion: memory used is disclosed, scope is user-controlled, lineage inspectable; never omniscient, silent, pretending, or auto-committing.
+### Verified durability audit (2026-07-03)
 
-### Machine observations as page brief + lens (routed to Codex against #12)
+**Already safe:**
+- `build/` is gitignored — the database is fully separate from app code; git updates can never touch it.
+- Migrations are additive only: `CREATE TABLE IF NOT EXISTS` + `ALTER TABLE ... ADD COLUMN`; no `DROP` statements exist anywhere in the storage layer.
+- Highlights, observations, proposals, interpretations, steward decisions: all in the DB, append-only or status-transition (highlight "dismiss" is a status, not a delete).
+- `herm preserve export` already exists as the preservation package path.
 
-"The machine thinks these may matter on this page" — an accordion brief *above* the page, read-then-decide (approve / edit / question / reject / boilerplate / defer), plus an optional **Machine Auto Highlight lens** showing machine-observed segments inline, subtle and non-destructive, always off-able, visually distinct from human highlights. Copy rule: *"Hermeneia noticed these possible points of attention. Read the page yourself, then approve, edit, question, or reject them."* The machine points; the human decides.
+**Verified gaps (fix before serious writing):**
+1. **The Current Question lives only in browser localStorage** (`hermeneia_investigation_v1`: thesis, purpose, lenses, falsifiability). Clearing browser data, switching browsers, or switching machines loses the investigation's declared frame — the one part of the record stored in the most volatile place in the stack. Constitutionally ironic: the corpus boundary is a commitment, and the question-frame isn't in the investigation record at all. Fix: persist the declaration into the DB (small deliberate migration) — or, interim and freeze-safe, include it in Generate Packet plus a one-click "download my investigation" JSON export.
+2. **One hard delete exists**: `DELETE FROM inquiry_notes` (app.py, `api_obs_inquiry_delete`) — violates "dismiss/archive/status changes instead of deletion." Convert to status transition.
+3. **No pre-migration backup**: migrations run silently on server startup. Additive-only mitigates, but a timestamped DB copy before any migration is cheap insurance.
+4. Bookmarks, register, and active plan/blueprint selection are also localStorage-bound (acceptable for UI state; the question-frame is the one that matters).
 
-### In-app model management (filed as issue #29)
+**The threshold rule:** serious long-form writing waits until gap 1 is closed and Generate Packet exists as the user-facing export.
 
-Live Jetson finding (local model name mismatch, fixed by `ollama pull llama3.2:3b` over SSH) → models should be installable/selectable from the UI as **governed commands, never a terminal**: whitelisted verbs, validated model names, streamed visible output (the Run Viewer pattern), local-machine disclosure.
+### The Writing Workspace (Google-Docs-like surface)
+
+A calmer writing room, not another pipeline screen: document canvas in the center; evidence / notes / questions / lineage in a side rail; **citations as source chips** (drag a highlight in, it carries its provenance); comments and marginalia; autosave; version history; export. This is where the report, packet, Salon script, or essay becomes editable without operating machinery. Version history here is the monotone record applied to drafts — every version kept, current draft = endorsement.
+
+### Corpus/commentary overlap statistics
+
+The analytical layer that protects source boundaries: what appears in the primary text vs. commentary vs. both; what commentary overemphasizes (the Pattern View's emphasis signal, generalized); what the primary text supports weakly or strongly; which motifs are primary-only or commentary-only. Supporting documents inform inquiry; the UI must never silently blend them into primary evidence.
+
+### Understanding-over-time (the passage timeline)
+
+For any passage: *"How has my understanding of this changed?"* — first highlight, first note, questions raised, AI proposals, steward decisions, revisions, current interpretation, and what changed and why. This is Reader Lineage becoming real: not only "where did this claim come from?" but **"how did my understanding form?"** Directly implements Article 6 (Every Interaction Preserves History) as a view, and the strikethrough-with-story pattern from the reference interface design.
+
+### Idle thesis grows *(smallest item — freeze-safe, ~30 lines of frontend)*
+
+If the screen is idle, no nagging, no modal — the Current Question gently returns to attention:
+
+```
+after ~45s idle:  Current Question grows slightly
+after ~90s idle:  it becomes more visually present
+any input:        returns instantly to normal
+```
+
+The purpose, verbatim: **"If you get stuck, go back to why you're doing the work to begin with."** Focus Mode becoming epistemic discipline rather than dimming. Buildable in one sitting whenever wanted, including before July 7.
+
+### Sequencing
+
+1. Generate Packet + investigation-declaration persistence (closes the writing threshold)
+2. Idle thesis (anytime — freeze-safe)
+3. Writing Workspace
+4. Overlap statistics, passage timeline (post-demo analytical layer)
+
+---
+
+## Question and Revision as First-Class Objects — the Product Correction *(Candidate Data-Model Change — 2026-07-03)*
+
+*Recorded: 2026-07-03, on Joseph's direction, against the Writing Threshold entry above — this is not a side note; it changes the data model. Origin: Joseph's review of the research program against the product.*
+
+### The correction
+
+Two objects have been hiding in plain sight:
+
+**1. Question is not metadata.** It has been treated as onboarding, a heading, a thesis field — and stored in localStorage. But the research program says questions *generate divergence* (the Critic review's own finding: "governing questions appear to be a primary driver of divergence"). Questions are productive objects:
+
+```
+Question
+  ├── text · scope · priority · frame (theological/critical/scientific)
+  ├── assumptions
+  ├── produces observations · attracts evidence
+  ├── generates interpretations
+  ├── is revised · branches into child questions
+  └── status: active / answered / superseded / unresolved
+```
+
+That is a graph node, not a note. The localStorage fragility flagged in the Writing Threshold audit and this correction are **the same work**: don't move the question blob into a DB column — give Question its schema. One migration closes the durability gap and the data-model gap together.
+
+**2. Revision is not version history.** Git stores *what* changed; Hermeneia stores *why understanding changed*:
+
+```
+Revision
+  cause: new observation | stronger counterargument | better question |
+         contradiction discovered | source correction | theological
+         constraint | reader feedback | Steward decision
+  evidence: linked observations
+  challenge: what was accepted or rejected
+  effect: interpretation narrowed / broadened / superseded
+```
+
+A revision is an epistemic event, not a file diff. This is what distinguishes Hermeneia from Notion, Obsidian, and Google Docs: it preserves **the evolutionary pressure that changed the content**, not just the content. The passage-timeline design lane (above) is powered by exactly this object.
+
+### Convergence evidence (why this is a correction, not a speculation)
+
+- **The kernel**: Question and Commitment are the two central primitives of the epistemic kernel (see Epistemic Kernel Exploration); Revision-with-cause is the reified transition — a recorded application of R in U(n+1) = R(U(n), E, Δ), with E and Δ captured per event. This is the **fourth independent rederivation** of the same structure (kernel dialogue, interaction constitution, workspace design, now the data model).
+- **The research program**: RF-003 ("governing question is the primary culture-adaptive variable") and RF-004 ("evidence weighting is downstream from the governing question") are replicated findings already pointing here; the *Question Constructor* note above is P0 for the same reason.
+- **RH-001 becomes instrumentable**: "disciplined revision may be the primitive operation" is currently a Low-confidence hypothesis with no measurement instrument. A Revision table with typed causes *is* the instrument — the schema that would let the hypothesis be tested rather than believed.
+
+### The complete product loop
+
+```
+Notice → Mark → Name → Question → Cluster → Interpret
+       → Challenge → Revise → Ratify → Render
+```
+
+"Notice" is human. "Mark" is the first artifact (the Dynamic Markup Layer is the *birth of an observation*, one step earlier than previously placed). **The editor is not the product; the marking-to-understanding pipeline is the product.** Google Docs competes on editing, Notion on organization, Obsidian on linking — Hermeneia competes on the loop.
+
+### The #C warning (preserved verbatim in spirit)
+
+The risk is overbuilding the constitution before the instrument has enough lived use. The system now has philosophy, constitution, white paper, pitch deck, preservation layer, release engineering, research program, methodology. **The next credibility jump will not come from another governing document.** It comes from a five-minute experience where someone can say:
+
+> "I marked this text. Hermeneia preserved what I meant by that mark, helped me revise my understanding, and showed me why the final interpretation changed."
+
+That loop is the proof-of-life. Not a PDF. Not a paper.
+
+Scripture anchor (Joseph): Proverbs 20:5 — *"The purpose in a man's heart is like deep water, but a man of understanding will draw it out."* Hermeneia's job: not to replace the reader — to help draw out what is buried, preserve the path, test the interpretation, and make the revision visible.
+
+### Sequencing consequence
+
+The post-demo queue reorders around the two migrations that matter: **Question object** (subsumes question-frame persistence from the Writing Threshold) and **Revision object** (powers the passage timeline and instruments RH-001). Markup Legend follows as the third. Everything else in the design lanes is views over these objects.
+
+---
+
+## Word Lens & ConceptTerm *(Design Lane — 2026-07-03, first feature request from live use)*
+
+*Recorded: 2026-07-03. Origin: Joseph's first writing session in the instrument — selecting "aspiration" in his question surfaced only browser-level options (Copy / Search / Ask ChatGPT). "So much of interpretation can be helped just by looking up the real definition of something."*
+
+### The feature
+
+Selected text opens **Word Lens** — interpretive word tools, not a context menu:
+
+```
+Word Lens: aspiration
+  Definition            plain-English meaning
+  Etymology             where the word came from, how meaning developed
+  Semantic Neighbors    ambition · desire · dream · hope · longing · fantasy · idolatry
+  Corpus Usage          where the term and its neighbors appear across the investigation
+  Interpretive Risk     how this word is commonly flattened or misunderstood
+  Lens Notes            how the word shifts under Christian / rhetorical / literary /
+                        psychological / historical lenses
+  Add to Investigation  promote to a first-class concept
+```
+
+The distinguishing move (verbatim): a dictionary answers *"what does this word mean?"* — Hermeneia answers **"what does this word make possible or impossible in this interpretation?"** Demonstrated live: distinguishing aspiration from its neighbors sharpened the governing question itself — *"Is Gatsby's problem aspiration itself, or aspiration that refuses correction by reality?"* (Note: that is the Interaction Constitution's preamble functioning in the wild — the interaction left the investigator with a better question.)
+
+### ConceptTerm — the third object, and it already has an ancestor
+
+Product object (Joseph's schema): term · definitions · etymology · semantic neighbors · corpus occurrences · lens-specific notes · **user-selected meaning** · linked observations · linked questions · interpretive risks · status: proposed / established / contested.
+
+**Grounding (verified):** the schema already has `terms` (8,379 rows) and `observation_terms` (47,760 links) from the Hermeneutic Field layer. Corpus Usage and linked-observations facets are *views over existing data*; "Trace usage in corpus" is the already-shipped Pattern View invoked on the term. ConceptTerm = the existing terms table + an enrichment/promotion layer. This is the **third candidate migration** in the post-demo spine: Question, Revision, ConceptTerm — and the cheapest, because its core object exists.
+
+**Unification with the Markup Legend:** a legend variable ("green = aspiration") and a ConceptTerm ("aspiration") are the same object at different maturities. One lifecycle, not two features:
+
+```
+Mark → Name (legend variable) → Define / Distinguish (Word Lens)
+     → Promote (ConceptTerm) → Trace (Pattern View) → Interpret → Render
+```
+
+### Constitutional rule: definitions carry provenance
+
+A definition is an observation from a **reference source**, never ground truth. Dictionary/lexicon lookups enter as reference-role corpus material (`source_role` already exists for exactly this); an LLM-proposed definition or neighbor-distinction is speculative until stewarded; the **user-selected meaning is a commitment** — which sense of the word governs *this* investigation is a stewarded, revisable decision, and Reports, Salon outputs, and Critic audits then use the established meaning instead of guessing.
+
+### Sequencing (Joseph's #C)
+
+Word Lens before Memory Renderings (songs, flashcards, study aids — the Salon's memory-oriented sibling of Reports): *"the song gets stronger when the vocabulary is already grounded."* Renderings inherit established meanings rather than re-deriving them.
+
+---
+
+## Formalization, Not Invention — and the Recursive Companion *(Positioning + Design Note — 2026-07-03)*
+
+*Recorded: 2026-07-03. Origin: live-use session. Two related observations.*
+
+### The identity correction (applied to the Guide in PR #8)
+
+Joseph: *"Hermeneia isn't something I made… the word means something."* The product must never sound like "I invented interpretation." It sounds like: **"I formalized and instrumented an ancient human practice."**
+
+Canonical framing language (approved, applied to the Guide's category card; also the white paper's positioning): Hermeneia is not the invention of interpretation. It is a formalization of the disciplined work of drawing meaning out of words, events, symbols, testimony, and evidence. The name carries the inheritance — *hermeneia*: interpretation, explanation, making meaning understandable. It does not replace the reader, scholar, teacher, theologian, lawyer, researcher, or student; it gives their interpretive work structure, memory, accountability, and lineage. **People have always interpreted. Hermeneia makes the process visible.**
+
+Shortest form: *"Hermeneia formalizes the ancient practice of interpretation into a modern, auditable system for preserving evidence, testing meaning, and tracing understanding from source to expression."*
+
+Scholarly note: this is the same humility the white paper's related-work section performs in academic form — naming Hirsch, Peirce, Collingwood, ACH, TMS et al. as ancestors *is* the "we didn't invent this" claim with citations. Posture anchor (Joseph): Proverbs 4 — wisdom is received, discerned, guarded, walked in; not invented.
+
+### The recursive companion & BYOP
+
+Observed in live use: Joseph runs a side chat bound to a corpus of understanding (the codebase itself) that informs the investigation — the process is recursive; the instrument is being investigated with its own method. Design implications:
+
+- **BYOP (Bring Your Own Provider)** is already Hermeneia's architecture (provider registry, local/Ollama) — but the observation extends it: the *conversational companion itself* is a participant pattern. A future Hermeneia companion is a chat surface bound to the investigation's corpus and record, governed like any participant (proposals speculative, commitments stewarded), swappable across providers or local models.
+- The codebase-as-corpus recursion is the same reflexivity as the white-paper-under-its-own-methodology: Hermeneia investigating Hermeneia is a legitimate validation corpus.
