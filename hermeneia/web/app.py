@@ -1777,6 +1777,69 @@ def create_app(
 
     # ── /api/health ──────────────────────────────────────────────────────────
 
+    # ── First-run setup (issue #20) ───────────────────────────────────
+    # A fresh environment must be usable from the UI alone — no SSH,
+    # Flask, SQLite, or pipeline-script knowledge required. These
+    # endpoints are strictly additive: init never touches existing data,
+    # and the demo compile is idempotent (SHA-256 dedupe in the Compiler).
+    _DEMO_CORPUS = Path(__file__).resolve().parents[2] / "examples" / "gatsby.pdf"
+
+    def _setup_state_payload() -> dict:
+        exists = db_path.exists()
+        doc_count = 0
+        if exists:
+            try:
+                conn = _conn()
+                doc_count = conn.execute(
+                    "SELECT COUNT(*) FROM source_documents"
+                ).fetchone()[0]
+                conn.close()
+            except Exception:
+                doc_count = 0
+        return {
+            "database_exists": exists,
+            "document_count": doc_count,
+            "db_path": str(db_path),
+            "demo_available": _DEMO_CORPUS.exists(),
+            "first_run": (not exists) or doc_count == 0,
+        }
+
+    @app.route("/api/setup/state")
+    def api_setup_state():
+        return jsonify(_setup_state_payload())
+
+    @app.route("/api/setup/init", methods=["POST"])
+    def api_setup_init():
+        created = False
+        if not db_path.exists():
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            from ..storage.sqlite import SQLiteStore as _Store
+            from ..storage.sqlite import ensure_profile_tables as _migrate
+            store = _Store(db_path)
+            store.close()
+            _mconn = sqlite3.connect(str(db_path))
+            _mconn.row_factory = sqlite3.Row
+            try:
+                _migrate(_mconn)
+            finally:
+                _mconn.close()
+            created = True
+        return jsonify({"created": created, **_setup_state_payload()})
+
+    @app.route("/api/setup/demo", methods=["POST"])
+    def api_setup_demo():
+        if not _DEMO_CORPUS.exists():
+            return jsonify({"error": "no demo corpus is bundled with this install"}), 404
+        api_setup_init()  # ensure the workspace exists; idempotent
+        from ..compiler.compiler import Compiler
+        try:
+            compiler = Compiler(db_path=db_path, build_dir=db_path.parent)
+            compiler.compile(_DEMO_CORPUS)
+            compiler.close()
+        except Exception as exc:
+            return jsonify({"error": f"demo compile failed: {exc}"}), 500
+        return jsonify(_setup_state_payload())
+
     @app.route("/api/health")
     def api_health():
         if not db_path.exists():
