@@ -1967,6 +1967,15 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) a11yS
   try {
     mount(await get('/api/health'));
   } catch(e) {
+    // A missing database is not an error — it is a fresh environment.
+    // Route to first-run onboarding instead of a dead screen.
+    try {
+      const s = await get('/api/setup/state');
+      if (!s.database_exists) {
+        mount({ document: { filename: null }, _noDatabase: true });
+        return;
+      }
+    } catch {}
     document.getElementById('root').innerHTML =
       `<div style="color:var(--red);padding:80px 0">${e.message}</div>`;
   }
@@ -2006,6 +2015,11 @@ function mount(h) {
 <section class="section xo" id="provider-settings">
   <div class="sec-label">Connections — Providers</div>
   <div id="provider-panel" class="e10-empty">Loading provider status...</div>
+</section>
+
+<section class="section e10-screen" id="firstrun">
+  <div class="sec-label">Welcome</div>
+  <div id="firstrun-panel"></div>
 </section>
 
 <section class="section e10-screen" id="setup">
@@ -2203,29 +2217,130 @@ function mount(h) {
   });
   ttsInit();
   updatePageThesis();
-  e10LoadObservations();
-  e10LoadFindings();
-  e10LoadResearchBanner();
-  // Fetch pipeline statuses for the nav mini cycle, then navigate
-  const bootDest = _bootDestination(h);
-  refreshEditionCycleCount().then(() =>
-    refreshNavCycleStatuses().then(() => updateNavCycle(bootDest))
-  );
-  e10Go(bootDest);
+  if (!h._noDatabase) {
+    // Data loaders 404 against a fresh environment — skip until the
+    // workspace exists.
+    e10LoadObservations();
+    e10LoadFindings();
+    e10LoadResearchBanner();
+    refreshEditionCycleCount().then(() =>
+      refreshNavCycleStatuses().then(() => updateNavCycle(_bootDestination(h)))
+    );
+  }
+  e10Go(_bootDestination(h));
 }
 
 // First-run routing: read before declare. Returning users (a saved
 // question exists) land on the dashboard; a fresh visitor with a corpus
-// lands in the Reader; with no corpus, on upload. If document state is
-// uncertain, fall back to the pre-existing behavior (Setup).
+// lands in the Reader; a fresh environment (no database or no documents)
+// lands on first-run onboarding — the UI stewards the first act of
+// inquiry; nobody should need SSH, Flask, SQLite, or pipeline scripts
+// to begin. If document state is uncertain, fall back to Setup.
 function _bootDestination(h) {
   try {
+    if (h && h._noDatabase) return 'firstrun';
     if (invLoad()) return 'onboarding';
     if (h && h.document && typeof h.document === 'object') {
-      return h.document.filename ? 'reader' : 'corpus';
+      return h.document.filename ? 'reader' : 'firstrun';
     }
   } catch {}
   return 'setup';
+}
+
+// ── First-run onboarding (issue #20) ───────────────────
+async function e10LoadFirstRun() {
+  const host = document.getElementById('firstrun-panel');
+  if (!host) return;
+  host.innerHTML = '<div class="e10-empty">Checking this environment…</div>';
+  const s = await get('/api/setup/state').catch(() => null);
+  if (!s) {
+    host.innerHTML = '<div class="e10-empty" style="color:var(--red)">The server is not reachable.</div>';
+    return;
+  }
+
+  const step = (n, title, body, done) => `
+    <div style="display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--border)">
+      <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                  font-size:12px;font-weight:700;${done
+                    ? 'background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent);border:1px solid var(--accent)'
+                    : 'background:var(--bg2);color:var(--dim2);border:1px solid var(--border)'}">${done ? '✓' : n}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--fg);margin-bottom:4px">${title}</div>
+        <div style="font-size:13px;color:var(--fg2);line-height:1.65">${body}</div>
+      </div>
+    </div>`;
+
+  host.innerHTML = `
+    <div style="max-width:640px">
+      <div style="font-size:15px;color:var(--fg2);line-height:1.7;margin-bottom:6px">
+        Hermeneia is not the invention of interpretation — it formalizes an ancient human practice:
+        reading a source, preserving what you notice, testing interpretations, and tracing every
+        conclusion back to its evidence. <strong style="color:var(--fg)">People have always interpreted.
+        Hermeneia makes the process visible.</strong>
+      </div>
+      <div style="font-size:12px;color:var(--dim2);line-height:1.6;margin-bottom:10px">
+        Everything you create lives in a local database, separate from the application —
+        updates change how Hermeneia looks, never your investigation record.<br>
+        Workspace location: <span style="font-family:var(--mono);font-size:11px">${x(s.db_path)}</span>
+      </div>
+
+      ${step(1, 'Create your workspace',
+        s.database_exists
+          ? 'Your workspace exists and is ready.'
+          : `No workspace database exists here yet. <br>
+             <button class="btn-primary" style="margin-top:8px;padding:7px 18px" onclick="_frInit(this)">Create workspace</button>`,
+        s.database_exists)}
+
+      ${step(2, 'Bring a source worth investigating',
+        s.document_count > 0
+          ? `${s.document_count} document${s.document_count !== 1 ? 's' : ''} in the corpus.`
+          : `${s.demo_available
+              ? `<button class="btn-primary" style="padding:7px 18px;margin:6px 8px 6px 0" ${s.database_exists ? '' : 'disabled title="Create the workspace first"'}
+                   onclick="_frDemo(this)">Load the demo corpus — The Great Gatsby</button>`
+              : `<span style="color:var(--dim2)">No demo corpus is bundled with this install.</span><br>`}
+             <button class="btn-trace" style="padding:7px 18px;margin-top:6px" ${s.database_exists ? '' : 'disabled title="Create the workspace first"'}
+               onclick="e10Go('corpus')">Upload your own PDF →</button>
+             <div style="font-size:11px;color:var(--dim2);margin-top:8px">Uploading runs the full extraction pipeline:
+             the text becomes preserved, immutable observations you can read, search, and interpret.</div>`,
+        s.document_count > 0)}
+
+      ${step(3, 'Read, and let a question form',
+        `Open the Reader and read the text directly. Highlight what catches your eye — everything you
+         notice is kept. When you're ready, name what you're trying to understand. You can bring a
+         question with you, or read until one forms.
+         ${s.document_count > 0 ? `<br><button class="btn-primary" style="margin-top:8px;padding:7px 18px" onclick="e10Go('reader')">Open the Reader →</button>` : ''}`,
+        false)}
+    </div>`;
+}
+
+async function _frInit(btn) {
+  btn.setAttribute('disabled', 'disabled');
+  btn.textContent = 'Creating…';
+  try {
+    const resp = await fetch('/api/setup/init', { method: 'POST' });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || 'init failed');
+    e10LoadFirstRun();
+  } catch (e) {
+    showAppError(e.message);
+    btn.removeAttribute('disabled');
+    btn.textContent = 'Create workspace';
+  }
+}
+
+async function _frDemo(btn) {
+  btn.setAttribute('disabled', 'disabled');
+  btn.textContent = 'Compiling the demo corpus — this runs the full extraction pipeline and can take a minute…';
+  try {
+    const resp = await fetch('/api/setup/demo', { method: 'POST' });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || 'demo compile failed');
+    window.location.reload();
+  } catch (e) {
+    showAppError(e.message);
+    btn.removeAttribute('disabled');
+    btn.textContent = 'Load the demo corpus — The Great Gatsby';
+  }
 }
 
 // ── Research Question Banner ───────────────────────────
@@ -4596,6 +4711,7 @@ function e10Go(id, scrollTarget) {
   } else {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+  if (id === 'firstrun')   e10LoadFirstRun();
   if (id === 'setup')      e10LoadSetup();
   if (id === 'onboarding') e10LoadOnboarding();
   if (id === 'corpus')    { e10LoadDocumentScope(); renderScopeBannerInto('research-question-banner'); }
