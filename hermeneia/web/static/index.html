@@ -5341,6 +5341,7 @@ async function e10LoadCloseReader() {
     _crRenderDocPicker(ws);
     _crMaybeShowReaderBanner(ws);
     _crRenderQuestionCard();
+    _cmpRender();
     await _crOpenDoc(primary.id);
   } catch(e) {
     ws.innerHTML = `<div class="e10-empty" style="color:var(--red)">Error loading corpus: ${x(e.message)}</div>`;
@@ -5375,6 +5376,133 @@ function _crDismissReaderBanner() {
 // The question card. Always present, quiet, static — the ask follows the
 // noticing. The only adaptive display is the highlight count, which the
 // user can already see in their own trail; there is no readiness scoring.
+// ── Companion (issue #10) ──────────────────────────────
+// A reading participant beside the Reader, never replacing it. Context
+// is explicit: only checked sections are sent, and every reply reports
+// exactly what was used. Nothing said here enters the record unless the
+// reader saves it themselves. Transcript is session-only for now
+// (Witness persistence is tracked separately).
+let _cmpTranscript = [];
+let _cmpBusy = false;
+let _cmpProvider = (() => { try { return localStorage.getItem('hermeneia_companion_provider') || ''; } catch { return ''; } })();
+let _cmpFlags = (() => {
+  try { return JSON.parse(localStorage.getItem('hermeneia_companion_context') || 'null')
+        || { governing_question: true, selected_passage: true, current_page: false,
+             reading_trail: false, saved_highlights: false, page_observations: false }; }
+  catch { return { governing_question: true, selected_passage: true, current_page: false,
+                   reading_trail: false, saved_highlights: false, page_observations: false }; }
+})();
+
+const _CMP_CONTEXT_LABELS = [
+  ['selected_passage',  'Selected passage'],
+  ['current_page',      'Current page'],
+  ['governing_question','Governing question'],
+  ['reading_trail',     'Reading trail'],
+  ['saved_highlights',  'Saved highlights'],
+  ['page_observations', 'Machine observations (this page)'],
+];
+
+function cmpToggleFlag(key) {
+  _cmpFlags[key] = !_cmpFlags[key];
+  try { localStorage.setItem('hermeneia_companion_context', JSON.stringify(_cmpFlags)); } catch {}
+  _cmpRenderContextRows();
+}
+
+function _cmpRenderContextRows() {
+  const host = document.getElementById('cmp-context');
+  if (!host) return;
+  host.innerHTML = _CMP_CONTEXT_LABELS.map(([key, label]) => `
+    <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:${_cmpFlags[key] ? 'var(--fg2)' : 'var(--dim2)'};cursor:pointer;padding:2px 0">
+      <input type="checkbox" ${_cmpFlags[key] ? 'checked' : ''} onchange="cmpToggleFlag('${key}')" style="flex-shrink:0">
+      ${label}${key === 'selected_passage' && _crSelText ? ` <span style="color:var(--accent)">·</span>` : ''}
+    </label>`).join('');
+}
+
+async function _cmpRender() {
+  const panel = document.getElementById('cr-companion-panel');
+  if (!panel) return;
+  panel.innerHTML = `
+    <div class="cr-side-title" style="display:flex;justify-content:space-between;align-items:center">
+      Companion
+      <select id="cmp-provider" onchange="_cmpProvider=this.value;try{localStorage.setItem('hermeneia_companion_provider',this.value)}catch{}"
+        style="font-size:10px;padding:2px 4px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);max-width:130px"></select>
+    </div>
+    <div style="font-size:11px;color:var(--dim2);margin-bottom:6px">It knows only what you check. Nothing it says enters the record unless you save it.</div>
+    <div id="cmp-context" style="margin-bottom:8px"></div>
+    <div id="cmp-transcript" style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+    <textarea id="cmp-input" rows="2" placeholder="Ask about what you're reading…"
+      style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:12px;line-height:1.5;padding:7px 9px;resize:vertical"></textarea>
+    <button class="btn-primary" id="cmp-ask" style="width:100%;margin-top:6px;padding:6px" onclick="cmpAsk()">Ask</button>`;
+  _cmpRenderContextRows();
+  _cmpRenderTranscript();
+
+  const sel = document.getElementById('cmp-provider');
+  if (sel) {
+    const data = await get('/api/e10/providers').catch(() => ({ providers: [] }));
+    const ready = (data.providers || []).filter(p => p.configured || p.status === 'configured');
+    sel.innerHTML = ready.map(p => `<option value="${x(p.participant)}">${x(p.label || p.participant)}</option>`).join('')
+      + `<option value="stub">Stub (no AI)</option>`;
+    if (_cmpProvider && [..._cmpProvider ? sel.options : []].some(o => o.value === _cmpProvider)) sel.value = _cmpProvider;
+    else _cmpProvider = sel.value;
+  }
+}
+
+function _cmpRenderTranscript() {
+  const host = document.getElementById('cmp-transcript');
+  if (!host) return;
+  host.innerHTML = _cmpTranscript.map(m => m.role === 'user'
+    ? `<div style="font-size:12px;color:var(--fg);line-height:1.5;border-left:2px solid var(--border);padding-left:8px">${x(m.text)}</div>`
+    : `<div style="font-size:12px;color:var(--fg2);line-height:1.6;background:var(--bg);border-radius:var(--r);padding:8px 10px">
+         ${x(m.text)}
+         <div style="font-size:10px;color:var(--dim2);margin-top:6px;border-top:1px solid var(--border);padding-top:5px">
+           ${x(m.provider)} · context used: ${m.context_used?.length ? m.context_used.map(c => x(c.summary)).join(' · ') : 'none'}
+         </div>
+       </div>`).join('')
+    + (_cmpBusy ? `<div style="font-size:11px;color:var(--dim2)">thinking…</div>` : '');
+  host.scrollTop = host.scrollHeight;
+}
+
+async function cmpAsk() {
+  const input = document.getElementById('cmp-input');
+  const message = input?.value.trim();
+  if (!message || _cmpBusy) return;
+  _cmpTranscript.push({ role: 'user', text: message });
+  _cmpBusy = true;
+  input.value = '';
+  document.getElementById('cmp-ask')?.setAttribute('disabled', 'disabled');
+  _cmpRenderTranscript();
+  try {
+    const resp = await fetch('/api/companion/ask', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: _cmpProvider || 'stub',
+        message,
+        document_id: _crDocId,
+        page: _crPage,
+        context_flags: _cmpFlags,
+        selected_text: _cmpFlags.selected_passage ? (_crSelText || '') : '',
+        governing_question_text: _cmpFlags.governing_question ? (invLoad()?.thesis || '') : '',
+      }),
+    });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || 'Companion unavailable');
+    _cmpTranscript.push({ role: 'companion', text: d.reply, provider: d.provider, context_used: d.context_used });
+  } catch (e) {
+    _cmpTranscript.push({ role: 'companion', text: `⚠ ${e.message}`, provider: 'error', context_used: [] });
+  }
+  _cmpBusy = false;
+  document.getElementById('cmp-ask')?.removeAttribute('disabled');
+  _cmpRenderTranscript();
+}
+
+function _crAskCompanion() {
+  _crHideToolbar();
+  if (!_cmpFlags.selected_passage) cmpToggleFlag('selected_passage');
+  _cmpRenderContextRows();
+  document.getElementById('cr-companion-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  setTimeout(() => document.getElementById('cmp-input')?.focus(), 300);
+}
+
 function _crRenderQuestionCard(editing = false) {
   const panel = document.getElementById('cr-question-panel');
   if (!panel) return;
@@ -5513,6 +5641,7 @@ function _crRenderDocPicker(ws) {
           <div id="cr-trail-detail" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px"></div>
         </div>
         <div class="cr-side-panel" id="cr-question-panel"></div>
+        <div class="cr-side-panel" id="cr-companion-panel"></div>
         <div class="cr-side-panel" id="cr-capture-panel">
           <div class="cr-side-title">Highlight Inspector</div>
           <div id="cr-sel-prompt" style="font-size:12px;color:var(--dim2);line-height:1.6">
@@ -5718,6 +5847,7 @@ function _crShowToolbar(cx, cy) {
     <button class="cr-sel-btn" onclick="_crHighlightSelected('question')">? Question</button>
     <button class="cr-sel-btn" onclick="_crHighlightSelected('concept')">✦ Concept</button>
     <button class="cr-sel-btn" onclick="_crHighlightSelected('candidate')" style="color:var(--accent)">→ Observation</button>
+    <button class="cr-sel-btn" onclick="_crAskCompanion()" title="Ask the Companion about only this passage">⁘ Ask</button>
     <button class="cr-sel-btn" onclick="ttsSpeak(_crSelText)" title="Read aloud">▶ Read</button>`;
   document.body.appendChild(tb);
   _crSelToolbar = tb;
