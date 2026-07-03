@@ -1009,6 +1009,24 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   padding: 4px 12px; white-space: nowrap;
 }
 .fs-pill.fs-on { border-color: var(--accent); color: var(--accent); }
+
+/* ── Rich highlight interaction (issue #21) ──────────────────────────
+   The passage being captured stays marked until saved or cancelled —
+   no DOM mutation of the reading text (CSS Custom Highlight API). */
+::highlight(hermeneia-pending) {
+  background-color: rgba(80, 255, 210, 0.26);
+  color: inherit;
+}
+.cr-concept-chip {
+  display: inline-block; margin-left: 6px; padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 20px; font-size: 10px; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+/* Provenance locators are stored with every capture but stay out of the
+   reading text unless the researcher register asks for them. */
+.cr-page-view .cr-page-region { display: none; }
+.cr-page-view.show-regions .cr-page-region { display: block; }
 .cr-nav-bar {
   display: flex; align-items: center; gap: 10px; margin-top: 18px;
 }
@@ -5288,6 +5306,25 @@ let _crHighlights = [];
 let _crSelText = '';
 let _crSelToolbar = null;
 let _crRelevance = 'unclear';
+let _crSelRange = null;   // cloned Range of the pending selection
+let _crConcept = '';      // concept name when capturing via the Concept action
+
+// The passage being captured stays visibly marked while the inspector
+// form is open — the selection is never lost mid-thought. Uses the CSS
+// Custom Highlight API (no DOM mutation of the reading text); browsers
+// without it keep the native selection instead.
+function _crMarkPending() {
+  try {
+    if (window.CSS?.highlights && _crSelRange) {
+      CSS.highlights.set('hermeneia-pending', new Highlight(_crSelRange));
+    }
+  } catch {}
+}
+function _crClearPending() {
+  try { window.CSS?.highlights?.delete('hermeneia-pending'); } catch {}
+  window.getSelection()?.removeAllRanges();
+  _crSelRange = null;
+}
 
 async function e10LoadCloseReader() {
   const ws = document.getElementById('reader-workspace');
@@ -5562,6 +5599,8 @@ function _crRenderPage() {
   }
 
   _fsApply();
+  // Locator metadata is register-gated: stored always, shown to researchers
+  document.getElementById('cr-page-view')?.classList.toggle('show-regions', _register === 'expert');
 
   // Nav controls
   const prev = document.getElementById('cr-prev-btn');
@@ -5642,6 +5681,8 @@ async function _crLoadHighlightList() {
           p.${h.page || '?'}
           ${h.relevance ? `<span style="color:${relColor[h.relevance]||'var(--dim2)'};margin-left:6px">${h.relevance}</span>` : ''}
           ${candidateBadge}
+          ${(Array.isArray(h.tags) ? h.tags : []).filter(t => typeof t === 'string' && t.startsWith('concept:')).map(t =>
+            `<span class="cr-concept-chip">✦ ${x(t.slice(8))}</span>`).join('')}
         </div>
         ${h.note_text ? `<div style="font-size:11px;color:var(--dim2);margin-top:3px;line-height:1.4">${x(h.note_text.slice(0,80))}${h.note_text.length>80?'…':''}</div>` : ''}
       </div>`;
@@ -5657,6 +5698,7 @@ function _crHandleSelection(e) {
   const text = sel?.toString().trim();
   if (!text || text.length < 3) { _crHideToolbar(); return; }
   _crSelText = text;
+  _crSelRange = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
   _crShowToolbar(e.clientX, e.clientY);
 }
 
@@ -5674,12 +5716,13 @@ function _crShowToolbar(cx, cy) {
     <button class="cr-sel-btn" onclick="_crHighlightSelected()">Highlight</button>
     <button class="cr-sel-btn" onclick="_crHighlightSelected('note')">+ Note</button>
     <button class="cr-sel-btn" onclick="_crHighlightSelected('question')">? Question</button>
+    <button class="cr-sel-btn" onclick="_crHighlightSelected('concept')">✦ Concept</button>
     <button class="cr-sel-btn" onclick="_crHighlightSelected('candidate')" style="color:var(--accent)">→ Observation</button>
     <button class="cr-sel-btn" onclick="ttsSpeak(_crSelText)" title="Read aloud">▶ Read</button>`;
   document.body.appendChild(tb);
   _crSelToolbar = tb;
   // Position just above the cursor
-  const left = Math.min(cx, window.innerWidth - 340);
+  const left = Math.min(cx, window.innerWidth - 430);
   const top  = cy - 52 + window.scrollY;
   tb.style.left = Math.max(8, left) + 'px';
   tb.style.top  = Math.max(8, top) + 'px';
@@ -5696,7 +5739,10 @@ function _crHighlightSelected(focus) {
   if (!text) return;
   _crSelText = text;
   _crRelevance = 'unclear';
-  window.getSelection()?.removeAllRanges();
+  _crConcept = focus === 'concept' ? text.length <= 48 ? text : '' : '';
+  // The selection is never cleared here — the passage stays marked
+  // until the capture is saved or cancelled.
+  _crMarkPending();
 
   const form = document.getElementById('cr-sel-form');
   const prompt = document.getElementById('cr-sel-prompt');
@@ -5705,15 +5751,23 @@ function _crHighlightSelected(focus) {
   form.style.display = 'block';
 
   const isCandidate = focus === 'candidate';
+  const isConcept  = focus === 'concept';
   const focusNote = focus === 'note' || focus === 'candidate';
   const focusQ    = focus === 'question';
+  const thesis = invLoad()?.thesis || '';
 
   form.innerHTML = `
     <div class="cr-saved-passage">${x(text.slice(0, 280))}${text.length > 280 ? '…' : ''}</div>
+    ${thesis ? `<div style="font-size:11px;color:var(--dim2);margin-top:8px;line-height:1.5">For your question: <em>${x(thesis.slice(0, 90))}${thesis.length > 90 ? '…' : ''}</em></div>` : ''}
     <div class="cr-highlight-form" style="margin-top:12px">
+      ${isConcept ? `<div class="cr-form-row">
+        <div class="cr-form-label">Concept name</div>
+        <input id="cr-concept-input" value="${x(_crConcept)}" placeholder="e.g. aspiration"
+          style="margin-top:4px;width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;padding:7px 10px">
+      </div>` : ''}
       <div class="cr-form-row">
-        <div class="cr-form-label">Why this matters</div>
-        <textarea id="cr-note-input" rows="3" placeholder="Your reading note…" style="margin-top:4px">${isCandidate ? 'Candidate for observation.' : ''}</textarea>
+        <div class="cr-form-label">${isConcept ? 'What this concept means in this investigation' : 'Why this matters'}</div>
+        <textarea id="cr-note-input" rows="3" placeholder="${isConcept ? 'Working definition, distinctions from neighboring terms…' : 'Your reading note…'}" style="margin-top:4px">${isCandidate ? 'Candidate for observation.' : ''}</textarea>
       </div>
       <div class="cr-form-row">
         <div class="cr-form-label">Question this raises</div>
@@ -5736,6 +5790,7 @@ function _crHighlightSelected(focus) {
 
   if (focusNote) setTimeout(() => document.getElementById('cr-note-input')?.focus(), 50);
   if (focusQ)    setTimeout(() => document.getElementById('cr-q-input')?.focus(), 50);
+  if (isConcept) setTimeout(() => document.getElementById('cr-concept-input')?.focus(), 50);
 
   form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -5747,7 +5802,9 @@ function _crSetRelevance(val, btn) {
 }
 
 function _crCancelHighlight() {
+  _crClearPending();
   _crSelText = '';
+  _crConcept = '';
   _crRelevance = 'unclear';
   const form = document.getElementById('cr-sel-form');
   const prompt = document.getElementById('cr-sel-prompt');
@@ -5766,6 +5823,7 @@ async function _crSaveHighlight(asCandidate) {
   const contextBefore = idx > 0 ? fullText.slice(Math.max(0, idx - 100), idx).trim() : '';
   const contextAfter  = idx > -1 ? fullText.slice(idx + _crSelText.length, idx + _crSelText.length + 100).trim() : '';
 
+  const conceptName = document.getElementById('cr-concept-input')?.value?.trim() || '';
   const payload = {
     source_document_id: _crDocId,
     page: _crPage,
@@ -5775,6 +5833,7 @@ async function _crSaveHighlight(asCandidate) {
     note_text: note || null,
     question_text: question || null,
     relevance: _crRelevance,
+    tags: conceptName ? [`concept:${conceptName}`] : [],
   };
 
   try {
@@ -5790,6 +5849,7 @@ async function _crSaveHighlight(asCandidate) {
       await fetch(`/api/reader/highlights/${encodeURIComponent(d.id)}/promote`, { method: 'POST' });
     }
 
+    _crClearPending();
     _crCancelHighlight();
     await _crLoadHighlightList();
     _crRefreshTrail();
