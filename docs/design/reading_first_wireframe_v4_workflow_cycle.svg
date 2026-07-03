@@ -1,0 +1,319 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1900" height="1200" viewBox="0 0 1900 1200">
+  <defs>
+    <style>
+      .bg { fill: #06100d; }
+      .panel { fill: #0d1915; stroke: #2d4a40; stroke-width: 1.5; }
+      .panel2 { fill: #12231d; stroke: #375e50; stroke-width: 1.5; }
+      .panel3 { fill: #07120f; stroke: #2e5a4a; stroke-width: 1.5; }
+      .reader { fill: #fbefd0; stroke: #927647; stroke-width: 1.5; }
+      .focus { fill: #fff9e7; stroke: #d7b567; stroke-width: 2; }
+      .popup { fill: #10211c; stroke: #79dcb2; stroke-width: 2; }
+      .warning { fill: #302416; stroke: #bd8f44; stroke-width: 1.25; }
+      .button { fill: #18352d; stroke: #5bc6a7; stroke-width: 1.25; }
+      .buttonFilled { fill: #67d6b6; stroke: #67d6b6; stroke-width: 1.25; }
+      .chip { fill: #203c34; stroke: #4c7a69; stroke-width: 1; }
+      .terminal { fill: #030806; stroke: #3b7c64; stroke-width: 1.25; }
+      .node { fill: #152a23; stroke: #5bc6a7; stroke-width: 1.5; }
+      .nodeActive { fill: #1f4a3c; stroke: #8ff5d0; stroke-width: 2.2; }
+      .nodeWarn { fill: #362716; stroke: #e2a94e; stroke-width: 1.8; }
+      .cycle { fill: #10211c; stroke: #426e5f; stroke-width: 1.4; }
+      .cycleActive { fill: #67d6b6; stroke: #8ff5d0; stroke-width: 2.2; }
+      .cycleDone { fill: #18352d; stroke: #67d6b6; stroke-width: 1.8; }
+      .line { stroke: #33554a; stroke-width: 2; }
+      .flow { stroke: #67d6b6; stroke-width: 2.5; marker-end: url(#arrow); }
+      .flowMuted { stroke: #3c6658; stroke-width: 2; marker-end: url(#arrowMuted); }
+      .cycleLine { stroke: #497768; stroke-width: 2; marker-end: url(#arrowMuted); }
+      .highlight { fill: #c8f1da; fill-opacity: 0.42; stroke: #66d6b5; stroke-width: 1.5; }
+      .chatUser { fill: #18352d; stroke: #5bc6a7; stroke-width: 1.2; }
+      .chatAI { fill: #151f1b; stroke: #3b6758; stroke-width: 1.2; }
+      .label { fill: #7be0bd; font-family: Inter, Arial, sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 1px; }
+      .title { fill: #f4fff9; font-family: Inter, Arial, sans-serif; font-size: 30px; font-weight: 800; }
+      .text { fill: #e8fff5; font-family: Inter, Arial, sans-serif; font-size: 21px; }
+      .small { fill: #b7d9cd; font-family: Inter, Arial, sans-serif; font-size: 16px; }
+      .tiny { fill: #92b2a6; font-family: Inter, Arial, sans-serif; font-size: 13px; }
+      .micro { fill: #7fa497; font-family: Inter, Arial, sans-serif; font-size: 11.5px; }
+      .paperText { fill: #33291c; font-family: Georgia, serif; font-size: 23px; }
+      .paperMuted { fill: #8a785e; font-family: Georgia, serif; font-size: 20px; }
+      .thesis { fill: #f8fff9; font-family: Inter, Arial, sans-serif; font-size: 24px; font-weight: 800; }
+      .terminalText { fill: #93f1c8; font-family: "SFMono-Regular", "Menlo", "Consolas", monospace; font-size: 13px; }
+      .terminalMuted { fill: #6ea88e; font-family: "SFMono-Regular", "Menlo", "Consolas", monospace; font-size: 13px; }
+      .terminalWarn { fill: #ffd28b; font-family: "SFMono-Regular", "Menlo", "Consolas", monospace; font-size: 13px; }
+      .darkText { fill: #062019; font-family: Inter, Arial, sans-serif; font-size: 13px; font-weight: 900; }
+      .darkCycle { fill: #062019; font-family: Inter, Arial, sans-serif; font-size: 12px; font-weight: 900; }
+      .whiteCycle { fill: #e8fff5; font-family: Inter, Arial, sans-serif; font-size: 12px; font-weight: 800; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#67d6b6"/>
+    </marker>
+    <marker id="arrowMuted" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#497768"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1900" height="1200"/>
+
+  <!-- Top nav -->
+  <rect class="panel" x="24" y="22" width="1852" height="76" rx="22"/>
+  <text class="title" x="52" y="69">Hermeneia</text>
+  <text class="small" x="232" y="66">Question-led reading · companion-guided inquiry · visible instrument · stewarded evidence</text>
+  <rect class="chip" x="1110" y="42" width="124" height="34" rx="12"/>
+  <text class="tiny" x="1130" y="64">Gatsby corpus</text>
+  <rect class="chip" x="1248" y="42" width="142" height="34" rx="12"/>
+  <text class="tiny" x="1268" y="64">Expert mode: on</text>
+  <rect class="chip" x="1406" y="42" width="126" height="34" rx="12"/>
+  <text class="tiny" x="1424" y="64">Provider: local</text>
+  <rect class="button" x="1552" y="37" width="116" height="44" rx="14"/>
+  <text class="small" x="1580" y="65">Render</text>
+  <rect class="button" x="1684" y="37" width="118" height="44" rx="14"/>
+  <text class="small" x="1709" y="65">Trace</text>
+
+  <!-- Left: investigation state -->
+  <rect class="panel" x="24" y="118" width="292" height="810" rx="24"/>
+  <text class="label" x="48" y="154">SESSION</text>
+  <text class="text" x="48" y="188">Where you are</text>
+  <text class="tiny" x="48" y="220">Chapter 1 · 42% · saved 2 min ago</text>
+  <rect class="panel2" x="48" y="240" width="240" height="12" rx="6"/>
+  <rect x="48" y="240" width="104" height="12" rx="6" fill="#79dcb2"/>
+
+  <line class="line" x1="48" y1="286" x2="288" y2="286"/>
+  <text class="label" x="48" y="322">RECORD</text>
+  <text class="tiny" x="64" y="354">• 7 human highlights</text>
+  <text class="tiny" x="64" y="380">• 3 segment questions</text>
+  <text class="tiny" x="64" y="406">• 2 accepted observations</text>
+  <text class="tiny" x="64" y="432">• 4 pending observations</text>
+  <text class="tiny" x="64" y="458">• 1 unresolved tension</text>
+  <text class="tiny" x="64" y="484">• 1 field note captured</text>
+
+  <line class="line" x1="48" y1="520" x2="288" y2="520"/>
+  <text class="label" x="48" y="556">FIELD NOTES</text>
+  <rect class="panel2" x="48" y="578" width="240" height="120" rx="18"/>
+  <text class="small" x="66" y="610">Latest understanding</text>
+  <text class="tiny" x="66" y="640">Aspiration becomes tragic</text>
+  <text class="tiny" x="66" y="664">when it refuses correction.</text>
+  <rect class="button" x="48" y="718" width="240" height="34" rx="13"/>
+  <text class="tiny" x="112" y="740">Open Investigation Log</text>
+
+  <line class="line" x1="48" y1="790" x2="288" y2="790"/>
+  <text class="label" x="48" y="826">CURRENT STEP</text>
+  <rect class="buttonFilled" x="48" y="850" width="240" height="42" rx="15"/>
+  <text class="darkText" x="116" y="877">READING</text>
+
+  <!-- Main center: thesis and reader -->
+  <rect class="panel" x="340" y="118" width="680" height="810" rx="28"/>
+  <rect class="panel2" x="370" y="142" width="620" height="104" rx="22"/>
+  <text class="label" x="400" y="176">THESIS / GOVERNING QUESTION</text>
+  <text class="thesis" x="400" y="214">What is the green light asking Gatsby to believe?</text>
+  <rect class="button" x="824" y="166" width="72" height="32" rx="12"/>
+  <text class="tiny" x="843" y="187">Refine</text>
+  <rect class="button" x="906" y="166" width="60" height="32" rx="12"/>
+  <text class="tiny" x="924" y="187">Fork</text>
+
+  <text class="label" x="370" y="288">READER</text>
+  <text class="tiny" x="448" y="288">The book remains center stage. Workflow changes panels, not the reading surface.</text>
+  <rect class="chip" x="786" y="268" width="94" height="30" rx="12"/>
+  <text class="tiny" x="803" y="288">Focus Scroll</text>
+  <rect class="chip" x="890" y="268" width="90" height="30" rx="12"/>
+  <text class="tiny" x="912" y="288">Read aloud</text>
+
+  <rect class="reader" x="400" y="318" width="560" height="490" rx="12"/>
+  <text class="paperMuted" x="444" y="376">In my younger and more vulnerable years my father gave</text>
+  <text class="paperMuted" x="444" y="412">me some advice that I've been turning over in my mind</text>
+  <text class="paperMuted" x="444" y="448">ever since.</text>
+  <rect class="focus" x="430" y="482" width="500" height="112" rx="18"/>
+  <text class="paperText" x="454" y="523">“Whenever you feel like criticizing anyone,” he told</text>
+  <text class="paperText" x="454" y="559">me, “just remember that all the people in this world</text>
+  <text class="paperText" x="454" y="595">haven't had the advantages that you've had.”</text>
+  <rect class="highlight" x="452" y="632" width="382" height="34" rx="8"/>
+  <text class="paperText" x="454" y="659">Reserving judgments is a matter of infinite hope.</text>
+  <text class="paperMuted" x="444" y="714">I am still a little afraid of missing something if I forget</text>
+  <text class="paperMuted" x="444" y="750">that, as my father snobbishly suggested...</text>
+
+  <rect class="panel2" x="478" y="680" width="426" height="58" rx="20"/>
+  <text class="small" x="500" y="716">Mark as</text>
+  <rect class="chip" x="568" y="696" width="72" height="26" rx="12"/>
+  <text class="tiny" x="584" y="714">theme</text>
+  <rect class="chip" x="650" y="696" width="88" height="26" rx="12"/>
+  <text class="tiny" x="668" y="714">question</text>
+  <rect class="chip" x="748" y="696" width="78" height="26" rx="12"/>
+  <text class="tiny" x="765" y="714">tension</text>
+  <rect class="chip" x="836" y="696" width="50" height="26" rx="12"/>
+  <text class="tiny" x="852" y="714">term</text>
+
+  <rect class="popup" x="370" y="830" width="620" height="76" rx="22"/>
+  <text class="label" x="400" y="860">FIELD NOTE CAPTURE</text>
+  <text class="small" x="400" y="886">What is your current understanding?</text>
+  <text class="tiny" x="646" y="886">Toggle: pressing questions</text>
+  <rect class="buttonFilled" x="876" y="852" width="84" height="34" rx="13"/>
+  <text class="darkText" x="894" y="874">Capture</text>
+
+  <!-- Companion side chat -->
+  <rect class="panel" x="1044" y="118" width="292" height="810" rx="24"/>
+  <text class="label" x="1070" y="154">COMPANION</text>
+  <text class="text" x="1070" y="188">Inquiry side chat</text>
+  <text class="tiny" x="1070" y="216">Bound to this investigation. Proposes only.</text>
+
+  <rect class="chip" x="1070" y="242" width="108" height="30" rx="12"/>
+  <text class="tiny" x="1086" y="262">Explorer mode</text>
+  <rect class="chip" x="1190" y="242" width="82" height="30" rx="12"/>
+  <text class="tiny" x="1208" y="262">Ollama</text>
+
+  <rect class="chatAI" x="1070" y="304" width="230" height="92" rx="18"/>
+  <text class="tiny" x="1090" y="332">Companion</text>
+  <text class="small" x="1090" y="360">This passage links hope</text>
+  <text class="small" x="1090" y="383">to judgment. Mark it</text>
+  <text class="small" x="1090" y="406">as a tension?</text>
+
+  <rect class="chatUser" x="1100" y="420" width="200" height="72" rx="18"/>
+  <text class="tiny" x="1120" y="448">You</text>
+  <text class="small" x="1120" y="475">Does hope mean grace</text>
+  <text class="small" x="1120" y="498">or self-deception?</text>
+
+  <rect class="chatAI" x="1070" y="516" width="230" height="132" rx="18"/>
+  <text class="tiny" x="1090" y="544">Companion · proposal</text>
+  <text class="small" x="1090" y="572">Possible question:</text>
+  <text class="tiny" x="1090" y="598">When does hope become</text>
+  <text class="tiny" x="1090" y="622">a refusal to see clearly?</text>
+  <rect class="chip" x="1090" y="636" width="82" height="24" rx="12"/>
+  <text class="micro" x="1105" y="652">attach</text>
+  <rect class="chip" x="1182" y="636" width="78" height="24" rx="12"/>
+  <text class="micro" x="1194" y="652">dismiss</text>
+
+  <line class="line" x1="1070" y1="690" x2="1300" y2="690"/>
+  <text class="label" x="1070" y="726">CAN HELP WITH</text>
+  <text class="tiny" x="1088" y="756">• ask clarifying questions</text>
+  <text class="tiny" x="1088" y="782">• propose tags or terms</text>
+  <text class="tiny" x="1088" y="808">• summarize where you are</text>
+  <text class="tiny" x="1088" y="834">• never commit evidence alone</text>
+  <rect class="panel3" x="1070" y="876" width="230" height="34" rx="13"/>
+  <text class="tiny" x="1086" y="898">Ask about selected passage...</text>
+
+  <!-- Context panel changes based on bottom workflow -->
+  <rect class="panel" x="1360" y="118" width="246" height="810" rx="24"/>
+  <text class="label" x="1386" y="154">STEP PANEL</text>
+  <text class="text" x="1386" y="188">Read tools</text>
+  <text class="tiny" x="1386" y="216">Changes when bottom cycle is clicked.</text>
+
+  <rect class="panel2" x="1386" y="250" width="194" height="100" rx="18"/>
+  <text class="small" x="1404" y="282">Current action</text>
+  <text class="tiny" x="1404" y="310">Read the corpus.</text>
+  <text class="tiny" x="1404" y="334">Mark what matters.</text>
+
+  <rect class="panel2" x="1386" y="374" width="194" height="126" rx="18"/>
+  <text class="small" x="1404" y="406">Segment tools</text>
+  <text class="tiny" x="1404" y="434">Highlight passage</text>
+  <text class="tiny" x="1404" y="460">Attach question</text>
+  <text class="tiny" x="1404" y="486">Define term</text>
+
+  <rect class="warning" x="1386" y="526" width="194" height="86" rx="14"/>
+  <text class="small" x="1404" y="556">Machine queue</text>
+  <text class="tiny" x="1404" y="584">4 pending · 1 artifact</text>
+
+  <rect class="panel2" x="1386" y="638" width="194" height="160" rx="18"/>
+  <text class="small" x="1404" y="670">Evidence status</text>
+  <text class="tiny" x="1420" y="700">• supports</text>
+  <text class="tiny" x="1420" y="726">• complicates</text>
+  <text class="tiny" x="1420" y="752">• challenges</text>
+  <text class="tiny" x="1420" y="778">• redirects</text>
+
+  <!-- Instrument Viewer right rail -->
+  <rect class="panel" x="1628" y="118" width="248" height="810" rx="24"/>
+  <text class="label" x="1654" y="154">INSTRUMENT</text>
+  <text class="text" x="1654" y="188">Run Viewer</text>
+  <text class="tiny" x="1654" y="216">Visual + Python trace.</text>
+
+  <rect class="buttonFilled" x="1654" y="242" width="88" height="32" rx="12"/>
+  <text class="darkText" x="1671" y="263">Visual</text>
+  <rect class="button" x="1750" y="242" width="88" height="32" rx="12"/>
+  <text class="tiny" x="1766" y="263">Terminal</text>
+
+  <rect class="panel3" x="1654" y="300" width="190" height="246" rx="18"/>
+  <rect class="node" x="1694" y="322" width="110" height="30" rx="12"/>
+  <text class="micro" x="1722" y="342">Source</text>
+  <line class="flowMuted" x1="1749" y1="352" x2="1749" y2="378"/>
+  <rect class="node" x="1694" y="380" width="110" height="30" rx="12"/>
+  <text class="micro" x="1716" y="400">Segment</text>
+  <line class="flow" x1="1749" y1="410" x2="1749" y2="436"/>
+  <rect class="nodeActive" x="1694" y="438" width="110" height="30" rx="12"/>
+  <text class="micro" x="1718" y="458">Observe</text>
+  <line class="flowMuted" x1="1749" y1="468" x2="1749" y2="494"/>
+  <rect class="nodeWarn" x="1680" y="496" width="138" height="30" rx="12"/>
+  <text class="micro" x="1702" y="516">Review flags</text>
+  <text class="micro" x="1684" y="538">492 obs · 31 flags</text>
+
+  <rect class="terminal" x="1654" y="570" width="190" height="266" rx="16"/>
+  <text class="terminalMuted" x="1670" y="600">[local] source.parse</text>
+  <text class="terminalText" x="1670" y="624">opened gatsby.pdf</text>
+  <text class="terminalMuted" x="1670" y="652">[local] segment.text</text>
+  <text class="terminalText" x="1670" y="676">324 paragraphs</text>
+  <text class="terminalMuted" x="1670" y="704">[local] observe.extract</text>
+  <text class="terminalText" x="1670" y="728">492 observations</text>
+  <text class="terminalWarn" x="1670" y="756">[steward] review</text>
+  <text class="terminalWarn" x="1670" y="780">31 likely artifacts</text>
+  <text class="terminalText" x="1670" y="808">[ready] Reader</text>
+
+  <rect class="button" x="1654" y="854" width="88" height="34" rx="13"/>
+  <text class="tiny" x="1673" y="876">Inspect</text>
+  <rect class="button" x="1750" y="854" width="88" height="34" rx="13"/>
+  <text class="tiny" x="1769" y="876">Pause</text>
+
+  <!-- Bottom clickable workflow cycle -->
+  <rect class="panel" x="24" y="952" width="1852" height="220" rx="24"/>
+  <text class="label" x="54" y="988">WORKFLOW CYCLE — CLICK A STEP TO CHANGE TOOLS, NOT TO MOVE THE BOOK</text>
+  <text class="small" x="54" y="1020">The Reader stays center stage. The thesis remains above it. Clicking steps changes the surrounding panels.</text>
+
+  <!-- cycle nodes -->
+  <circle class="cycleDone" cx="142" cy="1090" r="44"/>
+  <text class="whiteCycle" x="115" y="1088">Question</text>
+  <text class="micro" x="116" y="1108">compass</text>
+
+  <line class="cycleLine" x1="188" y1="1090" x2="246" y2="1090"/>
+  <circle class="cycleActive" cx="294" cy="1090" r="48"/>
+  <text class="darkCycle" x="276" y="1088">Read</text>
+  <text class="micro" x="272" y="1108" style="fill:#062019;font-weight:800;">current</text>
+
+  <line class="cycleLine" x1="344" y1="1090" x2="402" y2="1090"/>
+  <circle class="cycle" cx="450" cy="1090" r="44"/>
+  <text class="whiteCycle" x="424" y="1088">Segment</text>
+  <text class="micro" x="424" y="1108">mark text</text>
+
+  <line class="cycleLine" x1="496" y1="1090" x2="554" y2="1090"/>
+  <circle class="cycle" cx="602" cy="1090" r="44"/>
+  <text class="whiteCycle" x="590" y="1088">Ask</text>
+  <text class="micro" x="574" y="1108">questions</text>
+
+  <line class="cycleLine" x1="648" y1="1090" x2="706" y2="1090"/>
+  <circle class="cycle" cx="754" cy="1090" r="44"/>
+  <text class="whiteCycle" x="730" y="1088">Compare</text>
+  <text class="micro" x="728" y="1108">machine</text>
+
+  <line class="cycleLine" x1="800" y1="1090" x2="858" y2="1090"/>
+  <circle class="cycle" cx="906" cy="1090" r="44"/>
+  <text class="whiteCycle" x="884" y="1088">Steward</text>
+  <text class="micro" x="884" y="1108">decide</text>
+
+  <line class="cycleLine" x1="952" y1="1090" x2="1010" y2="1090"/>
+  <circle class="cycle" cx="1058" cy="1090" r="44"/>
+  <text class="whiteCycle" x="1038" y="1088">Build</text>
+  <text class="micro" x="1032" y="1108">blueprint</text>
+
+  <line class="cycleLine" x1="1104" y1="1090" x2="1162" y2="1090"/>
+  <circle class="cycle" cx="1210" cy="1090" r="44"/>
+  <text class="whiteCycle" x="1188" y="1088">Render</text>
+  <text class="micro" x="1190" y="1108">artist</text>
+
+  <line class="cycleLine" x1="1256" y1="1090" x2="1314" y2="1090"/>
+  <circle class="cycle" cx="1362" cy="1090" r="44"/>
+  <text class="whiteCycle" x="1342" y="1088">Audit</text>
+  <text class="micro" x="1340" y="1108">critic</text>
+
+  <line class="cycleLine" x1="1408" y1="1090" x2="1466" y2="1090"/>
+  <circle class="cycle" cx="1514" cy="1090" r="44"/>
+  <text class="whiteCycle" x="1494" y="1088">Trace</text>
+  <text class="micro" x="1486" y="1108">lineage</text>
+
+  <path d="M1514 1046 C1514 1002, 142 1002, 142 1046" fill="none" stroke="#497768" stroke-width="2" stroke-dasharray="6 8" marker-end="url(#arrowMuted)"/>
+  <text class="tiny" x="1598" y="1068">Cycle can repeat as the thesis changes.</text>
+  <text class="tiny" x="1598" y="1096">Clicking a node opens its tools.</text>
+  <text class="tiny" x="1598" y="1124">The book remains centered.</text>
+
+</svg>

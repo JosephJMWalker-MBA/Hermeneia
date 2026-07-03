@@ -4055,3 +4055,30 @@ Generate Audio Salon
 ```
 
 Sequencing: Generate Packet first (freeze-safe, immediate value) → Audio Salon script+diff (reuses existing Perspective/Blueprint/Artist/Critic machinery) → voices/audio rendering last.
+
+---
+
+## The Workflow-Cycle Shell — Wireframe v4 *(Design Target — 2026-07-03)*
+
+*Recorded: 2026-07-03. The target shell, preserved at `docs/design/reading_first_wireframe_v4_workflow_cycle.svg`. Joseph: "this is really what we are aiming for… but the reader much bigger, and all of the features and navigation for pipeline being like options with settings controls."*
+
+### The shell
+
+- **Reader center stage, warm paper, Focus Scroll** — with the governing question above it ("Refine" / "Fork" actions on the thesis card). Joseph's amendment to v4: the reader even bigger than drawn; pipeline features live as *options with settings controls*, not navigation.
+- **Bottom: the clickable workflow cycle** — `Question → Read → Segment → Ask → Compare → Steward → Build → Render → Audit → Trace` — with the load-bearing rule in the wireframe's own words: **"CLICK A STEP TO CHANGE TOOLS, NOT TO MOVE THE BOOK."** Clicking a cycle node swaps the surrounding panels (the Step Panel); the book never leaves center. The cycle repeats as the thesis changes.
+- **Left rail: Session / Record / Field Notes / Current Step** — the Investigation Status panel (issue #9) in its final position.
+- **Companion side chat** — "bound to this investigation; proposes only," with attach/dismiss chips on its proposals (proposals become record only through the reader's hand). Joseph's framing: *like Clippy, but smarter and connected to the lineage of the project* — see issue #10's Project Lineage / Constitutional Memory comment.
+- **Instrument Run Viewer right rail** (issue #19) — Visual + Terminal registers of the local pipeline's work, including steward flags ("492 obs · 31 likely artifacts").
+- **Field Note capture as the Reader's footer** ("What is your current understanding?" / toggle: pressing questions) — confirmed by the follow-up direction: Field Notes is a footnote tray at the bottom of the Reader, where the keyboard naturally lives on mobile and the same orientation on desktop (routed to Codex against issue #12).
+
+### Companion direction (routed to #10)
+
+Project Lineage (UI) / Constitutional Memory (doctrine): durable memory of the project's own development decisions with provenance — the recursion made explicit: *Hermeneia is built through governed interpretation, therefore it preserves the lineage of its own becoming.* Same constitutional discipline as the shipped Companion: memory used is disclosed, scope is user-controlled, lineage inspectable; never omniscient, silent, pretending, or auto-committing.
+
+### Machine observations as page brief + lens (routed to Codex against #12)
+
+"The machine thinks these may matter on this page" — an accordion brief *above* the page, read-then-decide (approve / edit / question / reject / boilerplate / defer), plus an optional **Machine Auto Highlight lens** showing machine-observed segments inline, subtle and non-destructive, always off-able, visually distinct from human highlights. Copy rule: *"Hermeneia noticed these possible points of attention. Read the page yourself, then approve, edit, question, or reject them."* The machine points; the human decides.
+
+### In-app model management (filed as issue #29)
+
+Live Jetson finding (local model name mismatch, fixed by `ollama pull llama3.2:3b` over SSH) → models should be installable/selectable from the UI as **governed commands, never a terminal**: whitelisted verbs, validated model names, streamed visible output (the Run Viewer pattern), local-machine disclosure.
