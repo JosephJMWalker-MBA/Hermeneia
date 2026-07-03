@@ -73,7 +73,53 @@ body.x .ho { display: none !important; }
   text-transform: uppercase;
   flex-shrink: 0;
 }
-.nav-right { display: flex; align-items: center; gap: 4px; }
+.nav-right { display: flex; align-items: center; gap: 8px; }
+
+.reader-home-btn {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 64%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.reader-home-btn:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: var(--accent);
+}
+.reader-home-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #03110d;
+}
+.return-reader-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 86;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 72%, transparent);
+  background: rgba(10, 16, 14, .94);
+  box-shadow: 0 12px 28px rgba(0,0,0,.38);
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+.return-reader-fab:hover {
+  background: color-mix(in srgb, var(--accent) 16%, rgba(10,16,14,.94));
+}
+.return-reader-fab.hidden { display: none; }
 
 .nav-cycle-wrap {
   position: absolute;
@@ -919,7 +965,7 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 .reader-action:hover { color: var(--accent); border-color: var(--accent); }
 /* ── Close Reading Workspace ─────────────────────────── */
 .cr-layout {
-  display: grid; grid-template-columns: minmax(0,1fr) 300px;
+  display: grid; grid-template-columns: minmax(520px,1fr) minmax(280px,340px);
   gap: 20px; align-items: start;
 }
 .cr-doc-picker {
@@ -945,6 +991,8 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   border: 1px solid var(--border); border-radius: var(--r);
   background: var(--surface); padding: 28px 32px;
   min-height: 400px; user-select: text; cursor: text;
+  max-width: 860px;
+  margin: 0 auto;
 }
 .cr-page-header {
   font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
@@ -953,11 +1001,141 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 .cr-page-region {
   font-size: 10px; color: var(--dim2); font-family: var(--mono);
   text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px;
+  user-select: none;
 }
 .cr-page-text {
   font-size: 16px; line-height: 1.85; color: var(--fg);
   white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 20px;
 }
+.cr-text-block {
+  position: relative;
+  padding-top: 18px;
+}
+.cr-block-capture {
+  position: absolute;
+  right: 0;
+  top: -6px;
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  background: rgba(10,10,10,.72);
+  color: var(--dim2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  padding: 3px 9px;
+  opacity: .72;
+}
+.cr-text-block:hover .cr-block-capture,
+.cr-block-capture:focus {
+  opacity: 1;
+  border-color: var(--accent);
+  color: var(--accent);
+  outline: none;
+}
+.cr-inline-highlight {
+  background: rgba(90, 255, 205, .16);
+  border-bottom: 1px solid rgba(90, 255, 205, .55);
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 1px 2px;
+}
+.cr-inline-highlight.important {
+  background: rgba(255, 202, 92, .22);
+  border-bottom-color: rgba(255, 202, 92, .72);
+}
+.cr-inline-highlight.candidate {
+  background: rgba(111, 176, 207, .18);
+  border-bottom-color: rgba(111, 176, 207, .72);
+}
+.cr-tag-chip {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border2);
+  color: var(--dim2);
+  font-size: 9px;
+  letter-spacing: .04em;
+}
+.cr-important-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: var(--fg2);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.cr-important-row input { margin-top: 2px; }
+
+/* ── Focus Scroll (issue #16) — attention-guided reading ─────────────
+   The current paragraph clarifies and brightens as it enters the focus
+   zone; surrounding text recedes. Not decoration: the page teaches the
+   reader to attend here and move one meaningful segment at a time. */
+.cr-page-view.focus-scroll {
+  background: #050706;
+  border-color: rgba(90, 255, 205, 0.10);
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px clamp(16px, 4vw, 40px) 22vh;
+}
+.cr-page-view.focus-scroll .cr-page-text {
+  --focus: 0;
+  font-size: clamp(1.05rem, 1.6vw, 1.35rem);
+  line-height: 1.85;
+  margin-bottom: 1.75rem;
+  color: color-mix(
+    in srgb,
+    rgba(90, 255, 205, 0.34) calc((1 - var(--focus)) * 100%),
+    rgba(248, 255, 252, 0.96) calc(var(--focus) * 100%)
+  );
+  text-shadow: 0 0 calc(var(--focus) * 18px) rgba(80, 255, 210, 0.18);
+  opacity: calc(0.38 + (var(--focus) * 0.62));
+  transform: translateY(calc((1 - var(--focus)) * 5px));
+  transition: color 420ms ease, opacity 420ms ease,
+              text-shadow 420ms ease, transform 420ms ease;
+}
+.cr-page-view.focus-scroll .cr-page-region { opacity: 0.35; }
+.cr-page-view.focus-scroll.warm {
+  background: #1b130b;
+  border-color: rgba(255, 180, 80, 0.12);
+}
+.cr-page-view.focus-scroll.warm .cr-page-text {
+  color: color-mix(
+    in srgb,
+    rgba(255, 178, 80, 0.38) calc((1 - var(--focus)) * 100%),
+    rgba(255, 245, 218, 0.96) calc(var(--focus) * 100%)
+  );
+  text-shadow: 0 0 calc(var(--focus) * 16px) rgba(255, 180, 80, 0.14);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cr-page-view.focus-scroll .cr-page-text { transition: none; transform: none; }
+}
+.fs-pill {
+  background: none; border: 1px solid var(--border); border-radius: 20px;
+  color: var(--dim2); cursor: pointer; font: inherit; font-size: 11px;
+  padding: 4px 12px; white-space: nowrap;
+}
+.fs-pill.fs-on { border-color: var(--accent); color: var(--accent); }
+
+/* ── Rich highlight interaction (issue #21) ──────────────────────────
+   The passage being captured stays marked until saved or cancelled —
+   no DOM mutation of the reading text (CSS Custom Highlight API). */
+::highlight(hermeneia-pending) {
+  background-color: rgba(80, 255, 210, 0.26);
+  color: inherit;
+}
+.cr-concept-chip {
+  display: inline-block; margin-left: 6px; padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 20px; font-size: 10px; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+/* Provenance locators are stored with every capture but stay out of the
+   reading text unless the researcher register asks for them. */
+.cr-page-view .cr-page-region { display: none; }
+.cr-page-view.show-regions .cr-page-region { display: block; }
 .cr-nav-bar {
   display: flex; align-items: center; gap: 10px; margin-top: 18px;
 }
@@ -1033,18 +1211,46 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   background: #2a220a; border: 1px solid #e0a800; border-radius: var(--r);
   padding: 8px 12px; font-size: 12px; color: #e0a800; margin-bottom: 14px;
 }
-/* selection toolbar */
+/* passage-attached capture surface */
 .cr-sel-toolbar {
   position: fixed; z-index: 9999;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r); box-shadow: 0 4px 16px rgba(0,0,0,.4);
-  padding: 6px 8px; display: flex; gap: 6px; align-items: center;
+  padding: 8px; display: flex; gap: 6px; align-items: center;
+  max-width: calc(100vw - 24px);
+}
+.cr-sel-toolbar.capture-open {
+  width: min(390px, calc(100vw - 24px));
+  padding: 12px;
+  display: block;
 }
 .cr-sel-btn {
   padding: 4px 10px; border-radius: 3px; border: 1px solid var(--border2);
   background: var(--bg); color: var(--fg2); cursor: pointer; font: inherit; font-size: 11px;
 }
 .cr-sel-btn:hover { border-color: var(--accent); color: var(--accent); }
+.cr-sel-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.cr-selection-preview {
+  font-size: 12px; color: var(--fg);
+  background: var(--accent2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 9px 10px;
+  line-height: 1.55;
+  max-height: 90px;
+  overflow: auto;
+  font-style: italic;
+}
+.cr-capture-help {
+  font-size: 11px;
+  color: var(--dim2);
+  line-height: 1.45;
+  margin-top: 8px;
+}
+@media (max-width: 980px) {
+  .cr-layout { grid-template-columns: 1fr; }
+  .cr-side { position: static; }
+}
 /* ── Investigation Setup ─────────────────────────────── */
 .setup-wrap { max-width: 640px; }
 .setup-preamble { font-size: 14px; color: var(--fg2); line-height: 1.75; margin-bottom: 28px; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); }
@@ -1586,12 +1792,15 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
     </div>
   </div>
   <div class="nav-right">
+    <button class="reader-home-btn" id="reader-home-btn" onclick="e10Go('reader')" title="Return to the book">Read</button>
     <button class="nav-btn" onclick="e10Go('guide')" style="font-size:13px">Guide</button>
     <button class="nav-btn" onclick="e10Go('constitution')" style="font-size:13px">Constitution</button>
     <button class="nav-btn" onclick="e10Go('lineage')" style="font-size:13px">Lineage</button>
     <button class="expert-btn" onclick="toggleExpert()">⚙ Connections</button>
   </div>
 </nav>
+
+<button class="return-reader-fab hidden" id="return-reader-fab" onclick="e10Go('reader')">Return to Reading</button>
 
 <div class="stage-nav-bar" id="stage-nav-bar">
   <button class="stage-nav-arrow" id="stage-nav-prev" onclick="stageNavStep(-1)">
@@ -1898,6 +2107,15 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) a11yS
   try {
     mount(await get('/api/health'));
   } catch(e) {
+    // A missing database is not an error — it is a fresh environment.
+    // Route to first-run onboarding instead of a dead screen.
+    try {
+      const s = await get('/api/setup/state');
+      if (!s.database_exists) {
+        mount({ document: { filename: null }, _noDatabase: true });
+        return;
+      }
+    } catch {}
     document.getElementById('root').innerHTML =
       `<div style="color:var(--red);padding:80px 0">${e.message}</div>`;
   }
@@ -1937,6 +2155,11 @@ function mount(h) {
 <section class="section xo" id="provider-settings">
   <div class="sec-label">Connections — Providers</div>
   <div id="provider-panel" class="e10-empty">Loading provider status...</div>
+</section>
+
+<section class="section e10-screen" id="firstrun">
+  <div class="sec-label">Welcome</div>
+  <div id="firstrun-panel"></div>
 </section>
 
 <section class="section e10-screen" id="setup">
@@ -2134,29 +2357,130 @@ function mount(h) {
   });
   ttsInit();
   updatePageThesis();
-  e10LoadObservations();
-  e10LoadFindings();
-  e10LoadResearchBanner();
-  // Fetch pipeline statuses for the nav mini cycle, then navigate
-  const bootDest = _bootDestination(h);
-  refreshEditionCycleCount().then(() =>
-    refreshNavCycleStatuses().then(() => updateNavCycle(bootDest))
-  );
-  e10Go(bootDest);
+  if (!h._noDatabase) {
+    // Data loaders 404 against a fresh environment — skip until the
+    // workspace exists.
+    e10LoadObservations();
+    e10LoadFindings();
+    e10LoadResearchBanner();
+    refreshEditionCycleCount().then(() =>
+      refreshNavCycleStatuses().then(() => updateNavCycle(_bootDestination(h)))
+    );
+  }
+  e10Go(_bootDestination(h));
 }
 
 // First-run routing: read before declare. Returning users (a saved
 // question exists) land on the dashboard; a fresh visitor with a corpus
-// lands in the Reader; with no corpus, on upload. If document state is
-// uncertain, fall back to the pre-existing behavior (Setup).
+// lands in the Reader; a fresh environment (no database or no documents)
+// lands on first-run onboarding — the UI stewards the first act of
+// inquiry; nobody should need SSH, Flask, SQLite, or pipeline scripts
+// to begin. If document state is uncertain, fall back to Setup.
 function _bootDestination(h) {
   try {
+    if (h && h._noDatabase) return 'firstrun';
     if (invLoad()) return 'onboarding';
     if (h && h.document && typeof h.document === 'object') {
-      return h.document.filename ? 'reader' : 'corpus';
+      return h.document.filename ? 'reader' : 'firstrun';
     }
   } catch {}
   return 'setup';
+}
+
+// ── First-run onboarding (issue #20) ───────────────────
+async function e10LoadFirstRun() {
+  const host = document.getElementById('firstrun-panel');
+  if (!host) return;
+  host.innerHTML = '<div class="e10-empty">Checking this environment…</div>';
+  const s = await get('/api/setup/state').catch(() => null);
+  if (!s) {
+    host.innerHTML = '<div class="e10-empty" style="color:var(--red)">The server is not reachable.</div>';
+    return;
+  }
+
+  const step = (n, title, body, done) => `
+    <div style="display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--border)">
+      <div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                  font-size:12px;font-weight:700;${done
+                    ? 'background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent);border:1px solid var(--accent)'
+                    : 'background:var(--bg2);color:var(--dim2);border:1px solid var(--border)'}">${done ? '✓' : n}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--fg);margin-bottom:4px">${title}</div>
+        <div style="font-size:13px;color:var(--fg2);line-height:1.65">${body}</div>
+      </div>
+    </div>`;
+
+  host.innerHTML = `
+    <div style="max-width:640px">
+      <div style="font-size:15px;color:var(--fg2);line-height:1.7;margin-bottom:6px">
+        Hermeneia is not the invention of interpretation — it formalizes an ancient human practice:
+        reading a source, preserving what you notice, testing interpretations, and tracing every
+        conclusion back to its evidence. <strong style="color:var(--fg)">People have always interpreted.
+        Hermeneia makes the process visible.</strong>
+      </div>
+      <div style="font-size:12px;color:var(--dim2);line-height:1.6;margin-bottom:10px">
+        Everything you create lives in a local database, separate from the application —
+        updates change how Hermeneia looks, never your investigation record.<br>
+        Workspace location: <span style="font-family:var(--mono);font-size:11px">${x(s.db_path)}</span>
+      </div>
+
+      ${step(1, 'Create your workspace',
+        s.database_exists
+          ? 'Your workspace exists and is ready.'
+          : `No workspace database exists here yet. <br>
+             <button class="btn-primary" style="margin-top:8px;padding:7px 18px" onclick="_frInit(this)">Create workspace</button>`,
+        s.database_exists)}
+
+      ${step(2, 'Bring a source worth investigating',
+        s.document_count > 0
+          ? `${s.document_count} document${s.document_count !== 1 ? 's' : ''} in the corpus.`
+          : `${s.demo_available
+              ? `<button class="btn-primary" style="padding:7px 18px;margin:6px 8px 6px 0" ${s.database_exists ? '' : 'disabled title="Create the workspace first"'}
+                   onclick="_frDemo(this)">Load the demo corpus — The Great Gatsby</button>`
+              : `<span style="color:var(--dim2)">No demo corpus is bundled with this install.</span><br>`}
+             <button class="btn-trace" style="padding:7px 18px;margin-top:6px" ${s.database_exists ? '' : 'disabled title="Create the workspace first"'}
+               onclick="e10Go('corpus')">Upload your own PDF →</button>
+             <div style="font-size:11px;color:var(--dim2);margin-top:8px">Uploading runs the full extraction pipeline:
+             the text becomes preserved, immutable observations you can read, search, and interpret.</div>`,
+        s.document_count > 0)}
+
+      ${step(3, 'Read, and let a question form',
+        `Open the Reader and read the text directly. Highlight what catches your eye — everything you
+         notice is kept. When you're ready, name what you're trying to understand. You can bring a
+         question with you, or read until one forms.
+         ${s.document_count > 0 ? `<br><button class="btn-primary" style="margin-top:8px;padding:7px 18px" onclick="e10Go('reader')">Open the Reader →</button>` : ''}`,
+        false)}
+    </div>`;
+}
+
+async function _frInit(btn) {
+  btn.setAttribute('disabled', 'disabled');
+  btn.textContent = 'Creating…';
+  try {
+    const resp = await fetch('/api/setup/init', { method: 'POST' });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || 'init failed');
+    e10LoadFirstRun();
+  } catch (e) {
+    showAppError(e.message);
+    btn.removeAttribute('disabled');
+    btn.textContent = 'Create workspace';
+  }
+}
+
+async function _frDemo(btn) {
+  btn.setAttribute('disabled', 'disabled');
+  btn.textContent = 'Compiling the demo corpus — this runs the full extraction pipeline and can take a minute…';
+  try {
+    const resp = await fetch('/api/setup/demo', { method: 'POST' });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || 'demo compile failed');
+    window.location.reload();
+  } catch (e) {
+    showAppError(e.message);
+    btn.removeAttribute('disabled');
+    btn.textContent = 'Load the demo corpus — The Great Gatsby';
+  }
 }
 
 // ── Research Question Banner ───────────────────────────
@@ -4505,6 +4829,14 @@ function updateNavCycle(activeId, statuses) {
   }
 }
 
+function _updateReaderReturnUI(activeId) {
+  const readBtn = document.getElementById('reader-home-btn');
+  const fab = document.getElementById('return-reader-fab');
+  const onReader = activeId === 'reader';
+  readBtn?.classList.toggle('active', onReader);
+  if (fab) fab.classList.toggle('hidden', onReader);
+}
+
 function e10Go(id, scrollTarget) {
   _expert = false;
   document.body.classList.remove('x');
@@ -4519,6 +4851,7 @@ function e10Go(id, scrollTarget) {
   updateNavCycle(id);
   refreshNavCycleStatuses().then(() => updateNavCycle(id));
   _updateStageNavBar(id);
+  _updateReaderReturnUI(id);
   if (scrollTarget) {
     requestAnimationFrame(() => {
       const el = typeof scrollTarget === 'string' ? document.getElementById(scrollTarget) : scrollTarget;
@@ -4527,6 +4860,7 @@ function e10Go(id, scrollTarget) {
   } else {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+  if (id === 'firstrun')   e10LoadFirstRun();
   if (id === 'setup')      e10LoadSetup();
   if (id === 'onboarding') e10LoadOnboarding();
   if (id === 'corpus')    { e10LoadDocumentScope(); renderScopeBannerInto('research-question-banner'); }
@@ -5237,6 +5571,27 @@ let _crHighlights = [];
 let _crSelText = '';
 let _crSelToolbar = null;
 let _crRelevance = 'unclear';
+let _crSelRange = null;   // cloned Range of the pending selection
+let _crConcept = '';      // concept name when capturing via the Concept action
+let _crCaptureOpen = false;
+let _crSelectionRect = null;
+
+// The passage being captured stays visibly marked while the inspector
+// form is open — the selection is never lost mid-thought. Uses the CSS
+// Custom Highlight API (no DOM mutation of the reading text); browsers
+// without it keep the native selection instead.
+function _crMarkPending() {
+  try {
+    if (window.CSS?.highlights && _crSelRange) {
+      CSS.highlights.set('hermeneia-pending', new Highlight(_crSelRange));
+    }
+  } catch {}
+}
+function _crClearPending() {
+  try { window.CSS?.highlights?.delete('hermeneia-pending'); } catch {}
+  window.getSelection()?.removeAllRanges();
+  _crSelRange = null;
+}
 
 async function e10LoadCloseReader() {
   const ws = document.getElementById('reader-workspace');
@@ -5253,6 +5608,8 @@ async function e10LoadCloseReader() {
     _crRenderDocPicker(ws);
     _crMaybeShowReaderBanner(ws);
     _crRenderQuestionCard();
+    _flnRender();
+    _cmpRender();
     await _crOpenDoc(primary.id);
   } catch(e) {
     ws.innerHTML = `<div class="e10-empty" style="color:var(--red)">Error loading corpus: ${x(e.message)}</div>`;
@@ -5287,6 +5644,272 @@ function _crDismissReaderBanner() {
 // The question card. Always present, quiet, static — the ask follows the
 // noticing. The only adaptive display is the highlight count, which the
 // user can already see in their own trail; there is no readiness scoring.
+// ── Investigation Log / Field Notes (issue #18) ────────
+// Append-only snapshots of evolving understanding, in two lanes:
+// 'corpus' (what I am learning about the text) and 'instrument'
+// (what I am learning about Hermeneia while using it). A gentle,
+// dismissible footer prompt appears after reading activity — an
+// attention-stewardship pattern, never a nag: fixed disclosed rule,
+// snoozable, and it only ever points here.
+let _flnLane = 'corpus';
+let _flnActivity = 0;                 // reading actions since last prompt/entry
+const _FLN_ACTIVITY_THRESHOLD = 6;    // page turns + saves before the prompt may appear
+const _FLN_MIN_INTERVAL_MS = 8 * 60 * 1000;
+
+function _flnLastMark() {
+  try { return parseInt(localStorage.getItem('hermeneia_fieldnotes_last') || '0', 10); } catch { return 0; }
+}
+function _flnMark() {
+  try { localStorage.setItem('hermeneia_fieldnotes_last', String(Date.now())); } catch {}
+  _flnActivity = 0;
+}
+
+function flnSetLane(lane) {
+  _flnLane = lane === 'instrument' ? 'instrument' : 'corpus';
+  document.querySelectorAll('.fln-lane').forEach(b =>
+    b.classList.toggle('fs-on', b.dataset.lane === _flnLane));
+}
+
+async function _flnRender() {
+  const panel = document.getElementById('cr-fieldnotes-panel');
+  if (!panel) return;
+  panel.innerHTML = `
+    <div class="cr-side-title">Field Notes</div>
+    <div style="display:flex;gap:4px;margin-bottom:8px">
+      <button class="fs-pill fln-lane fs-on" data-lane="corpus" onclick="flnSetLane('corpus')"
+        title="What I am learning about the text">About the text</button>
+      <button class="fs-pill fln-lane" data-lane="instrument" onclick="flnSetLane('instrument')"
+        title="What I am learning about Hermeneia while using it">About Hermeneia</button>
+    </div>
+    <div class="cr-form-label">What is your current understanding?</div>
+    <textarea id="fln-understanding" rows="3" placeholder="Pause for a moment. What has the reading helped you understand so far?"
+      style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:12px;line-height:1.6;padding:7px 9px;resize:vertical;margin:4px 0 8px"></textarea>
+    <div class="cr-form-label">What are your most pressing questions? <span style="color:var(--dim2);font-weight:400">(optional)</span></div>
+    <textarea id="fln-questions" rows="2" placeholder="What do you need to investigate next?"
+      style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:12px;line-height:1.6;padding:7px 9px;resize:vertical;margin:4px 0 8px"></textarea>
+    <button class="btn-primary" id="fln-save" style="width:100%;padding:6px" onclick="flnSave()">Keep this entry</button>
+    <div id="fln-entries" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto"></div>`;
+  _flnLoadEntries();
+}
+
+async function _flnLoadEntries() {
+  const host = document.getElementById('fln-entries');
+  if (!host) return;
+  try {
+    const d = await get('/api/investigation-log?limit=12');
+    const entries = d.entries || [];
+    if (!entries.length) {
+      host.innerHTML = '<div style="font-size:11px;color:var(--dim2)">No entries yet. Your understanding, as it forms, belongs in the record too.</div>';
+      return;
+    }
+    host.innerHTML = entries.map(e => `
+      <div style="border-left:2px solid ${e.lane === 'instrument' ? 'var(--yellow,#f4c542)' : 'var(--accent)'};padding-left:8px">
+        <div style="font-size:10px;color:var(--dim2);margin-bottom:2px">
+          ${e.lane === 'instrument' ? 'About Hermeneia' : 'About the text'}
+          · ${x((e.created_at || '').slice(0, 16).replace('T', ' '))}${e.page ? ` · p.${e.page}` : ''}
+        </div>
+        ${e.understanding ? `<div style="font-size:12px;color:var(--fg2);line-height:1.5">${x(e.understanding.slice(0, 220))}${e.understanding.length > 220 ? '…' : ''}</div>` : ''}
+        ${e.pressing_questions ? `<div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-top:3px">? ${x(e.pressing_questions.slice(0, 160))}${e.pressing_questions.length > 160 ? '…' : ''}</div>` : ''}
+      </div>`).join('');
+  } catch (err) {
+    host.innerHTML = `<div style="font-size:11px;color:var(--red)">${x(err.message)}</div>`;
+  }
+}
+
+async function flnSave() {
+  const uEl = document.getElementById('fln-understanding');
+  const qEl = document.getElementById('fln-questions');
+  const understanding = uEl?.value.trim() || '';
+  const pressing = qEl?.value.trim() || '';
+  if (!understanding && !pressing) { uEl?.focus(); return; }
+  const btn = document.getElementById('fln-save');
+  btn?.setAttribute('disabled', 'disabled');
+  try {
+    const resp = await fetch('/api/investigation-log', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lane: _flnLane,
+        understanding,
+        pressing_questions: pressing,
+        source_document_id: _crDocId || null,
+        page: _crPage || null,
+        governing_question: invLoad()?.thesis || '',
+      }),
+    });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || 'save failed');
+    if (uEl) uEl.value = '';
+    if (qEl) qEl.value = '';
+    _flnMark();
+    _flnHidePrompt();
+    if (btn) btn.textContent = '✓ Kept';
+    setTimeout(() => { if (btn) btn.textContent = 'Keep this entry'; }, 2500);
+    _flnLoadEntries();
+  } catch (err) {
+    showAppError(err.message);
+  }
+  btn?.removeAttribute('disabled');
+}
+
+// The gentle footer. Fixed rule, fully disclosed: appears after ~6
+// reading actions and no sooner than 8 minutes since the last entry
+// or prompt. It never blocks reading and never returns after "Later"
+// until the rule is satisfied again.
+function _flnActivityTick() {
+  _flnActivity += 1;
+  if (_flnActivity < _FLN_ACTIVITY_THRESHOLD) return;
+  if (Date.now() - _flnLastMark() < _FLN_MIN_INTERVAL_MS) return;
+  if (document.querySelector('.e10-screen.active')?.id !== 'reader') return;
+  _flnShowPrompt();
+}
+
+function _flnShowPrompt() {
+  if (document.getElementById('fln-footer')) return;
+  const bar = document.createElement('div');
+  bar.id = 'fln-footer';
+  bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:60;display:flex;align-items:center;justify-content:center;gap:14px;padding:10px 16px;background:var(--surface);border-top:1px solid var(--border);font-size:13px;color:var(--fg2)';
+  bar.innerHTML = `
+    <span>What is your current understanding?</span>
+    <button class="fs-pill fs-on" onclick="_flnOpenFromPrompt()">Write it down</button>
+    <button class="fs-pill" onclick="_flnSnooze()">Later</button>`;
+  document.body.appendChild(bar);
+}
+
+function _flnHidePrompt() { document.getElementById('fln-footer')?.remove(); }
+function _flnSnooze() { _flnMark(); _flnHidePrompt(); }
+function _flnOpenFromPrompt() {
+  _flnHidePrompt();
+  document.getElementById('cr-fieldnotes-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => document.getElementById('fln-understanding')?.focus(), 350);
+}
+
+// ── Companion (issue #10) ──────────────────────────────
+// A reading participant beside the Reader, never replacing it. Context
+// is explicit: only checked sections are sent, and every reply reports
+// exactly what was used. Nothing said here enters the record unless the
+// reader saves it themselves. Transcript is session-only for now
+// (Witness persistence is tracked separately).
+let _cmpTranscript = [];
+let _cmpBusy = false;
+let _cmpProvider = (() => { try { return localStorage.getItem('hermeneia_companion_provider') || ''; } catch { return ''; } })();
+let _cmpFlags = (() => {
+  try { return JSON.parse(localStorage.getItem('hermeneia_companion_context') || 'null')
+        || { governing_question: true, selected_passage: true, current_page: false,
+             reading_trail: false, saved_highlights: false, page_observations: false }; }
+  catch { return { governing_question: true, selected_passage: true, current_page: false,
+                   reading_trail: false, saved_highlights: false, page_observations: false }; }
+})();
+
+const _CMP_CONTEXT_LABELS = [
+  ['selected_passage',  'Selected passage'],
+  ['current_page',      'Current page'],
+  ['governing_question','Governing question'],
+  ['reading_trail',     'Reading trail'],
+  ['saved_highlights',  'Saved highlights'],
+  ['page_observations', 'Machine observations (this page)'],
+];
+
+function cmpToggleFlag(key) {
+  _cmpFlags[key] = !_cmpFlags[key];
+  try { localStorage.setItem('hermeneia_companion_context', JSON.stringify(_cmpFlags)); } catch {}
+  _cmpRenderContextRows();
+}
+
+function _cmpRenderContextRows() {
+  const host = document.getElementById('cmp-context');
+  if (!host) return;
+  host.innerHTML = _CMP_CONTEXT_LABELS.map(([key, label]) => `
+    <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:${_cmpFlags[key] ? 'var(--fg2)' : 'var(--dim2)'};cursor:pointer;padding:2px 0">
+      <input type="checkbox" ${_cmpFlags[key] ? 'checked' : ''} onchange="cmpToggleFlag('${key}')" style="flex-shrink:0">
+      ${label}${key === 'selected_passage' && _crSelText ? ` <span style="color:var(--accent)">·</span>` : ''}
+    </label>`).join('');
+}
+
+async function _cmpRender() {
+  const panel = document.getElementById('cr-companion-panel');
+  if (!panel) return;
+  panel.innerHTML = `
+    <div class="cr-side-title" style="display:flex;justify-content:space-between;align-items:center">
+      Companion
+      <select id="cmp-provider" onchange="_cmpProvider=this.value;try{localStorage.setItem('hermeneia_companion_provider',this.value)}catch{}"
+        style="font-size:10px;padding:2px 4px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);max-width:130px"></select>
+    </div>
+    <div style="font-size:11px;color:var(--dim2);margin-bottom:6px">It knows only what you check. Nothing it says enters the record unless you save it.</div>
+    <div id="cmp-context" style="margin-bottom:8px"></div>
+    <div id="cmp-transcript" style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
+    <textarea id="cmp-input" rows="2" placeholder="Ask about what you're reading…"
+      style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:12px;line-height:1.5;padding:7px 9px;resize:vertical"></textarea>
+    <button class="btn-primary" id="cmp-ask" style="width:100%;margin-top:6px;padding:6px" onclick="cmpAsk()">Ask</button>`;
+  _cmpRenderContextRows();
+  _cmpRenderTranscript();
+
+  const sel = document.getElementById('cmp-provider');
+  if (sel) {
+    const data = await get('/api/e10/providers').catch(() => ({ providers: [] }));
+    const ready = (data.providers || []).filter(p => p.configured || p.status === 'configured');
+    sel.innerHTML = ready.map(p => `<option value="${x(p.participant)}">${x(p.label || p.participant)}</option>`).join('')
+      + `<option value="stub">Stub (no AI)</option>`;
+    if (_cmpProvider && [..._cmpProvider ? sel.options : []].some(o => o.value === _cmpProvider)) sel.value = _cmpProvider;
+    else _cmpProvider = sel.value;
+  }
+}
+
+function _cmpRenderTranscript() {
+  const host = document.getElementById('cmp-transcript');
+  if (!host) return;
+  host.innerHTML = _cmpTranscript.map(m => m.role === 'user'
+    ? `<div style="font-size:12px;color:var(--fg);line-height:1.5;border-left:2px solid var(--border);padding-left:8px">${x(m.text)}</div>`
+    : `<div style="font-size:12px;color:var(--fg2);line-height:1.6;background:var(--bg);border-radius:var(--r);padding:8px 10px">
+         ${x(m.text)}
+         <div style="font-size:10px;color:var(--dim2);margin-top:6px;border-top:1px solid var(--border);padding-top:5px">
+           ${x(m.provider)} · context used: ${m.context_used?.length ? m.context_used.map(c => x(c.summary)).join(' · ') : 'none'}
+         </div>
+       </div>`).join('')
+    + (_cmpBusy ? `<div style="font-size:11px;color:var(--dim2)">thinking…</div>` : '');
+  host.scrollTop = host.scrollHeight;
+}
+
+async function cmpAsk() {
+  const input = document.getElementById('cmp-input');
+  const message = input?.value.trim();
+  if (!message || _cmpBusy) return;
+  _cmpTranscript.push({ role: 'user', text: message });
+  _cmpBusy = true;
+  input.value = '';
+  document.getElementById('cmp-ask')?.setAttribute('disabled', 'disabled');
+  _cmpRenderTranscript();
+  try {
+    const resp = await fetch('/api/companion/ask', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: _cmpProvider || 'stub',
+        message,
+        document_id: _crDocId,
+        page: _crPage,
+        context_flags: _cmpFlags,
+        selected_text: _cmpFlags.selected_passage ? (_crSelText || '') : '',
+        governing_question_text: _cmpFlags.governing_question ? (invLoad()?.thesis || '') : '',
+      }),
+    });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || 'Companion unavailable');
+    _cmpTranscript.push({ role: 'companion', text: d.reply, provider: d.provider, context_used: d.context_used });
+  } catch (e) {
+    _cmpTranscript.push({ role: 'companion', text: `⚠ ${e.message}`, provider: 'error', context_used: [] });
+  }
+  _cmpBusy = false;
+  document.getElementById('cmp-ask')?.removeAttribute('disabled');
+  _cmpRenderTranscript();
+}
+
+function _crAskCompanion() {
+  _crHideToolbar();
+  if (!_cmpFlags.selected_passage) cmpToggleFlag('selected_passage');
+  _cmpRenderContextRows();
+  document.getElementById('cr-companion-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  setTimeout(() => document.getElementById('cmp-input')?.focus(), 300);
+}
+
 function _crRenderQuestionCard(editing = false) {
   const panel = document.getElementById('cr-question-panel');
   if (!panel) return;
@@ -5336,6 +5959,56 @@ function _crKeepQuestion() {
   _crRenderQuestionCard();
 }
 
+// ── Focus Scroll (issue #16) ───────────────────────────
+// Attention-guided reading: score each text block by distance from the
+// focus zone (42% viewport height) and drive --focus. On by default;
+// the reader owns the toggle and the theme, both persisted.
+let _fsEnabled = (() => { try { return localStorage.getItem('hermeneia_focus_scroll') !== 'off'; } catch { return true; } })();
+let _fsTheme   = (() => { try { return localStorage.getItem('hermeneia_reader_theme') === 'warm' ? 'warm' : 'dark'; } catch { return 'dark'; } })();
+let _fsListening = false;
+
+function _fsUpdateFocus() {
+  const view = document.getElementById('cr-page-view');
+  if (!view || !view.classList.contains('focus-scroll')) return;
+  const viewportCenter = window.innerHeight * 0.42;
+  const maxDistance = window.innerHeight * 0.42;
+  view.querySelectorAll('.cr-page-text').forEach(p => {
+    const rect = p.getBoundingClientRect();
+    const center = rect.top + rect.height / 2;
+    const focus = Math.max(0, 1 - Math.abs(center - viewportCenter) / maxDistance);
+    p.style.setProperty('--focus', focus.toFixed(3));
+  });
+}
+
+function _fsApply() {
+  const view = document.getElementById('cr-page-view');
+  if (!view) return;
+  view.classList.toggle('focus-scroll', _fsEnabled);
+  view.classList.toggle('warm', _fsEnabled && _fsTheme === 'warm');
+  if (!_fsListening) {
+    window.addEventListener('scroll', _fsUpdateFocus, { passive: true });
+    window.addEventListener('resize', _fsUpdateFocus);
+    _fsListening = true;
+  }
+  if (_fsEnabled) requestAnimationFrame(_fsUpdateFocus);
+  const t1 = document.getElementById('fs-toggle');
+  const t2 = document.getElementById('fs-theme');
+  if (t1) { t1.classList.toggle('fs-on', _fsEnabled); t1.textContent = `◐ Focus Scroll ${_fsEnabled ? 'On' : 'Off'}`; }
+  if (t2) { t2.style.display = _fsEnabled ? '' : 'none'; t2.textContent = _fsTheme === 'warm' ? '☀ Paper' : '● Dark'; }
+}
+
+function fsToggle() {
+  _fsEnabled = !_fsEnabled;
+  try { localStorage.setItem('hermeneia_focus_scroll', _fsEnabled ? 'on' : 'off'); } catch {}
+  _fsApply();
+}
+
+function fsThemeToggle() {
+  _fsTheme = _fsTheme === 'warm' ? 'dark' : 'warm';
+  try { localStorage.setItem('hermeneia_reader_theme', _fsTheme); } catch {}
+  _fsApply();
+}
+
 function _crRenderDocPicker(ws) {
   const pills = _crDocs.map(d => {
     const roleClass = `cr-role-${d.source_role || 'primary'}`;
@@ -5347,7 +6020,11 @@ function _crRenderDocPicker(ws) {
     </button>`;
   }).join('');
   ws.innerHTML = `
-    <div class="cr-doc-picker" id="cr-doc-picker">${pills}</div>
+    <div class="cr-doc-picker" id="cr-doc-picker">${pills}
+      <span style="flex:1"></span>
+      <button class="fs-pill" id="fs-toggle" onclick="fsToggle()" title="The current paragraph brightens as it enters your focus zone; surrounding text recedes.">◐ Focus Scroll</button>
+      <button class="fs-pill" id="fs-theme" onclick="fsThemeToggle()" title="Switch between dark reading and warm paper reading.">● Dark</button>
+    </div>
     <div class="cr-layout">
       <div>
         <div id="cr-role-warning"></div>
@@ -5371,6 +6048,8 @@ function _crRenderDocPicker(ws) {
           <div id="cr-trail-detail" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px"></div>
         </div>
         <div class="cr-side-panel" id="cr-question-panel"></div>
+        <div class="cr-side-panel" id="cr-fieldnotes-panel"></div>
+        <div class="cr-side-panel" id="cr-companion-panel"></div>
         <div class="cr-side-panel" id="cr-capture-panel">
           <div class="cr-side-title">Highlight Inspector</div>
           <div id="cr-sel-prompt" style="font-size:12px;color:var(--dim2);line-height:1.6">
@@ -5395,6 +6074,7 @@ function _crRenderDocPicker(ws) {
 
   // Selection listener
   document.getElementById('cr-page-view').addEventListener('mouseup', _crHandleSelection);
+  document.removeEventListener('selectionchange', _crHandleSelectionChange);
   document.addEventListener('selectionchange', _crHandleSelectionChange);
 }
 
@@ -5402,6 +6082,10 @@ async function _crOpenDoc(docId) {
   _crDocId = docId;
   _crPage  = 1;
   _crSelText = '';
+  _crCaptureOpen = false;
+  _crHideToolbar(true);
+  _crClearPending();
+  _crSelectionRect = null;
 
   // Highlight active picker button
   document.querySelectorAll('.cr-doc-btn').forEach(b => b.classList.remove('active'));
@@ -5430,12 +6114,63 @@ async function _crOpenDoc(docId) {
     const docMeta = _crDocs.find(d => d.id === docId);
     if (docMeta?.last_page) _crPage = docMeta.last_page;
 
-    _crRenderPage();
     await _crLoadHighlightList();
+    _crRenderPage();
     _crRefreshTrail();
   } catch(e) {
     view.innerHTML = `<div class="e10-empty" style="color:var(--red)">Error: ${x(e.message)}</div>`;
   }
+}
+
+function _crHighlightTags(h) {
+  return Array.isArray(h?.tags) ? h.tags.filter(t => typeof t === 'string') : [];
+}
+
+function _crInlineHighlightClass(h) {
+  const tags = _crHighlightTags(h);
+  const parts = ['cr-inline-highlight'];
+  if (tags.includes('important')) parts.push('important');
+  if (h?.status === 'observation_candidate' || h?.status === 'promoted_to_observation') parts.push('candidate');
+  return parts.join(' ');
+}
+
+function _crRenderTextWithHighlights(text, highlights) {
+  if (!text) return '';
+  const active = (highlights || []).filter(h =>
+    h && h.status !== 'dismissed' && typeof h.selected_text === 'string' && h.selected_text.trim().length
+  );
+  if (active.length === 0) return x(text);
+
+  const ranges = [];
+  active.forEach(h => {
+    const selected = h.selected_text;
+    let start = text.indexOf(selected);
+    while (start >= 0) {
+      const end = start + selected.length;
+      const overlaps = ranges.some(r => start < r.end && end > r.start);
+      if (!overlaps) {
+        ranges.push({ start, end, highlight: h });
+        break;
+      }
+      start = text.indexOf(selected, start + 1);
+    }
+  });
+  if (ranges.length === 0) return x(text);
+
+  ranges.sort((a, b) => a.start - b.start || a.end - b.end);
+  let cursor = 0;
+  let html = '';
+  ranges.forEach(r => {
+    html += x(text.slice(cursor, r.start));
+    const titleParts = [`p.${r.highlight.page || '?'}`];
+    if (r.highlight.relevance) titleParts.push(r.highlight.relevance);
+    if (_crHighlightTags(r.highlight).includes('important')) titleParts.push('important');
+    if (r.highlight.status === 'observation_candidate') titleParts.push('observation candidate');
+    html += `<span class="${_crInlineHighlightClass(r.highlight)}" data-highlight-id="${x(r.highlight.id || '')}" title="${x(titleParts.join(' · '))}">${x(text.slice(r.start, r.end))}</span>`;
+    cursor = r.end;
+  });
+  html += x(text.slice(cursor));
+  return html;
 }
 
 function _crRenderPage() {
@@ -5445,9 +6180,13 @@ function _crRenderPage() {
   if (!pageData) {
     view.innerHTML = `<div class="e10-empty">No extracted text for page ${_crPage}.</div>`;
   } else {
-    const blocks = (pageData.extractions || []).map(ex =>
-      `<div class="cr-page-region">${x(ex.region || '')} ${ex.source_locator ? '· ' + x(ex.source_locator) : ''}</div>
-       <div class="cr-page-text">${x(ex.text)}</div>`
+    const pageHighlights = (_crHighlights || []).filter(h => Number(h.page || 0) === Number(_crPage));
+    const blocks = (pageData.extractions || []).map((ex, idx) =>
+      `<div class="cr-text-block" data-cr-block="${idx}">
+         <button class="cr-block-capture" onclick="_crCaptureBlock(${idx})" title="Capture this passage if text selection is unreliable">Capture this passage</button>
+         <div class="cr-page-region">${x(ex.region || '')} ${ex.source_locator ? '· ' + x(ex.source_locator) : ''}</div>
+         <div class="cr-page-text">${_crRenderTextWithHighlights(ex.text || '', pageHighlights)}</div>
+       </div>`
     ).join('');
     view.innerHTML = `
       <div class="cr-page-header">
@@ -5455,6 +6194,11 @@ function _crRenderPage() {
       </div>
       ${blocks || '<div class="e10-empty">No text extracted for this page.</div>'}`;
   }
+
+  _fsApply();
+  // Locator metadata is register-gated: stored always, shown to researchers
+  document.getElementById('cr-page-view')?.classList.toggle('show-regions', _register === 'expert');
+  _flnActivityTick();
 
   // Nav controls
   const prev = document.getElementById('cr-prev-btn');
@@ -5528,6 +6272,10 @@ async function _crLoadHighlightList() {
     list.innerHTML = _crHighlights.map(h => {
       const candidateBadge = h.status === 'observation_candidate' || h.status === 'promoted_to_observation'
         ? `<span class="cr-candidate-badge">${h.status === 'promoted_to_observation' ? 'promoted' : 'candidate'}</span>` : '';
+      const tags = _crHighlightTags(h);
+      const importantBadge = tags.includes('important') ? '<span class="cr-candidate-badge" style="background:#2a220a;color:#e0a800">important</span>' : '';
+      const typedTagBadges = tags.filter(t => t.startsWith('tag:')).map(t =>
+        `<span class="cr-tag-chip">${x(t.slice(4))}</span>`).join('');
       const relColor = { supports: 'var(--green)', complicates: '#e0a800', contradicts: 'var(--red)', background: 'var(--dim2)', unclear: 'var(--border2)' };
       return `<div class="cr-highlight-item" onclick="_crShowHighlightDetail('${x(h.id)}')">
         <div class="cr-highlight-quote">"${x((h.selected_text||'').slice(0,100))}${h.selected_text?.length > 100 ? '…' : ''}"</div>
@@ -5535,6 +6283,10 @@ async function _crLoadHighlightList() {
           p.${h.page || '?'}
           ${h.relevance ? `<span style="color:${relColor[h.relevance]||'var(--dim2)'};margin-left:6px">${h.relevance}</span>` : ''}
           ${candidateBadge}
+          ${importantBadge}
+          ${tags.filter(t => t.startsWith('concept:')).map(t =>
+            `<span class="cr-concept-chip">✦ ${x(t.slice(8))}</span>`).join('')}
+          ${typedTagBadges}
         </div>
         ${h.note_text ? `<div style="font-size:11px;color:var(--dim2);margin-top:3px;line-height:1.4">${x(h.note_text.slice(0,80))}${h.note_text.length>80?'…':''}</div>` : ''}
       </div>`;
@@ -5544,79 +6296,175 @@ async function _crLoadHighlightList() {
   }
 }
 
-// Selection toolbar
+// Selection capture
+function _crCaptureBlock(blockIndex) {
+  const block = document.querySelector(`[data-cr-block="${blockIndex}"]`);
+  const textEl = block?.querySelector('.cr-page-text');
+  const text = _crCleanSelectionText(textEl?.textContent || '');
+  if (!block || !text) return;
+  _crCaptureOpen = false;
+  _crHideToolbar(true);
+  _crClearPending();
+  _crSelText = text;
+  _crSelRange = null;
+  _crSelectionRect = textEl.getBoundingClientRect();
+  _crShowToolbar(_crSelectionRect);
+  _crHighlightSelected('note');
+}
+
+function _crNodeElement(node) {
+  return node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+}
+
+function _crSelectionInsideReader(range) {
+  const pageView = document.getElementById('cr-page-view');
+  const startEl = _crNodeElement(range?.startContainer);
+  const endEl = _crNodeElement(range?.endContainer);
+  return !!(
+    pageView &&
+    range &&
+    pageView.contains(range.commonAncestorContainer) &&
+    startEl?.closest('.cr-page-text') &&
+    endEl?.closest('.cr-page-text')
+  );
+}
+
+function _crCleanSelectionText(text) {
+  return (text || '').trim();
+}
+
 function _crHandleSelection(e) {
   const sel = window.getSelection();
-  const text = sel?.toString().trim();
-  if (!text || text.length < 3) { _crHideToolbar(); return; }
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+    if (!_crCaptureOpen) _crHideToolbar();
+    return;
+  }
+  const range = sel.getRangeAt(0);
+  if (!_crSelectionInsideReader(range)) {
+    if (!_crCaptureOpen) _crHideToolbar();
+    return;
+  }
+  const text = _crCleanSelectionText(sel.toString());
+  if (!text || text.length < 3) {
+    if (!_crCaptureOpen) _crHideToolbar();
+    return;
+  }
   _crSelText = text;
-  _crShowToolbar(e.clientX, e.clientY);
+  _crSelRange = range.cloneRange();
+  _crSelectionRect = range.getBoundingClientRect();
+  _crShowToolbar(_crSelectionRect, e?.clientX, e?.clientY);
 }
 
 function _crHandleSelectionChange() {
+  if (_crCaptureOpen) return;
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed) _crHideToolbar();
 }
 
-function _crShowToolbar(cx, cy) {
-  _crHideToolbar();
+function _crPlaceToolbar(tb, rect, fallbackX, fallbackY) {
+  const pad = 12;
+  const width = tb.offsetWidth || 390;
+  const height = tb.offsetHeight || 120;
+  const anchorLeft = Number.isFinite(rect?.left) ? rect.left : (fallbackX || pad);
+  const anchorTop = Number.isFinite(rect?.top) ? rect.top : (fallbackY || pad);
+  const anchorBottom = Number.isFinite(rect?.bottom) ? rect.bottom : anchorTop;
+  const desiredLeft = Math.min(Math.max(pad, anchorLeft), Math.max(pad, window.innerWidth - width - pad));
+  const below = anchorBottom + 10;
+  const above = anchorTop - height - 10;
+  const desiredTop = below + height < window.innerHeight
+    ? below
+    : Math.max(pad, above);
+  tb.style.left = `${desiredLeft}px`;
+  tb.style.top = `${desiredTop}px`;
+}
+
+function _crShowToolbar(rect, fallbackX, fallbackY) {
+  _crHideToolbar(true);
+  _crCaptureOpen = false;
   const tb = document.createElement('div');
   tb.className = 'cr-sel-toolbar';
   tb.id = 'cr-sel-toolbar';
   tb.innerHTML = `
-    <button class="cr-sel-btn" onclick="_crHighlightSelected()">Highlight</button>
-    <button class="cr-sel-btn" onclick="_crHighlightSelected('note')">+ Note</button>
-    <button class="cr-sel-btn" onclick="_crHighlightSelected('question')">? Question</button>
-    <button class="cr-sel-btn" onclick="_crHighlightSelected('candidate')" style="color:var(--accent)">→ Observation</button>
-    <button class="cr-sel-btn" onclick="ttsSpeak(_crSelText)" title="Read aloud">▶ Read</button>`;
+    <div class="cr-sel-actions">
+      <button class="cr-sel-btn" onclick="_crHighlightSelected()">Highlight</button>
+      <button class="cr-sel-btn" onclick="_crHighlightSelected('note')">+ Note</button>
+      <button class="cr-sel-btn" onclick="_crHighlightSelected('question')">? Question</button>
+      <button class="cr-sel-btn" onclick="_crHighlightSelected('concept')">✦ Concept</button>
+      <button class="cr-sel-btn" onclick="_crHighlightSelected('candidate')" style="color:var(--accent)">→ Observation</button>
+      <button class="cr-sel-btn" onclick="_crAskCompanion()" title="Ask the Companion about only this passage">⁘ Ask</button>
+      <button class="cr-sel-btn" onclick="ttsSpeak(_crSelText)" title="Read aloud">▶ Read</button>
+    </div>`;
   document.body.appendChild(tb);
   _crSelToolbar = tb;
-  // Position just above the cursor
-  const left = Math.min(cx, window.innerWidth - 340);
-  const top  = cy - 52 + window.scrollY;
-  tb.style.left = Math.max(8, left) + 'px';
-  tb.style.top  = Math.max(8, top) + 'px';
+  _crPlaceToolbar(tb, rect, fallbackX, fallbackY);
 }
 
-function _crHideToolbar() {
+function _crHideToolbar(force = false) {
+  if (_crCaptureOpen && !force) return;
   if (_crSelToolbar) { _crSelToolbar.remove(); _crSelToolbar = null; }
 }
 
 function _crHighlightSelected(focus) {
-  _crHideToolbar();
   const sel = window.getSelection();
-  const text = _crSelText || sel?.toString().trim();
+  const text = _crSelText || _crCleanSelectionText(sel?.toString());
   if (!text) return;
   _crSelText = text;
   _crRelevance = 'unclear';
-  window.getSelection()?.removeAllRanges();
+  _crConcept = focus === 'concept' ? text.length <= 48 ? text : '' : '';
+  _crCaptureOpen = true;
+  _crMarkPending();
+
+  if (!_crSelToolbar) _crShowToolbar(_crSelectionRect);
+  const tb = _crSelToolbar;
+  if (!tb) return;
+  _crCaptureOpen = true;
+  tb.classList.add('capture-open');
 
   const form = document.getElementById('cr-sel-form');
   const prompt = document.getElementById('cr-sel-prompt');
-  if (!form || !prompt) return;
-  prompt.style.display = 'none';
-  form.style.display = 'block';
+  if (prompt) {
+    prompt.style.display = '';
+    prompt.innerHTML = 'Capture is attached to the selected passage. Saved artifacts will appear here and in the Reading Trail.';
+  }
+  if (form) { form.style.display = 'none'; form.innerHTML = ''; }
 
   const isCandidate = focus === 'candidate';
+  const isConcept  = focus === 'concept';
   const focusNote = focus === 'note' || focus === 'candidate';
   const focusQ    = focus === 'question';
+  const thesis = invLoad()?.thesis || '';
 
-  form.innerHTML = `
-    <div class="cr-saved-passage">${x(text.slice(0, 280))}${text.length > 280 ? '…' : ''}</div>
+  tb.innerHTML = `
+    <div class="cr-selection-preview">${x(text.slice(0, 260))}${text.length > 260 ? '…' : ''}</div>
+    ${thesis ? `<div class="cr-capture-help">For your question: <em>${x(thesis.slice(0, 90))}${thesis.length > 90 ? '…' : ''}</em></div>` : ''}
     <div class="cr-highlight-form" style="margin-top:12px">
+      ${isConcept ? `<div class="cr-form-row">
+        <div class="cr-form-label">Concept name</div>
+        <input id="cr-concept-input" value="${x(_crConcept)}" placeholder="e.g. aspiration">
+      </div>` : ''}
       <div class="cr-form-row">
-        <div class="cr-form-label">Why this matters</div>
-        <textarea id="cr-note-input" rows="3" placeholder="Your reading note…" style="margin-top:4px">${isCandidate ? 'Candidate for observation.' : ''}</textarea>
+        <label class="cr-important-row">
+          <input id="cr-important-input" type="checkbox" ${isCandidate ? 'checked' : ''}>
+          <span><strong>Mark important</strong><br><span style="color:var(--dim2)">Keeps this as human attention metadata, not a score.</span></span>
+        </label>
       </div>
       <div class="cr-form-row">
-        <div class="cr-form-label">Question this raises</div>
-        <textarea id="cr-q-input" rows="2" placeholder="What does this open up?…" style="margin-top:4px"></textarea>
+        <div class="cr-form-label">Tags</div>
+        <input id="cr-tags-input" type="text" placeholder="theme, tension, term">
+      </div>
+      <div class="cr-form-row">
+        <div class="cr-form-label">${isConcept ? 'What this concept means in this investigation' : 'Note'}</div>
+        <textarea id="cr-note-input" rows="3" placeholder="${isConcept ? 'Working definition, distinctions from neighboring terms…' : 'Your reading note…'}">${isCandidate ? 'Candidate for observation.' : ''}</textarea>
+      </div>
+      <div class="cr-form-row">
+        <div class="cr-form-label">Question</div>
+        <textarea id="cr-q-input" rows="2" placeholder="What does this open up?…"></textarea>
       </div>
       <div class="cr-form-row">
         <div class="cr-form-label">Relevance to thesis</div>
         <div class="cr-relevance-btns">
           ${['supports','complicates','contradicts','background','unclear'].map(r =>
-            `<button class="cr-rel-btn cr-rel-${r} ${r==='unclear'?'active':''}" onclick="_crSetRelevance('${r}',this)">${r}</button>`
+            `<button class="cr-rel-btn cr-rel-${r} ${r==='unclear'?'active':''}" onclick="_crSetRelevance('${r}',this);return false">${r}</button>`
           ).join('')}
         </div>
       </div>
@@ -5625,12 +6473,13 @@ function _crHighlightSelected(focus) {
         <button class="btn-primary" style="flex:1;padding:8px;background:var(--accent2);color:var(--accent);border-color:var(--accent)" onclick="_crSaveHighlight(true)">→ Observation Candidate</button>
       </div>
       <button style="margin-top:8px;width:100%;padding:6px;background:none;border:1px solid var(--border2);border-radius:var(--r);color:var(--dim2);cursor:pointer;font:inherit;font-size:12px" onclick="_crCancelHighlight()">Cancel</button>
+      <div id="cr-capture-msg" style="font-size:12px;margin-top:6px"></div>
     </div>`;
 
+  requestAnimationFrame(() => _crPlaceToolbar(tb, _crSelectionRect));
   if (focusNote) setTimeout(() => document.getElementById('cr-note-input')?.focus(), 50);
   if (focusQ)    setTimeout(() => document.getElementById('cr-q-input')?.focus(), 50);
-
-  form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (isConcept) setTimeout(() => document.getElementById('cr-concept-input')?.focus(), 50);
 }
 
 function _crSetRelevance(val, btn) {
@@ -5640,25 +6489,58 @@ function _crSetRelevance(val, btn) {
 }
 
 function _crCancelHighlight() {
+  _crCaptureOpen = false;
+  _crHideToolbar(true);
+  _crClearPending();
   _crSelText = '';
+  _crConcept = '';
   _crRelevance = 'unclear';
+  _crSelectionRect = null;
   const form = document.getElementById('cr-sel-form');
   const prompt = document.getElementById('cr-sel-prompt');
   if (form) { form.style.display = 'none'; form.innerHTML = ''; }
-  if (prompt) prompt.style.display = '';
+  if (prompt) {
+    prompt.style.display = '';
+    prompt.innerHTML = 'Select any passage in the text to highlight it, write a note, ask a question, or create an observation candidate.';
+  }
+}
+
+function _crPageReadingText() {
+  return Array.from(document.querySelectorAll('#cr-page-view .cr-page-text'))
+    .map(el => el.textContent || '')
+    .join('\n\n');
+}
+
+function _crParseTypedTags(raw) {
+  return (raw || '')
+    .split(',')
+    .map(t => t.trim().replace(/\s+/g, ' '))
+    .filter(Boolean)
+    .map(t => (t.includes(':') || t === 'important') ? t : `tag:${t}`);
+}
+
+function _crUniqueTags(tags) {
+  return Array.from(new Set((tags || []).filter(t => typeof t === 'string' && t.trim()).map(t => t.trim())));
 }
 
 async function _crSaveHighlight(asCandidate) {
   const note = document.getElementById('cr-note-input')?.value?.trim() || '';
   const question = document.getElementById('cr-q-input')?.value?.trim() || '';
+  const important = !!document.getElementById('cr-important-input')?.checked;
+  const typedTags = _crParseTypedTags(document.getElementById('cr-tags-input')?.value || '');
 
   // Get surrounding context from page text
-  const pageView = document.getElementById('cr-page-view');
-  const fullText = pageView?.innerText || '';
+  const fullText = _crPageReadingText();
   const idx = fullText.indexOf(_crSelText);
   const contextBefore = idx > 0 ? fullText.slice(Math.max(0, idx - 100), idx).trim() : '';
   const contextAfter  = idx > -1 ? fullText.slice(idx + _crSelText.length, idx + _crSelText.length + 100).trim() : '';
 
+  const conceptName = document.getElementById('cr-concept-input')?.value?.trim() || '';
+  const tags = _crUniqueTags([
+    ...(conceptName ? [`concept:${conceptName}`] : []),
+    ...(important ? ['important'] : []),
+    ...typedTags,
+  ]);
   const payload = {
     source_document_id: _crDocId,
     page: _crPage,
@@ -5668,9 +6550,12 @@ async function _crSaveHighlight(asCandidate) {
     note_text: note || null,
     question_text: question || null,
     relevance: _crRelevance,
+    tags,
   };
 
   try {
+    const msg = document.getElementById('cr-capture-msg');
+    if (msg) { msg.textContent = 'Saving…'; msg.style.color = 'var(--dim2)'; }
     const res = await fetch('/api/reader/highlights', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5680,15 +6565,23 @@ async function _crSaveHighlight(asCandidate) {
     if (!res.ok) throw new Error(d.error || 'Save failed');
 
     if (asCandidate) {
-      await fetch(`/api/reader/highlights/${encodeURIComponent(d.id)}/promote`, { method: 'POST' });
+      const promote = await fetch(`/api/reader/highlights/${encodeURIComponent(d.id)}/promote`, { method: 'POST' });
+      if (!promote.ok) throw new Error((await promote.json()).error || 'Promotion failed');
     }
 
-    _crCancelHighlight();
     await _crLoadHighlightList();
+    _crRenderPage();
     _crRefreshTrail();
+    _crCaptureOpen = false;
+    _crHideToolbar(true);
+    _crClearPending();
+    _crSelText = '';
+    _crConcept = '';
+    _crSelectionRect = null;
+    _flnActivityTick();
+    _crShowHighlightDetail(d.id);
 
     // Brief confirmation
-    const form = document.getElementById('cr-sel-form');
     const prompt = document.getElementById('cr-sel-prompt');
     if (prompt) {
       prompt.style.display = '';
@@ -5699,8 +6592,8 @@ async function _crSaveHighlight(asCandidate) {
       }, 4000);
     }
   } catch(e) {
-    const form = document.getElementById('cr-sel-form');
-    if (form) form.insertAdjacentHTML('afterbegin', `<div style="color:var(--red);font-size:12px;margin-bottom:8px">Error: ${x(e.message)}</div>`);
+    const msg = document.getElementById('cr-capture-msg');
+    if (msg) { msg.textContent = e.message; msg.style.color = 'var(--red)'; }
   }
 }
 
@@ -5715,11 +6608,23 @@ async function _crShowHighlightDetail(highlightId) {
 
   const relColor = { supports: 'cr-rel-supports', complicates: 'cr-rel-complicates', contradicts: 'cr-rel-contradicts', background: 'cr-rel-background', unclear: 'cr-rel-unclear' };
   const statusLabel = { saved_highlight: 'Saved', observation_candidate: 'Observation Candidate', promoted_to_observation: 'Promoted', dismissed: 'Dismissed' };
+  const tags = _crHighlightTags(h);
+  const typedTags = tags.filter(t => t.startsWith('tag:')).map(t => t.slice(4)).join(', ');
 
   form.innerHTML = `
     <div style="font-size:10px;color:var(--dim2);font-family:var(--mono);margin-bottom:8px">p.${h.page || '?'} · ${statusLabel[h.status] || h.status}</div>
     <div class="cr-saved-passage">${x(h.selected_text)}</div>
     <div class="cr-highlight-form" style="margin-top:12px">
+      <div class="cr-form-row">
+        <label class="cr-important-row">
+          <input id="cr-edit-important" type="checkbox" ${tags.includes('important') ? 'checked' : ''}>
+          <span><strong>Mark important</strong><br><span style="color:var(--dim2)">Human attention metadata only.</span></span>
+        </label>
+      </div>
+      <div class="cr-form-row">
+        <div class="cr-form-label">Tags</div>
+        <input id="cr-edit-tags" type="text" value="${x(typedTags)}" placeholder="theme, tension, term">
+      </div>
       <div class="cr-form-row">
         <div class="cr-form-label">Note</div>
         <textarea id="cr-edit-note" rows="3" style="margin-top:4px">${x(h.note_text || '')}</textarea>
@@ -5752,17 +6657,27 @@ async function _crShowHighlightDetail(highlightId) {
 async function _crUpdateHighlight(id) {
   const note = document.getElementById('cr-edit-note')?.value?.trim() || '';
   const question = document.getElementById('cr-edit-q')?.value?.trim() || '';
+  const important = !!document.getElementById('cr-edit-important')?.checked;
+  const typedTags = _crParseTypedTags(document.getElementById('cr-edit-tags')?.value || '');
+  const existing = _crHighlights.find(h => h.id === id);
+  const conceptTags = _crHighlightTags(existing).filter(t => t.startsWith('concept:'));
+  const tags = _crUniqueTags([
+    ...conceptTags,
+    ...(important ? ['important'] : []),
+    ...typedTags,
+  ]);
   const msg = document.getElementById('cr-edit-msg');
   if (msg) { msg.textContent = 'Saving…'; msg.style.color = 'var(--dim2)'; }
   try {
     const res = await fetch(`/api/reader/highlights/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note_text: note, question_text: question, relevance: _crRelevance }),
+      body: JSON.stringify({ note_text: note, question_text: question, relevance: _crRelevance, tags }),
     });
     if (!res.ok) throw new Error((await res.json()).error || 'Update failed');
     if (msg) { msg.textContent = '✓ Saved'; msg.style.color = 'var(--green)'; }
     await _crLoadHighlightList();
+    _crRenderPage();
     _crRefreshTrail();
     setTimeout(() => _crCancelHighlight(), 1200);
   } catch(e) {
@@ -5776,6 +6691,7 @@ async function _crPromoteHighlight(id) {
     await fetch(`/api/reader/highlights/${encodeURIComponent(id)}/promote`, { method: 'POST' });
     if (msg) { msg.textContent = '✓ Marked as observation candidate'; msg.style.color = 'var(--green)'; }
     await _crLoadHighlightList();
+    _crRenderPage();
     _crRefreshTrail();
     setTimeout(() => _crCancelHighlight(), 1500);
   } catch(e) {
@@ -5789,6 +6705,7 @@ async function _crDismissHighlight(id) {
     await fetch(`/api/reader/highlights/${encodeURIComponent(id)}`, { method: 'DELETE' });
     _crCancelHighlight();
     await _crLoadHighlightList();
+    _crRenderPage();
     _crRefreshTrail();
   } catch(e) { alert(e.message); }
 }
@@ -7816,13 +8733,24 @@ function e10LoadGuide() {
       <div style="margin-bottom:40px;padding:24px 28px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2)">
         <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim2);margin-bottom:14px">What category is this?</div>
         <div style="font-size:17px;font-weight:700;color:var(--fg);margin-bottom:6px">
-          Hermeneia is a constitutional investigation architecture.
+          Hermeneia is a constitutional architecture for accountable interpretation.
+        </div>
+        <div style="font-size:13px;color:var(--fg2);line-height:1.7;max-width:600px;margin-bottom:14px">
+          Hermeneia is not the invention of interpretation. It is a formalization of an ancient
+          human practice: the disciplined work of drawing meaning out of words, events, symbols,
+          testimony, and evidence. The name comes from <em>hermeneia</em> — interpretation,
+          explanation, the act of making meaning understandable. Hermeneia honors that older
+          tradition by giving it a modern constitutional architecture: observations are preserved,
+          interpretations are tested, human judgment remains essential, and every conclusion can
+          be traced back to its source.
         </div>
         <div style="font-size:13px;color:var(--fg2);line-height:1.7;max-width:600px;margin-bottom:20px">
-          A governed system for the disciplined evolution and preservation of understanding.
           Hermeneia is not a language model — it is an architecture for governing how language,
           evidence, models, and human judgment participate together.
           Language models are <em>participants inside</em> Hermeneia, not the system itself.
+          It does not replace the reader, scholar, teacher, theologian, lawyer, researcher, or
+          student — it gives their interpretive work structure, memory, accountability, and lineage.
+          <strong>People have always interpreted. Hermeneia makes the process visible.</strong>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;max-width:560px">

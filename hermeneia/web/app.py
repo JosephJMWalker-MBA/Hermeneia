@@ -46,6 +46,7 @@ from ..compiler.projections.interpretive_divergence import (
 from ..storage.sqlite import SQLiteStore
 from ..explorer.interpreter import (
     ExplorerError,
+    _call_provider,
     generate_candidate_interpretation,
     generate_interpretation_from_bucket,
 )
@@ -1775,6 +1776,69 @@ def create_app(
         return resp
 
     # ── /api/health ──────────────────────────────────────────────────────────
+
+    # ── First-run setup (issue #20) ───────────────────────────────────
+    # A fresh environment must be usable from the UI alone — no SSH,
+    # Flask, SQLite, or pipeline-script knowledge required. These
+    # endpoints are strictly additive: init never touches existing data,
+    # and the demo compile is idempotent (SHA-256 dedupe in the Compiler).
+    _DEMO_CORPUS = Path(__file__).resolve().parents[2] / "examples" / "gatsby.pdf"
+
+    def _setup_state_payload() -> dict:
+        exists = db_path.exists()
+        doc_count = 0
+        if exists:
+            try:
+                conn = _conn()
+                doc_count = conn.execute(
+                    "SELECT COUNT(*) FROM source_documents"
+                ).fetchone()[0]
+                conn.close()
+            except Exception:
+                doc_count = 0
+        return {
+            "database_exists": exists,
+            "document_count": doc_count,
+            "db_path": str(db_path),
+            "demo_available": _DEMO_CORPUS.exists(),
+            "first_run": (not exists) or doc_count == 0,
+        }
+
+    @app.route("/api/setup/state")
+    def api_setup_state():
+        return jsonify(_setup_state_payload())
+
+    @app.route("/api/setup/init", methods=["POST"])
+    def api_setup_init():
+        created = False
+        if not db_path.exists():
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            from ..storage.sqlite import SQLiteStore as _Store
+            from ..storage.sqlite import ensure_profile_tables as _migrate
+            store = _Store(db_path)
+            store.close()
+            _mconn = sqlite3.connect(str(db_path))
+            _mconn.row_factory = sqlite3.Row
+            try:
+                _migrate(_mconn)
+            finally:
+                _mconn.close()
+            created = True
+        return jsonify({"created": created, **_setup_state_payload()})
+
+    @app.route("/api/setup/demo", methods=["POST"])
+    def api_setup_demo():
+        if not _DEMO_CORPUS.exists():
+            return jsonify({"error": "no demo corpus is bundled with this install"}), 404
+        api_setup_init()  # ensure the workspace exists; idempotent
+        from ..compiler.compiler import Compiler
+        try:
+            compiler = Compiler(db_path=db_path, build_dir=db_path.parent)
+            compiler.compile(_DEMO_CORPUS)
+            compiler.close()
+        except Exception as exc:
+            return jsonify({"error": f"demo compile failed: {exc}"}), 500
+        return jsonify(_setup_state_payload())
 
     @app.route("/api/health")
     def api_health():
@@ -5665,6 +5729,242 @@ Return ONLY valid JSON, no markdown, no explanation:
         conn.commit()
         conn.close()
         return jsonify({"ok": True, "status": "observation_candidate"})
+
+    # ── Companion (issue #10) ─────────────────────────────────────────
+    # A reading participant, not an authority. Context is explicit: only
+    # the sections the reader checked are gathered and sent — never
+    # silently expanded — and every reply reports exactly what was used.
+    _COMPANION_SYSTEM = (
+        "You are the Hermeneia Companion — a reading participant beside a human "
+        "investigator, not an authority over them. Ground your reply ONLY in the "
+        "context sections provided below. If the provided context is insufficient "
+        "to answer well, say precisely what is missing rather than inventing. "
+        "You may propose interpretations, distinctions, questions, and connections; "
+        "you never decide — the reader is the steward, and nothing you say enters "
+        "the investigation record unless the reader chooses to save it. Be concise. "
+        "When natural, end with one question worth investigating next."
+    )
+
+    @app.route("/api/companion/ask", methods=["POST"])
+    def api_companion_ask():
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(silent=True) or {}
+        message = str(payload.get("message") or "").strip()
+        if not message:
+            return jsonify({"error": "message is required"}), 400
+
+        raw_provider = str(payload.get("provider") or "").strip()
+        if raw_provider.lower() == "stub":
+            participant_key, participant_label, provider_id = "stub", "Stub (no AI)", "null"
+        else:
+            participant = _e10_participant(raw_provider)
+            if participant is None:
+                return jsonify({"error": f"unsupported provider: {raw_provider}"}), 400
+            participant_key, participant_label, _model = participant
+            provider_id = _E10_PARTICIPANTS[participant_key][1]
+
+        try:
+            adapter = active_provider_registry.create(provider_id)
+        except Exception as exc:
+            return jsonify({"error": f"provider unavailable: {exc}"}), 502
+
+        flags = payload.get("context_flags") or {}
+        doc_id = str(payload.get("document_id") or "").strip()
+        page = payload.get("page")
+        sections: list[tuple[str, str]] = []
+        context_used: list[dict] = []
+
+        def _use(key: str, summary: str, body: str) -> None:
+            sections.append((key, body))
+            context_used.append({"key": key, "summary": summary})
+
+        if flags.get("governing_question"):
+            q = str(payload.get("governing_question_text") or "").strip()
+            if q:
+                _use("governing_question", "the governing question",
+                     f"GOVERNING QUESTION (the investigation's compass — inform it, "
+                     f"do not merely validate it):\n{q}")
+            else:
+                context_used.append({"key": "governing_question",
+                                     "summary": "requested, but none is set"})
+
+        if flags.get("selected_passage"):
+            sel = str(payload.get("selected_text") or "").strip()
+            if sel:
+                _use("selected_passage", f"selected passage ({len(sel)} chars)",
+                     f"SELECTED PASSAGE (the reader is asking about this):\n\"{sel}\"")
+            else:
+                context_used.append({"key": "selected_passage",
+                                     "summary": "requested, but nothing is selected"})
+
+        conn = _conn()
+        try:
+            if flags.get("current_page") and doc_id and page:
+                rows = conn.execute(
+                    """SELECT se.raw_text FROM source_extractions se
+                       JOIN source_documents sd ON sd.id = se.document_id
+                       WHERE se.document_id = ? AND se.page = ?
+                         AND COALESCE(sd.excluded_from_analysis, 0) = 0
+                       ORDER BY se.id""",
+                    (doc_id, int(page)),
+                ).fetchall()
+                page_text = "\n".join(r["raw_text"] for r in rows)[:6000]
+                if page_text:
+                    _use("current_page", f"page {page} text",
+                         f"CURRENT PAGE (p.{page}):\n{page_text}")
+                else:
+                    context_used.append({"key": "current_page",
+                                         "summary": f"requested, but page {page} has no text"})
+
+            if flags.get("saved_highlights") and doc_id:
+                rows = conn.execute(
+                    """SELECT selected_text, note_text, question_text, page
+                       FROM reader_highlights
+                       WHERE source_document_id = ? AND status != 'dismissed'
+                       ORDER BY page, created_at LIMIT 20""",
+                    (doc_id,),
+                ).fetchall()
+                if rows:
+                    body = "\n".join(
+                        f"- p.{r['page']}: \"{r['selected_text'][:160]}\""
+                        + (f" — note: {r['note_text'][:160]}" if r["note_text"] else "")
+                        + (f" — question: {r['question_text'][:160]}" if r["question_text"] else "")
+                        for r in rows
+                    )
+                    _use("saved_highlights", f"{len(rows)} saved highlights",
+                         f"THE READER'S SAVED HIGHLIGHTS:\n{body}")
+                else:
+                    context_used.append({"key": "saved_highlights",
+                                         "summary": "requested, but none saved yet"})
+
+            if flags.get("reading_trail") and doc_id:
+                prog = conn.execute(
+                    "SELECT pages_read FROM reading_progress WHERE document_id = ?",
+                    (doc_id,),
+                ).fetchone()
+                counts = conn.execute(
+                    """SELECT COUNT(*) AS n,
+                              SUM(CASE WHEN question_text IS NOT NULL AND question_text != '' THEN 1 ELSE 0 END) AS q,
+                              SUM(CASE WHEN note_text IS NOT NULL AND note_text != '' THEN 1 ELSE 0 END) AS notes
+                       FROM reader_highlights
+                       WHERE source_document_id = ? AND status != 'dismissed'""",
+                    (doc_id,),
+                ).fetchone()
+                pages_read = 0
+                if prog and prog["pages_read"]:
+                    try:
+                        pages_read = len(json.loads(prog["pages_read"]))
+                    except Exception:
+                        pages_read = 0
+                _use("reading_trail", "reading trail summary",
+                     f"READING TRAIL: {pages_read} pages read; {counts['n'] or 0} highlights, "
+                     f"{counts['q'] or 0} questions, {counts['notes'] or 0} notes so far.")
+
+            if flags.get("page_observations") and doc_id and page:
+                rows = conn.execute(
+                    """SELECT o.raw_text FROM observations o
+                       JOIN source_documents sd ON sd.id = o.source_document_id
+                       WHERE o.source_document_id = ? AND o.page = ?
+                         AND COALESCE(sd.excluded_from_analysis, 0) = 0
+                       ORDER BY o.paragraph, o.sentence LIMIT 20""",
+                    (doc_id, int(page)),
+                ).fetchall()
+                if rows:
+                    body = "\n".join(f"- \"{r['raw_text'][:200]}\"" for r in rows)
+                    _use("page_observations",
+                         f"{len(rows)} machine observations from p.{page}",
+                         f"MACHINE OBSERVATIONS FOR PAGE {page}:\n{body}")
+                else:
+                    context_used.append({"key": "page_observations",
+                                         "summary": f"requested, but p.{page} has none"})
+        finally:
+            conn.close()
+
+        user_prompt = "\n\n".join(body for _, body in sections)
+        user_prompt = (user_prompt + "\n\n" if user_prompt else "") + f"READER'S MESSAGE:\n{message}"
+
+        try:
+            reply = _call_provider(adapter, _COMPANION_SYSTEM, user_prompt)
+        except Exception as exc:
+            return jsonify({"error": f"provider call failed: {exc}"}), 502
+
+        return jsonify({
+            "reply": reply,
+            "provider": participant_label,
+            "context_used": context_used,
+        })
+
+    # ── Investigation Log / Field Notes (issue #18) ───────────────────
+    # Append-only snapshots of the investigator's evolving understanding.
+    # Two lanes: 'corpus' (learning about the text) and 'instrument'
+    # (learning about Hermeneia while using it). These are the raw
+    # material of U(n) — captured live, never rewritten.
+    @app.route("/api/investigation-log", methods=["POST"])
+    def api_investigation_log_create():
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(silent=True) or {}
+        lane = str(payload.get("lane") or "corpus").strip().lower()
+        if lane not in ("corpus", "instrument"):
+            return jsonify({"error": "lane must be 'corpus' or 'instrument'"}), 400
+        understanding = str(payload.get("understanding") or "").strip()
+        pressing = str(payload.get("pressing_questions") or "").strip()
+        if not understanding and not pressing:
+            return jsonify({"error": "an entry needs an understanding, pressing questions, or both"}), 400
+
+        import uuid
+        entry_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        conn = _conn_rw()
+        doc_id = str(payload.get("source_document_id") or "").strip() or None
+        if doc_id:
+            row = conn.execute(
+                "SELECT id FROM source_documents WHERE id = ?", (doc_id,)
+            ).fetchone()
+            if not row:
+                doc_id = None
+        conn.execute(
+            """INSERT INTO investigation_log
+               (id, lane, understanding, pressing_questions,
+                source_document_id, page, governing_question, created_at)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (entry_id, lane, understanding or None, pressing or None,
+             doc_id, payload.get("page"),
+             str(payload.get("governing_question") or "").strip() or None, now),
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"id": entry_id, "created_at": now}), 201
+
+    @app.route("/api/investigation-log")
+    def api_investigation_log_list():
+        if not db_path.exists():
+            return jsonify({"entries": []}), 200
+        lane = str(request.args.get("lane") or "").strip().lower()
+        try:
+            limit = min(max(int(request.args.get("limit", 50)), 1), 200)
+        except ValueError:
+            limit = 50
+        conn = _conn()
+        if lane in ("corpus", "instrument"):
+            rows = conn.execute(
+                """SELECT il.*, sd.original_filename
+                   FROM investigation_log il
+                   LEFT JOIN source_documents sd ON sd.id = il.source_document_id
+                   WHERE il.lane = ? ORDER BY il.created_at DESC LIMIT ?""",
+                (lane, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT il.*, sd.original_filename
+                   FROM investigation_log il
+                   LEFT JOIN source_documents sd ON sd.id = il.source_document_id
+                   ORDER BY il.created_at DESC LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        conn.close()
+        return jsonify({"entries": [dict(r) for r in rows]})
 
     @app.route("/api/reader/documents/<doc_id>/summary")
     def api_reader_document_summary(doc_id: str):
