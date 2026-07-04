@@ -1,8 +1,10 @@
 # The Reader Shell — Implementation Specification
 
-*Recorded: 2026-07-03. Design pass only — no code in this PR. Reconciles the merged design record (PR #30 / FUTURE_ARCHITECTURE_NOTES: Workflow-Cycle Shell wireframe v4), issue #12 and its live-testing comments (Field Notes footer, machine page brief + lens, bucketing-before-interpretation), issue #26 (reduce pipeline overwhelm), and everything shipped in PRs #22–#27 into one coherent shell.*
+*Recorded: 2026-07-03. Design pass only — no code in this PR. Reconciles the merged design record (PR #30 / FUTURE_ARCHITECTURE_NOTES: Workflow-Cycle Shell wireframe v4), the Architecture Blueprint (`docs/hermeneia-architecture.md`), issue #12 and its live-testing comments (Field Notes footer + machine page brief + lens, all now shipped — PRs #32/#33/#34; plus bucketing-before-interpretation), issues #26 (reduce pipeline overwhelm) and #35 (Semantic Annotation MVP), and everything shipped in PRs #22–#34 into one coherent shell.*
 
 **The goal is to make Hermeneia feel obvious.** Not simpler — obvious: at any moment, the reader knows where they are, what the next meaningful act is, and how to get back to the book.
+
+**This spec is one document in a pair.** The Architecture Blueprint answers *"what is a mark, semantically?"* — the layered data model (Source → Semantic Structure → Human Interpretation → AI Reasoning → Knowledge Graph) in which every user action is a structured, ranked, machine-readable claim. This spec answers *"where do marks happen, and how does the interface hold together while they do?"* — the layout. They are the same vision from two angles: the blueprint is the compiler's type system; the shell is its editing surface. Neither is complete without the other, and §0.1 keeps them aligned.
 
 ---
 
@@ -28,6 +30,30 @@ The twelve principles, each with its mechanism in this spec:
 | 10 | Large explanatory text collapses behind Help | Help drawer (`?`), absorbing per-screen guide blocks, Guide, Constitution |
 | 11 | Active page identity always obvious | Region A shows document · page X of Y at all times |
 | 12 | Return to Reading always available | Persistent control in Region A whenever the book is not the focused surface |
+
+---
+
+## 0.1 Relationship to the Architecture Blueprint & the Semantic Annotation model (#35)
+
+The Blueprint reframed Hermeneia as an **interpretation compiler**: the user marks meaning; the machine reasons over the marked meaning; the marks are structured claims, not comments. That reframing does not change this shell — it *explains* it. Every region here is the editing surface for one blueprint layer, and the compiler pipeline is exactly the Cycle Bar read left to right.
+
+| Blueprint layer | Shell surface |
+|---|---|
+| L0 Source | Region B — the Book (source preserved, never mutated; the lens and pending-marks are non-destructive overlays, already shipped this way) |
+| L1 Semantic Structure | The Page Brief's groupings and the reader's own segmentation (theme / question / tension / term chips) |
+| L2 Human Interpretation | The marking actions — Highlight · Note · Question · Concept · Observation — plus the **Evidence Bucket**; this is the shell's center of gravity |
+| L3 AI Reasoning | The Interpretation, Build, Render Sheets — the compiler's back end, run *on the curated bucket*, never on raw text |
+| L4 Knowledge Graph | Trace Sheet + cross-document lineage (future) |
+
+**The one accommodation the shell owes the Blueprint: rank.** The Blueprint makes rank (1–5) a first-class property of every annotation — the signal that gives the machine hierarchy instead of a flat pile. The shell as drawn does not yet host a rank control. Minimal, non-disruptive placement:
+
+- **On capture:** the existing capture form (Note / Question / Concept / Observation) gains one optional row — a 1–5 rank selector, defaulting to unset. It never blocks saving; an unranked mark is still a mark. Labels per the Blueprint: 5 foundational · 4 strong · 3 useful · 2 minor · 1 speculative.
+- **In the Tool Rail:** trail glances become rank-aware where it's free (`7 ✎ · 2 at rank 5`); the Evidence Bucket sorts by rank so the strongest evidence sits at the top of what feeds interpretation.
+- **In the Sheets:** the Interpretation Sheet passes rank through as weight; the AI prompt treats high-rank user marks as authoritative signals (Blueprint §Layer 3). This is the mechanism by which "the user made the document more meaningful" produces better output.
+
+**Two senses of "bucket," reconciled.** The Blueprint's `HermeneiaBucket` is a *thematic grouping* (Covenant, Aspiration, Exile) — a tag with its own rank. This spec's **Evidence Bucket** is the *working set* selected to feed one interpretation run. They compose cleanly: thematic buckets are how you tag marks while reading (Segment step); the Evidence Bucket is how you gather a subset — often "everything tagged Aspiration, rank ≥ 3" — to interpret (Steward step). The rail's bucket glance should let you build the working set *from* thematic tags, not just one mark at a time.
+
+**Storage note.** The Blueprint proposes a TypeScript annotation model; the running system is Python/SQLite with `reader_highlights` (already carrying `note_text`, `question_text`, `tags`, `relevance`, `status`) and `observation_reviews`. Rank is the one field not yet present. When #35 is built, the cheapest faithful path is an additive `rank` column on `reader_highlights` (the same additive-migration discipline used for `investigation_log`), not a parallel TypeScript store — the annotation *model* is right; its *substrate* is the existing hardened Python write path. This keeps the durability guarantees (append-only, gitignored DB, status-not-delete) that every reader artifact already enjoys.
 
 ---
 
@@ -199,7 +225,7 @@ Nothing is deleted from the record; retired surfaces disappear from navigation, 
 **Mechanism: the shell is additive, then absorbing.** A `shell-v2` body class gates the new layout; every existing screen keeps working underneath until the phase that absorbs it. No data changes anywhere — this is entirely presentation. Codex's in-flight `body.reader-mode` / workspace-drawer work (#26 WIP) is the seed of exactly this and should be treated as Phase 1 in progress, not parallel effort.
 
 - **Phase 1 — Frame** (flag off by default): Question Bar; Cycle Bar (rendering + rail swapping only — nodes for Build→Trace still `e10Go` to their screens); Return to Reading. Old nav still present.
-- **Phase 2 — Reader edges**: Field Tray (Codex-queued); Page Brief + Lens (Codex-queued); Tool Rail v1 (Read/Segment steps); Companion dock/bubble.
+- **Phase 2 — Reader edges**: Field Tray, Page Brief, and Lens are **shipped** (PRs #32/#33/#34) — Phase 2 now means *relocating* them into the shell frame (tray → footer region F, brief → region C above the book, lens toggle → rail) rather than building them; plus Tool Rail v1 (Read/Segment steps) and Companion dock/bubble. The rank control (§0.1) rides in here on the capture form.
 - **Phase 3 — Sheets**: pipeline-tail screens presented as overlays; old top nav hidden behind the flag; flag defaults ON, `Legacy shell` toggle in Settings for one release.
 - **Phase 4 — Consolidation**: Settings absorbs Connections/Sources; Help drawer absorbs guides; dashboard merges into Where-You-Are; retire stage bars.
 - **Phase 5 — Responsive**: tablet + mobile breakpoints; remove legacy toggle.
