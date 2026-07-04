@@ -994,6 +994,23 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   max-width: 860px;
   margin: 0 auto;
 }
+/* Question Compass — persistent interpretive orientation, above the book.
+   Compact and quiet so it never competes with the reading surface. */
+.cr-question-compass {
+  max-width: 860px; margin: 0 auto 16px;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--r);
+  background: color-mix(in srgb, var(--surface) 92%, var(--accent));
+  padding: 10px 16px;
+}
+.cr-compass-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .12em;
+  color: var(--dim2); margin-bottom: 4px;
+}
+.cr-compass-tagline { font-size: 14px; color: var(--fg2); font-style: italic; }
+.cr-compass-question { font-size: 15px; color: var(--fg); line-height: 1.45; }
+.cr-compass-hint { font-size: 12px; color: var(--dim2); margin-top: 4px; line-height: 1.4; }
 .cr-page-header {
   font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
   color: var(--dim2); margin-bottom: 18px; display: flex; align-items: center; gap: 12px;
@@ -6137,6 +6154,7 @@ function _crKeepQuestion() {
   const input = document.getElementById('cr-question-input');
   if (input) input.value = '';  // clear so the re-render guard doesn't hold the form open
   _crRenderQuestionCard();
+  _crRenderQuestionCompass();
 }
 
 // ── Focus Scroll (issue #16) ───────────────────────────
@@ -6205,6 +6223,7 @@ function _crRenderDocPicker(ws) {
       <button class="fs-pill" id="fs-toggle" onclick="fsToggle()" title="The current paragraph brightens as it enters your focus zone; surrounding text recedes.">◐ Focus Scroll</button>
       <button class="fs-pill" id="fs-theme" onclick="fsThemeToggle()" title="Switch between dark reading and warm paper reading.">● Dark</button>
     </div>
+    <div class="cr-question-compass" id="cr-question-compass"></div>
     <div class="cr-layout">
       <div>
         <div id="cr-role-warning"></div>
@@ -6284,10 +6303,34 @@ function _crRenderDocPicker(ws) {
       </div>
     </div>`;
 
+  // Persistent interpretive orientation, above the book surface.
+  _crRenderQuestionCompass();
+
   // Selection listener
   document.getElementById('cr-page-view').addEventListener('mouseup', _crHandleSelection);
   document.removeEventListener('selectionchange', _crHandleSelectionChange);
   document.addEventListener('selectionchange', _crHandleSelectionChange);
+}
+
+// Question Compass (issue #56 slice 2): a persistent, unobtrusive orientation
+// element near the top of the Reader. Visible even when no question is set —
+// your question is your compass, not your conclusion. It never replaces the
+// "Your Question" form and holds no state of its own; it reflects invLoad().
+function _crRenderQuestionCompass() {
+  const el = document.getElementById('cr-question-compass');
+  if (!el) return;
+  const q = (invLoad()?.thesis || '').trim();
+  if (!q) {
+    el.innerHTML = `
+      <div class="cr-compass-label">Question Compass</div>
+      <div class="cr-compass-tagline">Your question is your compass, not your conclusion.</div>
+      <div class="cr-compass-hint">Set a question to guide what you notice, challenge, and revise.</div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="cr-compass-label">Question Compass</div>
+    <div class="cr-compass-question">${x(q)}</div>
+    <div class="cr-compass-hint">Use the corpus to inform, pressure-test, complicate, revise, or overturn it.</div>`;
 }
 
 async function _crOpenDoc(docId) {
