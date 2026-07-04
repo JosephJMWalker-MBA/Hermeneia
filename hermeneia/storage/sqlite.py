@@ -1132,6 +1132,24 @@ END;
 """)
     conn.commit()
 
+    # Issue #71: the governing question is the interpretive root of the
+    # workspace. Unlike the append-only investigation_log, the current question
+    # is a single mutable record (the steward revises it). Its durable home is
+    # here; the browser keeps only a cache. This is what the Workspace Bundle
+    # (issue #70) serializes as investigation.json.
+    conn.executescript("""
+CREATE TABLE IF NOT EXISTS workspace_investigation (
+    id            TEXT PRIMARY KEY,   -- 'current' single-row workspace question
+    thesis        TEXT,
+    purpose       TEXT,
+    lenses        TEXT,               -- JSON array
+    reconsider    TEXT,
+    created_at    TEXT,
+    updated_at    TEXT NOT NULL
+);
+""")
+    conn.commit()
+
 
 # Backwards-compat alias used by CLI commands written before v9
 ensure_artist_tables = ensure_profile_tables

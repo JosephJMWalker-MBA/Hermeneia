@@ -2629,6 +2629,8 @@ function mount(h) {
     e10LoadObservations();
     e10LoadFindings();
     e10LoadResearchBanner();
+    // Reconcile the governing question from its durable DB home (issue #71).
+    _invHydrate();
     refreshEditionCycleCount().then(() =>
       refreshNavCycleStatuses().then(() => updateNavCycle(_bootDestination(h)))
     );
@@ -2858,15 +2860,56 @@ function buildCycleDiagram(pipeline, activeScreenId) {
 }
 
 // ── Investigation (localStorage) ──────────────────────────────────────────────
+// Issue #71: the governing question is the interpretive root of the workspace.
+// Its durable home is the database (/api/investigation); localStorage is only a
+// synchronous cache so the many invLoad() call sites stay fast. invSave writes
+// both; _invHydrate reconciles the cache from the DB on boot (DB wins) and
+// migrates a legacy browser-only question into the DB when the DB has none.
 const _INV_KEY = 'hermeneia_investigation_v1';
 function invLoad() {
   try { return JSON.parse(localStorage.getItem(_INV_KEY) || 'null'); } catch { return null; }
 }
 function invSave(obj) {
   try { localStorage.setItem(_INV_KEY, JSON.stringify(obj)); } catch {}
+  try {
+    fetch('/api/investigation', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        thesis: obj?.thesis || '',
+        purpose: obj?.purpose || '',
+        lenses: obj?.lenses || [],
+        reconsider: obj?.reconsider || '',
+        created: obj?.created || '',
+      }),
+    }).catch(() => {});
+  } catch {}
 }
 function invClear() {
   try { localStorage.removeItem(_INV_KEY); } catch {}
+}
+async function _invHydrate() {
+  try {
+    const data = await get('/api/investigation');
+    const dbInv = data && data.investigation;
+    if (dbInv && (dbInv.thesis || '').trim()) {
+      // Database is the source of truth: refresh the cache and any live UI.
+      const cached = {
+        thesis: dbInv.thesis || '',
+        purpose: dbInv.purpose || '',
+        lenses: dbInv.lenses || [],
+        reconsider: dbInv.reconsider || '',
+        created: dbInv.created_at || '',
+      };
+      try { localStorage.setItem(_INV_KEY, JSON.stringify(cached)); } catch {}
+      _crRenderQuestionCompass?.();
+      _crRenderQuestionCard?.();
+      updatePageThesis?.();
+    } else {
+      // No durable record yet: migrate a legacy browser-only question.
+      const local = invLoad();
+      if (local && (local.thesis || '').trim()) invSave(local);
+    }
+  } catch {}
 }
 
 let _setupTags = [];

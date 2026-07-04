@@ -5774,6 +5774,15 @@ Return ONLY valid JSON, no markdown, no explanation:
                    WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
                    ORDER BY rp.document_id"""
             ).fetchall()
+        # The durable governing question (issue #71) is the source of truth for
+        # the packet's compass; field-note snapshots remain a fallback.
+        try:
+            inv_row = conn.execute(
+                "SELECT thesis FROM workspace_investigation WHERE id = 'current'"
+            ).fetchone()
+        except sqlite3.OperationalError:
+            inv_row = None
+        governing = inv_row["thesis"] if inv_row and inv_row["thesis"] else None
         conn.close()
 
         summary = compile_study(annotations)
@@ -5784,6 +5793,7 @@ Return ONLY valid JSON, no markdown, no explanation:
             reading_progress=[dict(progress) for progress in reading_progress],
             compiled_at=datetime.now(timezone.utc).isoformat(),
             scope_document_id=doc_id or None,
+            governing_question=governing,
         )
         return jsonify(summary)
 
@@ -6097,6 +6107,79 @@ Return ONLY valid JSON, no markdown, no explanation:
         conn.commit()
         conn.close()
         return jsonify({"id": entry_id, "created_at": now}), 201
+
+    # ── Governing question (issue #71) ────────────────────────────────────────
+    # The interpretive root of the workspace. Durable, DB-backed, single mutable
+    # record; the browser keeps only a cache. This is what the Workspace Bundle
+    # (#70) serializes as investigation.json.
+
+    @app.route("/api/investigation", methods=["GET"])
+    def api_investigation_get():
+        if not db_path.exists():
+            return jsonify({"investigation": None}), 200
+        conn = _conn_rw()
+        try:
+            row = conn.execute(
+                "SELECT thesis, purpose, lenses, reconsider, created_at, updated_at "
+                "FROM workspace_investigation WHERE id = 'current'"
+            ).fetchone()
+        except sqlite3.OperationalError:
+            row = None  # pre-migration DB; treated as no record
+        conn.close()
+        if not row:
+            return jsonify({"investigation": None}), 200
+        return jsonify({"investigation": {
+            "thesis": row["thesis"],
+            "purpose": row["purpose"],
+            "lenses": _json_list(row["lenses"]),
+            "reconsider": row["reconsider"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }}), 200
+
+    @app.route("/api/investigation", methods=["PUT"])
+    def api_investigation_put():
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(silent=True) or {}
+        thesis = str(payload.get("thesis") or "").strip()
+        if not thesis:
+            return jsonify({"error": "thesis is required"}), 400
+        purpose = str(payload.get("purpose") or "").strip() or None
+        reconsider = str(payload.get("reconsider") or "").strip() or None
+        lenses = payload.get("lenses")
+        lenses_json = json.dumps(lenses if isinstance(lenses, list) else [])
+        now = datetime.now(timezone.utc).isoformat()
+        conn = _conn_rw()
+        # Preserve the original created_at across revisions.
+        existing = conn.execute(
+            "SELECT created_at FROM workspace_investigation WHERE id = 'current'"
+        ).fetchone()
+        created_at = (
+            existing["created_at"]
+            if existing and existing["created_at"]
+            else (str(payload.get("created") or "").strip() or now)
+        )
+        conn.execute(
+            """INSERT INTO workspace_investigation
+                 (id, thesis, purpose, lenses, reconsider, created_at, updated_at)
+               VALUES ('current', ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(id) DO UPDATE SET
+                 thesis=excluded.thesis, purpose=excluded.purpose,
+                 lenses=excluded.lenses, reconsider=excluded.reconsider,
+                 updated_at=excluded.updated_at""",
+            (thesis, purpose, lenses_json, reconsider, created_at, now),
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"investigation": {
+            "thesis": thesis,
+            "purpose": purpose,
+            "lenses": lenses if isinstance(lenses, list) else [],
+            "reconsider": reconsider,
+            "created_at": created_at,
+            "updated_at": now,
+        }}), 200
 
     @app.route("/api/investigation-log")
     def api_investigation_log_list():
