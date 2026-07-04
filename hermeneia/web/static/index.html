@@ -2505,18 +2505,27 @@ function mount(h) {
   e10Go(_bootDestination(h));
 }
 
-// First-run routing: read before declare. Returning users (a saved
-// question exists) land on the dashboard; a fresh visitor with a corpus
-// lands in the Reader; a fresh environment (no database or no documents)
-// lands on first-run onboarding — the UI stewards the first act of
-// inquiry; nobody should need SSH, Flask, SQLite, or pipeline scripts
-// to begin. If document state is uncertain, fall back to Setup.
+// First-run routing: read before declare. Reader-first (issue #56 slice 1,
+// issue #26) — once a readable corpus exists, Hermeneia opens the book before
+// any pipeline/dashboard surface, even for a returning steward who already
+// saved a question. The machine accompanies the reading; it does not gate it.
+// A returning steward with no readable corpus yet resumes at onboarding; a
+// fresh environment (no database or no documents) lands on first-run
+// onboarding — nobody should need SSH, Flask, SQLite, or pipeline scripts to
+// begin. Every older stage remains reachable by explicit navigation. If
+// document state is uncertain, fall back to Setup.
 function _bootDestination(h) {
   try {
     if (h && h._noDatabase) return 'firstrun';
+    // Reader-first: an existing document/corpus wins over the dashboard.
+    if (h && h.document && typeof h.document === 'object' && h.document.filename) {
+      return 'reader';
+    }
+    // No readable corpus yet: returning stewards resume onboarding, a fresh
+    // database with no document goes to first-run setup.
     if (invLoad()) return 'onboarding';
     if (h && h.document && typeof h.document === 'object') {
-      return h.document.filename ? 'reader' : 'firstrun';
+      return 'firstrun';
     }
   } catch {}
   return 'setup';
