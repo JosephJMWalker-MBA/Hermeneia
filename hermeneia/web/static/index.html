@@ -1048,6 +1048,30 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   background: rgba(111, 176, 207, .18);
   border-bottom-color: rgba(111, 176, 207, .72);
 }
+/* ── Machine Auto-Highlight Lens (issue #12) ─────────────
+   Machine attention shown inline, non-destructive and clearly
+   distinct from user highlights (cool violet, dotted underline,
+   faint wash — user marks are greenish with a solid border).
+   The machine points; the Page Brief remains the governing
+   surface for what enters the record. */
+.cr-machine-hl {
+  background: rgba(150, 150, 240, .10);
+  border-bottom: 1px dotted rgba(150, 150, 240, .75);
+  border-radius: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0 1px;
+  cursor: help;
+}
+.cr-machine-hl.cr-machine-approved {
+  background: rgba(150, 150, 240, .22);
+  border-bottom: 2px solid rgba(150, 150, 240, .92);
+}
+.cr-machine-hl.cr-machine-deferred {
+  background: transparent;
+  border-bottom: 1px dotted rgba(150, 150, 240, .45);
+  opacity: .8;
+}
 .cr-tag-chip {
   display: inline-block;
   margin-left: 5px;
@@ -1230,6 +1254,12 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 .cr-brief-count { font-size: 11px; color: var(--accent); white-space: nowrap; }
 .cr-brief-body { display: none; padding: 0 14px 12px; border-top: 1px solid var(--border); }
 .cr-page-brief[data-open="1"] .cr-brief-body { display: block; }
+.cr-brief-lens {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 0 14px 11px; border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.cr-brief-lens-hint { font-size: 11px; color: var(--dim2); }
 .cr-brief-note {
   font-size: 12px; color: var(--dim2); line-height: 1.6;
   margin: 12px 0; font-style: italic;
@@ -5650,6 +5680,9 @@ let _crTotalPages = 1;
 let _crDocs  = [];
 let _crPages = [];   // [{page, extractions, highlights}]
 let _crHighlights = [];
+let _crPageObs = [];            // machine observations for the current page (lens source)
+let _crCurrentExtractions = []; // current page extractions, kept for non-destructive re-render
+let _crLensOn = (() => { try { return localStorage.getItem('hermeneia_machine_lens') === '1'; } catch { return false; } })();
 let _crSelText = '';
 let _crSelToolbar = null;
 let _crRelevance = 'unclear';
@@ -6124,6 +6157,11 @@ function _crRenderDocPicker(ws) {
             <span style="flex:1"></span>
             <span class="cr-brief-count" id="cr-brief-count"></span>
           </button>
+          <div class="cr-brief-lens">
+            <button class="fs-pill" id="cr-lens-toggle" onclick="_crToggleLens()"
+              title="Show machine-observed passages inline on the page. Non-destructive — it never changes the source text or creates a record.">◧ Machine highlights</button>
+            <span class="cr-brief-lens-hint">A lens, not authorship — approve to keep, in the brief below.</span>
+          </div>
           <div class="cr-brief-body" id="cr-brief-body">
             <div class="cr-brief-note">Hermeneia noticed these possible points of attention. Read the page yourself, then approve, edit, question, or reject them.</div>
             <div id="cr-brief-list"></div>
@@ -6250,14 +6288,18 @@ function _crInlineHighlightClass(h) {
   return parts.join(' ');
 }
 
-function _crRenderTextWithHighlights(text, highlights) {
+// Renders a block's text non-destructively from source: user highlights are
+// wrapped by exact-substring match, and — when the Machine Lens is on — machine
+// observations are wrapped too, in a visually distinct style. User marks take
+// precedence on any overlap; rejected machine observations are never drawn.
+function _crRenderTextWithHighlights(text, highlights, machineObs) {
   if (!text) return '';
   const active = (highlights || []).filter(h =>
     h && h.status !== 'dismissed' && typeof h.selected_text === 'string' && h.selected_text.trim().length
   );
-  if (active.length === 0) return x(text);
 
   const ranges = [];
+  // User highlights first — they win any overlap with machine attention.
   active.forEach(h => {
     const selected = h.selected_text;
     let start = text.indexOf(selected);
@@ -6265,10 +6307,25 @@ function _crRenderTextWithHighlights(text, highlights) {
       const end = start + selected.length;
       const overlaps = ranges.some(r => start < r.end && end > r.start);
       if (!overlaps) {
-        ranges.push({ start, end, highlight: h });
+        ranges.push({ start, end, kind: 'user', highlight: h });
         break;
       }
       start = text.indexOf(selected, start + 1);
+    }
+  });
+  // Machine observations — only where they do not overlap a user mark.
+  // Exact substring is the safe strategy; an observation whose raw_text is not
+  // found verbatim in this block (normalization, cross-block spans) is simply
+  // not drawn rather than mismatched.
+  (machineObs || []).forEach(o => {
+    const seg = (o.raw_text || '').trim();
+    if (!seg || o.review_status === 'rejected') return;   // rejected = hidden
+    let start = text.indexOf(seg);
+    while (start >= 0) {
+      const end = start + seg.length;
+      const overlaps = ranges.some(r => start < r.end && end > r.start);
+      if (!overlaps) { ranges.push({ start, end, kind: 'machine', obs: o }); break; }
+      start = text.indexOf(seg, start + 1);
     }
   });
   if (ranges.length === 0) return x(text);
@@ -6278,15 +6335,62 @@ function _crRenderTextWithHighlights(text, highlights) {
   let html = '';
   ranges.forEach(r => {
     html += x(text.slice(cursor, r.start));
-    const titleParts = [`p.${r.highlight.page || '?'}`];
-    if (r.highlight.relevance) titleParts.push(r.highlight.relevance);
-    if (_crHighlightTags(r.highlight).includes('important')) titleParts.push('important');
-    if (r.highlight.status === 'observation_candidate') titleParts.push('observation candidate');
-    html += `<span class="${_crInlineHighlightClass(r.highlight)}" data-highlight-id="${x(r.highlight.id || '')}" title="${x(titleParts.join(' · '))}">${x(text.slice(r.start, r.end))}</span>`;
+    const body = x(text.slice(r.start, r.end));
+    if (r.kind === 'machine') {
+      const stateLabel = { approved: 'approved', unsure: 'deferred' }[r.obs.review_status] || 'unreviewed';
+      html += `<span class="${_crMachineHighlightClass(r.obs)}" data-machine-obs="${x(r.obs.id || '')}" title="Machine observation · ${stateLabel} · p.${r.obs.page || '?'}">${body}</span>`;
+    } else {
+      const h = r.highlight;
+      const titleParts = [`p.${h.page || '?'}`];
+      if (h.relevance) titleParts.push(h.relevance);
+      if (_crHighlightTags(h).includes('important')) titleParts.push('important');
+      if (h.status === 'observation_candidate') titleParts.push('observation candidate');
+      html += `<span class="${_crInlineHighlightClass(h)}" data-highlight-id="${x(h.id || '')}" title="${x(titleParts.join(' · '))}">${body}</span>`;
+    }
     cursor = r.end;
   });
   html += x(text.slice(cursor));
   return html;
+}
+
+function _crMachineHighlightClass(o) {
+  const parts = ['cr-machine-hl'];
+  if (o.review_status === 'approved') parts.push('cr-machine-approved');
+  else if (o.review_status === 'unsure') parts.push('cr-machine-deferred');
+  return parts.join(' ');
+}
+
+// The Machine Auto-Highlight Lens (issue #12). Non-destructive: it re-renders
+// each block's text from the source extraction, so toggling on and off never
+// mutates the text or creates a record. When off, machine spans simply are not
+// produced. Approve/reject/defer remain governed by the Page Brief; the lens
+// only reflects that state (approved = confirmed, deferred = subtle, rejected =
+// hidden).
+function _crApplyLens() {
+  const view = document.getElementById('cr-page-view');
+  if (!view) return;
+  const pageHighlights = (_crHighlights || []).filter(h => Number(h.page || 0) === Number(_crPage));
+  const machineObs = _crLensOn ? (_crPageObs || []) : [];
+  view.querySelectorAll('.cr-text-block').forEach(block => {
+    const idx = Number(block.dataset.crBlock);
+    const ex = _crCurrentExtractions[idx];
+    const textEl = block.querySelector('.cr-page-text');
+    if (ex && textEl) {
+      textEl.innerHTML = _crRenderTextWithHighlights(ex.text || '', pageHighlights, machineObs);
+    }
+  });
+}
+
+function _crReflectLensToggle() {
+  const btn = document.getElementById('cr-lens-toggle');
+  if (btn) btn.classList.toggle('fs-on', _crLensOn);
+}
+
+function _crToggleLens() {
+  _crLensOn = !_crLensOn;
+  try { localStorage.setItem('hermeneia_machine_lens', _crLensOn ? '1' : '0'); } catch {}
+  _crReflectLensToggle();
+  _crApplyLens();
 }
 
 function _crRenderPage() {
@@ -6297,6 +6401,7 @@ function _crRenderPage() {
     view.innerHTML = `<div class="e10-empty">No extracted text for page ${_crPage}.</div>`;
   } else {
     const pageHighlights = (_crHighlights || []).filter(h => Number(h.page || 0) === Number(_crPage));
+    _crCurrentExtractions = pageData.extractions || [];
     const blocks = (pageData.extractions || []).map((ex, idx) =>
       `<div class="cr-text-block" data-cr-block="${idx}">
          <button class="cr-block-capture" onclick="_crCaptureBlock(${idx})" title="Capture this passage if text selection is unreliable">Capture this passage</button>
@@ -6364,6 +6469,11 @@ async function _crLoadRelated() {
   try {
     const data = await get(`/api/reader/documents/${encodeURIComponent(_crDocId)}/related-observations?page=${_crPage}`);
     const obs = data.observations || [];
+    // Lens source: strictly current-page observations only (the feed may
+    // include ±1 neighbours for the brief; the lens must not mark them).
+    _crPageObs = obs.filter(o => Number(o.page) === Number(_crPage));
+    _crReflectLensToggle();
+    _crApplyLens();
     // Secondary full list (unchanged presentation).
     if (panel) {
       panel.innerHTML = obs.length ? obs.map(o =>
@@ -6467,6 +6577,11 @@ function _crMarkBriefRuled(item, status) {
   item.dataset.ruled = '1';
   const actions = item.querySelector('.cr-brief-actions');
   if (actions) actions.outerHTML = `<span class="cr-brief-status" style="color:${color}">${label}</span>`;
+  // Keep the lens in step with the governing brief: a ruling here restyles
+  // (or, for reject, removes) the corresponding machine highlight on the page.
+  const obsId = item.dataset.obs;
+  const target = (_crPageObs || []).find(o => o.id === obsId);
+  if (target) { target.review_status = status; if (_crLensOn) _crApplyLens(); }
 }
 
 async function _crLoadHighlightList() {
