@@ -51,8 +51,52 @@ from ..explorer.interpreter import (
     generate_interpretation_from_bucket,
 )
 from ..explorer.bucketer import BucketingError, generate_candidate_buckets
+from ..study import compile_study
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+def _coerce_rank(value):
+    """Validate an annotation rank (Issue #35). Returns (rank_or_None, error_or_None).
+
+    Accepts None/'' (unranked is valid) and integers 1-5. Rejects everything else
+    so the substrate never stores a meaningless rank.
+    """
+    if value is None:
+        return None, None
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return None, None
+        if not value.isdecimal():
+            return None, "rank must be an integer 1-5 or null"
+        r = int(value)
+    elif isinstance(value, bool) or not isinstance(value, int):
+        return None, "rank must be an integer 1-5 or null"
+    else:
+        r = value
+    if not (1 <= r <= 5):
+        return None, "rank must be between 1 and 5"
+    return r, None
+
+
+def _coerce_optional_text(value):
+    if value is None:
+        return None
+    cleaned = str(value).strip()
+    return cleaned or None
+
+
+def _json_list(value):
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except (TypeError, ValueError):
+            return []
+        return parsed if isinstance(parsed, list) else []
+    return []
 
 
 def create_app(
@@ -5524,13 +5568,21 @@ Return ONLY valid JSON, no markdown, no explanation:
         if relevance not in valid_relevance:
             relevance = "unclear"
 
+        # Issue #35 substrate: rank (1-5 or None), theme_bucket, evidence_bucket.
+        rank, rank_err = _coerce_rank(payload.get("rank"))
+        if rank_err:
+            conn.close()
+            return jsonify({"error": rank_err}), 400
+        theme_bucket = _coerce_optional_text(payload.get("theme_bucket"))
+        evidence_bucket = _coerce_optional_text(payload.get("evidence_bucket"))
+
         conn.execute(
             """INSERT INTO reader_highlights
                (id, source_document_id, source_role, page, source_locator,
                 selected_text, context_before, context_after,
                 note_text, question_text, question_type, relevance, tags,
-                status, created_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                status, rank, theme_bucket, evidence_bucket, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 highlight_id,
                 doc_id,
@@ -5546,6 +5598,9 @@ Return ONLY valid JSON, no markdown, no explanation:
                 relevance,
                 json.dumps(payload.get("tags") or []),
                 "saved_highlight",
+                rank,
+                theme_bucket,
+                evidence_bucket,
                 now,
                 now,
             )
@@ -5574,7 +5629,9 @@ Return ONLY valid JSON, no markdown, no explanation:
             conn.close()
             return _scope_error_response(exc)
 
-        allowed = {"note_text", "question_text", "question_type", "relevance", "tags", "status", "page", "source_locator"}
+        allowed = {"note_text", "question_text", "question_type", "relevance", "tags",
+                   "status", "page", "source_locator",
+                   "rank", "theme_bucket", "evidence_bucket"}
         valid_status = {"saved_highlight", "observation_candidate", "promoted_to_observation", "dismissed"}
         valid_relevance = {"supports", "complicates", "contradicts", "background", "unclear"}
         sets, vals = [], []
@@ -5585,6 +5642,13 @@ Return ONLY valid JSON, no markdown, no explanation:
                 continue
             if key == "relevance" and val not in valid_relevance:
                 continue
+            if key == "rank":
+                val, rank_err = _coerce_rank(val)
+                if rank_err:
+                    conn.close()
+                    return jsonify({"error": rank_err}), 400
+            if key in ("theme_bucket", "evidence_bucket"):
+                val = _coerce_optional_text(val)
             if key == "tags":
                 val = json.dumps(val if isinstance(val, list) else [])
             sets.append(f"{key} = ?")
@@ -5626,6 +5690,41 @@ Return ONLY valid JSON, no markdown, no explanation:
         conn.close()
         return jsonify({"ok": True})
 
+    @app.route("/api/study/compile")
+    def api_study_compile():
+        """Compile a reader's ranked marks into a structured study summary
+        (Issue #35). Deterministic, AI-free. Optional ?document_id= scopes to
+        one document; otherwise compiles across all marks."""
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        doc_id = str(request.args.get("document_id") or "").strip()
+        conn = _conn()
+        if doc_id:
+            try:
+                require_active_document(conn, doc_id)
+            except _ScopeAccessError as exc:
+                conn.close()
+                return _scope_error_response(exc)
+            rows = conn.execute(
+                "SELECT * FROM reader_highlights WHERE source_document_id = ? "
+                "ORDER BY page, created_at, id",
+                (doc_id,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT rh.* FROM reader_highlights rh
+                   JOIN source_documents sd ON sd.id = rh.source_document_id
+                   WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
+                   ORDER BY rh.page, rh.created_at, rh.id"""
+            ).fetchall()
+        conn.close()
+        annotations = []
+        for r in rows:
+            d = dict(r)
+            d["tags"] = _json_list(d.get("tags"))
+            annotations.append(d)
+        return jsonify(compile_study(annotations))
+
     @app.route("/api/reader/documents/<doc_id>/highlights")
     def api_reader_document_highlights(doc_id: str):
         """All non-dismissed highlights for a document."""
@@ -5647,7 +5746,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         result = []
         for h in rows:
             d = dict(h)
-            d["tags"] = json.loads(d.get("tags") or "[]")
+            d["tags"] = _json_list(d.get("tags"))
             result.append(d)
         return jsonify({"highlights": result})
 
