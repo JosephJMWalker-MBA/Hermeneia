@@ -41,6 +41,8 @@ workspace/
 ├── investigation.json     # governing question (#72), purpose, lenses, reconsider
 ├── corpus/
 │   ├── documents.json     # source doc metadata: hashes, roles, exclusion, pages
+│   ├── extractions.json   # exact parser output — the substrate observations were built on (§5.1)
+│   ├── observations.json  # canonical extraction-derived
 │   └── uploads/           # original source files (PDFs, …), named by hash
 ├── study/
 │   ├── highlights.json    # reader highlights: text, notes, questions, tags
@@ -112,18 +114,58 @@ safe). This is what keeps the bundle honest across versions.
 
 ---
 
-## 5. Round-trip fidelity and determinism
+## 5. Evidence preservation, round-trip fidelity, and determinism
+
+### 5.1 Preserved extractions vs. rebuild capability
+
+`source_extractions` are stored in the bundle as **canonical**, not treated as
+regenerable-from-the-PDF. They usually *can* be regenerated — but that is not the
+point. Hermeneia's constitutional model preserves the **exact evidence the
+steward worked against**:
+
+```
+PDF  →  Parser v1.7  →  SourceExtractions  →  Observations  →  Interpretations
+```
+
+If, three years later, Parser v2.3 fixes OCR, ligatures, hyphenation, or layout
+reconstruction, re-parsing the PDF may produce a *different* extraction. That may
+be an improvement — but it is no longer the substrate on which the investigation
+was actually conducted. Regenerating silently would rewrite history.
+
+So the spec separates two concepts:
+
+- **Canonical investigation state** — preserve the `source_extractions` that
+  actually produced the observations. This is what `corpus/extractions.json`
+  holds, and why its role is `canonical`.
+- **Rebuild capability** — the `uploads/` PDFs are also preserved, so a newer
+  parser *can* be re-run later and its output **compared** against the preserved
+  extraction, rather than overwriting it:
+
+```
+Original parser output
+        ├── Investigation A  (historical, preserved)
+Reparse with newer parser
+        └── Investigation B  (or a migration preview)
+```
+
+Instead of silently changing history, Hermeneia can say: *"The parser has
+improved. Here is exactly what would change."* This is the same discipline as the
+evaluation harness — **preserve history first, evaluate changes second.** (A
+reparse/compare tool is a future follow-up, not part of WBS v1; the bundle only
+needs to preserve both the extraction and the source so it stays possible.)
+
+### 5.2 Round-trip fidelity and determinism
 
 Two properties make the bundle trustworthy and Git-friendly.
 
-### Round-trip
+#### Round-trip
 
 `SQLite → bundle → SQLite` must be **lossless for `canonical` and `authored`
 data**. `derived` data is explicitly *not* required to survive byte-for-byte — it
 is regenerated. A conformance test walks: seed a DB → export → import into a
 fresh DB → assert canonical+authored rows are identical.
 
-### Determinism (non-negotiable)
+#### Determinism (non-negotiable)
 
 Bundle serialization MUST be deterministic, or Git diffs become noise and the
 "intellectual history" story collapses:
@@ -135,7 +177,7 @@ Bundle serialization MUST be deterministic, or Git diffs become noise and the
 The synthesis packet and lineage already hold this discipline (deterministic for
 identical inputs), so the bundle inherits a proven pattern.
 
-### What a good Git diff then looks like
+#### What a good Git diff then looks like
 
 ```
 Study Gatsby Chapter 1
@@ -157,7 +199,7 @@ Git history becomes an **intellectual** history, not a binary snapshot.
 | `workspace_investigation` (#72) | `investigation.json` | authored |
 | `source_documents` | `corpus/documents.json` | canonical |
 | `build/uploads/*` | `corpus/uploads/<hash>.<ext>` | canonical |
-| `source_extractions` | `corpus/documents.json` (per-doc extractions) or a sibling | canonical |
+| `source_extractions` | `corpus/extractions.json` | canonical (the exact substrate; see §5.1) |
 | `observations` (+ terms) | `corpus/observations.json` | canonical |
 | `reader_highlights` | `study/highlights.json` (+ `questions`/`buckets`/`rankings` projections) | authored |
 | `investigation_log` | `study/field_notes.json` | authored |
@@ -251,3 +293,10 @@ long-term archival) consumes and produces the same honest artifact.
 A pleasant interface attracts users. A trustworthy, portable format is what lets
 someone entrust years of thinking to a system. This spec is the contract that
 makes that trust portable.
+
+Seen this way, the Workspace Bundle is quietly larger than a backup format: it is
+**Hermeneia's constitution for portability.** Every future storage provider —
+GitHub, a local folder, S3, IPFS, Syncthing, an external drive, a USB stick —
+consumes and produces the same bundle. The provider becomes plumbing; the
+Workspace Bundle becomes the contract. Just as Hermeneia has a constitution for
+what it *means*, the workspace now has a published format for how it *travels*.
