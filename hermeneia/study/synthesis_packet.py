@@ -281,6 +281,127 @@ def _reading_trail(
     }
 
 
+def _lineage(
+    active: list[dict[str, Any]],
+    field_note_packet: dict[str, Any],
+    document_names: dict[str, str],
+    thesis_ids: list[Any],
+    strongest_ids: list[Any],
+    evidence_ids: list[Any],
+) -> dict[str, Any]:
+    """Deterministic backward references from packet items to their records.
+
+    For every study record that surfaces anywhere in the packet, record the
+    roles it plays (ranked highlight, theme bucket, thesis candidate, …) and
+    the single source chain that grounds it. Absent source fields are listed
+    explicitly in ``missing`` rather than silently dropped, so an untraceable
+    claim is visible as such. This reads only the records already passed in;
+    it performs no provider call and touches no canonical evidence.
+    """
+    thesis = {str(i) for i in thesis_ids}
+    strongest = {str(i) for i in strongest_ids}
+    evidence = {str(i) for i in evidence_ids}
+    records: list[dict[str, Any]] = []
+
+    for annotation in sorted(active, key=_record_key):
+        highlight_id = annotation.get("id")
+        if not highlight_id:
+            continue
+        roles: list[str] = []
+        if _rank(annotation.get("rank")):
+            roles.append("ranked_highlight")
+        theme = _text(annotation.get("theme_bucket"))
+        if theme:
+            roles.append(f"theme_bucket:{theme}")
+        if _text(annotation.get("question_text")):
+            roles.append("unresolved_question")
+        if str(highlight_id) in thesis:
+            roles.append("thesis_candidate")
+        if str(highlight_id) in strongest:
+            roles.append("strongest_observation")
+        if str(highlight_id) in evidence:
+            roles.append("evidence_bucket")
+        if not roles:
+            continue  # highlight is not surfaced anywhere in the packet
+        document_id = annotation.get("source_document_id")
+        source = {
+            "document_id": document_id,
+            "filename": document_names.get(str(document_id or "")),
+            "page": annotation.get("page"),
+            "source_locator": _text(annotation.get("source_locator")),
+            "observation_id": annotation.get("observation_id"),
+        }
+        missing = [
+            field for field in ("page", "source_locator")
+            if source.get(field) in (None, "")
+        ]
+        traceable = bool(document_id) and not (
+            {"page", "source_locator"} <= set(missing)
+        )
+        records.append({
+            "record_type": "reader_highlight",
+            "record_id": highlight_id,
+            "roles": roles,
+            "source": source,
+            "traceable": traceable,
+            "missing": missing,
+        })
+
+    field_note_roles: dict[Any, dict[str, Any]] = {}
+    understanding = field_note_packet.get("current_understanding")
+    if understanding:
+        field_note_roles.setdefault(
+            understanding.get("field_note_id"),
+            {"roles": [], "source": understanding.get("source", {})},
+        )["roles"].append("field_note_understanding")
+    for question in field_note_packet.get("pressing_questions", []):
+        entry = field_note_roles.setdefault(
+            question.get("field_note_id"),
+            {"roles": [], "source": question.get("source", {})},
+        )
+        entry["roles"].append("field_note_question")
+
+    for field_note_id, entry in sorted(
+        field_note_roles.items(), key=lambda item: str(item[0] or "")
+    ):
+        if not field_note_id:
+            continue
+        src = entry["source"] or {}
+        source = {
+            "document_id": src.get("document_id"),
+            "filename": src.get("filename"),
+            "page": src.get("page"),
+            "source_locator": None,
+        }
+        traceable = bool(source["document_id"]) and source["page"] is not None
+        records.append({
+            "record_type": "field_note",
+            "record_id": field_note_id,
+            "roles": entry["roles"],
+            "source": source,
+            "traceable": traceable,
+            "missing": ["source_locator"],
+            "missing_reason": (
+                "Field notes are recorded at page granularity; no block-level "
+                "locator exists."
+            ),
+        })
+
+    return {
+        "note": (
+            "Deterministic backward references from packet items to the study "
+            "records and source locations that produced them. No canonical "
+            "evidence is read or modified."
+        ),
+        "records": records,
+        "counts": {
+            "records": len(records),
+            "traceable": sum(1 for record in records if record["traceable"]),
+            "untraceable": sum(1 for record in records if not record["traceable"]),
+        },
+    }
+
+
 def compile_synthesis_packet(
     annotations: list[dict[str, Any]],
     *,
@@ -312,6 +433,22 @@ def compile_synthesis_packet(
     compiled_record = compile_study(active)
     field_note_packet = _field_note_packet(field_notes)
     ranked_highlights = _ranked_highlights(active, document_names)
+
+    thesis_candidate_ids = [
+        item.get("id")
+        for item in compiled_record["thesis_candidates"]
+        if item.get("id")
+    ]
+    strongest_observation_ids = [
+        item.get("id")
+        for item in compiled_record["strongest_observations"]
+        if item.get("id")
+    ]
+    evidence_bucket_ids = [
+        item.get("id")
+        for item in compiled_record["evidence_bucket"]
+        if item.get("id")
+    ]
 
     return {
         "packet_type": PACKET_VERSION,
@@ -357,23 +494,19 @@ def compile_synthesis_packet(
         ),
         "compiled_record": {
             "counts": compiled_record["counts"],
-            "thesis_candidate_ids": [
-                item.get("id")
-                for item in compiled_record["thesis_candidates"]
-                if item.get("id")
-            ],
-            "strongest_observation_ids": [
-                item.get("id")
-                for item in compiled_record["strongest_observations"]
-                if item.get("id")
-            ],
-            "evidence_bucket_ids": [
-                item.get("id")
-                for item in compiled_record["evidence_bucket"]
-                if item.get("id")
-            ],
+            "thesis_candidate_ids": thesis_candidate_ids,
+            "strongest_observation_ids": strongest_observation_ids,
+            "evidence_bucket_ids": evidence_bucket_ids,
             "suggested_next_steps": compiled_record["suggested_next_steps"],
         },
+        "lineage": _lineage(
+            active,
+            field_note_packet,
+            document_names,
+            thesis_candidate_ids,
+            strongest_observation_ids,
+            evidence_bucket_ids,
+        ),
         "provenance": {
             "compiler": "hermeneia.study.compile_synthesis_packet",
             "version": PACKET_VERSION,
