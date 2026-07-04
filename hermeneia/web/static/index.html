@@ -1185,17 +1185,18 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
   color: var(--dim2); font-weight: 700; margin-bottom: 12px;
 }
-.cr-highlight-form textarea, .cr-highlight-form input[type=text] {
+.cr-highlight-form textarea, .cr-highlight-form input[type=text], .cr-highlight-form select {
   width: 100%; box-sizing: border-box; background: var(--bg);
   border: 1px solid var(--border2); border-radius: var(--r);
   color: var(--fg); font: inherit; font-size: 13px;
   padding: 8px 10px; resize: vertical;
 }
-.cr-highlight-form textarea:focus, .cr-highlight-form input[type=text]:focus {
+.cr-highlight-form textarea:focus, .cr-highlight-form input[type=text]:focus, .cr-highlight-form select:focus {
   outline: none; border-color: var(--accent);
 }
 .cr-form-row { margin-bottom: 10px; }
 .cr-form-label { font-size: 10px; color: var(--dim2); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+.cr-form-hint { font-size: 11px; color: var(--dim2); margin-top: 4px; line-height: 1.45; }
 .cr-relevance-btns { display: flex; flex-wrap: wrap; gap: 6px; }
 .cr-rel-btn {
   padding: 3px 9px; border-radius: 3px; border: 1px solid var(--border2);
@@ -1221,6 +1222,13 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 .cr-highlight-item:hover { border-color: var(--accent); }
 .cr-highlight-quote { color: var(--fg2); font-style: italic; line-height: 1.5; margin-bottom: 4px; }
 .cr-highlight-meta { color: var(--dim2); font-size: 10px; font-family: var(--mono); }
+.cr-annotation-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.cr-annotation-chip {
+  display: inline-block; font-size: 9px; text-transform: uppercase; letter-spacing: .07em;
+  padding: 1px 5px; border-radius: 3px; border: 1px solid var(--border2);
+  color: var(--dim2); background: var(--surface);
+}
+.cr-annotation-rank { border-color: var(--accent); color: var(--accent); background: var(--accent2); }
 .cr-candidate-badge {
   display: inline-block; font-size: 9px; text-transform: uppercase; letter-spacing: .08em;
   padding: 1px 5px; border-radius: 3px; background: #1e2a3a; color: #6fb0cf;
@@ -6280,6 +6288,47 @@ function _crHighlightTags(h) {
   return Array.isArray(h?.tags) ? h.tags.filter(t => typeof t === 'string') : [];
 }
 
+const _CR_RANK_LABELS = {
+  1: 'Speculative',
+  2: 'Minor',
+  3: 'Useful',
+  4: 'Strong',
+  5: 'Foundational',
+};
+
+function _crRankLabel(rank) {
+  const n = Number(rank);
+  return Number.isInteger(n) && _CR_RANK_LABELS[n] ? `${n} — ${_CR_RANK_LABELS[n]}` : '';
+}
+
+function _crRankOptions(selected) {
+  const current = Number(selected);
+  return '<option value="">Unranked</option>' + [1, 2, 3, 4, 5].map(n =>
+    `<option value="${n}" ${current === n ? 'selected' : ''}>${n} — ${_CR_RANK_LABELS[n]}</option>`
+  ).join('');
+}
+
+function _crReadRankValue(id) {
+  const raw = document.getElementById(id)?.value || '';
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= 5 ? n : raw;
+}
+
+function _crReadOptionalText(id) {
+  const value = document.getElementById(id)?.value?.trim() || '';
+  return value || null;
+}
+
+function _crAnnotationMetaHtml(h) {
+  const chips = [];
+  const rankLabel = _crRankLabel(h?.rank);
+  const theme = (h?.theme_bucket || '').trim();
+  if (rankLabel) chips.push(`<span class="cr-annotation-chip cr-annotation-rank">Rank ${x(rankLabel)}</span>`);
+  if (theme) chips.push(`<span class="cr-annotation-chip">Theme ${x(theme)}</span>`);
+  return chips.length ? `<div class="cr-annotation-meta">${chips.join('')}</div>` : '';
+}
+
 function _crInlineHighlightClass(h) {
   const tags = _crHighlightTags(h);
   const parts = ['cr-inline-highlight'];
@@ -6616,6 +6665,7 @@ async function _crLoadHighlightList() {
             `<span class="cr-concept-chip">✦ ${x(t.slice(8))}</span>`).join('')}
           ${typedTagBadges}
         </div>
+        ${_crAnnotationMetaHtml(h)}
         ${h.note_text ? `<div style="font-size:11px;color:var(--dim2);margin-top:3px;line-height:1.4">${x(h.note_text.slice(0,80))}${h.note_text.length>80?'…':''}</div>` : ''}
       </div>`;
     }).join('');
@@ -6781,6 +6831,16 @@ function _crHighlightSelected(focus) {
         <input id="cr-tags-input" type="text" placeholder="theme, tension, term">
       </div>
       <div class="cr-form-row">
+        <div class="cr-form-label">Rank</div>
+        <select id="cr-rank-input">${_crRankOptions(null)}</select>
+        <div class="cr-form-hint">How much weight should this mark carry?</div>
+      </div>
+      <div class="cr-form-row">
+        <div class="cr-form-label">Theme bucket</div>
+        <input id="cr-theme-input" type="text" placeholder="aspiration, class, exile">
+        <div class="cr-form-hint">What kind of meaning does this belong to?</div>
+      </div>
+      <div class="cr-form-row">
         <div class="cr-form-label">${isConcept ? 'What this concept means in this investigation' : 'Note'}</div>
         <textarea id="cr-note-input" rows="3" placeholder="${isConcept ? 'Working definition, distinctions from neighboring terms…' : 'Your reading note…'}">${isCandidate ? 'Candidate for observation.' : ''}</textarea>
       </div>
@@ -6856,6 +6916,8 @@ async function _crSaveHighlight(asCandidate) {
   const question = document.getElementById('cr-q-input')?.value?.trim() || '';
   const important = !!document.getElementById('cr-important-input')?.checked;
   const typedTags = _crParseTypedTags(document.getElementById('cr-tags-input')?.value || '');
+  const rank = _crReadRankValue('cr-rank-input');
+  const themeBucket = _crReadOptionalText('cr-theme-input');
 
   // Get surrounding context from page text
   const fullText = _crPageReadingText();
@@ -6879,6 +6941,8 @@ async function _crSaveHighlight(asCandidate) {
     question_text: question || null,
     relevance: _crRelevance,
     tags,
+    rank,
+    theme_bucket: themeBucket,
   };
 
   try {
@@ -6942,6 +7006,7 @@ async function _crShowHighlightDetail(highlightId) {
   form.innerHTML = `
     <div style="font-size:10px;color:var(--dim2);font-family:var(--mono);margin-bottom:8px">p.${h.page || '?'} · ${statusLabel[h.status] || h.status}</div>
     <div class="cr-saved-passage">${x(h.selected_text)}</div>
+    ${_crAnnotationMetaHtml(h)}
     <div class="cr-highlight-form" style="margin-top:12px">
       <div class="cr-form-row">
         <label class="cr-important-row">
@@ -6952,6 +7017,16 @@ async function _crShowHighlightDetail(highlightId) {
       <div class="cr-form-row">
         <div class="cr-form-label">Tags</div>
         <input id="cr-edit-tags" type="text" value="${x(typedTags)}" placeholder="theme, tension, term">
+      </div>
+      <div class="cr-form-row">
+        <div class="cr-form-label">Rank</div>
+        <select id="cr-edit-rank">${_crRankOptions(h.rank)}</select>
+        <div class="cr-form-hint">How much weight should this mark carry?</div>
+      </div>
+      <div class="cr-form-row">
+        <div class="cr-form-label">Theme bucket</div>
+        <input id="cr-edit-theme" type="text" value="${x(h.theme_bucket || '')}" placeholder="aspiration, class, exile">
+        <div class="cr-form-hint">What kind of meaning does this belong to?</div>
       </div>
       <div class="cr-form-row">
         <div class="cr-form-label">Note</div>
@@ -6987,6 +7062,8 @@ async function _crUpdateHighlight(id) {
   const question = document.getElementById('cr-edit-q')?.value?.trim() || '';
   const important = !!document.getElementById('cr-edit-important')?.checked;
   const typedTags = _crParseTypedTags(document.getElementById('cr-edit-tags')?.value || '');
+  const rank = _crReadRankValue('cr-edit-rank');
+  const themeBucket = _crReadOptionalText('cr-edit-theme');
   const existing = _crHighlights.find(h => h.id === id);
   const conceptTags = _crHighlightTags(existing).filter(t => t.startsWith('concept:'));
   const tags = _crUniqueTags([
@@ -7000,7 +7077,14 @@ async function _crUpdateHighlight(id) {
     const res = await fetch(`/api/reader/highlights/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note_text: note, question_text: question, relevance: _crRelevance, tags }),
+      body: JSON.stringify({
+        note_text: note,
+        question_text: question,
+        relevance: _crRelevance,
+        tags,
+        rank,
+        theme_bucket: themeBucket,
+      }),
     });
     if (!res.ok) throw new Error((await res.json()).error || 'Update failed');
     if (msg) { msg.textContent = '✓ Saved'; msg.style.color = 'var(--green)'; }
