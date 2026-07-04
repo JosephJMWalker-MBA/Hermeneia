@@ -52,6 +52,7 @@ from ..explorer.interpreter import (
 )
 from ..explorer.bucketer import BucketingError, generate_candidate_buckets
 from ..study import compile_study, compile_synthesis_packet
+from .reader_projection import project_reader_extractions
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -5497,22 +5498,25 @@ Return ONLY valid JSON, no markdown, no explanation:
             conn.close()
             return _scope_error_response(exc)
         extractions = conn.execute(
-            """SELECT page, region, raw_text, source_locator
+            """SELECT id, page, region, raw_text, source_locator
                FROM source_extractions
                WHERE document_id = ?
                ORDER BY page, source_locator""",
             (doc_id,)
         ).fetchall()
 
-        # Group by page
-        pages: dict[int, list] = {}
+        # Group canonical extractions by page, then build disposable Reader
+        # projections per page. The projection never mutates the stored
+        # evidence — it only assembles display blocks (e.g. PDF drop-cap
+        # repair) that carry their contributing extraction IDs.
+        raw_by_page: dict[int, list] = {}
         for ex in extractions:
             pg = ex["page"] or 1
-            pages.setdefault(pg, []).append({
-                "region": ex["region"],
-                "text": ex["raw_text"],
-                "source_locator": ex["source_locator"],
-            })
+            raw_by_page.setdefault(pg, []).append(dict(ex))
+        pages: dict[int, list] = {
+            pg: project_reader_extractions(rows)
+            for pg, rows in raw_by_page.items()
+        }
 
         # Fetch highlights for this doc
         highlights = conn.execute(
