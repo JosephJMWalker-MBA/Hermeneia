@@ -6,5 +6,13 @@ structured study summary. AI enrichment (Blueprint Layer 3) builds on top of thi
 it never replaces it.
 """
 from .compiler import MARK_TYPES, RANK_LABELS, classify_mark, compile_study
+from .synthesis_packet import PACKET_VERSION, compile_synthesis_packet
 
-__all__ = ["MARK_TYPES", "RANK_LABELS", "classify_mark", "compile_study"]
+__all__ = [
+    "MARK_TYPES",
+    "RANK_LABELS",
+    "classify_mark",
+    "compile_study",
+    "compile_synthesis_packet",
+    "PACKET_VERSION",
+]
