@@ -10,6 +10,7 @@ from .evidence_preservation import (
     EVIDENCE_PRESERVATION,
     score_evidence_preservation,
 )
+from .corpus_boundary import CORPUS_BOUNDARY, score_corpus_boundary
 from .report import HARNESS_VERSION, build_evaluation_report
 
 __all__ = [
@@ -20,6 +21,8 @@ __all__ = [
     "ScorerVerdict",
     "EVIDENCE_PRESERVATION",
     "score_evidence_preservation",
+    "CORPUS_BOUNDARY",
+    "score_corpus_boundary",
     "HARNESS_VERSION",
     "build_evaluation_report",
 ]

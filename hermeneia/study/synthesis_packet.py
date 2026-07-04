@@ -463,6 +463,7 @@ def compile_synthesis_packet(
                     "file_hash": document.get("file_hash"),
                     "source_role": document.get("source_role") or "primary",
                     "total_pages": document.get("total_pages"),
+                    "excluded": bool(document.get("excluded_from_analysis")),
                 }
                 for document in ordered_documents
             ],
