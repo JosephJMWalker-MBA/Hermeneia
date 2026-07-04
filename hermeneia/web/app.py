@@ -6589,9 +6589,11 @@ Return ONLY valid JSON, no markdown, no explanation:
         if page is not None:
             rows = conn.execute(
                 """SELECT o.id, o.raw_text, o.page, o.source_locator,
-                          sd.original_filename, sd.source_role
+                          sd.original_filename, sd.source_role,
+                          orv.review_status
                    FROM observations o
                    JOIN source_documents sd ON sd.id = o.source_document_id
+                   LEFT JOIN observation_reviews orv ON orv.observation_id = o.id
                    WHERE o.source_document_id = ? AND ABS(o.page - ?) <= 1
                      AND sd.excluded_from_analysis = 0
                    ORDER BY ABS(o.page - ?), o.paragraph
@@ -6601,9 +6603,11 @@ Return ONLY valid JSON, no markdown, no explanation:
         else:
             rows = conn.execute(
                 """SELECT o.id, o.raw_text, o.page, o.source_locator,
-                          sd.original_filename, sd.source_role
+                          sd.original_filename, sd.source_role,
+                          orv.review_status
                    FROM observations o
                    JOIN source_documents sd ON sd.id = o.source_document_id
+                   LEFT JOIN observation_reviews orv ON orv.observation_id = o.id
                    WHERE o.source_document_id = ?
                      AND sd.excluded_from_analysis = 0
                    ORDER BY o.page, o.paragraph

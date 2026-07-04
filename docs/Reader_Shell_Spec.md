@@ -211,8 +211,9 @@ Rollback at any phase = flip the flag. Every phase leaves the test suite green a
 | # | PR | Size | Depends on | Owner note |
 |---|----|----|------------|-----------|
 | 1 | Question Bar (question + page identity + Return to Reading; question card merges) | S | — | |
-| 2 | Field Notes Tray | S | — | **Codex-queued (#12)** |
-| 3 | Page Brief + Machine Lens | M | — | **Codex-queued (#12)** |
+| 2 | Field Notes Tray | S | — | **Shipped — PR #32** |
+| 3a | Page Brief (accordion + stewardship rulings) | M | — | **Shipped — this PR (#12)** |
+| 3b | Machine Lens (inline auto-highlight) | M | 3a | deferred to a later PR |
 | 4 | Cycle Bar + Tool Rail v1 (Read/Segment), stage bars hidden behind flag | M | 1 | |
 | 5 | Evidence Bucket (rail foot; brief/selection actions feed it) | M | 3,4 | pairs with #11 rulings |
 | 6 | Companion dock ↔ bubble | S | 1 | restyling note (Atlas) applies here |
@@ -225,6 +226,8 @@ Rollback at any phase = flip the flag. Every phase leaves the test suite green a
 | 13 | Retire legacy shell | S | all | |
 
 Sequencing logic: PRs 1–6 are independent-ish and each visibly improves the live app; the Sheets (7–9) are the structural absorption; 10–13 are consolidation. At no point is the Reader loop — read, notice, ask, keep — interrupted.
+
+**Page Brief persistence (PR 3a):** the brief's stewardship actions are durable, not placeholder. Approve / Reject / Defer write to the existing `observation_reviews` table via `POST /api/observations/<id>/review` (statuses `approved` / `rejected` / `unsure`); Add question writes an `inquiry_notes` row via `POST /api/observations/<id>/inquiry`. The `related-observations` feed now returns each observation's `review_status`, so rulings reappear on reload. Nothing here is temporary. What is deferred is *routing* — the Evidence Bucket (PR 5, with #11's ruling vocabulary) will consume these same records; until then a ruling is recorded but not yet bucketed.
 
 ---
 

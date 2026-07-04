@@ -343,6 +343,65 @@ def test_related_observations_scoped_to_page(tmp_path):
     assert "obs_p9" not in ids, "Distant-page observations must not appear when filtering by page"
 
 
+# ── Machine Page Brief (issue #12): the brief is fed by related-observations,
+#    and its stewardship rulings persist via the existing review endpoint. ──
+
+def test_page_brief_observations_carry_review_status(tmp_path):
+    """The brief needs each page observation with its current ruling so it can
+    render (and, on reload, reflect) approve/reject/defer state."""
+    db = _make_db(tmp_path)
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    _insert_doc(conn, "a" * 64, "gatsby.pdf", source_role="primary")
+    _insert_obs(conn, "obs_p1", "a" * 64, "Page 1 observation.", page=1)
+    conn.commit(); conn.close()
+
+    client = create_app(db_path=db).test_client()
+    obs = client.get(f"/api/reader/documents/{'a'*64}/related-observations?page=1").get_json()["observations"]
+    assert obs and "review_status" in obs[0]
+    assert obs[0]["review_status"] is None  # unruled by default
+
+
+def test_page_brief_ruling_persists_across_reload(tmp_path):
+    """A brief stewardship action (approve) persists and is visible on a fresh
+    app instance over the same DB — the requirement: rulings survive reload."""
+    db = _make_db(tmp_path)
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    _insert_doc(conn, "a" * 64, "gatsby.pdf", source_role="primary")
+    _insert_obs(conn, "obs_p1", "a" * 64, "Page 1 observation.", page=1)
+    conn.commit(); conn.close()
+
+    first = create_app(db_path=db).test_client()
+    r = first.post("/api/observations/obs_p1/review", json={"review_status": "approved"})
+    assert r.status_code == 200
+
+    second = create_app(db_path=db).test_client()
+    obs = second.get(f"/api/reader/documents/{'a'*64}/related-observations?page=1").get_json()["observations"]
+    ruled = {o["id"]: o["review_status"] for o in obs}
+    assert ruled["obs_p1"] == "approved", "Brief ruling must survive reload"
+
+
+def test_page_brief_question_persists_as_inquiry(tmp_path):
+    """The brief's 'add question' action records an inquiry note against the
+    observation, durable across reload."""
+    db = _make_db(tmp_path)
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    _insert_doc(conn, "a" * 64, "gatsby.pdf", source_role="primary")
+    _insert_obs(conn, "obs_p1", "a" * 64, "Page 1 observation.", page=1)
+    conn.commit(); conn.close()
+
+    first = create_app(db_path=db).test_client()
+    r = first.post("/api/observations/obs_p1/inquiry",
+                   json={"question_text": "Is this the narrator's judgment or the author's?"})
+    assert r.status_code == 201
+
+    second = create_app(db_path=db).test_client()
+    notes = second.get("/api/observations/obs_p1/review").get_json()["inquiry_notes"]
+    assert any("narrator's judgment" in n["question_text"] for n in notes)
+
+
 # ── Document list ──────────────────────────────────────────────────────────────
 
 def test_reader_documents_list_excludes_excluded_docs(tmp_path):
