@@ -1251,6 +1251,43 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   .cr-layout { grid-template-columns: 1fr; }
   .cr-side { position: static; }
 }
+/* ── Field Notes footer tray (issue #12) ─────────────────
+   Field Notes lives at the bottom of the Reader — a footnote
+   tray, not a side panel. Collapsed to a slim bar; opens
+   upward into the composer. Fixed to the viewport bottom so
+   on mobile it sits where the keyboard appears; the same
+   bottom orientation holds on desktop. It is a descendant of
+   the reader screen, so it is hidden whenever the reader is
+   not the active e10-screen. */
+.cr-layout { padding-bottom: 52px; }
+.cr-fln-tray {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 55;
+  background: var(--surface); border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 12px rgba(0,0,0,.18);
+  display: flex; flex-direction: column;
+}
+.cr-fln-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px; cursor: pointer; font-size: 13px;
+  color: var(--fg2); user-select: none;
+}
+.cr-fln-bar:hover { color: var(--fg); }
+.cr-fln-bar-label { font-weight: 600; }
+.cr-fln-count { font-size: 11px; color: var(--dim2); }
+.cr-fln-hint  { font-size: 12px; color: var(--accent); }
+.cr-fln-caret { transition: transform .2s; font-size: 11px; }
+.cr-fln-tray[data-open="1"] .cr-fln-caret { transform: rotate(180deg); }
+.cr-fln-body {
+  display: none; border-top: 1px solid var(--border);
+  max-height: min(52vh, 460px); overflow-y: auto;
+}
+.cr-fln-tray[data-open="1"] .cr-fln-body { display: block; }
+.cr-fln-inner { max-width: 900px; margin: 0 auto; padding: 14px 16px 18px; }
+.cr-fln-tray.cr-fln-glow { animation: flnGlow 1.8s ease-in-out 2; }
+@keyframes flnGlow {
+  0%, 100% { box-shadow: 0 -2px 12px rgba(0,0,0,.18); }
+  50%      { box-shadow: 0 -2px 20px var(--accent); }
+}
 /* ── Investigation Setup ─────────────────────────────── */
 .setup-wrap { max-width: 640px; }
 .setup-preamble { font-size: 14px; color: var(--fg2); line-height: 1.75; margin-bottom: 28px; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); }
@@ -5671,10 +5708,9 @@ function flnSetLane(lane) {
 }
 
 async function _flnRender() {
-  const panel = document.getElementById('cr-fieldnotes-panel');
-  if (!panel) return;
-  panel.innerHTML = `
-    <div class="cr-side-title">Field Notes</div>
+  const host = document.getElementById('cr-fln-inner');
+  if (!host) return;
+  host.innerHTML = `
     <div style="display:flex;gap:4px;margin-bottom:8px">
       <button class="fs-pill fln-lane fs-on" data-lane="corpus" onclick="flnSetLane('corpus')"
         title="What I am learning about the text">About the text</button>
@@ -5683,13 +5719,24 @@ async function _flnRender() {
     </div>
     <div class="cr-form-label">What is your current understanding?</div>
     <textarea id="fln-understanding" rows="3" placeholder="Pause for a moment. What has the reading helped you understand so far?"
-      style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:12px;line-height:1.6;padding:7px 9px;resize:vertical;margin:4px 0 8px"></textarea>
+      style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;line-height:1.6;padding:7px 9px;resize:vertical;margin:4px 0 8px"></textarea>
     <div class="cr-form-label">What are your most pressing questions? <span style="color:var(--dim2);font-weight:400">(optional)</span></div>
     <textarea id="fln-questions" rows="2" placeholder="What do you need to investigate next?"
-      style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:12px;line-height:1.6;padding:7px 9px;resize:vertical;margin:4px 0 8px"></textarea>
+      style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;line-height:1.6;padding:7px 9px;resize:vertical;margin:4px 0 8px"></textarea>
     <button class="btn-primary" id="fln-save" style="width:100%;padding:6px" onclick="flnSave()">Keep this entry</button>
-    <div id="fln-entries" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto"></div>`;
+    <div id="fln-entries" style="margin-top:12px;display:flex;flex-direction:column;gap:8px"></div>`;
+  flnSetLane(_flnLane);
   _flnLoadEntries();
+}
+
+// Collapsed ↔ expanded. Toggling only refreshes the entry list;
+// it never rebuilds the composer, so any in-progress draft survives.
+function flnToggleTray(force) {
+  const tray = document.getElementById('cr-fln-tray');
+  if (!tray) return;
+  const open = force === undefined ? tray.dataset.open !== '1' : !!force;
+  tray.dataset.open = open ? '1' : '0';
+  if (open) { tray.classList.remove('cr-fln-glow'); _flnLoadEntries(); }
 }
 
 async function _flnLoadEntries() {
@@ -5698,6 +5745,9 @@ async function _flnLoadEntries() {
   try {
     const d = await get('/api/investigation-log?limit=12');
     const entries = d.entries || [];
+    const countEl = document.getElementById('cr-fln-count');
+    if (countEl) countEl.textContent = entries.length
+      ? `· ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}` : '';
     if (!entries.length) {
       host.innerHTML = '<div style="font-size:11px;color:var(--dim2)">No entries yet. Your understanding, as it forms, belongs in the record too.</div>';
       return;
@@ -5763,25 +5813,19 @@ function _flnActivityTick() {
   _flnShowPrompt();
 }
 
+// The prompt now lives inside the tray itself — one surface, not two.
+// When the disclosed rule fires, the tray opens and glows gently,
+// inviting the entry without a separate blocking bar. The reader can
+// always ignore it; it never returns until the rule is satisfied again.
 function _flnShowPrompt() {
-  if (document.getElementById('fln-footer')) return;
-  const bar = document.createElement('div');
-  bar.id = 'fln-footer';
-  bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:60;display:flex;align-items:center;justify-content:center;gap:14px;padding:10px 16px;background:var(--surface);border-top:1px solid var(--border);font-size:13px;color:var(--fg2)';
-  bar.innerHTML = `
-    <span>What is your current understanding?</span>
-    <button class="fs-pill fs-on" onclick="_flnOpenFromPrompt()">Write it down</button>
-    <button class="fs-pill" onclick="_flnSnooze()">Later</button>`;
-  document.body.appendChild(bar);
-}
-
-function _flnHidePrompt() { document.getElementById('fln-footer')?.remove(); }
-function _flnSnooze() { _flnMark(); _flnHidePrompt(); }
-function _flnOpenFromPrompt() {
-  _flnHidePrompt();
-  document.getElementById('cr-fieldnotes-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const tray = document.getElementById('cr-fln-tray');
+  if (!tray || tray.dataset.open === '1') return;
+  flnToggleTray(true);
+  tray.classList.add('cr-fln-glow');
   setTimeout(() => document.getElementById('fln-understanding')?.focus(), 350);
 }
+
+function _flnHidePrompt() { document.getElementById('cr-fln-tray')?.classList.remove('cr-fln-glow'); }
 
 // ── Companion (issue #10) ──────────────────────────────
 // A reading participant beside the Reader, never replacing it. Context
@@ -6048,7 +6092,6 @@ function _crRenderDocPicker(ws) {
           <div id="cr-trail-detail" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px"></div>
         </div>
         <div class="cr-side-panel" id="cr-question-panel"></div>
-        <div class="cr-side-panel" id="cr-fieldnotes-panel"></div>
         <div class="cr-side-panel" id="cr-companion-panel"></div>
         <div class="cr-side-panel" id="cr-capture-panel">
           <div class="cr-side-title">Highlight Inspector</div>
@@ -6069,6 +6112,18 @@ function _crRenderDocPicker(ws) {
             <div style="font-size:12px;color:var(--dim2)">Navigate to a page to see related observations.</div>
           </div>
         </div>
+      </div>
+    </div>
+    <div class="cr-fln-tray" id="cr-fln-tray" data-open="0">
+      <div class="cr-fln-bar" onclick="flnToggleTray()">
+        <span class="cr-fln-bar-label">✎ Field Notes</span>
+        <span class="cr-fln-count" id="cr-fln-count"></span>
+        <span style="flex:1"></span>
+        <span class="cr-fln-hint">+ Field note</span>
+        <span class="cr-fln-caret">▴</span>
+      </div>
+      <div class="cr-fln-body" id="cr-fln-body">
+        <div class="cr-fln-inner" id="cr-fln-inner"></div>
       </div>
     </div>`;
 
