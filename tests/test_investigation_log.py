@@ -155,3 +155,46 @@ def test_unknown_document_stored_as_unattributed(tmp_path):
     assert r.status_code == 201
     e = client.get("/api/investigation-log").get_json()["entries"][0]
     assert e["source_document_id"] is None
+
+
+def test_both_lane_entries_survive_reload(tmp_path):
+    """Field Notes moved from the Reader side stack into a bottom footer
+    tray (issue #12); the composer's two lanes and their persistence must
+    keep working. Save one entry per lane, then reopen over the same DB
+    and confirm both survive with their lanes intact."""
+    db = _make_db(tmp_path)
+    first = create_app(db_path=db).test_client()
+    assert first.post("/api/investigation-log", json={
+        "lane": "corpus",
+        "understanding": "The text keeps returning to the green light.",
+    }).status_code == 201
+    assert first.post("/api/investigation-log", json={
+        "lane": "instrument",
+        "understanding": "Adding a footnote from the footer felt natural.",
+        "pressing_questions": "Does the tray sit where the keyboard appears?",
+    }).status_code == 201
+
+    second = create_app(db_path=db).test_client()
+    all_entries = second.get("/api/investigation-log").get_json()["entries"]
+    assert len(all_entries) == 2
+    corpus = second.get("/api/investigation-log?lane=corpus").get_json()["entries"]
+    instrument = second.get("/api/investigation-log?lane=instrument").get_json()["entries"]
+    assert [e["understanding"] for e in corpus] == [
+        "The text keeps returning to the green light."]
+    assert instrument[0]["pressing_questions"].startswith("Does the tray")
+
+
+def test_field_notes_relocated_to_footer_tray():
+    """Guard the relocation itself: Field Notes is no longer a Reader
+    side panel, and the footer tray with the two-lane composer exists."""
+    index = (Path(__file__).resolve().parents[1]
+             / "hermeneia" / "web" / "static" / "index.html").read_text()
+    # The side-stack panel is gone.
+    assert 'id="cr-fieldnotes-panel"' not in index
+    # The footer tray and its composer host exist.
+    assert 'id="cr-fln-tray"' in index
+    assert 'id="cr-fln-inner"' in index
+    assert "flnToggleTray" in index
+    # Both lanes are still offered in the composer.
+    assert ">About the text<" in index
+    assert ">About Hermeneia<" in index
