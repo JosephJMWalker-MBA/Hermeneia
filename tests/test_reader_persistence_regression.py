@@ -217,6 +217,36 @@ def test_reader_shell_keeps_return_to_reading_visible():
     assert "reader-home-btn.active" in index_html
 
 
+def test_machine_page_brief_is_above_the_page_with_constitutional_copy():
+    """Issue #12: machine observations become a pre-reading page brief above
+    the reader, with careful copy and stewardship actions — not a buried list."""
+    index_html = (
+        Path(__file__).parent.parent
+        / "hermeneia"
+        / "web"
+        / "static"
+        / "index.html"
+    ).read_text()
+
+    # The brief exists as an accordion with the required headline and count copy.
+    assert 'id="cr-page-brief"' in index_html
+    assert "The machine thinks these may matter on this page" in index_html
+    assert "· tap to review" in index_html
+    assert "_crToggleBrief()" in index_html
+    # Constitutional copy, verbatim.
+    assert ("Hermeneia noticed these possible points of attention. Read the page "
+            "yourself, then approve, edit, question, or reject them.") in index_html
+    # Initial stewardship actions.
+    assert "_crBriefRule(" in index_html
+    assert "'approved'" in index_html and "'rejected'" in index_html and "'unsure'" in index_html
+    assert "_crBriefQuestion(" in index_html
+    # The brief sits above the page text, not in the side stack.
+    assert index_html.index('id="cr-page-brief"') < index_html.index('id="cr-page-view"')
+    # The old long list is demoted to a secondary, collapsed disclosure.
+    assert "Machine Observations — Full List" in index_html
+    assert "_crToggleRelated()" in index_html
+
+
 def test_reader_capture_ui_is_passage_attached_and_records_attention_metadata():
     """The live loop must support passage selection -> important/tag/note/
     question/candidate capture without depending on a detached side panel."""

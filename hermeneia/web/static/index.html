@@ -1207,6 +1207,51 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   font-size: 12px; color: var(--fg2); border: 1px solid var(--border);
   border-radius: var(--r); padding: 8px 10px; line-height: 1.5;
 }
+/* ── Machine Page Brief (issue #12) ──────────────────────
+   A pre-reading brief above the page — "the machine thinks
+   these may matter on this page" — not a buried list. The
+   machine points; the human decides. Collapsed by default so
+   it never pre-empts the reading; the copy insists the reader
+   read the page first. */
+.cr-page-brief {
+  max-width: 860px; margin: 0 auto 14px; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface);
+}
+.cr-brief-head {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  background: none; border: none; color: var(--fg2); cursor: pointer;
+  font: inherit; font-size: 13px; padding: 11px 14px; text-align: left;
+}
+.cr-brief-head:hover { color: var(--fg); }
+.cr-brief-caret { transition: transform .2s; font-size: 11px; color: var(--dim2); }
+.cr-page-brief[data-open="1"] .cr-brief-caret { transform: rotate(90deg); }
+.cr-brief-headline { font-weight: 600; }
+.cr-brief-count { font-size: 11px; color: var(--accent); white-space: nowrap; }
+.cr-brief-body { display: none; padding: 0 14px 12px; border-top: 1px solid var(--border); }
+.cr-page-brief[data-open="1"] .cr-brief-body { display: block; }
+.cr-brief-note {
+  font-size: 12px; color: var(--dim2); line-height: 1.6;
+  margin: 12px 0; font-style: italic;
+}
+.cr-brief-item {
+  border-left: 2px solid var(--border2); padding: 6px 0 8px 10px;
+  margin-bottom: 8px; font-size: 13px; color: var(--fg2); line-height: 1.5;
+}
+.cr-brief-item[data-ruled="1"] { opacity: .55; }
+.cr-brief-loc { font-size: 10px; color: var(--dim2); font-family: var(--mono); margin-bottom: 3px; }
+.cr-brief-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.cr-brief-act {
+  font-size: 11px; padding: 3px 9px; border: 1px solid var(--border2);
+  border-radius: 4px; background: var(--bg); color: var(--fg2);
+  cursor: pointer; font: inherit; font-size: 11px;
+}
+.cr-brief-act:hover { border-color: var(--fg2); color: var(--fg); }
+.cr-brief-act:disabled { opacity: .5; cursor: default; }
+.cr-brief-status {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  font-weight: 700; margin-top: 7px; display: inline-block;
+}
 .cr-non-primary-warning {
   background: #2a220a; border: 1px solid #e0a800; border-radius: var(--r);
   padding: 8px 12px; font-size: 12px; color: #e0a800; margin-bottom: 14px;
@@ -6072,6 +6117,18 @@ function _crRenderDocPicker(ws) {
     <div class="cr-layout">
       <div>
         <div id="cr-role-warning"></div>
+        <div class="cr-page-brief" id="cr-page-brief" data-open="0" hidden>
+          <button class="cr-brief-head" onclick="_crToggleBrief()" aria-expanded="false">
+            <span class="cr-brief-caret">▸</span>
+            <span class="cr-brief-headline">The machine thinks these may matter on this page</span>
+            <span style="flex:1"></span>
+            <span class="cr-brief-count" id="cr-brief-count"></span>
+          </button>
+          <div class="cr-brief-body" id="cr-brief-body">
+            <div class="cr-brief-note">Hermeneia noticed these possible points of attention. Read the page yourself, then approve, edit, question, or reject them.</div>
+            <div id="cr-brief-list"></div>
+          </div>
+        </div>
         <div class="cr-page-view" id="cr-page-view">
           <div class="e10-empty">Select a document above.</div>
         </div>
@@ -6107,8 +6164,12 @@ function _crRenderDocPicker(ws) {
           </div>
         </div>
         <div class="cr-side-panel" id="cr-related-panel">
-          <div class="cr-side-title">Machine Observations — This Page</div>
-          <div class="cr-related-obs" id="cr-related-obs">
+          <div class="cr-side-title" style="display:flex;justify-content:space-between;align-items:center">
+            Machine Observations — Full List
+            <button onclick="_crToggleRelated()" id="cr-related-toggle" style="font-size:10px;background:none;border:none;color:var(--dim2);cursor:pointer;padding:0">Show ▾</button>
+          </div>
+          <div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-bottom:8px">Now shown as a page brief above the reader. This is the secondary full list.</div>
+          <div class="cr-related-obs" id="cr-related-obs" style="display:none">
             <div style="font-size:12px;color:var(--dim2)">Navigate to a page to see related observations.</div>
           </div>
         </div>
@@ -6288,27 +6349,124 @@ function _crNextPage() {
   if (_crPage < _crTotalPages) { _crPage++; _crRenderPage(); window.scrollTo({top: document.getElementById('cr-page-view').offsetTop - 80, behavior: 'smooth'}); }
 }
 
+// The Machine Page Brief (issue #12). One fetch feeds two surfaces: the
+// primary pre-reading brief above the page, and the secondary full list
+// in the (now collapsed) side panel. Rulings persist via the existing
+// observation review / inquiry endpoints — the machine points, the human
+// decides what enters the record.
 async function _crLoadRelated() {
   if (!_crDocId) return;
   const panel = document.getElementById('cr-related-obs');
-  if (!panel) return;
-  panel.innerHTML = '<div style="font-size:12px;color:var(--dim2)">Loading…</div>';
+  const brief = document.getElementById('cr-page-brief');
+  const list = document.getElementById('cr-brief-list');
+  const count = document.getElementById('cr-brief-count');
+  if (panel) panel.innerHTML = '<div style="font-size:12px;color:var(--dim2)">Loading…</div>';
   try {
     const data = await get(`/api/reader/documents/${encodeURIComponent(_crDocId)}/related-observations?page=${_crPage}`);
     const obs = data.observations || [];
-    if (obs.length === 0) {
-      panel.innerHTML = '<div style="font-size:12px;color:var(--dim2)">No machine observations on this page.</div>';
-      return;
+    // Secondary full list (unchanged presentation).
+    if (panel) {
+      panel.innerHTML = obs.length ? obs.map(o =>
+        `<div class="cr-rel-obs-item">
+          <div style="font-size:10px;color:var(--dim2);margin-bottom:3px;font-family:var(--mono)">p.${o.page} · ${x(o.source_locator || '')}</div>
+          ${x((o.raw_text || '').slice(0, 160))}${o.raw_text?.length > 160 ? '…' : ''}
+        </div>`).join('')
+        : '<div style="font-size:12px;color:var(--dim2)">No machine observations on this page.</div>';
     }
-    panel.innerHTML = obs.map(o =>
-      `<div class="cr-rel-obs-item">
-        <div style="font-size:10px;color:var(--dim2);margin-bottom:3px;font-family:var(--mono)">p.${o.page} · ${x(o.source_locator || '')}</div>
-        ${x((o.raw_text || '').slice(0, 160))}${o.raw_text?.length > 160 ? '…' : ''}
-      </div>`
-    ).join('');
+    // Primary brief.
+    if (brief && list && count) {
+      if (obs.length === 0) {
+        brief.hidden = true;
+        brief.dataset.open = '0';
+      } else {
+        brief.hidden = false;
+        count.textContent = `${obs.length} observation${obs.length === 1 ? '' : 's'} · tap to review`;
+        list.innerHTML = obs.map(o => _crBriefItem(o)).join('');
+      }
+    }
   } catch(e) {
-    panel.innerHTML = `<div style="font-size:12px;color:var(--red)">${x(e.message)}</div>`;
+    if (panel) panel.innerHTML = `<div style="font-size:12px;color:var(--red)">${x(e.message)}</div>`;
+    if (brief) brief.hidden = true;
   }
+}
+
+function _crBriefItem(o) {
+  const ruled = o.review_status ? '1' : '0';
+  const label = { approved: 'Approved · in the record', rejected: 'Rejected · ruled irrelevant', unsure: 'Deferred' }[o.review_status];
+  const color = { approved: 'var(--green)', rejected: 'var(--red)', unsure: '#e0a800' }[o.review_status] || 'var(--dim2)';
+  const id = x(o.id);
+  const actions = o.review_status
+    ? `<span class="cr-brief-status" style="color:${color}">${label || x(o.review_status)}</span>`
+    : `<div class="cr-brief-actions">
+         <button class="cr-brief-act" onclick="_crBriefRule('${id}','approved',this)">Approve / use</button>
+         <button class="cr-brief-act" onclick="_crBriefRule('${id}','rejected',this)">Reject</button>
+         <button class="cr-brief-act" onclick="_crBriefRule('${id}','unsure',this)">Defer</button>
+         <button class="cr-brief-act" onclick="_crBriefQuestion('${id}',this)">Add question</button>
+       </div>`;
+  return `<div class="cr-brief-item" data-ruled="${ruled}" data-obs="${id}">
+    <div class="cr-brief-loc">p.${o.page} · ${x(o.source_locator || '')}</div>
+    ${x((o.raw_text || '').slice(0, 200))}${o.raw_text?.length > 200 ? '…' : ''}
+    ${actions}
+  </div>`;
+}
+
+function _crToggleBrief() {
+  const brief = document.getElementById('cr-page-brief');
+  if (!brief) return;
+  const open = brief.dataset.open !== '1';
+  brief.dataset.open = open ? '1' : '0';
+  brief.querySelector('.cr-brief-head')?.setAttribute('aria-expanded', String(open));
+}
+
+function _crToggleRelated() {
+  const obs = document.getElementById('cr-related-obs');
+  const btn = document.getElementById('cr-related-toggle');
+  if (!obs) return;
+  const show = obs.style.display === 'none';
+  obs.style.display = show ? 'flex' : 'none';
+  if (btn) btn.textContent = show ? 'Hide ▴' : 'Show ▾';
+}
+
+async function _crBriefRule(obsId, status, btn) {
+  const item = btn?.closest('.cr-brief-item');
+  item?.querySelectorAll('.cr-brief-act').forEach(b => b.setAttribute('disabled', 'disabled'));
+  try {
+    const resp = await fetch(`/api/observations/${encodeURIComponent(obsId)}/review`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ review_status: status, follow_up_needed: status === 'unsure' }),
+    });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || 'ruling failed');
+    _crMarkBriefRuled(item, status);
+  } catch (err) {
+    showAppError(err.message);
+    item?.querySelectorAll('.cr-brief-act').forEach(b => b.removeAttribute('disabled'));
+  }
+}
+
+async function _crBriefQuestion(obsId, btn) {
+  const text = (window.prompt('What do you want to ask about this observation?') || '').trim();
+  if (!text) return;
+  try {
+    const resp = await fetch(`/api/observations/${encodeURIComponent(obsId)}/inquiry`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question_text: text, question_type: 'unclassified' }),
+    });
+    const d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || 'question failed');
+    if (btn) { btn.textContent = '✓ Question added'; setTimeout(() => { if (btn) btn.textContent = 'Add question'; }, 2500); }
+  } catch (err) {
+    showAppError(err.message);
+  }
+}
+
+function _crMarkBriefRuled(item, status) {
+  if (!item) return;
+  const label = { approved: 'Approved · in the record', rejected: 'Rejected · ruled irrelevant', unsure: 'Deferred' }[status] || status;
+  const color = { approved: 'var(--green)', rejected: 'var(--red)', unsure: '#e0a800' }[status] || 'var(--dim2)';
+  item.dataset.ruled = '1';
+  const actions = item.querySelector('.cr-brief-actions');
+  if (actions) actions.outerHTML = `<span class="cr-brief-status" style="color:${color}">${label}</span>`;
 }
 
 async function _crLoadHighlightList() {
