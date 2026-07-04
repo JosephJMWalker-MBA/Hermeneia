@@ -1011,6 +1011,45 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 .cr-compass-tagline { font-size: 14px; color: var(--fg2); font-style: italic; }
 .cr-compass-question { font-size: 15px; color: var(--fg); line-height: 1.45; }
 .cr-compass-hint { font-size: 12px; color: var(--dim2); margin-top: 4px; line-height: 1.4; }
+/* Reader tool rail + drawer — additive shortcuts to existing surfaces.
+   Compact and quiet; core reading never depends on it. */
+.cr-tool-rail {
+  max-width: 860px; margin: 0 auto 14px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+}
+.cr-rail-btn {
+  font-size: 11px; color: var(--fg2);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 4px 11px; cursor: pointer;
+  white-space: nowrap;
+}
+.cr-rail-btn:hover { border-color: var(--accent); color: var(--fg); }
+.cr-rail-drawer-btn { background: none; }
+.cr-tool-drawer {
+  max-width: 860px; margin: -6px auto 16px;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface); padding: 12px 14px;
+}
+.cr-tool-drawer[data-open="0"] { display: none; }
+.cr-tool-drawer-note { font-size: 12px; color: var(--dim2); line-height: 1.5; margin-bottom: 10px; }
+.cr-tool-row {
+  display: block; width: 100%; text-align: left;
+  background: none; border: none; border-top: 1px solid var(--border);
+  padding: 8px 2px; cursor: pointer;
+}
+.cr-tool-row:first-of-type { border-top: none; }
+.cr-tool-row:hover .cr-tool-row-name { color: var(--accent); }
+.cr-tool-row-name { display: block; font-size: 13px; color: var(--fg); font-weight: 600; }
+.cr-tool-row-desc { display: block; font-size: 12px; color: var(--dim2); margin-top: 2px; }
+/* Brief flag when the rail scrolls to an existing panel. */
+.cr-tool-flash { animation: crToolFlash 1.2s ease-out; }
+@keyframes crToolFlash {
+  0%   { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
+  100% { box-shadow: 0 0 0 2px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cr-tool-flash { animation: none; }
+}
 .cr-page-header {
   font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
   color: var(--dim2); margin-bottom: 18px; display: flex; align-items: center; gap: 12px;
@@ -6224,6 +6263,27 @@ function _crRenderDocPicker(ws) {
       <button class="fs-pill" id="fs-theme" onclick="fsThemeToggle()" title="Switch between dark reading and warm paper reading.">● Dark</button>
     </div>
     <div class="cr-question-compass" id="cr-question-compass"></div>
+    <div class="cr-tool-rail" id="cr-tool-rail" role="toolbar" aria-label="Reader tools">
+      <button class="cr-rail-btn" onclick="_crRailGo('question')" title="Jump to Your Question">◈ Question</button>
+      <button class="cr-rail-btn" onclick="_crRailGo('companion')" title="Jump to Companion">✦ Companion</button>
+      <button class="cr-rail-btn" onclick="_crRailGo('capture')" title="Jump to Highlight Inspector">◧ Inspector</button>
+      <button class="cr-rail-btn" onclick="_crRailGo('trail')" title="Jump to Reading Trail">↳ Trail</button>
+      <button class="cr-rail-btn" onclick="_crRailGo('fieldnotes')" title="Open Field Notes">✎ Field Notes</button>
+      <button class="cr-rail-btn" onclick="_crRailGo('highlights')" title="Jump to Saved Highlights">★ Highlights</button>
+      <button class="cr-rail-btn" onclick="_crRailGo('observations')" title="Jump to Machine Observations">◎ Observations</button>
+      <span style="flex:1"></span>
+      <button class="cr-rail-btn cr-rail-drawer-btn" id="cr-tool-drawer-btn" onclick="_crToggleToolDrawer()" aria-expanded="false" aria-controls="cr-tool-drawer" title="What these tools do">Tools ▾</button>
+    </div>
+    <div class="cr-tool-drawer" id="cr-tool-drawer" data-open="0" hidden>
+      <div class="cr-tool-drawer-note">Shortcuts to the tools already in this Reader. The panels stay where they are — this is a faster way to reach them.</div>
+      <button class="cr-tool-row" onclick="_crRailGo('question')"><span class="cr-tool-row-name">◈ Question</span><span class="cr-tool-row-desc">Set and revise the question guiding this reading.</span></button>
+      <button class="cr-tool-row" onclick="_crRailGo('companion')"><span class="cr-tool-row-name">✦ Companion</span><span class="cr-tool-row-desc">Ask the machine to accompany you with explicit context.</span></button>
+      <button class="cr-tool-row" onclick="_crRailGo('capture')"><span class="cr-tool-row-name">◧ Highlight Inspector</span><span class="cr-tool-row-desc">Note, question, or capture the selected passage.</span></button>
+      <button class="cr-tool-row" onclick="_crRailGo('trail')"><span class="cr-tool-row-name">↳ Reading Trail</span><span class="cr-tool-row-desc">See how far you have read and where you have been.</span></button>
+      <button class="cr-tool-row" onclick="_crRailGo('fieldnotes')"><span class="cr-tool-row-name">✎ Field Notes</span><span class="cr-tool-row-desc">Open the footer tray for running field notes.</span></button>
+      <button class="cr-tool-row" onclick="_crRailGo('highlights')"><span class="cr-tool-row-name">★ Saved Highlights</span><span class="cr-tool-row-desc">Review the highlights you have kept.</span></button>
+      <button class="cr-tool-row" onclick="_crRailGo('observations')"><span class="cr-tool-row-name">◎ Machine Observations</span><span class="cr-tool-row-desc">Browse the full list of machine-observed passages.</span></button>
+    </div>
     <div class="cr-layout">
       <div>
         <div id="cr-role-warning"></div>
@@ -6306,6 +6366,11 @@ function _crRenderDocPicker(ws) {
   // Persistent interpretive orientation, above the book surface.
   _crRenderQuestionCompass();
 
+  // Reset the tool drawer to closed on each render.
+  const _drawer = document.getElementById('cr-tool-drawer');
+  if (_drawer) { _drawer.setAttribute('data-open', '0'); _drawer.hidden = true; }
+  document.getElementById('cr-tool-drawer-btn')?.setAttribute('aria-expanded', 'false');
+
   // Selection listener
   document.getElementById('cr-page-view').addEventListener('mouseup', _crHandleSelection);
   document.removeEventListener('selectionchange', _crHandleSelectionChange);
@@ -6331,6 +6396,43 @@ function _crRenderQuestionCompass() {
     <div class="cr-compass-label">Question Compass</div>
     <div class="cr-compass-question">${x(q)}</div>
     <div class="cr-compass-hint">Use the corpus to inform, pressure-test, complicate, revise, or overturn it.</div>`;
+}
+
+// Reader tool rail (issue #56 slice 3): an additive, progressively enhancing
+// access pattern. It does not move or rewrite any panel — each entry scrolls
+// to (and briefly flags) the existing surface. Field Notes lives in the footer
+// tray, so its entry also opens the tray. Reading works without the rail.
+const _CR_TOOL_TARGETS = {
+  question:     'cr-question-panel',
+  companion:    'cr-companion-panel',
+  capture:      'cr-capture-panel',
+  trail:        'cr-trail-panel',
+  fieldnotes:   'cr-fln-tray',
+  highlights:   'cr-highlights-panel',
+  observations: 'cr-related-panel',
+};
+function _crRailGo(key) {
+  const id = _CR_TOOL_TARGETS[key];
+  const el = id && document.getElementById(id);
+  if (!el) return;
+  if (key === 'fieldnotes' && el.dataset.open !== '1') flnToggleTray(true);
+  if (key === 'observations') {
+    // The full observations list is collapsed by default; reveal it.
+    const obs = document.getElementById('cr-related-obs');
+    if (obs && obs.style.display === 'none') _crToggleRelated();
+  }
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.add('cr-tool-flash');
+  setTimeout(() => el.classList.remove('cr-tool-flash'), 1200);
+}
+function _crToggleToolDrawer() {
+  const d = document.getElementById('cr-tool-drawer');
+  const b = document.getElementById('cr-tool-drawer-btn');
+  if (!d) return;
+  const open = d.dataset.open === '1';
+  d.dataset.open = open ? '0' : '1';
+  d.hidden = open;
+  if (b) b.setAttribute('aria-expanded', String(!open));
 }
 
 async function _crOpenDoc(docId) {
