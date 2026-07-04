@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+import json
+import re
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+
+
+INDEX = Path(__file__).parent.parent / "hermeneia" / "web" / "static" / "index.html"
+
+
+def _extract_fn(html: str, name: str) -> str:
+    match = re.search(r"\nfunction " + re.escape(name) + r"\(.*?\n\}\n", html, re.S)
+    assert match, f"could not extract function {name} from index.html"
+    return match.group(0)
+
+
+def test_reading_tools_preserve_reader_selection_for_dock_fallback():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available for Reader accessibility UI test")
+
+    html = INDEX.read_text()
+    harness = (
+        "const readerNode={};\n"
+        "let selection={rangeCount:0,isCollapsed:true,toString(){return '';}};\n"
+        "const window={getSelection(){return selection;}};\n"
+        "const pageView={contains(node){return node===readerNode;}};\n"
+        "const document={getElementById(id){return id==='cr-page-view'?pageView:null;}};\n"
+        "const _a11y={read:false};\n"
+        "let _a11yHintShown=true;\n"
+        "let _a11yLastReaderSelection='';\n"
+        "let spoken='';\n"
+        "let status='';\n"
+        "function a11ySpeak(text){spoken=text;}\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _a11ySync(){}\n"
+        "function setTimeout(){}\n"
+        + _extract_fn(html, "_a11yGetSelectedText")
+        + _extract_fn(html, "_a11yCacheReaderSelection")
+        + _extract_fn(html, "_a11yGetDockReadText")
+        + _extract_fn(html, "a11yClickRead")
+        + "selection={rangeCount:1,isCollapsed:false,"
+        "getRangeAt(){return {commonAncestorContainer:readerNode};},"
+        "toString(){return '  Cached   Reader passage  ';}};\n"
+        "_a11yCacheReaderSelection();\n"
+        "selection={rangeCount:1,isCollapsed:false,"
+        "getRangeAt(){return {commonAncestorContainer:{}};},"
+        "toString(){return 'Outside the Reader';}};\n"
+        "_a11yCacheReaderSelection();\n"
+        "const cachedAfterOutside=_a11yLastReaderSelection;\n"
+        "selection={rangeCount:0,isCollapsed:true,toString(){return '';}};\n"
+        "_a11yCacheReaderSelection();\n"
+        "a11yClickRead();\n"
+        "const fallback={cached:_a11yLastReaderSelection,cachedAfterOutside,spoken,status};\n"
+        "spoken='';status='';\n"
+        "selection={rangeCount:1,isCollapsed:false,"
+        "getRangeAt(){return {commonAncestorContainer:{}};},"
+        "toString(){return 'Current window selection';}};\n"
+        "a11yClickRead();\n"
+        "const current={spoken,status};\n"
+        "spoken='';status='';_a11yLastReaderSelection='';\n"
+        "selection={rangeCount:0,isCollapsed:true,toString(){return '';}};\n"
+        "a11yClickRead();\n"
+        "process.stdout.write(JSON.stringify({fallback,current,emptyStatus:status}));\n"
+    )
+    result = subprocess.run(
+        [node, "-e", harness],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
+    behavior = json.loads(result.stdout)
+    assert behavior["fallback"] == {
+        "cached": "Cached Reader passage",
+        "cachedAfterOutside": "Cached Reader passage",
+        "spoken": "Cached Reader passage",
+        "status": "",
+    }
+    assert behavior["current"] == {
+        "spoken": "Current window selection",
+        "status": "",
+    }
+    assert behavior["emptyStatus"] == "Select text first."
+
+
+def test_passage_read_action_still_uses_reader_passage_text():
+    html = INDEX.read_text()
+
+    assert 'onclick="ttsSpeak(_crSelText)" title="Read aloud"' in html
+    assert "function a11yReadSelection() {\n  const text = _a11yGetSelectedText();" in html

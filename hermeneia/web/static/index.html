@@ -2035,11 +2035,26 @@ let _e10ProviderNotices = {};
 const _a11y = { read: false, focus: false, textLg: false, speaking: false, collapsed: false };
 let _a11yHintTimer = null;
 let _a11yHintShown = false;
+let _a11yLastReaderSelection = '';
 
 function _a11yGetSelectedText() {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return '';
   return sel.toString().replace(/\s+/g, ' ').trim();
+}
+
+function _a11yCacheReaderSelection() {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  const pageView = document.getElementById('cr-page-view');
+  if (!pageView || !pageView.contains(range.commonAncestorContainer)) return;
+  const text = _a11yGetSelectedText();
+  if (text) _a11yLastReaderSelection = text;
+}
+
+function _a11yGetDockReadText() {
+  return _a11yGetSelectedText() || _a11yLastReaderSelection;
 }
 
 function _a11ySetStatus(msg, cls) {
@@ -2101,7 +2116,7 @@ function a11yToggle(cap) {
   _a11ySync();
 }
 
-// Read button: toggle mode ON, or if already ON read current selection directly
+// Read button: enable the mode, then read the current or last valid Reader selection
 function a11yClickRead() {
   if (!_a11y.read) {
     _a11y.read = true;
@@ -2116,14 +2131,12 @@ function a11yClickRead() {
         _a11yHintTimer = setTimeout(() => hint.classList.remove('hint-visible'), 4000);
       }
     }
-    return;
   }
-  // Already on — try to read current selection
-  const text = _a11yGetSelectedText();
+  const text = _a11yGetDockReadText();
   if (text) {
     a11ySpeak(text);
   } else {
-    _a11ySetStatus('Select text first', 'status-ready');
+    _a11ySetStatus('Select text first.', 'status-ready');
     setTimeout(() => _a11y.read && _a11ySetStatus('Select text to read', 'status-ready'), 1800);
   }
 }
@@ -2218,6 +2231,8 @@ document.addEventListener('mouseup', (e) => {
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('#a11y-selection-tip')) a11yDismissTip();
 });
+
+document.addEventListener('selectionchange', _a11yCacheReaderSelection);
 
 // Cancel speech on tab hide or screen navigation
 document.addEventListener('visibilitychange', () => { if (document.hidden) a11yStop(); });
