@@ -1367,6 +1367,20 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 }
 .cr-brief-act:hover { border-color: var(--fg2); color: var(--fg); }
 .cr-brief-act:disabled { opacity: .5; cursor: default; }
+/* Reader-local actions — quieter than the governance rulings above them. */
+.cr-brief-local { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 7px; }
+.cr-brief-local-act {
+  font-size: 11px; padding: 0; border: none; background: none;
+  color: var(--dim2); cursor: pointer; font: inherit; font-size: 11px;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.cr-brief-local-act:hover { color: var(--accent); }
+.cr-brief-inspect {
+  margin-top: 7px; padding: 8px 10px; border-left: 2px solid var(--border);
+  background: var(--surface2); border-radius: 4px;
+}
+.cr-brief-inspect-loc { font-size: 10px; color: var(--dim2); font-family: var(--mono); margin-bottom: 4px; }
+.cr-brief-inspect-text { font-size: 13px; color: var(--fg2); line-height: 1.6; white-space: pre-wrap; }
 .cr-brief-status {
   font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
   font-weight: 700; margin-top: 7px; display: inline-block;
@@ -5830,6 +5844,7 @@ let _crDocs  = [];
 let _crPages = [];   // [{page, extractions, highlights}]
 let _crHighlights = [];
 let _crPageObs = [];            // machine observations for the current page (lens source)
+let _crBriefObs = [];           // full page-brief feed (may include ±1 neighbours) for Reader-local actions
 let _crCurrentExtractions = []; // current page extractions, kept for non-destructive re-render
 let _crLensOn = (() => { try { return localStorage.getItem('hermeneia_machine_lens') === '1'; } catch { return false; } })();
 let _crSelText = '';
@@ -6708,7 +6723,7 @@ function _crRenderPage() {
     const pageHighlights = (_crHighlights || []).filter(h => Number(h.page || 0) === Number(_crPage));
     _crCurrentExtractions = pageData.extractions || [];
     const blocks = (pageData.extractions || []).map((ex, idx) =>
-      `<div class="cr-text-block" data-cr-block="${idx}">
+      `<div class="cr-text-block" data-cr-block="${idx}" data-cr-locator="${x(ex.source_locator || '')}">
          <button class="cr-block-capture" onclick="_crCaptureBlock(${idx})" title="Capture this passage if text selection is unreliable">Capture this passage</button>
          <div class="cr-page-region">${x(ex.region || '')} ${ex.source_locator ? '· ' + x(ex.source_locator) : ''}</div>
          <div class="cr-page-text">${_crRenderTextWithHighlights(ex.text || '', pageHighlights)}</div>
@@ -6777,6 +6792,7 @@ async function _crLoadRelated() {
     // Lens source: strictly current-page observations only (the feed may
     // include ±1 neighbours for the brief; the lens must not mark them).
     _crPageObs = obs.filter(o => Number(o.page) === Number(_crPage));
+    _crBriefObs = obs;
     _crReflectLensToggle();
     _crApplyLens();
     // Secondary full list (unchanged presentation).
@@ -6818,9 +6834,20 @@ function _crBriefItem(o) {
          <button class="cr-brief-act" onclick="_crBriefRule('${id}','unsure',this)">Defer</button>
          <button class="cr-brief-act" onclick="_crBriefQuestion('${id}',this)">Add question</button>
        </div>`;
+  // Reader-local actions (issue #56 slice 5): a lens, not authorship. These
+  // never change canonical observation status — they only help the steward
+  // inspect and use a suggestion while reading. Always available, independent
+  // of the governance ruling above.
+  const local = `<div class="cr-brief-local">
+    <button class="cr-brief-local-act" onclick="_crBriefInspect('${id}',this)">Inspect</button>
+    <button class="cr-brief-local-act" onclick="_crBriefJump('${x(o.source_locator || '')}')">Jump to passage</button>
+    <button class="cr-brief-local-act" onclick="_crBriefCompanion('${id}')">Ask Companion</button>
+  </div>`;
   return `<div class="cr-brief-item" data-ruled="${ruled}" data-obs="${id}">
     <div class="cr-brief-loc">p.${o.page} · ${x(o.source_locator || '')}</div>
     ${x((o.raw_text || '').slice(0, 200))}${o.raw_text?.length > 200 ? '…' : ''}
+    <div class="cr-brief-inspect" id="cr-brief-inspect-${id}" hidden></div>
+    ${local}
     ${actions}
   </div>`;
 }
@@ -6887,6 +6914,50 @@ function _crMarkBriefRuled(item, status) {
   const obsId = item.dataset.obs;
   const target = (_crPageObs || []).find(o => o.id === obsId);
   if (target) { target.review_status = status; if (_crLensOn) _crApplyLens(); }
+}
+
+// ── Reader-local observation actions (issue #56 slice 5) ───────────────────
+// A lens, not authorship: none of these change canonical observation status,
+// extraction, or the database. They make a suggestion easier to inspect and
+// use while reading; the steward still decides what enters the record.
+function _crBriefInspect(obsId, btn) {
+  const box = document.getElementById(`cr-brief-inspect-${obsId}`);
+  if (!box) return;
+  const o = (_crBriefObs || []).find(x => x.id === obsId);
+  if (!o) return;
+  const open = box.hidden;
+  if (open) {
+    box.innerHTML = `
+      <div class="cr-brief-inspect-loc">${x(o.source_locator || '')}${o.page != null ? ` · p.${o.page}` : ''}</div>
+      <div class="cr-brief-inspect-text">${x(o.raw_text || '')}</div>`;
+  }
+  box.hidden = !open;
+  if (btn) btn.textContent = open ? 'Hide' : 'Inspect';
+}
+function _crBriefJump(locator) {
+  if (!locator) return;
+  const blocks = document.querySelectorAll('#cr-page-view .cr-text-block');
+  let target = null;
+  for (const b of blocks) {
+    const loc = b.getAttribute('data-cr-locator') || '';
+    if (loc && (loc === locator || locator.startsWith(loc) || loc.startsWith(locator))) { target = b; break; }
+  }
+  if (!target) return;
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const flash = target.querySelector('.cr-page-text') || target;
+  flash.classList.add('cr-tool-flash');
+  setTimeout(() => flash.classList.remove('cr-tool-flash'), 1200);
+}
+function _crBriefCompanion(obsId) {
+  const o = (_crBriefObs || []).find(x => x.id === obsId);
+  if (!o) return;
+  const input = document.getElementById('cmp-input');
+  if (!input) return;
+  // Prefill only — never auto-send, never auto-save the response.
+  const snippet = (o.raw_text || '').slice(0, 240);
+  input.value = `About this passage (${o.source_locator || 'p.' + o.page}): "${snippet}" — `;
+  document.getElementById('cr-companion-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  input.focus();
 }
 
 async function _crLoadHighlightList() {
