@@ -6002,16 +6002,42 @@ async function _cmpRender() {
 function _cmpRenderTranscript() {
   const host = document.getElementById('cmp-transcript');
   if (!host) return;
-  host.innerHTML = _cmpTranscript.map(m => m.role === 'user'
+  host.innerHTML = _cmpTranscript.map((m, index) => m.role === 'user'
     ? `<div style="font-size:12px;color:var(--fg);line-height:1.5;border-left:2px solid var(--border);padding-left:8px">${x(m.text)}</div>`
     : `<div style="font-size:12px;color:var(--fg2);line-height:1.6;background:var(--bg);border-radius:var(--r);padding:8px 10px">
          ${x(m.text)}
          <div style="font-size:10px;color:var(--dim2);margin-top:6px;border-top:1px solid var(--border);padding-top:5px">
            ${x(m.provider)} · context used: ${m.context_used?.length ? m.context_used.map(c => x(c.summary)).join(' · ') : 'none'}
          </div>
+         ${m.provider !== 'error' ? `
+           <div style="margin-top:7px;border-top:1px solid var(--border);padding-top:6px">
+             <div style="font-size:10px;color:var(--dim2);margin-bottom:5px">Use this response</div>
+             <div style="display:flex;gap:5px;flex-wrap:wrap">
+               <button type="button" class="fs-pill" onclick="cmpUseResponse(${index}, 'understanding')">Add to current understanding</button>
+               <button type="button" class="fs-pill" onclick="cmpUseResponse(${index}, 'questions')">Add to pressing questions</button>
+             </div>
+           </div>` : ''}
        </div>`).join('')
     + (_cmpBusy ? `<div style="font-size:11px;color:var(--dim2)">thinking…</div>` : '');
   host.scrollTop = host.scrollHeight;
+}
+
+function cmpUseResponse(index, target) {
+  const message = _cmpTranscript[index];
+  if (!message || message.role !== 'companion' || message.provider === 'error') return;
+  const fieldId = target === 'understanding'
+    ? 'fln-understanding'
+    : target === 'questions' ? 'fln-questions' : '';
+  if (!fieldId) return;
+  const field = document.getElementById(fieldId);
+  const text = String(message.text || '').trim();
+  if (!field || !text) return;
+  const existing = field.value;
+  field.value = existing.trim() ? `${existing}\n\n${text}` : text;
+  flnSetLane('corpus');
+  flnToggleTray(true);
+  field.focus();
+  field.setSelectionRange(field.value.length, field.value.length);
 }
 
 async function cmpAsk() {
