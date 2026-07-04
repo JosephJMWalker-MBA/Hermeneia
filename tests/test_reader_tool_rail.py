@@ -115,12 +115,6 @@ def test_field_notes_stays_in_footer_tray_not_a_side_panel():
 # ── Out-of-scope guards (later #56 slices) ─────────────────────────────────
 
 
-def test_no_workspace_drawer_scope_in_this_pr():
-    index = _index()
-    assert 'id="workspace-drawer"' not in index
-    assert "toggleWorkspaceMenu(" not in index
-
-
 def test_no_actionable_observation_scope_in_this_pr():
     index = _index()
     for token in ("_crOpenObservation", "_crSetObservationStatus", "Interpret in Lab"):
