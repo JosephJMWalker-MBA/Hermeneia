@@ -1051,6 +1051,9 @@ CREATE TABLE IF NOT EXISTS reader_highlights (
     status              TEXT NOT NULL DEFAULT 'saved_highlight'
         CHECK(status IN ('saved_highlight','observation_candidate','promoted_to_observation','dismissed')),
     observation_id      TEXT REFERENCES observations(id),
+    rank                INTEGER CHECK(rank IS NULL OR (rank >= 1 AND rank <= 5)),
+    theme_bucket        TEXT,
+    evidence_bucket     TEXT,
     created_at          TEXT NOT NULL,
     updated_at          TEXT NOT NULL
 );
@@ -1075,6 +1078,28 @@ CREATE TABLE IF NOT EXISTS reading_progress (
 CREATE INDEX IF NOT EXISTS idx_reading_progress_doc
     ON reading_progress(document_id);
 """)
+    conn.commit()
+
+    # Issue #35 / Reader Shell Spec section 0.1: ranked semantic annotation substrate
+    # on reader_highlights. A mark is a structured claim, not a comment:
+    #   rank            1-5 (nullable): gives the machine hierarchy over a flat pile
+    #   theme_bucket    a meaning CATEGORY (thematic grouping, e.g. "aspiration")
+    #   evidence_bucket a working-SET / shell-tray membership (distinct from theme)
+    # Additive and idempotent: the annotation model on the existing hardened
+    # write path, not a parallel store. Fresh DBs get the columns (+ rank CHECK)
+    # from the CREATE above; existing DBs get plain columns here (rank validated
+    # in the API, as relevance already is).
+    _rh_cols = {r[1] for r in conn.execute("PRAGMA table_info(reader_highlights)").fetchall()}
+    if "rank" not in _rh_cols:
+        conn.execute("ALTER TABLE reader_highlights ADD COLUMN rank INTEGER")
+    if "theme_bucket" not in _rh_cols:
+        conn.execute("ALTER TABLE reader_highlights ADD COLUMN theme_bucket TEXT")
+    if "evidence_bucket" not in _rh_cols:
+        conn.execute("ALTER TABLE reader_highlights ADD COLUMN evidence_bucket TEXT")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_highlight_theme "
+        "ON reader_highlights(theme_bucket)"
+    )
     conn.commit()
 
     # Issue #18: Investigation Log / Field Notes — snapshots of the
