@@ -1,0 +1,25 @@
+"""Deterministic, provider-free evaluation harness for interpretation quality.
+
+Design: docs/evaluation-harness-design.md (issue #63). This package names
+obligations and checks whether they held for a compiled study record. It makes
+no provider call, reads no canonical evidence for mutation, and never claims to
+measure understanding — only whether specific, named obligations were met.
+"""
+from .scorer import PASS, FAIL, NOT_APPLICABLE, Scorer, ScorerVerdict
+from .evidence_preservation import (
+    EVIDENCE_PRESERVATION,
+    score_evidence_preservation,
+)
+from .report import HARNESS_VERSION, build_evaluation_report
+
+__all__ = [
+    "PASS",
+    "FAIL",
+    "NOT_APPLICABLE",
+    "Scorer",
+    "ScorerVerdict",
+    "EVIDENCE_PRESERVATION",
+    "score_evidence_preservation",
+    "HARNESS_VERSION",
+    "build_evaluation_report",
+]
