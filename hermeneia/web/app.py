@@ -51,7 +51,7 @@ from ..explorer.interpreter import (
     generate_interpretation_from_bucket,
 )
 from ..explorer.bucketer import BucketingError, generate_candidate_buckets
-from ..study import compile_study
+from ..study import compile_study, compile_synthesis_packet
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -5692,9 +5692,12 @@ Return ONLY valid JSON, no markdown, no explanation:
 
     @app.route("/api/study/compile")
     def api_study_compile():
-        """Compile a reader's ranked marks into a structured study summary
-        (Issue #35). Deterministic, AI-free. Optional ?document_id= scopes to
-        one document; otherwise compiles across all marks."""
+        """Compile study records and an LLM-ready synthesis packet.
+
+        Deterministic and provider-free. Optional ``?document_id=`` scopes to
+        one active document; otherwise compilation spans all active documents.
+        The Issue #35 summary keys remain at the response root for compatibility.
+        """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
         doc_id = str(request.args.get("document_id") or "").strip()
@@ -5717,13 +5720,68 @@ Return ONLY valid JSON, no markdown, no explanation:
                    WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
                    ORDER BY rh.page, rh.created_at, rh.id"""
             ).fetchall()
-        conn.close()
         annotations = []
         for r in rows:
             d = dict(r)
             d["tags"] = _json_list(d.get("tags"))
             annotations.append(d)
-        return jsonify(compile_study(annotations))
+
+        if doc_id:
+            documents = conn.execute(
+                """SELECT id, original_filename AS filename, file_hash,
+                          source_role, total_pages
+                   FROM source_documents WHERE id = ?""",
+                (doc_id,),
+            ).fetchall()
+            field_notes = conn.execute(
+                """SELECT il.*, sd.original_filename
+                   FROM investigation_log il
+                   LEFT JOIN source_documents sd ON sd.id = il.source_document_id
+                   WHERE il.source_document_id = ?
+                   ORDER BY il.created_at, il.id""",
+                (doc_id,),
+            ).fetchall()
+            reading_progress = conn.execute(
+                """SELECT document_id, pages_read, last_page, completed_at, updated_at
+                   FROM reading_progress WHERE document_id = ?""",
+                (doc_id,),
+            ).fetchall()
+        else:
+            documents = conn.execute(
+                """SELECT id, original_filename AS filename, file_hash,
+                          source_role, total_pages
+                   FROM source_documents
+                   WHERE COALESCE(excluded_from_analysis, 0) = 0
+                   ORDER BY original_filename, id"""
+            ).fetchall()
+            field_notes = conn.execute(
+                """SELECT il.*, sd.original_filename
+                   FROM investigation_log il
+                   LEFT JOIN source_documents sd ON sd.id = il.source_document_id
+                   WHERE il.source_document_id IS NULL
+                      OR COALESCE(sd.excluded_from_analysis, 0) = 0
+                   ORDER BY il.created_at, il.id"""
+            ).fetchall()
+            reading_progress = conn.execute(
+                """SELECT rp.document_id, rp.pages_read, rp.last_page,
+                          rp.completed_at, rp.updated_at
+                   FROM reading_progress rp
+                   JOIN source_documents sd ON sd.id = rp.document_id
+                   WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
+                   ORDER BY rp.document_id"""
+            ).fetchall()
+        conn.close()
+
+        summary = compile_study(annotations)
+        summary["synthesis_packet"] = compile_synthesis_packet(
+            annotations,
+            documents=[dict(document) for document in documents],
+            field_notes=[dict(note) for note in field_notes],
+            reading_progress=[dict(progress) for progress in reading_progress],
+            compiled_at=datetime.now(timezone.utc).isoformat(),
+            scope_document_id=doc_id or None,
+        )
+        return jsonify(summary)
 
     @app.route("/api/reader/documents/<doc_id>/highlights")
     def api_reader_document_highlights(doc_id: str):
