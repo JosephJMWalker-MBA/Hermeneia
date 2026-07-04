@@ -213,7 +213,7 @@ Rollback at any phase = flip the flag. Every phase leaves the test suite green a
 | 1 | Question Bar (question + page identity + Return to Reading; question card merges) | S | — | |
 | 2 | Field Notes Tray | S | — | **Shipped — PR #32** |
 | 3a | Page Brief (accordion + stewardship rulings) | M | — | **Shipped — this PR (#12)** |
-| 3b | Machine Lens (inline auto-highlight) | M | 3a | deferred to a later PR |
+| 3b | Machine Lens (inline auto-highlight) | M | 3a | **Shipped — this PR (#12)** |
 | 4 | Cycle Bar + Tool Rail v1 (Read/Segment), stage bars hidden behind flag | M | 1 | |
 | 5 | Evidence Bucket (rail foot; brief/selection actions feed it) | M | 3,4 | pairs with #11 rulings |
 | 6 | Companion dock ↔ bubble | S | 1 | restyling note (Atlas) applies here |
@@ -228,6 +228,8 @@ Rollback at any phase = flip the flag. Every phase leaves the test suite green a
 Sequencing logic: PRs 1–6 are independent-ish and each visibly improves the live app; the Sheets (7–9) are the structural absorption; 10–13 are consolidation. At no point is the Reader loop — read, notice, ask, keep — interrupted.
 
 **Page Brief persistence (PR 3a):** the brief's stewardship actions are durable, not placeholder. Approve / Reject / Defer write to the existing `observation_reviews` table via `POST /api/observations/<id>/review` (statuses `approved` / `rejected` / `unsure`); Add question writes an `inquiry_notes` row via `POST /api/observations/<id>/inquiry`. The `related-observations` feed now returns each observation's `review_status`, so rulings reappear on reload. Nothing here is temporary. What is deferred is *routing* — the Evidence Bucket (PR 5, with #11's ruling vocabulary) will consume these same records; until then a ruling is recorded but not yet bucketed.
+
+**Machine Lens (PR 3b):** a toggle (`Machine highlights`, persisted in `hermeneia_machine_lens`) beside the Page Brief marks the current page's machine-observed passages inline, re-rendering each block from its source extraction so the source text is never mutated and no highlight record is created — approving in the brief remains the only path into the record. Machine spans are cool-violet, dotted (`.cr-machine-hl`), clearly distinct from the reader's green solid-bordered highlights; user marks win any overlap. Ruling state restyles the lens live: approved = confirmed (`.cr-machine-approved`), deferred = subtle (`.cr-machine-deferred`), rejected = hidden. Scope is current-page only (the ±1 brief feed is filtered to `page === current` for the lens). **Matching limitation:** an observation is drawn only where its `raw_text` occurs verbatim within a single on-page block; observations that were normalized, span block boundaries, or don't match exactly are silently not drawn rather than mismatched — a deliberately conservative strategy. A fuzzier locator-based anchor is future work.
 
 ---
 
