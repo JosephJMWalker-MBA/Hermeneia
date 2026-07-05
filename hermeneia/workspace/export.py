@@ -17,8 +17,10 @@ reports, critic reports, governance/release artifacts.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import sqlite3
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -264,6 +266,54 @@ def build_bundle_files(
     out: dict[str, bytes] = {path: data for path, (_role, data) in content.items()}
     out["manifest.json"] = _dumps(manifest)
     return out
+
+
+def _read_upload_files(db_path: Path) -> list[tuple[str, bytes]]:
+    uploads_dir = Path(db_path).parent / "uploads"
+    files: list[tuple[str, bytes]] = []
+    if uploads_dir.is_dir():
+        for f in sorted(uploads_dir.iterdir()):
+            if f.is_file():
+                files.append((f.name, f.read_bytes()))
+    return files
+
+
+def build_workspace_zip(
+    db_path: str | Path,
+    *,
+    generated_at: str,
+    workspace_id: str | None = None,
+    app_version: str = "",
+) -> bytes:
+    """Build the workspace bundle as a deterministic in-memory .zip.
+
+    The archive is written with a fixed entry timestamp and sorted paths so
+    identical inputs produce byte-identical zip bytes — no temp files, no DB
+    mutation. This is what the Export Workspace download returns.
+    """
+    db_path = Path(db_path)
+    if workspace_id is None:
+        workspace_id = _default_workspace_id(db_path)
+    conn = _connect_ro(db_path)
+    try:
+        files = build_bundle_files(
+            conn,
+            generated_at=generated_at,
+            workspace_id=workspace_id,
+            upload_files=_read_upload_files(db_path),
+            app_version=app_version,
+        )
+    finally:
+        conn.close()
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(files):
+            info = zipfile.ZipInfo(f"workspace/{path}", date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            archive.writestr(info, files[path])
+    return buffer.getvalue()
 
 
 def _default_workspace_id(db_path: Path) -> str:
