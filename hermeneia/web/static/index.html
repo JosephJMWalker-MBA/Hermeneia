@@ -1478,6 +1478,63 @@ body.has-workflow-rail { padding-bottom: 40px; }
 .cr-form-row { margin-bottom: 10px; }
 .cr-form-label { font-size: 10px; color: var(--dim2); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
 .cr-form-hint { font-size: 11px; color: var(--dim2); margin-top: 4px; line-height: 1.45; }
+.cmp-guide {
+  margin-bottom: 10px; border: 1px solid var(--border);
+  border-radius: var(--r); background: var(--bg);
+  overflow: hidden;
+}
+.cmp-guide-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 10px; padding: 10px 11px; border-bottom: 1px solid var(--border);
+}
+.cmp-guide-kicker {
+  font-size: 9px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--accent); font-weight: 700; margin-bottom: 3px;
+}
+.cmp-guide-title { font-size: 13px; color: var(--fg); font-weight: 700; line-height: 1.3; }
+.cmp-guide-note { font-size: 11px; color: var(--dim2); line-height: 1.45; margin-top: 4px; }
+.cmp-guide-actions { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
+.cmp-guide-body { padding: 9px 10px 10px; }
+.cmp-method-strip {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 9px;
+}
+.cmp-method-step {
+  font-size: 9px; color: var(--dim2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 2px 6px; background: var(--surface);
+}
+.cmp-method-step.active { color: var(--accent); border-color: var(--accent); }
+.cmp-step {
+  display: grid; grid-template-columns: 16px 1fr; gap: 7px;
+  padding: 8px 0; border-top: 1px solid var(--border);
+}
+.cmp-step:first-of-type { border-top: none; }
+.cmp-step-mark {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 1px solid var(--border2); color: var(--dim2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; line-height: 1; margin-top: 1px;
+}
+.cmp-step.done .cmp-step-mark {
+  border-color: #2d6a4f; color: #b7e4c7; background: #16321f;
+}
+.cmp-step.current .cmp-step-mark {
+  border-color: var(--accent); color: var(--accent); background: var(--accent2);
+}
+.cmp-step-label { font-size: 12px; color: var(--fg); font-weight: 650; line-height: 1.3; }
+.cmp-step-why { font-size: 11px; color: var(--dim2); line-height: 1.5; margin-top: 3px; }
+.cmp-step-action {
+  margin-top: 6px; padding: 4px 8px; border-radius: 4px;
+  border: 1px solid var(--border2); background: var(--surface);
+  color: var(--fg2); cursor: pointer; font: inherit; font-size: 11px;
+}
+.cmp-step-action:hover { border-color: var(--accent); color: var(--accent); }
+.cmp-step.done .cmp-step-action { display: none; }
+.cmp-guide-paused {
+  margin-bottom: 10px; padding: 9px 10px; border: 1px solid var(--border);
+  border-radius: var(--r); background: var(--bg); font-size: 11px;
+  color: var(--dim2); line-height: 1.5;
+}
+.cmp-guide-paused-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
 .cr-relevance-btns { display: flex; flex-wrap: wrap; gap: 6px; }
 .cr-rel-btn {
   padding: 3px 9px; border-radius: 3px; border: 1px solid var(--border2);
@@ -1682,6 +1739,11 @@ body.has-workflow-rail { padding-bottom: 40px; }
 .setup-tag-input { background: var(--bg); border: 1px solid var(--border); border-radius: 20px; color: var(--fg); font-size: 12px; padding: 4px 12px; font-family: var(--sans); }
 .setup-tag-input:focus { outline: none; border-color: var(--accent); }
 .setup-divider { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+.fr-companion-layout {
+  display: grid; grid-template-columns: minmax(0, 640px) minmax(280px, 360px);
+  gap: 18px; align-items: start;
+}
+@media (max-width: 980px) { .fr-companion-layout { grid-template-columns: 1fr; } }
 /* ── Investigation card on dashboard ─────────────────── */
 .inv-card { border: 1px solid var(--accent); border-radius: var(--r); padding: 18px 20px; margin-bottom: 24px; background: color-mix(in srgb, var(--accent) 5%, transparent); }
 .inv-card-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; gap: 10px; flex-wrap: wrap; }
@@ -3092,7 +3154,8 @@ async function e10LoadFirstRun() {
     </div>`;
 
   host.innerHTML = `
-    <div style="max-width:640px">
+    <div class="fr-companion-layout">
+    <div>
       <div style="font-size:15px;color:var(--fg2);line-height:1.7;margin-bottom:6px">
         Hermeneia is not the invention of interpretation — it formalizes an ancient human practice:
         reading a source, preserving what you notice, testing interpretations, and tracing every
@@ -3131,6 +3194,14 @@ async function e10LoadFirstRun() {
          question with you, or read until one forms.
          ${s.document_count > 0 ? `<br><button class="btn-primary" style="margin-top:8px;padding:7px 18px" onclick="e10Go('reader')">Open the Reader →</button>` : ''}`,
         false)}
+    </div>
+    <aside class="cr-side-panel" style="position:static;opacity:1;background:var(--surface);margin:0">
+      <div class="cr-side-title">Companion</div>
+      <div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-bottom:8px">
+        The Companion starts before provider setup. It can guide the workbench method in deterministic mode while the workspace is created.
+      </div>
+      <div id="cmp-onboarding-host">${_cmpOnboardingHtml()}</div>
+    </aside>
     </div>`;
 }
 
@@ -6580,6 +6651,286 @@ const _CMP_CONTEXT_LABELS = [
   ['page_observations', 'Machine observations (this page)'],
 ];
 
+const _CMP_ONBOARDING_KEY = 'hermeneia_companion_onboarding_v1';
+const _CMP_METHOD_STEPS = ['Thesis', 'Read', 'Observe', 'Search', 'Interpret', 'Blueprint', 'Critic', 'Meta-synthesis'];
+const _CMP_ONBOARDING_STEPS = [
+  {
+    id: 'welcome',
+    label: 'Welcome',
+    why: 'Hermeneia is a reading workbench. The Companion starts here as a guide to the method, not as a separate tour.',
+    action: 'Begin walkthrough',
+  },
+  {
+    id: 'reader',
+    label: 'Reader',
+    why: 'The Reader is the main canvas. Search, Timeline, field notes, and the later workflow all serve the reading.',
+    action: 'Center the Reader',
+  },
+  {
+    id: 'thesis',
+    label: 'Thesis',
+    why: 'Set a governing question so every observation, search, and interpretation has a human purpose.',
+    action: 'Set governing question',
+  },
+  {
+    id: 'read',
+    label: 'Read',
+    why: 'Read a small amount before asking the system to explain. The source text remains the first authority.',
+    action: 'I have read a little',
+  },
+  {
+    id: 'observe',
+    label: 'Observe',
+    why: 'Make or review one highlight, question, or observation candidate. Human attention starts the record.',
+    action: 'Open inspector',
+  },
+  {
+    id: 'search',
+    label: 'Search',
+    why: 'Ask: where else does this idea appear? Corpus Search checks the rest of the evidence without leaving the book.',
+    action: 'Open Corpus Search',
+  },
+  {
+    id: 'timeline',
+    label: 'Timeline',
+    why: 'Ask: what have you discovered so far? Timeline shows the trail of highlights, questions, notes, and field notes.',
+    action: 'Open Timeline',
+  },
+  {
+    id: 'later',
+    label: 'Interpret / Blueprint / Critic / Meta-synthesis',
+    why: 'Interpretation, Blueprint, Critic, and Meta-synthesis come later. First, build a traceable reading trail.',
+    action: 'Acknowledge later layers',
+  },
+  {
+    id: 'coach',
+    label: 'Persistent coach',
+    why: 'After onboarding, keep the Companion available as a checklist and coach while the Reader remains central.',
+    action: 'Keep Companion available',
+  },
+];
+
+function _cmpDefaultOnboardingState() {
+  return { completed: {}, paused: false, finished: false, updated_at: '' };
+}
+
+function _cmpLoadOnboardingState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(_CMP_ONBOARDING_KEY) || 'null');
+    return {
+      ..._cmpDefaultOnboardingState(),
+      ...(saved && typeof saved === 'object' ? saved : {}),
+      completed: (saved && typeof saved.completed === 'object' && saved.completed) ? saved.completed : {},
+    };
+  } catch {
+    return _cmpDefaultOnboardingState();
+  }
+}
+
+function _cmpSaveOnboardingState(state) {
+  const next = {
+    ..._cmpDefaultOnboardingState(),
+    ...(state || {}),
+    completed: state?.completed || {},
+    updated_at: new Date().toISOString(),
+  };
+  try { localStorage.setItem(_CMP_ONBOARDING_KEY, JSON.stringify(next)); } catch {}
+  return next;
+}
+
+function _cmpStepComplete(stepId, state) {
+  if (state?.completed?.[stepId]) return true;
+  if (stepId === 'reader') return !!_crDocId;
+  if (stepId === 'thesis') return !!(invLoad()?.thesis || '').trim();
+  if (stepId === 'observe') return Array.isArray(_crHighlights) && _crHighlights.some(h => h && h.status !== 'dismissed');
+  return false;
+}
+
+function _cmpStepsWithStatus(state) {
+  let currentFound = false;
+  return _CMP_ONBOARDING_STEPS.map(step => {
+    const done = _cmpStepComplete(step.id, state);
+    const current = !done && !currentFound;
+    if (current) currentFound = true;
+    return { ...step, done, current };
+  });
+}
+
+function _cmpCurrentStep(state) {
+  return _cmpStepsWithStatus(state).find(s => s.current) || null;
+}
+
+function _cmpOnboardingComplete(state) {
+  return _cmpStepsWithStatus(state).every(s => s.done);
+}
+
+function _cmpRenderMethodStrip(currentStep) {
+  const active = currentStep?.id || '';
+  const activeMethod = active === 'thesis' ? 'Thesis'
+    : active === 'read' || active === 'reader' || active === 'welcome' ? 'Read'
+    : active === 'observe' || active === 'timeline' ? 'Observe'
+    : active === 'search' ? 'Search'
+    : active === 'later' ? 'Interpret'
+    : active === 'coach' ? 'Meta-synthesis' : '';
+  return `<div class="cmp-method-strip" aria-label="Hermeneia study method">
+    ${_CMP_METHOD_STEPS.map(label => `<span class="cmp-method-step ${label === activeMethod ? 'active' : ''}">${x(label)}</span>`).join('')}
+  </div>`;
+}
+
+function _cmpOnboardingHtml() {
+  const state = _cmpLoadOnboardingState();
+  const steps = _cmpStepsWithStatus(state);
+  const current = steps.find(s => s.current);
+  const complete = _cmpOnboardingComplete(state);
+  const priority = current ? `<strong style="color:var(--fg)">Current:</strong> ${x(current.label)} — ${x(current.why)}` : 'Walkthrough complete.';
+
+  if (state.paused || state.finished || complete) {
+    const label = complete || state.finished ? 'Walkthrough complete' : 'Walkthrough paused';
+    return `<div class="cmp-guide-paused" id="cmp-onboarding">
+      <div><strong style="color:var(--fg)">${label}.</strong> ${priority}</div>
+      <div style="margin-top:4px">Progress is stored in this browser. No configured model is required for this guide; deterministic stub guidance still works before AI setup.</div>
+      <div class="cmp-guide-paused-actions">
+        <button type="button" class="fs-pill" onclick="cmpOpenOnboarding()">Open guide</button>
+        <button type="button" class="fs-pill" onclick="cmpRestartOnboarding()">Restart walkthrough</button>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="cmp-guide" id="cmp-onboarding">
+    <div class="cmp-guide-head">
+      <div>
+        <div class="cmp-guide-kicker">First Companion workflow</div>
+        <div class="cmp-guide-title">Companion-led onboarding</div>
+        <div class="cmp-guide-note">The Companion teaches the reading method while the Reader stays central. Progress is local to this browser.</div>
+      </div>
+      <div class="cmp-guide-actions">
+        <button type="button" class="fs-pill" onclick="cmpContinueOnboardingLater()">Continue later</button>
+        <button type="button" class="fs-pill" onclick="cmpRestartOnboarding()">Restart</button>
+      </div>
+    </div>
+    <div class="cmp-guide-body">
+      ${_cmpRenderMethodStrip(current)}
+      ${steps.map(step => `
+        <div class="cmp-step ${step.done ? 'done' : step.current ? 'current' : ''}" data-step="${x(step.id)}">
+          <div class="cmp-step-mark">${step.done ? '✓' : step.current ? '→' : '○'}</div>
+          <div>
+            <div class="cmp-step-label">${x(step.label)}</div>
+            <div class="cmp-step-why">${x(step.why)}</div>
+            ${step.current ? `<button type="button" class="cmp-step-action" onclick="cmpOnboardingAction('${x(step.id)}')">${x(step.action)}</button>` : ''}
+          </div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function _cmpRenderOnboarding() {
+  const host = document.getElementById('cmp-onboarding-host');
+  if (host) host.innerHTML = _cmpOnboardingHtml();
+}
+
+function cmpMarkOnboardingStep(stepId, opts = {}) {
+  if (!_CMP_ONBOARDING_STEPS.some(s => s.id === stepId)) return;
+  const state = _cmpLoadOnboardingState();
+  state.completed[stepId] = true;
+  if (!opts.keepPaused) state.paused = false;
+  if (_cmpOnboardingComplete(state)) state.finished = true;
+  _cmpSaveOnboardingState(state);
+  _cmpRenderOnboarding();
+}
+
+function cmpOpenOnboarding() {
+  const state = _cmpLoadOnboardingState();
+  state.paused = false;
+  state.finished = false;
+  _cmpSaveOnboardingState(state);
+  _cmpRenderOnboarding();
+  document.getElementById('cmp-onboarding')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function cmpContinueOnboardingLater() {
+  const state = _cmpLoadOnboardingState();
+  state.paused = true;
+  _cmpSaveOnboardingState(state);
+  _cmpRenderOnboarding();
+}
+
+function cmpRestartOnboarding() {
+  _cmpSaveOnboardingState(_cmpDefaultOnboardingState());
+  _cmpRenderOnboarding();
+}
+
+function _cmpSearchSeed() {
+  const selected = (_crSelText || (window.getSelection ? String(window.getSelection()).trim() : '')).trim();
+  if (selected && selected.length <= 80) return selected;
+  const thesis = (invLoad()?.thesis || '').trim();
+  const words = thesis.split(/\s+/).map(w => w.replace(/[^\w-]/g, '')).filter(w => w.length > 3);
+  return words[0] || '';
+}
+
+function _cmpFocusReader() {
+  e10Go('reader');
+  setTimeout(() => {
+    const view = document.getElementById('cr-page-view');
+    if (view) view.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 80);
+}
+
+function cmpOnboardingAction(stepId) {
+  if (stepId === 'welcome') {
+    cmpMarkOnboardingStep('welcome');
+    document.getElementById('cr-companion-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return;
+  }
+  if (stepId === 'reader') {
+    cmpMarkOnboardingStep('reader');
+    _cmpFocusReader();
+    return;
+  }
+  if (stepId === 'thesis') {
+    if ((invLoad()?.thesis || '').trim()) {
+      cmpMarkOnboardingStep('thesis');
+      return;
+    }
+    _crRenderQuestionCard(true);
+    _crRailGo('question');
+    setTimeout(() => document.getElementById('cr-question-input')?.focus(), 120);
+    return;
+  }
+  if (stepId === 'read') {
+    cmpMarkOnboardingStep('read');
+    _cmpFocusReader();
+    return;
+  }
+  if (stepId === 'observe') {
+    if (_cmpStepComplete('observe', _cmpLoadOnboardingState())) cmpMarkOnboardingStep('observe');
+    _crRailGo('capture');
+    return;
+  }
+  if (stepId === 'search') {
+    cmpMarkOnboardingStep('search');
+    openCorpusSearch(_cmpSearchSeed());
+    return;
+  }
+  if (stepId === 'timeline') {
+    cmpMarkOnboardingStep('timeline');
+    openTimeline();
+    return;
+  }
+  if (stepId === 'later') {
+    cmpMarkOnboardingStep('later');
+    document.getElementById('workflow-rail')?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    return;
+  }
+  if (stepId === 'coach') {
+    cmpMarkOnboardingStep('coach');
+    const state = _cmpLoadOnboardingState();
+    state.paused = true;
+    state.finished = true;
+    _cmpSaveOnboardingState(state);
+    _cmpRenderOnboarding();
+  }
+}
+
 function cmpToggleFlag(key) {
   _cmpFlags[key] = !_cmpFlags[key];
   try { localStorage.setItem('hermeneia_companion_context', JSON.stringify(_cmpFlags)); } catch {}
@@ -6606,6 +6957,7 @@ async function _cmpRender() {
         style="font-size:10px;padding:2px 4px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);max-width:130px"></select>
     </div>
     <div style="font-size:11px;color:var(--dim2);margin-bottom:6px">It knows only what you check. Nothing it says enters the record unless you save it.</div>
+    <div id="cmp-onboarding-host">${_cmpOnboardingHtml()}</div>
     <div id="cmp-context" style="margin-bottom:8px"></div>
     <div id="cmp-transcript" style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
     <textarea id="cmp-input" rows="2" placeholder="Ask about what you're reading…"
@@ -6755,6 +7107,7 @@ function _crKeepQuestion() {
   if (input) input.value = '';  // clear so the re-render guard doesn't hold the form open
   _crRenderQuestionCard();
   _crRenderQuestionCompass();
+  cmpMarkOnboardingStep('thesis', { keepPaused: true });
 }
 
 // ── Focus Scroll (issue #16) ───────────────────────────
@@ -7012,6 +7365,7 @@ function openCorpusSearch(prefill) {
   if (sel && sel.length && sel.length <= 80) input.value = sel;
   input.focus(); input.select();
   if (input.value.trim()) _corpusRunSearch(input.value.trim());
+  cmpMarkOnboardingStep('search', { keepPaused: true });
 }
 function closeCorpusSearch() {
   const panel = document.getElementById('corpus-search');
@@ -7085,6 +7439,7 @@ function _crGoToPage(page) {
   const p = Math.max(1, Math.min(Number(page) || 1, _crTotalPages || 1));
   _crPage = p;
   _crRenderPage();
+  if (p > 1) cmpMarkOnboardingStep('read', { keepPaused: true });
   const view = document.getElementById('cr-page-view');
   if (view) {
     window.scrollTo({ top: view.offsetTop - 80, behavior: 'smooth' });
@@ -7107,6 +7462,7 @@ async function openTimeline() {
   const panel = document.getElementById('attn-timeline');
   if (!panel) return;
   panel.hidden = false;
+  cmpMarkOnboardingStep('timeline', { keepPaused: true });
   await _attnLoad();
 }
 function closeTimeline() {
@@ -7221,6 +7577,7 @@ async function _crOpenDoc(docId) {
     await _crLoadHighlightList();
     _crRenderPage();
     _crRefreshTrail();
+    _cmpRenderOnboarding();
   } catch(e) {
     view.innerHTML = `<div class="e10-empty" style="color:var(--red)">Error: ${x(e.message)}</div>`;
   }
@@ -7438,11 +7795,21 @@ function _crRenderPage() {
 }
 
 function _crPrevPage() {
-  if (_crPage > 1) { _crPage--; _crRenderPage(); window.scrollTo({top: document.getElementById('cr-page-view').offsetTop - 80, behavior: 'smooth'}); }
+  if (_crPage > 1) {
+    _crPage--;
+    _crRenderPage();
+    cmpMarkOnboardingStep('read', { keepPaused: true });
+    window.scrollTo({top: document.getElementById('cr-page-view').offsetTop - 80, behavior: 'smooth'});
+  }
 }
 
 function _crNextPage() {
-  if (_crPage < _crTotalPages) { _crPage++; _crRenderPage(); window.scrollTo({top: document.getElementById('cr-page-view').offsetTop - 80, behavior: 'smooth'}); }
+  if (_crPage < _crTotalPages) {
+    _crPage++;
+    _crRenderPage();
+    cmpMarkOnboardingStep('read', { keepPaused: true });
+    window.scrollTo({top: document.getElementById('cr-page-view').offsetTop - 80, behavior: 'smooth'});
+  }
 }
 
 // The Machine Page Brief (issue #12). One fetch feeds two surfaces: the
@@ -7970,6 +8337,7 @@ async function _crSaveHighlight(asCandidate) {
     _crSelectionRect = null;
     _flnActivityTick();
     _crShowHighlightDetail(d.id);
+    cmpMarkOnboardingStep('observe', { keepPaused: true });
 
     // Brief confirmation
     const prompt = document.getElementById('cr-sel-prompt');
@@ -7990,6 +8358,7 @@ async function _crSaveHighlight(asCandidate) {
 async function _crShowHighlightDetail(highlightId) {
   const h = _crHighlights.find(h => h.id === highlightId);
   if (!h) return;
+  cmpMarkOnboardingStep('observe', { keepPaused: true });
   const form = document.getElementById('cr-sel-form');
   const prompt = document.getElementById('cr-sel-prompt');
   if (!form || !prompt) return;
