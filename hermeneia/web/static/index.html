@@ -1162,6 +1162,60 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   font-size: 9px; text-transform: uppercase; letter-spacing: .06em;
   padding: 1px 5px; border-radius: 3px; background: var(--surface2); color: var(--dim2);
 }
+.cr-rail-timeline { }
+
+/* Attention timeline — a slide-up workbench strip below the book. */
+.attn-timeline {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 340;
+  height: 300px; max-height: 52vh;
+  background: var(--surface); border-top: 1px solid var(--border);
+  box-shadow: 0 -12px 40px rgba(0,0,0,.35);
+  display: flex; flex-direction: column;
+  transform: translateY(0); transition: transform .18s ease;
+}
+.attn-timeline[hidden] { display: flex; transform: translateY(102%); }
+.attn-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 18px; border-bottom: 1px solid var(--border);
+}
+.attn-title { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--dim2); }
+.attn-meta { font-size: 12px; color: var(--dim2); }
+.attn-filters { display: flex; gap: 4px; }
+.attn-filter {
+  font-size: 11px; color: var(--dim2); background: none;
+  border: 1px solid transparent; border-radius: 999px; padding: 3px 10px; cursor: pointer;
+}
+.attn-filter:hover { color: var(--fg); }
+.attn-filter.active { color: var(--accent); border-color: var(--accent); }
+.attn-close { background: none; border: none; color: var(--dim2); cursor: pointer; font-size: 15px; }
+.attn-close:hover { color: var(--fg); }
+.attn-track {
+  flex: 1; overflow-x: auto; overflow-y: hidden;
+  display: flex; gap: 12px; padding: 16px 18px; align-items: stretch;
+}
+.attn-hint { font-size: 12px; color: var(--dim2); padding: 8px; }
+.attn-card {
+  flex: 0 0 260px; width: 260px; cursor: pointer;
+  border: 1px solid var(--border); border-left: 3px solid var(--border2);
+  border-radius: var(--r); background: var(--bg); padding: 11px 13px;
+  display: flex; flex-direction: column; gap: 6px; text-align: left; font: inherit;
+}
+.attn-card:hover { border-color: var(--accent); }
+.attn-card.k-question { border-left-color: #e0a800; }
+.attn-card.k-highlight { border-left-color: var(--accent); }
+.attn-card.k-note { border-left-color: #6fb0cf; }
+.attn-card.k-field_note { border-left-color: #cf6fcf; }
+.attn-card-top { display: flex; align-items: center; gap: 8px; }
+.attn-kind {
+  font-size: 9px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700;
+  padding: 1px 6px; border-radius: 3px; background: var(--surface2); color: var(--dim2);
+}
+.attn-when { font-size: 10px; color: var(--dim2); font-family: var(--mono); margin-left: auto; }
+.attn-card-text { font-size: 12.5px; color: var(--fg2); line-height: 1.5; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
+.attn-card-note { font-size: 12px; color: var(--dim2); font-style: italic; }
+.attn-card-loc { font-size: 10px; color: var(--dim2); font-family: var(--mono); margin-top: auto; }
+.attn-rank { color: var(--accent); font-size: 10px; }
 .cr-tool-drawer {
   max-width: 860px; margin: -6px auto 16px;
   border: 1px solid var(--border); border-radius: var(--r);
@@ -2179,6 +2233,27 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
   <div class="corpus-search-meta" id="corpus-search-meta"></div>
   <div class="corpus-search-results" id="corpus-search-results">
     <div class="corpus-search-hint">Search any word or phrase across the corpus. Results appear here beside the book — click one to open that passage.</div>
+  </div>
+</aside>
+
+<!-- Attention timeline (PR 3): "what have I discovered so far?" A slide-up
+     workbench strip below the book; the Reader stays visible above it. -->
+<aside class="attn-timeline" id="attn-timeline" hidden aria-label="Attention timeline">
+  <div class="attn-head">
+    <span class="attn-title">What you've discovered</span>
+    <span class="attn-meta" id="attn-meta"></span>
+    <span style="flex:1"></span>
+    <div class="attn-filters" id="attn-filters">
+      <button class="attn-filter active" data-kind="all" onclick="_attnSetFilter('all')">All</button>
+      <button class="attn-filter" data-kind="highlight" onclick="_attnSetFilter('highlight')">Highlights</button>
+      <button class="attn-filter" data-kind="question" onclick="_attnSetFilter('question')">Questions</button>
+      <button class="attn-filter" data-kind="note" onclick="_attnSetFilter('note')">Notes</button>
+      <button class="attn-filter" data-kind="field_note" onclick="_attnSetFilter('field_note')">Field notes</button>
+    </div>
+    <button class="attn-close" onclick="closeTimeline()" aria-label="Close timeline">✕</button>
+  </div>
+  <div class="attn-track" id="attn-track">
+    <div class="attn-hint">Loading your attention timeline…</div>
   </div>
 </aside>
 
@@ -6693,6 +6768,7 @@ function _crRenderDocPicker(ws) {
     <div class="cr-question-compass" id="cr-question-compass"></div>
     <div class="cr-tool-rail" id="cr-tool-rail" role="toolbar" aria-label="Reader tools">
       <button class="cr-rail-btn cr-rail-search" onclick="openCorpusSearch()" title="Search the corpus without leaving the book">⌕ Search corpus</button>
+      <button class="cr-rail-btn cr-rail-timeline" onclick="openTimeline()" title="What have I discovered so far?">◷ Timeline</button>
       <button class="cr-rail-btn" onclick="_crRailGo('question')" title="Jump to Your Question">◈ Question</button>
       <button class="cr-rail-btn" onclick="_crRailGo('companion')" title="Jump to Companion">✦ Companion</button>
       <button class="cr-rail-btn" onclick="_crRailGo('capture')" title="Jump to Highlight Inspector">◧ Inspector</button>
@@ -6959,8 +7035,94 @@ function _crGoToPage(page) {
   }
 }
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeCorpusSearch();
+  if (e.key === 'Escape') { closeCorpusSearch(); closeTimeline(); }
 });
+
+// ── Attention timeline (PR 3) ──────────────────────────
+// "What have I discovered so far?" — a slide-up strip below the book showing
+// the steward's captured attention (highlights, questions, notes, field notes)
+// in reverse-chronological order. Clicking a card navigates the book to that
+// passage. Reuses /api/reader/timeline; the Reader stays visible above.
+let _attnEntries = [];
+let _attnFilter = 'all';
+async function openTimeline() {
+  const panel = document.getElementById('attn-timeline');
+  if (!panel) return;
+  panel.hidden = false;
+  await _attnLoad();
+}
+function closeTimeline() {
+  const p = document.getElementById('attn-timeline');
+  if (p) p.hidden = true;
+}
+function _attnSetFilter(kind) {
+  _attnFilter = kind;
+  document.querySelectorAll('.attn-filter').forEach(b =>
+    b.classList.toggle('active', b.dataset.kind === kind));
+  _attnRender();
+}
+async function _attnLoad() {
+  const track = document.getElementById('attn-track');
+  if (track) track.innerHTML = '<div class="attn-hint">Loading your attention timeline…</div>';
+  try {
+    const data = await get('/api/reader/timeline');
+    _attnEntries = data.entries || [];
+    _attnRender();
+  } catch (e) {
+    if (track) track.innerHTML = `<div class="attn-hint" style="color:var(--red)">${x(e.message)}</div>`;
+  }
+}
+function _attnRender() {
+  const track = document.getElementById('attn-track');
+  const meta = document.getElementById('attn-meta');
+  if (!track) return;
+  const items = _attnFilter === 'all'
+    ? _attnEntries : _attnEntries.filter(e => e.kind === _attnFilter);
+  if (meta) meta.textContent = _attnEntries.length ? `${items.length} of ${_attnEntries.length}` : '';
+  if (!_attnEntries.length) {
+    track.innerHTML = '<div class="attn-hint">Nothing captured yet. Highlight a passage, ask a question, or write a field note — it will appear here.</div>';
+    return;
+  }
+  if (!items.length) { track.innerHTML = '<div class="attn-hint">No entries of this kind yet.</div>'; return; }
+  track.innerHTML = items.map(_attnCard).join('');
+}
+function _attnCard(e) {
+  const kindLabel = { highlight: 'Highlight', question: 'Question', note: 'Note', field_note: 'Field note' }[e.kind] || e.kind;
+  const doc = String(e.document_name || '').replace(/\.pdf$/i, '');
+  const loc = e.page != null ? `${x(doc)} · p.${x(String(e.page))}` : x(doc);
+  const when = _attnWhen(e.created_at);
+  let text = '', note = '';
+  if (e.kind === 'field_note') {
+    text = e.understanding || e.pressing_questions || '';
+  } else {
+    text = e.question_text || e.selected_text || '';
+    if (e.note_text) note = e.note_text;
+  }
+  const rank = (e.rank && Number(e.rank)) ? `<span class="attn-rank" title="rank ${Number(e.rank)}">${'★'.repeat(Number(e.rank))}</span>` : '';
+  const nav = e.document_id ? `onclick='_attnOpen(${JSON.stringify(e.document_id)}, ${Number(e.page) || 1})'` : '';
+  return `<button class="attn-card k-${x(e.kind)}" ${nav}>
+    <div class="attn-card-top"><span class="attn-kind">${x(kindLabel)}</span>${rank}<span class="attn-when">${x(when)}</span></div>
+    <div class="attn-card-text">${x(text)}</div>
+    ${note ? `<div class="attn-card-note">${x(note)}</div>` : ''}
+    <div class="attn-card-loc">${loc}</div>
+  </button>`;
+}
+function _attnWhen(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    return d.toISOString().slice(0, 10);
+  } catch { return ''; }
+}
+function _attnOpen(docId, page) {
+  e10Go('reader');
+  if (docId === _crDocId) { _crGoToPage(page); }
+  else { _crOpenDoc(docId).then(() => _crGoToPage(page)).catch(() => {}); }
+}
 
 async function _crOpenDoc(docId) {
   _crDocId = docId;

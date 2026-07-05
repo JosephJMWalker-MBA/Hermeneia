@@ -5797,6 +5797,72 @@ Return ONLY valid JSON, no markdown, no explanation:
         )
         return jsonify(summary)
 
+    # ── Attention timeline (PR 3) ─────────────────────────────────────────────
+    # "What have I discovered so far?" — a chronological feed of the steward's
+    # captured attention (highlights, notes, questions, field notes) across the
+    # corpus. Read-only aggregation; excludes dismissed highlights and muted
+    # documents. Human attention only — machine observations are kept separate.
+    @app.route("/api/reader/timeline")
+    def api_reader_timeline():
+        if not db_path.exists():
+            return jsonify({"entries": [], "count": 0}), 200
+        conn = _conn()
+        entries: list[dict] = []
+        highlights = conn.execute(
+            """SELECT rh.id, rh.selected_text, rh.note_text, rh.question_text,
+                      rh.rank, rh.theme_bucket, rh.page, rh.source_locator,
+                      rh.source_document_id, sd.original_filename, rh.created_at
+               FROM reader_highlights rh
+               LEFT JOIN source_documents sd ON sd.id = rh.source_document_id
+               WHERE rh.status != 'dismissed'
+                 AND COALESCE(sd.excluded_from_analysis, 0) = 0
+               ORDER BY rh.created_at DESC"""
+        ).fetchall()
+        for r in highlights:
+            if (r["question_text"] or "").strip():
+                kind = "question"
+            elif (r["note_text"] or "").strip():
+                kind = "note"
+            else:
+                kind = "highlight"
+            entries.append({
+                "kind": kind,
+                "id": r["id"],
+                "selected_text": r["selected_text"],
+                "note_text": r["note_text"],
+                "question_text": r["question_text"],
+                "rank": r["rank"],
+                "theme_bucket": r["theme_bucket"],
+                "document_id": r["source_document_id"],
+                "document_name": r["original_filename"],
+                "page": r["page"],
+                "source_locator": r["source_locator"],
+                "created_at": r["created_at"],
+            })
+        field_notes = conn.execute(
+            """SELECT il.id, il.understanding, il.pressing_questions, il.page,
+                      il.source_document_id, sd.original_filename, il.created_at
+               FROM investigation_log il
+               LEFT JOIN source_documents sd ON sd.id = il.source_document_id
+               WHERE il.source_document_id IS NULL
+                  OR COALESCE(sd.excluded_from_analysis, 0) = 0
+               ORDER BY il.created_at DESC"""
+        ).fetchall()
+        for r in field_notes:
+            entries.append({
+                "kind": "field_note",
+                "id": r["id"],
+                "understanding": r["understanding"],
+                "pressing_questions": r["pressing_questions"],
+                "document_id": r["source_document_id"],
+                "document_name": r["original_filename"],
+                "page": r["page"],
+                "created_at": r["created_at"],
+            })
+        conn.close()
+        entries.sort(key=lambda e: str(e.get("created_at") or ""), reverse=True)
+        return jsonify({"entries": entries, "count": len(entries)})
+
     @app.route("/api/reader/documents/<doc_id>/highlights")
     def api_reader_document_highlights(doc_id: str):
         """All non-dismissed highlights for a document."""
