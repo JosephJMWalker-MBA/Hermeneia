@@ -93,4 +93,8 @@ def test_passage_read_action_still_uses_reader_passage_text():
     html = INDEX.read_text()
 
     assert 'onclick="ttsSpeak(_crSelText)" title="Read aloud"' in html
-    assert "function a11yReadSelection() {\n  const text = _a11yGetSelectedText();" in html
+    # a11yReadSelection reads the current selection; it now also auto-enables
+    # read mode so the popup's Read button works without pre-toggling (item 7).
+    assert "function a11yReadSelection() {" in html
+    assert "_a11yGetSelectedText()" in html
+    assert "if (!_a11y.read) { _a11y.read = true; _a11ySync(); }" in html
