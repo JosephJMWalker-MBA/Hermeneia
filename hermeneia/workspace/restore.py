@@ -14,8 +14,10 @@ truth. Reports/governance artifacts are not part of WBS v1.
 """
 from __future__ import annotations
 
+import io
 import json
 import sqlite3
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +40,43 @@ _OCCUPANCY_TABLES = [table for table, _ in _TABLE_FILES] + ["workspace_investiga
 
 class RestoreError(RuntimeError):
     """Raised when a bundle cannot be safely restored."""
+
+
+def find_bundle_root(extracted: str | Path) -> Path:
+    """Locate the directory holding manifest.json inside an extracted bundle.
+
+    Accepts either a bundle extracted at the top level or wrapped in a single
+    ``workspace/`` directory (as the download .zip produces).
+    """
+    extracted = Path(extracted)
+    if (extracted / "manifest.json").is_file():
+        return extracted
+    subdirs = [
+        p for p in extracted.iterdir()
+        if p.is_dir() and (p / "manifest.json").is_file()
+    ]
+    if len(subdirs) == 1:
+        return subdirs[0]
+    raise RestoreError("no manifest.json found in the uploaded bundle")
+
+
+def safe_extract_zip(zip_bytes: bytes, dest: str | Path) -> Path:
+    """Extract a bundle .zip into ``dest``, guarding against path traversal.
+
+    Returns the located bundle root. Raises RestoreError for a malformed or
+    unsafe archive.
+    """
+    dest = Path(dest).resolve()
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
+            for member in archive.namelist():
+                target = (dest / member).resolve()
+                if dest not in target.parents and target != dest:
+                    raise RestoreError("unsafe path in bundle zip")
+            archive.extractall(dest)
+    except zipfile.BadZipFile as exc:
+        raise RestoreError(f"not a valid .zip bundle: {exc}") from exc
+    return find_bundle_root(dest)
 
 
 def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
