@@ -11,10 +11,20 @@ from .export import (
     build_workspace_zip,
     export_workspace_bundle,
 )
+from .restore import (
+    RestoreError,
+    preview_restore,
+    read_bundle,
+    restore_workspace,
+)
 
 __all__ = [
     "WBS_VERSION",
     "build_bundle_files",
     "build_workspace_zip",
     "export_workspace_bundle",
+    "RestoreError",
+    "preview_restore",
+    "read_bundle",
+    "restore_workspace",
 ]
