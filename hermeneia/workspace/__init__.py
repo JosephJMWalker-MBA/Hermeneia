@@ -13,9 +13,11 @@ from .export import (
 )
 from .restore import (
     RestoreError,
+    find_bundle_root,
     preview_restore,
     read_bundle,
     restore_workspace,
+    safe_extract_zip,
 )
 
 __all__ = [
@@ -24,7 +26,9 @@ __all__ = [
     "build_workspace_zip",
     "export_workspace_bundle",
     "RestoreError",
+    "find_bundle_root",
     "preview_restore",
     "read_bundle",
     "restore_workspace",
+    "safe_extract_zip",
 ]
