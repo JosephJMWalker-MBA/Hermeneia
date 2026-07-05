@@ -6241,6 +6241,49 @@ Return ONLY valid JSON, no markdown, no explanation:
             rw.close()
         return jsonify({"identity": identity}), 200
 
+    # ── Import Workspace (issues #70/#76/#81) ─────────────────────────────────
+    # Inspect before acting: preview a bundle .zip read-only, then restore only
+    # on explicit confirmation. v1 restores into a fresh workspace only; a
+    # non-empty target is surfaced, never silently overwritten.
+    @app.route("/api/workspace/import/preview", methods=["POST"])
+    def api_workspace_import_preview():
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        from ..workspace import RestoreError, preview_restore, safe_extract_zip
+
+        file = request.files.get("bundle")
+        if file is None:
+            return jsonify({"error": "a bundle .zip is required"}), 400
+        data = file.read()
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                root = safe_extract_zip(data, td)
+                preview = preview_restore(db_path, root)
+        except RestoreError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify(preview)
+
+    @app.route("/api/workspace/import/restore", methods=["POST"])
+    def api_workspace_import_restore():
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        from ..workspace import RestoreError, restore_workspace, safe_extract_zip
+
+        file = request.files.get("bundle")
+        if file is None:
+            return jsonify({"error": "a bundle .zip is required"}), 400
+        data = file.read()
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                root = safe_extract_zip(data, td)
+                result = restore_workspace(db_path, root, overwrite=False)
+        except RestoreError as exc:
+            # A non-empty target is a refusal the user must resolve, not a
+            # malformed bundle — 409 Conflict, with the reason surfaced.
+            status = 409 if "not empty" in str(exc) else 400
+            return jsonify({"error": str(exc)}), status
+        return jsonify(result)
+
     @app.route("/api/investigation-log")
     def api_investigation_log_list():
         if not db_path.exists():
