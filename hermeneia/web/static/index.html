@@ -212,11 +212,28 @@ body.x .ho { display: none !important; }
 }
 .nav-btn:hover { color: var(--fg); background: rgba(255,255,255,.04); }
 
+/* Study compass bar — the governing question, persistent across screens. */
+.thesis-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 20px; font-size: 13px; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 88%, var(--accent));
+  color: var(--fg2);
+}
+.thesis-bar:hover { background: color-mix(in srgb, var(--surface) 78%, var(--accent)); }
+.thesis-bar .thesis-bar-icon { color: var(--accent); flex-shrink: 0; }
+.thesis-bar .thesis-bar-text {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.thesis-bar.unset { color: var(--dim2); font-style: italic; }
+.thesis-bar.unset .thesis-bar-icon { color: var(--dim2); }
+
 /* Workspace drawer — additive grouping of pipeline tools. Reader stays
    primary; this is secondary/supporting structure, hidden until requested. */
 .workspace-drawer {
-  position: absolute; right: 16px; top: 60px; z-index: 60;
+  position: fixed; right: 16px; top: 56px; z-index: 400;
   width: 320px; max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 72px); overflow-y: auto;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r); box-shadow: 0 12px 40px rgba(0,0,0,.4);
   padding: 14px 16px;
@@ -946,6 +963,16 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 }
 .e10-lineage-arrow { color: var(--dim); text-align: center; }
 .provider-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+/* Advanced provider controls (role calibration + overrides) are quiet by
+   default; a standard user sees status, an expert expands the details. */
+.provider-adv { margin-bottom: 6px; }
+.provider-adv > summary {
+  cursor: pointer; list-style: none; font-size: 11px; color: var(--dim2);
+  letter-spacing: .04em; padding: 4px 0; user-select: none;
+}
+.provider-adv > summary::before { content: '⚙ '; }
+.provider-adv > summary::-webkit-details-marker { display: none; }
+.provider-adv[open] > summary { color: var(--fg2); }
 .provider-card {
   border: 1px solid var(--border); border-radius: var(--r);
   background: var(--surface); padding: 16px;
@@ -1025,8 +1052,8 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 .reader-action:hover { color: var(--accent); border-color: var(--accent); }
 /* ── Close Reading Workspace ─────────────────────────── */
 .cr-layout {
-  display: grid; grid-template-columns: minmax(520px,1fr) minmax(280px,340px);
-  gap: 20px; align-items: start;
+  display: grid; grid-template-columns: minmax(560px,1fr) minmax(240px,300px);
+  gap: 26px; align-items: start;
 }
 .cr-doc-picker {
   display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;
@@ -1049,9 +1076,9 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 .cr-role-exploratory { background: #2a1e1e; color: #cf8f6f; }
 .cr-page-view {
   border: 1px solid var(--border); border-radius: var(--r);
-  background: var(--surface); padding: 28px 32px;
+  background: var(--surface); padding: 34px 44px;
   min-height: 400px; user-select: text; cursor: text;
-  max-width: 860px;
+  max-width: 900px;
   margin: 0 auto;
 }
 /* Question Compass — persistent interpretive orientation, above the book.
@@ -1216,9 +1243,9 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   background: #050706;
   border-color: rgba(90, 255, 205, 0.10);
   font-family: ui-serif, Georgia, "Times New Roman", serif;
-  max-width: 760px;
+  max-width: 860px;
   margin: 0 auto;
-  padding: 48px clamp(16px, 4vw, 40px) 22vh;
+  padding: 48px clamp(20px, 4.5vw, 56px) 22vh;
 }
 .cr-page-view.focus-scroll .cr-page-text {
   --focus: 0;
@@ -1291,11 +1318,18 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 }
 .cr-progress-fill { height: 100%; background: var(--accent); transition: width .4s; }
 .cr-side {
-  position: sticky; top: 72px; display: flex; flex-direction: column; gap: 14px;
+  position: sticky; top: 72px; display: flex; flex-direction: column; gap: 12px;
 }
+/* Secondary Reader tools recede so they do not compete with the book; they
+   return to full presence on hover or focus. Functionality is unchanged. */
 .cr-side-panel {
   border: 1px solid var(--border); border-radius: var(--r);
-  background: var(--surface); padding: 16px;
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  padding: 13px 14px; font-size: 13px;
+  opacity: .82; transition: opacity .15s, background .15s, border-color .15s;
+}
+.cr-side-panel:hover, .cr-side-panel:focus-within {
+  opacity: 1; background: var(--surface); border-color: var(--border2);
 }
 .cr-side-title {
   font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
@@ -2046,10 +2080,13 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
     <button class="nav-btn" id="workspace-menu-btn" onclick="toggleWorkspaceMenu()" aria-expanded="false" aria-controls="workspace-drawer" style="font-size:13px" title="Pipeline tools that support the reading">Workspace ▾</button>
     <button class="nav-btn" onclick="e10Go('guide')" style="font-size:13px">Guide</button>
     <button class="nav-btn" onclick="e10Go('constitution')" style="font-size:13px">Constitution</button>
-    <button class="nav-btn" onclick="e10Go('lineage')" style="font-size:13px">Lineage</button>
     <button class="expert-btn" onclick="toggleExpert()">⚙ Connections</button>
   </div>
 </nav>
+
+<!-- Persistent study compass: the governing question, visible on every screen.
+     Gently prompts the steward to set one when none exists (issue: reader-first). -->
+<div id="thesis-bar" class="thesis-bar" hidden onclick="_thesisBarClick()"></div>
 
 <!-- Workspace drawer (issue #56 slice 4): an additive grouping of the older
      pipeline surfaces behind one clear entry point. Reader stays primary; the
@@ -2325,6 +2362,9 @@ function a11ySpeak(text) {
 
 // Called from the floating tip's Read button
 function a11yReadSelection() {
+  // Clicking Read from the selection popup should just work — auto-enable what
+  // is needed rather than requiring the global Read toggle first.
+  if (!_a11y.read) { _a11y.read = true; _a11ySync(); }
   const text = _a11yGetSelectedText();
   a11ySpeak(text);
 }
@@ -2362,8 +2402,11 @@ function a11yCollapse() {
 document.addEventListener('mouseup', (e) => {
   // Don't trigger if click was inside dock or tip
   if (e.target.closest('#a11y-dock, #a11y-dock-collapsed-pill, #a11y-selection-tip')) return;
-  if (!_a11y.read) return;
   if (_a11y.speaking) return;
+  // Show the Read popup on any content selection — the popup's Read button
+  // auto-enables read mode, so the global toggle need not be on first. Skip
+  // selections inside form fields.
+  if (e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
   const text = _a11yGetSelectedText();
   const tip  = document.getElementById('a11y-selection-tip');
   if (!tip) return;
@@ -2434,6 +2477,11 @@ function toggleExpert() {
 // Additive progressive disclosure: group the older pipeline surfaces behind
 // one clear entry point without changing routing. Every entry reuses the
 // existing e10Go() navigation; the existing nav buttons stay in place.
+function _wsCloseMenu() {
+  const d = document.getElementById('workspace-drawer');
+  if (d) { d.dataset.open = '0'; d.hidden = true; }
+  document.getElementById('workspace-menu-btn')?.setAttribute('aria-expanded', 'false');
+}
 function toggleWorkspaceMenu() {
   const d = document.getElementById('workspace-drawer');
   const b = document.getElementById('workspace-menu-btn');
@@ -2443,6 +2491,17 @@ function toggleWorkspaceMenu() {
   d.hidden = open;
   if (b) b.setAttribute('aria-expanded', String(!open));
 }
+// Close the Workspace drawer on outside click or Escape — it is a tool drawer,
+// not a persistent navigation surface (issue: reader-first cleanup).
+document.addEventListener('click', (e) => {
+  const d = document.getElementById('workspace-drawer');
+  if (!d || d.dataset.open !== '1') return;
+  if (e.target.closest('#workspace-drawer') || e.target.closest('#workspace-menu-btn')) return;
+  _wsCloseMenu();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') _wsCloseMenu();
+});
 function _wsGo(stage) {
   const d = document.getElementById('workspace-drawer');
   if (d) { d.dataset.open = '0'; d.hidden = true; }
@@ -3995,7 +4054,34 @@ function dictWrap(targetId, innerHtml) {
   return `<div class="dict-wrap">${innerHtml}${sttMakeBtn(targetId)}</div>`;
 }
 
+function _thesisBarClick() {
+  // Go to the book and focus the question, whether setting or revising it.
+  e10Go('reader');
+  setTimeout(() => {
+    try { _crRenderQuestionCard(true); } catch {}
+    document.getElementById('cr-question-input')?.focus();
+  }, 60);
+}
+function _renderThesisBar() {
+  const bar = document.getElementById('thesis-bar');
+  if (!bar) return;
+  const thesis = (invLoad()?.thesis || '').trim();
+  bar.hidden = false;
+  if (thesis) {
+    bar.classList.remove('unset');
+    bar.innerHTML = `<span class="thesis-bar-icon">◈</span>`
+      + `<span class="thesis-bar-text">${x(thesis)}</span>`;
+    bar.title = thesis;
+  } else {
+    bar.classList.add('unset');
+    bar.innerHTML = `<span class="thesis-bar-icon">◇</span>`
+      + `<span class="thesis-bar-text">Set a governing question to guide your reading →</span>`;
+    bar.title = 'Set your governing question';
+  }
+}
+
 function updatePageThesis() {
+  _renderThesisBar();
   const el   = document.getElementById('page-thesis');
   const wrap = document.getElementById('page-thesis-wrap');
   if (!el || !wrap) return;
@@ -5679,6 +5765,8 @@ function e10ProviderCard(provider, cal, perf) {
     ${ollamaSteps}
     ${perfHtml}
     ${calSummary}
+    <details class="provider-adv">
+      <summary>Role calibration &amp; manual overrides</summary>
     <table style="width:100%;border-collapse:collapse;margin-bottom:6px">
       <thead>
         <tr>
@@ -5690,6 +5778,7 @@ function e10ProviderCard(provider, cal, perf) {
       </thead>
       <tbody>${roleRows}</tbody>
     </table>
+    </details>
     <div class="provider-note">${x(provider.message)}</div>
     ${notice ? `<div class="provider-key-panel"><div class="provider-key-title">${x(notice)}</div></div>` : ''}
     <div class="e10-actions">
