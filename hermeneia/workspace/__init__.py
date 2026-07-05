@@ -8,11 +8,13 @@ and never writes canonical data. See docs/workspace-bundle-spec.md.
 from .export import (
     WBS_VERSION,
     build_bundle_files,
+    build_workspace_zip,
     export_workspace_bundle,
 )
 
 __all__ = [
     "WBS_VERSION",
     "build_bundle_files",
+    "build_workspace_zip",
     "export_workspace_bundle",
 ]

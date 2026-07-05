@@ -6181,6 +6181,26 @@ Return ONLY valid JSON, no markdown, no explanation:
             "updated_at": now,
         }}), 200
 
+    # ── Export Workspace (issues #70/#76/#79) ────────────────────────────────
+    # Download the whole workspace as a portable, deterministic WBS v1 bundle
+    # (.zip). Read-only over the DB; the browser receives a self-contained
+    # artifact. Storage adapters (server path, Git, folder) come later.
+    @app.route("/api/workspace/export")
+    def api_workspace_export():
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        from ..workspace import build_workspace_zip
+
+        generated_at = datetime.now(timezone.utc).isoformat()
+        data = build_workspace_zip(db_path, generated_at=generated_at)
+        stamp = generated_at[:10]
+        response = make_response(data)
+        response.headers["Content-Type"] = "application/zip"
+        response.headers["Content-Disposition"] = (
+            f'attachment; filename="hermeneia-workspace-{stamp}.zip"'
+        )
+        return response
+
     @app.route("/api/investigation-log")
     def api_investigation_log_list():
         if not db_path.exists():
