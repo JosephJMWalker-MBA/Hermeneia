@@ -136,8 +136,9 @@ def test_canonical_and_authored_content_is_verbatim(tmp_path: Path):
     _export(db_path, out)
 
     docs = json.loads((out / "corpus/documents.json").read_text())
-    assert docs[0]["filename"] == "gatsby.pdf"
-    assert docs[0]["excluded"] is False
+    # Canonical rows are verbatim so the bundle round-trips losslessly.
+    assert docs[0]["original_filename"] == "gatsby.pdf"
+    assert docs[0]["excluded_from_analysis"] == 0
     inv = json.loads((out / "investigation.json").read_text())
     assert inv["thesis"] == "How does desire depend on distance?"
     assert inv["lenses"] == ["aspiration"]

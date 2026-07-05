@@ -188,13 +188,20 @@ def build_bundle_files(
     Pure and deterministic: identical inputs (DB state, generated_at,
     workspace_id, uploads) produce byte-identical output. Read-only over the DB.
     """
-    documents = _rows(
-        conn,
-        "SELECT id, original_filename AS filename, file_hash, source_role, "
-        "total_pages, excluded_from_analysis FROM source_documents ORDER BY id",
-    )
-    for doc in documents:
-        doc["excluded"] = bool(doc.pop("excluded_from_analysis"))
+    # Verbatim so the bundle round-trips losslessly (restore re-inserts these).
+    documents = _rows(conn, "SELECT * FROM source_documents ORDER BY id")
+    # Packet-shaped view for the derived compile (which reads `filename`).
+    packet_documents = [
+        {
+            "id": d.get("id"),
+            "filename": d.get("original_filename"),
+            "file_hash": d.get("file_hash"),
+            "source_role": d.get("source_role"),
+            "total_pages": d.get("total_pages"),
+            "excluded_from_analysis": d.get("excluded_from_analysis"),
+        }
+        for d in documents
+    ]
     extractions = _rows(
         conn,
         "SELECT * FROM source_extractions ORDER BY document_id, source_locator, id",
@@ -214,7 +221,7 @@ def build_bundle_files(
     derived = _derived(
         conn,
         highlights=highlights,
-        documents=documents,
+        documents=packet_documents,
         field_notes=field_notes,
         generated_at=generated_at,
         governing_question=(investigation or {}).get("thesis"),
