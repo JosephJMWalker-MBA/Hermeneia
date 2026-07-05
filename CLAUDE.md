@@ -1,3 +1,8 @@
+> **Product direction:** Read [`docs/FROZEN_PRODUCT_DIRECTION.md`](docs/FROZEN_PRODUCT_DIRECTION.md)
+> first — it is the canonical source for where the experience is going (Reader as
+> the main canvas, tools unfold around the work, the staged PR roadmap). This
+> file (`CLAUDE.md`) governs architecture; that file governs experience.
+
 # ARCHITECTURE FREEZE v1.0 — LIFTED
 
 **Status:** Lifted  
