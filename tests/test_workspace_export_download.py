@@ -105,10 +105,14 @@ def test_export_endpoint_404_without_database(tmp_path: Path):
     assert resp.status_code == 404
 
 
-def test_export_endpoint_does_not_mutate_the_database(tmp_path: Path):
+def test_export_endpoint_is_read_only_after_identity_exists(tmp_path: Path):
+    """Export lazily creates the workspace identity once (issue #83); after that
+    it is read-only over canonical/authored data."""
     db_path = _seed(tmp_path)
+    client = create_app(db_path=db_path).test_client()
+    client.get("/api/workspace/export")  # first call establishes identity
     before = db_path.read_bytes()
-    create_app(db_path=db_path).test_client().get("/api/workspace/export")
+    client.get("/api/workspace/export")  # subsequent export writes nothing
     assert db_path.read_bytes() == before
 
 

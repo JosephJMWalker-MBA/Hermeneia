@@ -324,9 +324,15 @@ def build_workspace_zip(
 
 
 def _default_workspace_id(db_path: Path) -> str:
-    """Deterministic workspace id from the canonical corpus (stable per workspace)."""
+    """The workspace's durable identity (issue #83) if present, else a
+    corpus-hash fallback for legacy databases without a persisted identity."""
+    from .identity import read_workspace_id
+
     conn = _connect_ro(db_path)
     try:
+        persistent = read_workspace_id(conn)
+        if persistent:
+            return persistent
         ids = [r["id"] for r in conn.execute(
             "SELECT id FROM source_documents ORDER BY id")]
     finally:
