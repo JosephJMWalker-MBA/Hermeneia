@@ -1150,6 +1150,21 @@ CREATE TABLE IF NOT EXISTS workspace_investigation (
 """)
     conn.commit()
 
+    # Issue #83: the workspace's own durable identity — who the workspace is,
+    # independent of the corpus it currently contains. A named interpretive
+    # project is not reducible to the files inside it, so its id must not be a
+    # corpus fingerprint. Single mutable row; generated once, then stable.
+    conn.executescript("""
+CREATE TABLE IF NOT EXISTS workspace_identity (
+    id             TEXT PRIMARY KEY,   -- 'current' single-row identity
+    workspace_id   TEXT NOT NULL,      -- durable, corpus-independent id
+    workspace_name TEXT,
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL
+);
+""")
+    conn.commit()
+
 
 # Backwards-compat alias used by CLI commands written before v9
 ensure_artist_tables = ensure_profile_tables

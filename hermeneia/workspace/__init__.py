@@ -19,6 +19,12 @@ from .restore import (
     restore_workspace,
     safe_extract_zip,
 )
+from .identity import (
+    ensure_workspace_identity,
+    read_workspace_id,
+    read_workspace_identity,
+    set_workspace_name,
+)
 
 __all__ = [
     "WBS_VERSION",
@@ -30,5 +36,8 @@ __all__ = [
     "preview_restore",
     "read_bundle",
     "restore_workspace",
-    "safe_extract_zip",
+    "ensure_workspace_identity",
+    "read_workspace_id",
+    "read_workspace_identity",
+    "set_workspace_name",
 ]

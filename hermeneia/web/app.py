@@ -6189,10 +6189,21 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_workspace_export():
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        from ..workspace import build_workspace_zip
+        from ..workspace import build_workspace_zip, ensure_workspace_identity
+
+        # The bundle carries the workspace's durable identity (issue #83), not a
+        # corpus fingerprint. Ensure one exists before exporting.
+        rw = _conn_rw()
+        try:
+            identity = ensure_workspace_identity(rw)
+        finally:
+            rw.close()
 
         generated_at = datetime.now(timezone.utc).isoformat()
-        data = build_workspace_zip(db_path, generated_at=generated_at)
+        data = build_workspace_zip(
+            db_path, generated_at=generated_at,
+            workspace_id=identity["workspace_id"],
+        )
         stamp = generated_at[:10]
         response = make_response(data)
         response.headers["Content-Type"] = "application/zip"
@@ -6201,48 +6212,34 @@ Return ONLY valid JSON, no markdown, no explanation:
         )
         return response
 
-    # ── Import Workspace (issues #70/#76/#81) ─────────────────────────────────
-    # Inspect before acting: preview a bundle .zip read-only, then restore only
-    # on explicit confirmation. v1 restores into a fresh workspace only; a
-    # non-empty target is surfaced, never silently overwritten.
-    @app.route("/api/workspace/import/preview", methods=["POST"])
-    def api_workspace_import_preview():
+    # ── Workspace identity (issue #83) ────────────────────────────────────────
+    # Who the workspace is, independent of the corpus it contains.
+    @app.route("/api/workspace/identity", methods=["GET"])
+    def api_workspace_identity_get():
+        if not db_path.exists():
+            return jsonify({"identity": None}), 200
+        from ..workspace import ensure_workspace_identity
+
+        rw = _conn_rw()
+        try:
+            identity = ensure_workspace_identity(rw)
+        finally:
+            rw.close()
+        return jsonify({"identity": identity}), 200
+
+    @app.route("/api/workspace/identity", methods=["PUT"])
+    def api_workspace_identity_put():
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        from ..workspace import RestoreError, preview_restore, safe_extract_zip
+        from ..workspace import set_workspace_name
 
-        file = request.files.get("bundle")
-        if file is None:
-            return jsonify({"error": "a bundle .zip is required"}), 400
-        data = file.read()
+        payload = request.get_json(silent=True) or {}
+        rw = _conn_rw()
         try:
-            with tempfile.TemporaryDirectory() as td:
-                root = safe_extract_zip(data, td)
-                preview = preview_restore(db_path, root)
-        except RestoreError as exc:
-            return jsonify({"error": str(exc)}), 400
-        return jsonify(preview)
-
-    @app.route("/api/workspace/import/restore", methods=["POST"])
-    def api_workspace_import_restore():
-        if not db_path.exists():
-            return jsonify({"error": "database not found"}), 404
-        from ..workspace import RestoreError, restore_workspace, safe_extract_zip
-
-        file = request.files.get("bundle")
-        if file is None:
-            return jsonify({"error": "a bundle .zip is required"}), 400
-        data = file.read()
-        try:
-            with tempfile.TemporaryDirectory() as td:
-                root = safe_extract_zip(data, td)
-                result = restore_workspace(db_path, root, overwrite=False)
-        except RestoreError as exc:
-            # A non-empty target is a refusal the user must resolve, not a
-            # malformed bundle — 409 Conflict, with the reason surfaced.
-            status = 409 if "not empty" in str(exc) else 400
-            return jsonify({"error": str(exc)}), status
-        return jsonify(result)
+            identity = set_workspace_name(rw, payload.get("workspace_name"))
+        finally:
+            rw.close()
+        return jsonify({"identity": identity}), 200
 
     @app.route("/api/investigation-log")
     def api_investigation_log_list():
