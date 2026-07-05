@@ -51,6 +51,11 @@ body.x .ho { display: none !important; }
 
 /* ── Layout ───────────────────────────────────────────── */
 .wrap { max-width: 860px; margin: 0 auto; padding: 0 28px; }
+/* The Reader is the workbench canvas — give it more available width and less
+   side inset than the narrow reading pages. The reading column itself stays
+   comfortable (see .cr-page-view max-width). */
+body.reader-active .wrap { max-width: 1180px; padding: 0 20px; }
+@media (max-width: 640px) { body.reader-active .wrap { padding: 0 14px; } }
 
 /* ── Nav ──────────────────────────────────────────────── */
 .nav {
@@ -212,12 +217,17 @@ body.x .ho { display: none !important; }
 }
 .nav-btn:hover { color: var(--fg); background: rgba(255,255,255,.04); }
 
-/* Study compass bar — the governing question, persistent across screens. */
+/* Study compass bar — the governing question, the study's compass. It stays
+   sticky just beneath the nav while scrolling so the question is always in view.
+   Thin and quiet: it sits above the Reader content but below panels, dropdowns,
+   and modals, and reserves its own space so it never covers the reading text. */
 .thesis-bar {
+  position: sticky; top: 72px; z-index: 95;
   display: flex; align-items: center; gap: 8px;
   padding: 6px 20px; font-size: 13px; cursor: pointer;
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface) 88%, var(--accent));
+  backdrop-filter: blur(8px);
   color: var(--fg2);
 }
 .thesis-bar:hover { background: color-mix(in srgb, var(--surface) 78%, var(--accent)); }
@@ -1052,9 +1062,14 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 .reader-action:hover { color: var(--accent); border-color: var(--accent); }
 /* ── Close Reading Workspace ─────────────────────────── */
 .cr-layout {
-  display: grid; grid-template-columns: minmax(560px,1fr) minmax(240px,300px);
+  display: grid; grid-template-columns: minmax(560px,1fr) minmax(240px,320px);
   gap: 26px; align-items: start;
 }
+/* Align the compass, tool rail, and drawer with the full workbench width so the
+   Reader canvas uses the available space instead of a narrow inset column. */
+body.reader-active .cr-question-compass,
+body.reader-active .cr-tool-rail,
+body.reader-active .cr-tool-drawer { max-width: none; }
 .cr-doc-picker {
   display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;
 }
@@ -1163,22 +1178,31 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   padding: 1px 5px; border-radius: 3px; background: var(--surface2); color: var(--dim2);
 }
 .cr-rail-timeline { }
+/* Rail buttons reflect the open state of the surface they toggle. */
+.cr-rail-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent2); font-weight: 600; }
 
-/* Attention timeline — a slide-up workbench strip below the book. */
+/* Attention timeline — a slide-up bottom sheet below the book ("What you've
+   discovered"). It rides above the persistent workflow rail and stays clearly
+   visible; the Reader remains in view above it. Visibility is driven by the
+   .open class (not the hidden attribute) so the slide always animates and can
+   never end up stuck off-screen. */
 .attn-timeline {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 340;
-  height: 300px; max-height: 52vh;
-  background: var(--surface); border-top: 1px solid var(--border);
-  box-shadow: 0 -12px 40px rgba(0,0,0,.35);
+  position: fixed; left: 0; right: 0; bottom: 40px; z-index: 460;
+  height: 320px; max-height: 56vh;
+  background: var(--surface); border-top: 2px solid var(--accent);
+  box-shadow: 0 -18px 50px rgba(0,0,0,.5);
   display: flex; flex-direction: column;
-  transform: translateY(0); transition: transform .18s ease;
+  transform: translateY(calc(100% + 40px));
+  transition: transform .2s ease;
 }
-.attn-timeline[hidden] { display: flex; transform: translateY(102%); }
+.attn-timeline[hidden] { display: flex; }
+.attn-timeline.open { transform: translateY(0); }
 .attn-head {
   display: flex; align-items: center; gap: 12px;
-  padding: 10px 18px; border-bottom: 1px solid var(--border);
+  padding: 12px 18px; border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 84%, var(--accent));
 }
-.attn-title { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--dim2); }
+.attn-title { font-size: 13px; font-weight: 700; letter-spacing: .04em; color: var(--fg); }
 .attn-meta { font-size: 12px; color: var(--dim2); }
 .attn-filters { display: flex; gap: 4px; }
 .attn-filter {
@@ -1239,8 +1263,6 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 .wf-step.active { color: var(--accent); font-weight: 650; }
 .wf-step.active::before { content: '● '; font-size: 8px; vertical-align: middle; }
 .wf-sep { color: var(--border2); font-size: 10px; padding: 0 2px; user-select: none; }
-/* The attention timeline slides up above the persistent rail. */
-.attn-timeline { bottom: 40px; }
 /* Keep content clear of the fixed rail. */
 body.has-workflow-rail { padding-bottom: 40px; }
 .cr-tool-drawer {
@@ -5671,6 +5693,9 @@ function e10Go(id, scrollTarget) {
   document.querySelectorAll('.e10-screen').forEach(screen => {
     screen.classList.toggle('active', screen.id === id);
   });
+  // The Reader is the main canvas: let it use more horizontal width than the
+  // narrow text pages the rest of the app uses.
+  document.body.classList.toggle('reader-active', id === 'reader');
   // Highlight active pipeline step + update mini cycle
   document.querySelectorAll('.nav-step').forEach(btn => {
     const stepId = btn.id.replace('navstep-', '');
@@ -7230,6 +7255,16 @@ function _crRenderDocPicker(ws) {
           <button class="cr-nav-btn" id="cr-next-btn" onclick="_crNextPage()" disabled>Next →</button>
         </div>
       </div>
+      <!-- FOLLOW-UP (sidebar geography, Issue #102 §4): this right column is
+           doing too much. The target is for the right sidebar to become
+           Companion-only, with the non-Companion support/navigation panels
+           (Reading Trail, Question, Highlight Inspector, Saved Highlights,
+           Machine Observations) and the onboarding workflow guide migrating
+           into the accessibility/tools sidebar (#a11y-dock) as its expandable
+           home for workspace navigation and larger context panels. That move
+           touches capture/highlight/observation wiring across the Reader, so it
+           is deferred to its own focused PR rather than bundled into this
+           visibility/layout polish. Do not keep adding non-Companion UI here. -->
       <div class="cr-side">
         <div class="cr-side-panel" id="cr-trail-panel">
           <div class="cr-side-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -7462,12 +7497,22 @@ async function openTimeline() {
   const panel = document.getElementById('attn-timeline');
   if (!panel) return;
   panel.hidden = false;
+  // Force layout, then add .open so the slide-up transition always runs and the
+  // sheet cannot get stuck off-screen (the Jetson visibility bug).
+  void panel.offsetHeight;
+  requestAnimationFrame(() => panel.classList.add('open'));
+  document.querySelectorAll('.cr-rail-timeline').forEach(b => b.classList.add('active'));
   cmpMarkOnboardingStep('timeline', { keepPaused: true });
   await _attnLoad();
 }
 function closeTimeline() {
   const p = document.getElementById('attn-timeline');
-  if (p) p.hidden = true;
+  if (!p || p.hidden) return;
+  p.classList.remove('open');
+  document.querySelectorAll('.cr-rail-timeline').forEach(b => b.classList.remove('active'));
+  const done = () => { p.hidden = true; p.removeEventListener('transitionend', done); clearTimeout(t); };
+  const t = setTimeout(done, 260);
+  p.addEventListener('transitionend', done);
 }
 function _attnSetFilter(kind) {
   _attnFilter = kind;
