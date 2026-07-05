@@ -1216,6 +1216,33 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
 .attn-card-note { font-size: 12px; color: var(--dim2); font-style: italic; }
 .attn-card-loc { font-size: 10px; color: var(--dim2); font-family: var(--mono); margin-top: auto; }
 .attn-rank { color: var(--accent); font-size: 10px; }
+
+/* Bottom workflow rail (PR 4): a compact, persistent strip of interpretive
+   steps beneath the Reader. The old prev/next stepper is superseded by these
+   jump-anywhere tabs. */
+.stage-nav-bar { display: none; }
+.workflow-rail {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 330;
+  display: flex; align-items: center; gap: 2px;
+  height: 40px; padding: 0 12px;
+  background: var(--surface); border-top: 1px solid var(--border);
+  overflow-x: auto;
+}
+.workflow-rail[hidden] { display: none; }
+.wf-step {
+  background: none; border: none; border-radius: 6px;
+  color: var(--dim2); font: inherit; font-size: 12px;
+  padding: 5px 12px; cursor: pointer; white-space: nowrap;
+  transition: color .12s, background .12s;
+}
+.wf-step:hover { color: var(--fg); background: var(--surface2); }
+.wf-step.active { color: var(--accent); font-weight: 650; }
+.wf-step.active::before { content: '● '; font-size: 8px; vertical-align: middle; }
+.wf-sep { color: var(--border2); font-size: 10px; padding: 0 2px; user-select: none; }
+/* The attention timeline slides up above the persistent rail. */
+.attn-timeline { bottom: 40px; }
+/* Keep content clear of the fixed rail. */
+body.has-workflow-rail { padding-bottom: 40px; }
 .cr-tool-drawer {
   max-width: 860px; margin: -6px auto 16px;
   border: 1px solid var(--border); border-radius: var(--r);
@@ -2273,6 +2300,26 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
   </button>
 </div>
 
+<!-- Bottom workflow rail (PR 4): compact interpretive steps beneath the Reader.
+     Tabs, not prev/next — jump to any step; the Reader stays the anchor. -->
+<nav class="workflow-rail" id="workflow-rail" hidden aria-label="Interpretive workflow">
+  <button class="wf-step" data-stage="reader" onclick="_wfGo('reader')" title="The book">Read</button>
+  <span class="wf-sep">›</span>
+  <button class="wf-step" data-stage="corpus" onclick="_wfGo('corpus')" title="Evidence base">Corpus</button>
+  <span class="wf-sep">›</span>
+  <button class="wf-step" data-stage="lab" onclick="_wfGo('lab')" title="Generate candidate interpretations">Interpret</button>
+  <span class="wf-sep">›</span>
+  <button class="wf-step" data-stage="review" onclick="_wfGo('review')" title="Steward proposals">Review</button>
+  <span class="wf-sep">›</span>
+  <button class="wf-step" data-stage="architect" onclick="_wfGo('architect')" title="Build the argument">Blueprint</button>
+  <span class="wf-sep">›</span>
+  <button class="wf-step" data-stage="reports" onclick="_wfGo('reports')" title="Render outputs">Render</button>
+  <span class="wf-sep">›</span>
+  <button class="wf-step" data-stage="critic" onclick="_wfGo('critic')" title="Audit fidelity">Critic</button>
+  <span class="wf-sep">›</span>
+  <button class="wf-step" data-stage="lineage" onclick="_wfGo('lineage')" title="Trace claims to evidence">Lineage</button>
+</nav>
+
 <!-- Accessibility Dock v0.2 — fixed right-center, always visible -->
 <div id="a11y-dock" role="toolbar" aria-label="Reading tools">
   <div class="dock-header">Reading Tools</div>
@@ -2985,6 +3032,9 @@ function mount(h) {
     e10LoadResearchBanner();
     // Reconcile the governing question from its durable DB home (issue #71).
     _invHydrate();
+    // The workflow rail is workbench chrome — shown once a workspace exists.
+    document.getElementById('workflow-rail')?.removeAttribute('hidden');
+    document.body.classList.add('has-workflow-rail');
     refreshEditionCycleCount().then(() =>
       refreshNavCycleStatuses().then(() => updateNavCycle(_bootDestination(h)))
     );
@@ -5374,8 +5424,16 @@ const _STAGE_NAMES = {
 };
 let _currentStageId = 'onboarding';
 
+function _wfGo(stage) { e10Go(stage); }
+function _renderWorkflowRail(activeId) {
+  const rail = document.getElementById('workflow-rail');
+  if (!rail) return;
+  rail.querySelectorAll('.wf-step').forEach(b =>
+    b.classList.toggle('active', b.dataset.stage === activeId));
+}
 function _updateStageNavBar(id) {
   _currentStageId = id;
+  _renderWorkflowRail(id);
   const idx = _STAGE_ORDER.indexOf(id);
   const inCycle = idx !== -1;
   const bar = document.getElementById('stage-nav-bar');
