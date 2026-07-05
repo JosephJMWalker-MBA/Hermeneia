@@ -74,6 +74,51 @@ Meta-synthesis
 
 Onboarding, when it comes, teaches *this workflow* — not the buttons.
 
+## 4a. Target workbench layout (visual north star)
+
+The reference is a timeline video editor (CapCut): a stable central canvas with
+tools arranged around it, a timeline workspace below, a details panel to the
+side, and a persistent chat entry point. Hermeneia adopts that *shape*, mapped to
+reading:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  Tool ribbon (compact, quiet):  Search · Highlights · Field Notes · …  │
+├───────────────┬──────────────────────────────────────┬─────────────────┤
+│  Corpus /     │                                      │  Details /       │
+│  source       │           READER  (the book)         │  Lineage         │
+│  browser      │           — the main canvas —         │  (context,       │
+│  (slides in   │                                      │   traceability)  │
+│   beside the  │                                      │                  │
+│   Reader)     │                                      │                  │
+├───────────────┴──────────────────────────────────────┴─────────────────┤
+│  Pipeline rail (compact): Observe · Corpus · Interpret · Blueprint ·    │
+│                           Critic · Lineage · Footnotes                   │
+├──────────────────────────────────────────────────────────────────────────┤
+│  Attention timeline:  observations · questions · highlights · notes      │
+└──────────────────────────────────────────────────────────────────────────┘
+                                          ◍ Companion — persistent floating icon ┘
+```
+
+Mapping from the reference:
+
+| Reference (video editor) | Hermeneia |
+|--------------------------|-----------|
+| Top tool tabs | Compact tool ribbon (reading/interpretation tools, quieter than the reference) |
+| Left source/media panel | Corpus / source browser that slides in beside the Reader |
+| Center preview canvas | **Reader (the book)** — always present, the center of gravity |
+| Right Details panel | Details / Lineage panel — traceability and context |
+| Bottom timeline | Attention timeline — observations, questions, highlights as a workspace |
+| Persistent "Chat with AI" icon | Companion — persistent, reachable as a floating icon |
+| (row under the canvas) | Compact pipeline rail — smaller than the reference's icons |
+
+**How the roadmap assembles this layout incrementally** (never all at once):
+Corpus Search (PR 2) builds the *left/side corpus panel*; the Observation
+timeline (PR 3) builds the *bottom timeline*; the bottom workflow rail (PR 4)
+builds the *pipeline rail under the Reader*; the Details/Lineage panel and a
+persistent Companion icon are folded in alongside. The Reader stays central at
+every step; a new region never displaces the book.
+
 ## 5. Staged implementation plan
 
 Each PR is one disciplined slice: focused, tested, no scope creep. **None of the
