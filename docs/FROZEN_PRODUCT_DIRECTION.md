@@ -119,6 +119,51 @@ builds the *pipeline rail under the Reader*; the Details/Lineage panel and a
 persistent Companion icon are folded in alongside. The Reader stays central at
 every step; a new region never displaces the book.
 
+### The concrete reference: Google Docs + Gemini
+
+The CapCut analogy gives the *shape*; the cleanest concrete rendering of that
+shape is **Google Docs with the Gemini side panel open**. Hermeneia should feel
+like that, mapped to reading rather than editing:
+
+```
+┌──────┬─────────────────────────────────────────┬──────────────────┬──┐
+│ Docs │  compact tool ribbon (Search · Timeline) │  ▤ Companion      │▮│
+│ tabs ├─────────────────────────────────────────┤  clean header:    │▮│  ← thin
+│      │                                         │  menu·expand·close│▮│  tool
+│ (corpus / source                               │                   │▮│  icon
+│  navigation,                                   │  scrolling thread │▮│  rail
+│  slim, collapsible)                            │                   │  │  (Trail,
+│      │            READER (the book)             │                   │  │  Question,
+│      │            — the canvas —                │                   │  │  Inspector,
+│      │                                         │ ┌───────────────┐ │  │  Highlights,
+│      │                                         │ │ Ask Companion ▸│ │  │  Observations)
+│      │                                         │ └───────────────┘ │  │
+├──────┴─────────────────────────────────────────┤ (input pinned to  │  │
+│  bottom workflow rail · attention timeline      │  the bottom)      │  │
+└─────────────────────────────────────────────────┴──────────────────┴──┘
+```
+
+What the reference sharpens (beyond the CapCut sketch):
+
+- **Companion is a real docked chat, not one panel among many.** It has a clean
+  header (menu · expand · close), a scrolling thread, and — critically — an
+  **input box pinned to the bottom** ("Ask Companion"), always reachable without
+  scrolling past other panels. A quiet disclaimer line sits beneath it.
+- **The right side is Companion-only.** The non-Companion support panels
+  (Reading Trail, Question, Highlight Inspector, Saved Highlights, Machine
+  Observations) collapse into a **thin far-right vertical icon rail** — the role
+  the accessibility/tools sidebar (`#a11y-dock`) already plays. Click an icon,
+  its panel unfolds; it never lives permanently stacked above Companion.
+- **The left rail is corpus/document navigation** — slim and collapsible, like
+  Google Docs' "Document tabs", not a wall of controls.
+- **The center canvas stays clean** with a quiet top ribbon and comfortable
+  margins.
+
+This is a *refinement of §4a, not a new direction*: the Reader stays central,
+tools unfold around the work, nothing steals the book. It is assembled in
+disciplined slices (docked Companion chat, then the far-right tool-rail
+migration — the "sidebar geography" work), never as one big redesign.
+
 ## 5. Staged implementation plan
 
 Each PR is one disciplined slice: focused, tested, no scope creep. **None of the
