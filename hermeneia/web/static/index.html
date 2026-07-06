@@ -1466,6 +1466,25 @@ body.has-workflow-rail { padding-bottom: 40px; }
   font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
   color: var(--dim2); font-weight: 700; margin-bottom: 12px;
 }
+/* Companion as a docked chat (workbench north star: Google Docs + Gemini).
+   A fixed-height column: quiet header on top, the thread scrolls in the middle,
+   and the composer ("Ask Companion") is pinned to the bottom so it is always
+   reachable without scrolling past the conversation. */
+.cr-companion-dock {
+  display: flex; flex-direction: column;
+  height: min(64vh, 600px);
+}
+.cr-companion-dock:empty { height: auto; display: block; }
+.cmp-note { font-size: 11px; color: var(--dim2); margin-bottom: 8px; }
+.cmp-scroll {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+  padding-right: 2px;
+}
+.cmp-composer {
+  flex: 0 0 auto; margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
 .cr-highlight-form textarea, .cr-highlight-form input[type=text], .cr-highlight-form select {
   width: 100%; box-sizing: border-box; background: var(--bg);
   border: 1px solid var(--border2); border-radius: var(--r);
@@ -1685,6 +1704,10 @@ body.has-workflow-rail { padding-bottom: 40px; }
 @media (max-width: 980px) {
   .cr-layout { grid-template-columns: 1fr; }
   .cr-side { position: static; }
+  /* On a single-column phone layout the whole page scrolls, so let the dock
+     flow naturally instead of nesting a fixed-height scroller. */
+  .cr-companion-dock { height: auto; display: block; }
+  .cr-companion-dock .cmp-scroll { max-height: 340px; }
 }
 /* ── Field Notes footer tray (issue #12) ─────────────────
    Field Notes lives at the bottom of the Reader — a footnote
@@ -6956,13 +6979,17 @@ async function _cmpRender() {
       <select id="cmp-provider" onchange="_cmpProvider=this.value;try{localStorage.setItem('hermeneia_companion_provider',this.value)}catch{}"
         style="font-size:10px;padding:2px 4px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);max-width:130px"></select>
     </div>
-    <div style="font-size:11px;color:var(--dim2);margin-bottom:6px">It knows only what you check. Nothing it says enters the record unless you save it.</div>
-    <div id="cmp-onboarding-host">${_cmpOnboardingHtml()}</div>
-    <div id="cmp-context" style="margin-bottom:8px"></div>
-    <div id="cmp-transcript" style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
-    <textarea id="cmp-input" rows="2" placeholder="Ask about what you're reading…"
-      style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:12px;line-height:1.5;padding:7px 9px;resize:vertical"></textarea>
-    <button class="btn-primary" id="cmp-ask" style="width:100%;margin-top:6px;padding:6px" onclick="cmpAsk()">Ask</button>`;
+    <div class="cmp-note">It knows only what you check. Nothing it says enters the record unless you save it.</div>
+    <div class="cmp-scroll" id="cmp-scroll">
+      <div id="cmp-onboarding-host">${_cmpOnboardingHtml()}</div>
+      <div id="cmp-transcript" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div class="cmp-composer">
+      <div id="cmp-context" style="margin-bottom:8px"></div>
+      <textarea id="cmp-input" rows="2" placeholder="Ask Companion about what you're reading…"
+        style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:12px;line-height:1.5;padding:7px 9px;resize:vertical"></textarea>
+      <button class="btn-primary" id="cmp-ask" style="width:100%;margin-top:6px;padding:6px" onclick="cmpAsk()">Ask</button>
+    </div>`;
   _cmpRenderContextRows();
   _cmpRenderTranscript();
 
@@ -6997,7 +7024,9 @@ function _cmpRenderTranscript() {
            </div>` : ''}
        </div>`).join('')
     + (_cmpBusy ? `<div style="font-size:11px;color:var(--dim2)">thinking…</div>` : '');
-  host.scrollTop = host.scrollHeight;
+  // Keep the newest message in view; the composer stays pinned below the scroll.
+  const scroller = document.getElementById('cmp-scroll') || host;
+  scroller.scrollTop = scroller.scrollHeight;
 }
 
 function cmpUseResponse(index, target) {
@@ -7240,7 +7269,7 @@ function _crRenderDocPicker(ws) {
           <div id="cr-trail-detail" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px"></div>
         </div>
         <div class="cr-side-panel" id="cr-question-panel"></div>
-        <div class="cr-side-panel" id="cr-companion-panel"></div>
+        <div class="cr-side-panel cr-companion-dock" id="cr-companion-panel"></div>
         <div class="cr-side-panel" id="cr-capture-panel">
           <div class="cr-side-title">Highlight Inspector</div>
           <div id="cr-sel-prompt" style="font-size:12px;color:var(--dim2);line-height:1.6">
