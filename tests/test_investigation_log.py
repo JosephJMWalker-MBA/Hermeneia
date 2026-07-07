@@ -186,12 +186,13 @@ def test_both_lane_entries_survive_reload(tmp_path):
 
 def test_field_notes_relocated_to_footer_tray():
     """Guard the relocation itself: Field Notes is no longer a Reader
-    side panel, and the footer tray with the two-lane composer exists."""
+    side panel, and now lives in the shared bottom workstation."""
     index = (Path(__file__).resolve().parents[1]
              / "hermeneia" / "web" / "static" / "index.html").read_text()
     # The side-stack panel is gone.
     assert 'id="cr-fieldnotes-panel"' not in index
-    # The footer tray and its composer host exist.
+    # The shared bottom workstation and Field Notes composer host exist.
+    assert 'id="cr-bottom-workstation"' in index
     assert 'id="cr-fln-tray"' in index
     assert 'id="cr-fln-inner"' in index
     assert "flnToggleTray" in index

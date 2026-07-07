@@ -119,12 +119,14 @@ def test_timeline_empty_workspace(tmp_path: Path):
 
 def test_timeline_panel_and_trigger_present():
     index = INDEX.read_text()
+    assert 'id="cr-bottom-workstation"' in index
     assert 'id="attn-timeline"' in index
     assert "openTimeline()" in index
     assert "closeTimeline()" in index
     assert "cr-rail-timeline" in index
     assert "/api/reader/timeline" in index
     assert "_attnSetFilter" in index
+    assert "Timeline" in index
     # Clicking a card navigates the book, not a page away.
     assert "_attnOpen" in index
     assert "_crGoToPage" in index

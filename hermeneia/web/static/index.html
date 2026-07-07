@@ -1126,20 +1126,58 @@ body.reader-active .cr-tool-drawer { max-width: none; }
   white-space: nowrap;
 }
 .cr-rail-btn:hover { border-color: var(--accent); color: var(--fg); }
-.cr-rail-search { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.cr-rail-search { }
 .cr-rail-drawer-btn { background: none; }
 
-/* Reader-side Corpus Search — a slide-in panel beside the book. The Reader
-   stays visible; search results appear here, never a page you leave to. */
-.corpus-search {
-  position: fixed; top: 56px; right: 0; bottom: 0; z-index: 350;
-  width: 400px; max-width: 92vw;
-  background: var(--surface); border-left: 1px solid var(--border);
-  box-shadow: -12px 0 40px rgba(0,0,0,.35);
+/* Bottom workstation: one collapsible shell shared by Search, Timeline, and
+   Field Notes. The Reader remains visible above; only one mode is open at a
+   time, never stacked drawers. */
+.cr-bottom-workstation {
+  position: fixed; left: 0; right: 72px; bottom: 40px; z-index: 460;
+  height: min(44vh, 360px);
+  background: var(--surface); border-top: 2px solid var(--accent);
+  box-shadow: 0 -18px 50px rgba(0,0,0,.5);
   display: flex; flex-direction: column;
-  transform: translateX(0); transition: transform .18s ease;
 }
-.corpus-search[hidden] { display: flex; transform: translateX(102%); }
+.cr-bottom-workstation[hidden] { display: none; }
+.cr-bottom-workstation-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 84%, var(--accent));
+}
+.cr-bottom-workstation-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--dim2);
+}
+.cr-bottom-workstation-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.cr-bottom-workstation-tab,
+.cr-bottom-workstation-close {
+  font: inherit; font-size: 12px; cursor: pointer;
+  border-radius: 999px; padding: 5px 12px;
+}
+.cr-bottom-workstation-tab {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--fg2);
+}
+.cr-bottom-workstation-tab:hover,
+.cr-bottom-workstation-close:hover { border-color: var(--accent); color: var(--fg); }
+.cr-bottom-workstation-tab.active {
+  border-color: var(--accent); color: var(--accent);
+  background: var(--accent2); font-weight: 600;
+}
+.cr-bottom-workstation-close {
+  margin-left: auto;
+  background: none; border: 1px solid var(--border); color: var(--dim2);
+}
+.cr-bottom-workstation-body { flex: 1; min-height: 0; }
+body.has-workflow-rail.has-bottom-workstation { padding-bottom: 392px; }
+body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 352px; }
+
+/* Search Corpus lives inside the shared workstation. */
+.corpus-search {
+  height: 100%;
+  background: var(--surface);
+  display: flex; flex-direction: column;
+}
+.corpus-search[hidden] { display: none; }
 .corpus-search-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 16px 8px;
@@ -1187,16 +1225,12 @@ body.reader-active .cr-tool-drawer { max-width: none; }
    .open class (not the hidden attribute) so the slide always animates and can
    never end up stuck off-screen. */
 .attn-timeline {
-  position: fixed; left: 0; right: 0; bottom: 40px; z-index: 460;
-  height: 320px; max-height: 56vh;
-  background: var(--surface); border-top: 2px solid var(--accent);
-  box-shadow: 0 -18px 50px rgba(0,0,0,.5);
+  height: 100%;
+  background: var(--surface);
   display: flex; flex-direction: column;
-  transform: translateY(calc(100% + 40px));
-  transition: transform .2s ease;
 }
-.attn-timeline[hidden] { display: flex; }
-.attn-timeline.open { transform: translateY(0); }
+.attn-timeline[hidden] { display: none; }
+.attn-timeline.open { display: flex; }
 .attn-head {
   display: flex; align-items: center; gap: 12px;
   padding: 12px 18px; border-bottom: 1px solid var(--border);
@@ -1739,34 +1773,37 @@ body.has-workflow-rail { padding-bottom: 40px; }
    bottom orientation holds on desktop. It is a descendant of
    the reader screen, so it is hidden whenever the reader is
    not the active e10-screen. */
-.cr-layout { padding-bottom: 52px; }
+.cr-layout { padding-bottom: 0; }
 .cr-fln-tray {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 55;
-  background: var(--surface); border-top: 1px solid var(--border);
-  box-shadow: 0 -2px 12px rgba(0,0,0,.18);
+  height: 100%;
+  background: var(--surface);
   display: flex; flex-direction: column;
 }
 .cr-fln-bar {
   display: flex; align-items: center; gap: 10px;
-  padding: 9px 16px; cursor: pointer; font-size: 13px;
+  padding: 12px 16px 10px; font-size: 13px;
   color: var(--fg2); user-select: none;
+  border-bottom: 1px solid var(--border);
 }
-.cr-fln-bar:hover { color: var(--fg); }
 .cr-fln-bar-label { font-weight: 600; }
 .cr-fln-count { font-size: 11px; color: var(--dim2); }
 .cr-fln-hint  { font-size: 12px; color: var(--accent); }
-.cr-fln-caret { transition: transform .2s; font-size: 11px; }
-.cr-fln-tray[data-open="1"] .cr-fln-caret { transform: rotate(180deg); }
 .cr-fln-body {
-  display: none; border-top: 1px solid var(--border);
-  max-height: min(52vh, 460px); overflow-y: auto;
+  flex: 1; min-height: 0; overflow-y: auto;
 }
-.cr-fln-tray[data-open="1"] .cr-fln-body { display: block; }
 .cr-fln-inner { max-width: 900px; margin: 0 auto; padding: 14px 16px 18px; }
 .cr-fln-tray.cr-fln-glow { animation: flnGlow 1.8s ease-in-out 2; }
 @keyframes flnGlow {
   0%, 100% { box-shadow: 0 -2px 12px rgba(0,0,0,.18); }
   50%      { box-shadow: 0 -2px 20px var(--accent); }
+}
+@media (max-width: 900px) {
+  .cr-bottom-workstation { height: min(48vh, 320px); }
+  .cr-bottom-workstation-head { flex-wrap: wrap; align-items: flex-start; }
+  .cr-bottom-workstation-title { width: 100%; }
+  .cr-bottom-workstation-close { margin-left: 0; }
+  body.has-workflow-rail.has-bottom-workstation { padding-bottom: 352px; }
+  body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 312px; }
 }
 /* ── Investigation Setup ─────────────────────────────── */
 .setup-wrap { max-width: 640px; }
@@ -2425,42 +2462,66 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
   </div>
 </div>
 
-<!-- Reader-side Corpus Search (PR 2): "where else does this idea appear?"
-     A slide-in panel beside the book; the Reader never leaves. -->
-<aside class="corpus-search" id="corpus-search" hidden aria-label="Search the corpus">
-  <div class="corpus-search-head">
-    <span class="corpus-search-title">Search the corpus</span>
-    <button class="corpus-search-close" onclick="closeCorpusSearch()" aria-label="Close search">✕</button>
-  </div>
-  <input type="text" id="corpus-search-input" class="corpus-search-input"
-         placeholder="Where else does this idea appear?" autocomplete="off"
-         oninput="_corpusSearchInput()" spellcheck="false">
-  <div class="corpus-search-meta" id="corpus-search-meta"></div>
-  <div class="corpus-search-results" id="corpus-search-results">
-    <div class="corpus-search-hint">Search any word or phrase across the corpus. Results appear here beside the book — click one to open that passage.</div>
-  </div>
-</aside>
-
-<!-- Attention timeline (PR 3): "what have I discovered so far?" A slide-up
-     workbench strip below the book; the Reader stays visible above it. -->
-<aside class="attn-timeline" id="attn-timeline" hidden aria-label="Attention timeline">
-  <div class="attn-head">
-    <span class="attn-title">What you've discovered</span>
-    <span class="attn-meta" id="attn-meta"></span>
-    <span style="flex:1"></span>
-    <div class="attn-filters" id="attn-filters">
-      <button class="attn-filter active" data-kind="all" onclick="_attnSetFilter('all')">All</button>
-      <button class="attn-filter" data-kind="highlight" onclick="_attnSetFilter('highlight')">Highlights</button>
-      <button class="attn-filter" data-kind="question" onclick="_attnSetFilter('question')">Questions</button>
-      <button class="attn-filter" data-kind="note" onclick="_attnSetFilter('note')">Notes</button>
-      <button class="attn-filter" data-kind="field_note" onclick="_attnSetFilter('field_note')">Field notes</button>
+<!-- Bottom workstation: one collapsible shell for Search Corpus, Timeline,
+     and Field Notes. The Reader remains above; these tools now switch modes
+     instead of opening as separate competing panels. -->
+<section class="cr-bottom-workstation" id="cr-bottom-workstation" hidden aria-label="Bottom workstation">
+  <div class="cr-bottom-workstation-head">
+    <span class="cr-bottom-workstation-title">Bottom workstation</span>
+    <div class="cr-bottom-workstation-tabs" role="tablist" aria-label="Reader workstation modes">
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-search" data-workstation-mode="search" type="button" role="tab" aria-controls="corpus-search" aria-selected="false" onclick="_crOpenBottomWorkstation('search')">Search Corpus</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-timeline" data-workstation-mode="timeline" type="button" role="tab" aria-controls="attn-timeline" aria-selected="false" onclick="_crOpenBottomWorkstation('timeline')">Timeline</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-fieldnotes" data-workstation-mode="fieldnotes" type="button" role="tab" aria-controls="cr-fln-tray" aria-selected="false" onclick="_crOpenBottomWorkstation('fieldnotes')">Field Notes</button>
     </div>
-    <button class="attn-close" onclick="closeTimeline()" aria-label="Close timeline">✕</button>
+    <button class="cr-bottom-workstation-close" type="button" onclick="_crCloseBottomWorkstation()" aria-label="Collapse bottom workstation">Collapse</button>
   </div>
-  <div class="attn-track" id="attn-track">
-    <div class="attn-hint">Loading your attention timeline…</div>
+  <div class="cr-bottom-workstation-body">
+    <aside class="corpus-search" id="corpus-search" hidden aria-label="Search the corpus">
+      <div class="corpus-search-head">
+        <span class="corpus-search-title">Search the corpus</span>
+        <button class="corpus-search-close" onclick="closeCorpusSearch()" aria-label="Close search">✕</button>
+      </div>
+      <input type="text" id="corpus-search-input" class="corpus-search-input"
+             placeholder="Where else does this idea appear?" autocomplete="off"
+             oninput="_corpusSearchInput()" spellcheck="false">
+      <div class="corpus-search-meta" id="corpus-search-meta"></div>
+      <div class="corpus-search-results" id="corpus-search-results">
+        <div class="corpus-search-hint">Search any word or phrase across the corpus. Results appear in the workstation below the book — click one to open that passage.</div>
+      </div>
+    </aside>
+
+    <aside class="attn-timeline" id="attn-timeline" hidden aria-label="Attention timeline">
+      <div class="attn-head">
+        <span class="attn-title">What you've discovered</span>
+        <span class="attn-meta" id="attn-meta"></span>
+        <span style="flex:1"></span>
+        <div class="attn-filters" id="attn-filters">
+          <button class="attn-filter active" data-kind="all" onclick="_attnSetFilter('all')">All</button>
+          <button class="attn-filter" data-kind="highlight" onclick="_attnSetFilter('highlight')">Highlights</button>
+          <button class="attn-filter" data-kind="question" onclick="_attnSetFilter('question')">Questions</button>
+          <button class="attn-filter" data-kind="note" onclick="_attnSetFilter('note')">Notes</button>
+          <button class="attn-filter" data-kind="field_note" onclick="_attnSetFilter('field_note')">Field notes</button>
+        </div>
+        <button class="attn-close" onclick="closeTimeline()" aria-label="Close timeline">✕</button>
+      </div>
+      <div class="attn-track" id="attn-track">
+        <div class="attn-hint">Loading your attention timeline…</div>
+      </div>
+    </aside>
+
+    <div class="cr-fln-tray" id="cr-fln-tray" data-open="0" hidden>
+      <div class="cr-fln-bar">
+        <span class="cr-fln-bar-label">✎ Field Notes</span>
+        <span class="cr-fln-count" id="cr-fln-count"></span>
+        <span style="flex:1"></span>
+        <span class="cr-fln-hint">Running notes stay in the workstation while the book remains visible above.</span>
+      </div>
+      <div class="cr-fln-body" id="cr-fln-body">
+        <div class="cr-fln-inner" id="cr-fln-inner"></div>
+      </div>
+    </div>
   </div>
-</aside>
+</section>
 
 <button class="return-reader-fab hidden" id="return-reader-fab" onclick="e10Go('reader')">Return to Reading</button>
 
@@ -6694,9 +6755,9 @@ async function _flnRender() {
   if (!host) return;
   host.innerHTML = `
     <div style="display:flex;gap:4px;margin-bottom:8px">
-      <button class="fs-pill fln-lane fs-on" data-lane="corpus" onclick="flnSetLane('corpus')"
+      <button class="fs-pill fln-lane fs-on" data-lane="corpus"
         title="What I am learning about the text">About the text</button>
-      <button class="fs-pill fln-lane" data-lane="instrument" onclick="flnSetLane('instrument')"
+      <button class="fs-pill fln-lane" data-lane="instrument"
         title="What I am learning about Hermeneia while using it">About Hermeneia</button>
     </div>
     <div class="cr-form-label">What is your current understanding?</div>
@@ -6705,20 +6766,36 @@ async function _flnRender() {
     <div class="cr-form-label">What are your most pressing questions? <span style="color:var(--dim2);font-weight:400">(optional)</span></div>
     <textarea id="fln-questions" rows="2" placeholder="What do you need to investigate next?"
       style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;line-height:1.6;padding:7px 9px;resize:vertical;margin:4px 0 8px"></textarea>
-    <button class="btn-primary" id="fln-save" style="width:100%;padding:6px" onclick="flnSave()">Keep this entry</button>
+    <button class="btn-primary" id="fln-save" style="width:100%;padding:6px;position:sticky;bottom:0;z-index:2;box-shadow:0 -6px 14px rgba(0,0,0,.18)">Keep this entry</button>
     <div id="fln-entries" style="margin-top:12px;display:flex;flex-direction:column;gap:8px"></div>`;
+  host.querySelectorAll('.fln-lane').forEach(btn => {
+    if (btn.dataset.bound === '1') return;
+    btn.addEventListener('click', () => flnSetLane(btn.dataset.lane));
+    btn.dataset.bound = '1';
+  });
+  const saveBtn = document.getElementById('fln-save');
+  if (saveBtn && saveBtn.dataset.bound !== '1') {
+    saveBtn.addEventListener('click', (e) => { e.preventDefault(); flnSave(); });
+    saveBtn.dataset.bound = '1';
+  }
   flnSetLane(_flnLane);
   _flnLoadEntries();
 }
 
-// Collapsed ↔ expanded. Toggling only refreshes the entry list;
-// it never rebuilds the composer, so any in-progress draft survives.
+// Field Notes now rides inside the shared bottom workstation. Toggling still
+// only refreshes the entry list; it never rebuilds the composer, so any
+// in-progress draft survives.
 function flnToggleTray(force) {
   const tray = document.getElementById('cr-fln-tray');
   if (!tray) return;
   const open = force === undefined ? tray.dataset.open !== '1' : !!force;
-  tray.dataset.open = open ? '1' : '0';
-  if (open) { tray.classList.remove('cr-fln-glow'); _flnLoadEntries(); }
+  if (open) {
+    _crOpenBottomWorkstation('fieldnotes');
+    tray.classList.remove('cr-fln-glow');
+    _flnLoadEntries();
+    return;
+  }
+  _crCloseBottomWorkstation();
 }
 
 async function _flnLoadEntries() {
@@ -7371,9 +7448,9 @@ function _crRenderDocPicker(ws) {
     </div>
     <div class="cr-question-compass" id="cr-question-compass"></div>
     <div class="cr-tool-rail" id="cr-tool-rail" role="toolbar" aria-label="Reader tools">
-      <button class="cr-rail-btn cr-rail-search" onclick="openCorpusSearch()" title="Search the corpus without leaving the book">⌕ Search corpus</button>
-      <button class="cr-rail-btn cr-rail-timeline" onclick="openTimeline()" title="What have I discovered so far?">◷ Timeline</button>
-      <button class="cr-rail-btn" onclick="_crRailGo('fieldnotes')" title="Open Field Notes">✎ Field Notes</button>
+      <button class="cr-rail-btn cr-rail-search" data-workstation-mode="search" onclick="openCorpusSearch()" title="Search the corpus without leaving the book">⌕ Search corpus</button>
+      <button class="cr-rail-btn cr-rail-timeline" data-workstation-mode="timeline" onclick="openTimeline()" title="What have I discovered so far?">◷ Timeline</button>
+      <button class="cr-rail-btn cr-rail-fieldnotes" data-workstation-mode="fieldnotes" onclick="_crRailGo('fieldnotes')" title="Open Field Notes">✎ Field Notes</button>
       <span style="flex:1"></span>
       <button class="cr-rail-btn cr-rail-drawer-btn" type="button" onclick="_dockTogglePanel('guide')" title="Open workflow guide">? Guide</button>
       <button class="cr-rail-btn cr-rail-drawer-btn" id="cr-tool-drawer-btn" type="button" onclick="_dockTogglePanel('tools')" aria-expanded="false" aria-controls="cr-tool-drawer" title="Open tools dock">⚙ Tools</button>
@@ -7386,7 +7463,7 @@ function _crRenderDocPicker(ws) {
       <button class="cr-tool-row" onclick="_crRailGo('companion')"><span class="cr-tool-row-name">✦ Companion</span><span class="cr-tool-row-desc">Ask the machine to accompany you with explicit context.</span></button>
       <button class="cr-tool-row" onclick="_crRailGo('capture')"><span class="cr-tool-row-name">◧ Highlight Inspector</span><span class="cr-tool-row-desc">Note, question, or capture the selected passage.</span></button>
       <button class="cr-tool-row" onclick="_crRailGo('trail')"><span class="cr-tool-row-name">↳ Reading Trail</span><span class="cr-tool-row-desc">See how far you have read and where you have been.</span></button>
-      <button class="cr-tool-row" onclick="_crRailGo('fieldnotes')"><span class="cr-tool-row-name">✎ Field Notes</span><span class="cr-tool-row-desc">Open the footer tray for running field notes.</span></button>
+      <button class="cr-tool-row" onclick="_crRailGo('fieldnotes')"><span class="cr-tool-row-name">✎ Field Notes</span><span class="cr-tool-row-desc">Open Field Notes in the shared bottom workstation.</span></button>
       <button class="cr-tool-row" onclick="_crRailGo('highlights')"><span class="cr-tool-row-name">★ Saved Highlights</span><span class="cr-tool-row-desc">Review the highlights you have kept.</span></button>
       <button class="cr-tool-row" onclick="_crRailGo('observations')"><span class="cr-tool-row-name">◎ Machine Observations</span><span class="cr-tool-row-desc">Browse the full list of machine-observed passages.</span></button>
     </div>
@@ -7433,18 +7510,6 @@ function _crRenderDocPicker(ws) {
       <div class="cr-side">
         <div class="cr-side-panel cr-companion-dock" id="cr-companion-panel"></div>
       </div>
-    </div>
-    <div class="cr-fln-tray" id="cr-fln-tray" data-open="0">
-      <div class="cr-fln-bar" onclick="flnToggleTray()">
-        <span class="cr-fln-bar-label">✎ Field Notes</span>
-        <span class="cr-fln-count" id="cr-fln-count"></span>
-        <span style="flex:1"></span>
-        <span class="cr-fln-hint">+ Field note</span>
-        <span class="cr-fln-caret">▴</span>
-      </div>
-      <div class="cr-fln-body" id="cr-fln-body">
-        <div class="cr-fln-inner" id="cr-fln-inner"></div>
-      </div>
     </div>`;
 
   // Persistent interpretive orientation, above the book surface.
@@ -7459,6 +7524,7 @@ function _crRenderDocPicker(ws) {
   document.getElementById('cr-page-view').addEventListener('mouseup', _crHandleSelection);
   document.removeEventListener('selectionchange', _crHandleSelectionChange);
   document.addEventListener('selectionchange', _crHandleSelectionChange);
+  _crSyncBottomWorkstationState();
 }
 
 // Question Compass (issue #56 slice 2): a persistent, unobtrusive orientation
@@ -7484,12 +7550,84 @@ function _crRenderQuestionCompass() {
 
 // Reader tool access stays additive: the quiet top ribbon handles search,
 // timeline, and field notes, while the far-right dock opens the support panels
-// that used to be stacked in the Reader sidebar. Field Notes still lives in the
-// footer tray, so its entry opens the tray in place. Reading works without any
-// dock panel being open.
+// that used to be stacked in the Reader sidebar. Search, Timeline, and Field
+// Notes now share one bottom workstation so they switch modes instead of
+// stacking. Reading works without any dock panel being open.
 const _CR_TOOL_TARGETS = {
   fieldnotes:   'cr-fln-tray',
 };
+let _crBottomMode = '';
+function _crBottomPanels() {
+  return {
+    search: document.getElementById('corpus-search'),
+    timeline: document.getElementById('attn-timeline'),
+    fieldnotes: document.getElementById('cr-fln-tray'),
+  };
+}
+function _crSyncBottomWorkstationState() {
+  const shell = document.getElementById('cr-bottom-workstation');
+  const panels = _crBottomPanels();
+  const open = !!(shell && !shell.hidden && _crBottomMode);
+  if (shell) shell.dataset.mode = _crBottomMode || '';
+  document.body.classList.toggle('has-bottom-workstation', open);
+  Object.entries(panels).forEach(([mode, panel]) => {
+    if (!panel) return;
+    const active = open && _crBottomMode === mode;
+    panel.hidden = !active;
+    if (mode === 'timeline') panel.classList.toggle('open', active);
+    if (mode === 'fieldnotes') panel.dataset.open = active ? '1' : '0';
+  });
+  document.querySelectorAll('[data-workstation-mode]').forEach(btn => {
+    const active = open && btn.dataset.workstationMode === _crBottomMode;
+    btn.classList.toggle('active', active);
+    if (btn.getAttribute('role') === 'tab') btn.setAttribute('aria-selected', String(active));
+  });
+}
+async function _crOpenBottomWorkstation(mode) {
+  const shell = document.getElementById('cr-bottom-workstation');
+  if (!shell) return;
+  shell.hidden = false;
+  _crBottomMode = mode;
+  _crSyncBottomWorkstationState();
+  if (mode === 'timeline') {
+    cmpMarkOnboardingStep('timeline', { keepPaused: true });
+    await _attnLoad();
+  } else if (mode === 'fieldnotes') {
+    document.getElementById('cr-fln-tray')?.classList.remove('cr-fln-glow');
+    _flnLoadEntries();
+  }
+}
+function _crCloseBottomWorkstation() {
+  const shell = document.getElementById('cr-bottom-workstation');
+  if (!shell) return;
+  shell.hidden = true;
+  _crBottomMode = '';
+  _crSyncBottomWorkstationState();
+}
+function _crBindBottomWorkstationControls() {
+  const bindings = [
+    ['cr-bottom-tab-search', () => _crOpenBottomWorkstation('search')],
+    ['cr-bottom-tab-timeline', () => _crOpenBottomWorkstation('timeline')],
+    ['cr-bottom-tab-fieldnotes', () => _crOpenBottomWorkstation('fieldnotes')],
+  ];
+  bindings.forEach(([id, handler]) => {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.bound === '1') return;
+    el.addEventListener('click', (e) => { e.preventDefault(); handler(); });
+    el.dataset.bound = '1';
+  });
+  document.querySelectorAll('.cr-bottom-workstation-close, .corpus-search-close, .attn-close').forEach(el => {
+    if (el.dataset.bound === '1') return;
+    const handler = el.classList.contains('attn-close') ? closeTimeline
+      : el.classList.contains('corpus-search-close') ? closeCorpusSearch
+      : _crCloseBottomWorkstation;
+    el.addEventListener('click', (e) => { e.preventDefault(); handler(); });
+    el.dataset.bound = '1';
+  });
+}
+window._crOpenBottomWorkstation = _crOpenBottomWorkstation;
+window._crCloseBottomWorkstation = _crCloseBottomWorkstation;
+_crBindBottomWorkstationControls();
 const _DOCK_PANEL_META = {
   guide:        { id: 'dock-guide-panel', title: 'Guide' },
   question:     { id: 'cr-question-panel', title: 'Question' },
@@ -7547,10 +7685,15 @@ function _crRailGo(key) {
     document.getElementById('cr-companion-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
+  if (key === 'fieldnotes') {
+    flnToggleTray(true);
+    document.getElementById('cr-bottom-workstation')?.classList.add('cr-tool-flash');
+    setTimeout(() => document.getElementById('cr-bottom-workstation')?.classList.remove('cr-tool-flash'), 1200);
+    return;
+  }
   const id = _CR_TOOL_TARGETS[key];
   const el = id && document.getElementById(id);
   if (!el) return;
-  if (key === 'fieldnotes' && el.dataset.open !== '1') flnToggleTray(true);
   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   el.classList.add('cr-tool-flash');
   setTimeout(() => el.classList.remove('cr-tool-flash'), 1200);
@@ -7566,15 +7709,14 @@ function _crToggleToolDrawer() {
 }
 
 // ── Reader-side Corpus Search (PR 2) ───────────────────
-// "Where else does this idea appear?" — a slide-in panel beside the book.
-// Reuses /api/search over observations; the Reader never leaves. Clicking a
-// result navigates the book to that passage while the panel stays open.
+// "Where else does this idea appear?" — now a tab in the shared bottom
+// workstation. Reuses /api/search over observations; the Reader never leaves.
+// Clicking a result navigates the book to that passage while search stays open.
 let _corpusSearchTimer = null;
 function openCorpusSearch(prefill) {
-  const panel = document.getElementById('corpus-search');
   const input = document.getElementById('corpus-search-input');
-  if (!panel || !input) return;
-  panel.hidden = false;
+  if (!input) return;
+  _crOpenBottomWorkstation('search');
   const sel = prefill || (window.getSelection ? String(window.getSelection()).trim() : '');
   if (sel && sel.length && sel.length <= 80) input.value = sel;
   input.focus(); input.select();
@@ -7582,8 +7724,7 @@ function openCorpusSearch(prefill) {
   cmpMarkOnboardingStep('search', { keepPaused: true });
 }
 function closeCorpusSearch() {
-  const panel = document.getElementById('corpus-search');
-  if (panel) panel.hidden = true;
+  if (_crBottomMode === 'search') _crCloseBottomWorkstation();
 }
 function _corpusSearchInput() {
   const input = document.getElementById('corpus-search-input');
@@ -7597,7 +7738,7 @@ async function _corpusRunSearch(q) {
   if (!results || !meta) return;
   if (!q) {
     meta.textContent = '';
-    results.innerHTML = '<div class="corpus-search-hint">Search any word or phrase across the corpus. Results appear here beside the book — click one to open that passage.</div>';
+    results.innerHTML = '<div class="corpus-search-hint">Search any word or phrase across the corpus. Results appear in the workstation below the book — click one to open that passage.</div>';
     return;
   }
   meta.textContent = 'Searching…';
@@ -7662,36 +7803,21 @@ function _crGoToPage(page) {
   }
 }
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closeCorpusSearch(); closeTimeline(); }
+  if (e.key === 'Escape' && _crBottomMode) _crCloseBottomWorkstation();
 });
 
 // ── Attention timeline (PR 3) ──────────────────────────
-// "What have I discovered so far?" — a slide-up strip below the book showing
+// "What have I discovered so far?" — now a tab in the bottom workstation showing
 // the steward's captured attention (highlights, questions, notes, field notes)
 // in reverse-chronological order. Clicking a card navigates the book to that
 // passage. Reuses /api/reader/timeline; the Reader stays visible above.
 let _attnEntries = [];
 let _attnFilter = 'all';
 async function openTimeline() {
-  const panel = document.getElementById('attn-timeline');
-  if (!panel) return;
-  panel.hidden = false;
-  // Force layout, then add .open so the slide-up transition always runs and the
-  // sheet cannot get stuck off-screen (the Jetson visibility bug).
-  void panel.offsetHeight;
-  requestAnimationFrame(() => panel.classList.add('open'));
-  document.querySelectorAll('.cr-rail-timeline').forEach(b => b.classList.add('active'));
-  cmpMarkOnboardingStep('timeline', { keepPaused: true });
-  await _attnLoad();
+  await _crOpenBottomWorkstation('timeline');
 }
 function closeTimeline() {
-  const p = document.getElementById('attn-timeline');
-  if (!p || p.hidden) return;
-  p.classList.remove('open');
-  document.querySelectorAll('.cr-rail-timeline').forEach(b => b.classList.remove('active'));
-  const done = () => { p.hidden = true; p.removeEventListener('transitionend', done); clearTimeout(t); };
-  const t = setTimeout(done, 260);
-  p.addEventListener('transitionend', done);
+  if (_crBottomMode === 'timeline') _crCloseBottomWorkstation();
 }
 function _attnSetFilter(kind) {
   _attnFilter = kind;
