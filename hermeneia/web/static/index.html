@@ -2472,6 +2472,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-search" data-workstation-mode="search" type="button" role="tab" aria-controls="corpus-search" aria-selected="false" onclick="_crOpenBottomWorkstation('search')">Search Corpus</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-timeline" data-workstation-mode="timeline" type="button" role="tab" aria-controls="attn-timeline" aria-selected="false" onclick="_crOpenBottomWorkstation('timeline')">Timeline</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-fieldnotes" data-workstation-mode="fieldnotes" type="button" role="tab" aria-controls="cr-fln-tray" aria-selected="false" onclick="_crOpenBottomWorkstation('fieldnotes')">Field Notes</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-blueprint" data-workstation-mode="blueprint" type="button" role="tab" aria-controls="cr-blueprint-draft" aria-selected="false" onclick="_crOpenBottomWorkstation('blueprint')">Blueprint</button>
     </div>
     <button class="cr-bottom-workstation-close" type="button" onclick="_crCloseBottomWorkstation()" aria-label="Collapse bottom workstation">Collapse</button>
   </div>
@@ -2520,6 +2521,27 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
         <div class="cr-fln-inner" id="cr-fln-inner"></div>
       </div>
     </div>
+
+    <aside class="cr-blueprint-draft" id="cr-blueprint-draft" hidden aria-label="Draft a Blueprint from your reading">
+      <div class="cr-fln-bar">
+        <span class="cr-fln-bar-label">◈ Draft Blueprint</span>
+        <span class="cr-fln-count" id="cr-blueprint-meta"></span>
+        <span style="flex:1"></span>
+        <span class="cr-fln-hint">Turn your question and what you've captured into a candidate argument — reading stays above.</span>
+      </div>
+      <div class="cr-fln-body">
+        <div class="cr-blueprint-question" id="cr-blueprint-question"></div>
+        <div class="cr-blueprint-controls" style="display:flex;gap:10px;align-items:center;margin:10px 0">
+          <select class="ob-extract-provider" id="cr-blueprint-provider" style="max-width:220px">
+            <option value="null">Stub (no AI)</option>
+            <option value="anthropic">Claude</option>
+            <option value="openai">GPT</option>
+          </select>
+          <button class="btn-primary" id="cr-blueprint-btn" onclick="_crDraftBlueprint(false)">Draft Blueprint</button>
+        </div>
+        <div id="cr-blueprint-proposal" style="display:none"></div>
+      </div>
+    </aside>
   </div>
 </section>
 
@@ -7556,6 +7578,7 @@ function _crBottomPanels() {
     search: document.getElementById('corpus-search'),
     timeline: document.getElementById('attn-timeline'),
     fieldnotes: document.getElementById('cr-fln-tray'),
+    blueprint: document.getElementById('cr-blueprint-draft'),
   };
 }
 function _crSyncBottomWorkstationState() {
@@ -7589,6 +7612,8 @@ async function _crOpenBottomWorkstation(mode) {
   } else if (mode === 'fieldnotes') {
     document.getElementById('cr-fln-tray')?.classList.remove('cr-fln-glow');
     _flnLoadEntries();
+  } else if (mode === 'blueprint') {
+    _crLoadBlueprintDraft();
   }
 }
 function _crCloseBottomWorkstation() {
@@ -7598,11 +7623,151 @@ function _crCloseBottomWorkstation() {
   _crBottomMode = '';
   _crSyncBottomWorkstationState();
 }
+// ── Thesis → Blueprint (bottom workstation "Blueprint" tab) ──────────────
+// Forward path: turn the governing question + what the reader has captured into
+// a proposed Intent Hypothesis. Reuses POST /api/pipeline/extract-blueprint —
+// no new endpoint, no schema change.
+async function _crGatherBlueprintEvidence() {
+  let notes = [];
+  let observations = [];
+  try {
+    const d = await get('/api/investigation-log?limit=200');
+    notes = (d.entries || []).filter(e => e && e.lane !== 'instrument');
+  } catch {}
+  try {
+    const d = await get('/api/e10/observations?q=&filter=all&limit=5000');
+    observations = (d.observations || []).filter(o => o && o.review_status === 'approved');
+  } catch {}
+  const highlights = (_crHighlights || []).filter(h => h && h.status !== 'dismissed');
+  return { notes, highlights, observations };
+}
+
+async function _crLoadBlueprintDraft() {
+  const qEl    = document.getElementById('cr-blueprint-question');
+  const metaEl = document.getElementById('cr-blueprint-meta');
+  const btn    = document.getElementById('cr-blueprint-btn');
+  const propEl = document.getElementById('cr-blueprint-proposal');
+  const thesis = (invLoad()?.thesis || '').trim();
+  if (propEl) { propEl.style.display = 'none'; propEl.innerHTML = ''; }
+  if (qEl) {
+    qEl.innerHTML = thesis
+      ? `<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2);margin-bottom:4px">Governing question</div>`
+        + `<div style="font-size:14px;color:var(--fg);line-height:1.5">${x(thesis)}</div>`
+      : `<div style="font-size:12px;color:var(--dim2);line-height:1.5">Set a governing question first — the Blueprint is a hypothesis about the argument your reading is building toward.</div>`;
+  }
+  if (btn) btn.disabled = !thesis;
+  const { notes, highlights, observations } = await _crGatherBlueprintEvidence();
+  if (metaEl) {
+    const n = notes.length, h = highlights.length, o = observations.length;
+    metaEl.textContent = `· ${n} field note${n===1?'':'s'} · ${h} highlight${h===1?'':'s'} · ${o} approved observation${o===1?'':'s'}`;
+  }
+}
+
+async function _crAssembleBlueprintSeed() {
+  const thesis = (invLoad()?.thesis || '').trim();
+  const { notes, highlights, observations } = await _crGatherBlueprintEvidence();
+  const lines = [];
+  if (thesis) lines.push(`Governing question: ${thesis}`, '');
+  if (highlights.length) {
+    lines.push('Passages the reader kept:');
+    highlights.forEach(h => {
+      const quote = (h.selected_text || '').trim();
+      if (!quote) return;
+      const rel = h.relevance ? ` [${h.relevance}]` : '';
+      const note = h.note_text ? ` — ${h.note_text.trim()}` : '';
+      lines.push(`- (p.${h.page || '?'})${rel} "${quote}"${note}`);
+    });
+    lines.push('');
+  }
+  if (notes.length) {
+    lines.push("The reader's field notes:");
+    notes.forEach(e => {
+      const u = (e.understanding || '').trim();
+      const q = (e.pressing_questions || '').trim();
+      if (u) lines.push(`- (p.${e.page || '?'}) ${u}`);
+      if (q) lines.push(`  ? ${q}`);
+    });
+    lines.push('');
+  }
+  if (observations.length) {
+    lines.push('Approved machine observations:');
+    observations.forEach(o => {
+      const t = (o.raw_text || '').trim();
+      if (t) lines.push(`- (p.${o.page || '?'}) ${t}`);
+    });
+    lines.push('');
+  }
+  return lines.join('\n').trim();
+}
+
+async function _crDraftBlueprint(save) {
+  const provider = document.getElementById('cr-blueprint-provider')?.value || 'null';
+  const propEl   = document.getElementById('cr-blueprint-proposal');
+  const btn      = document.getElementById('cr-blueprint-btn');
+  if (!propEl) return;
+
+  const text = await _crAssembleBlueprintSeed();
+  if (!text) {
+    propEl.style.display = 'block';
+    propEl.innerHTML = `<div style="color:#f87171;font-size:13px">Set a governing question and capture at least one highlight, note, or observation first.</div>`;
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Drafting…'; }
+  propEl.style.display = 'none';
+  try {
+    const resp = await fetch('/api/pipeline/extract-blueprint', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, provider, save }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      propEl.style.display = 'block';
+      propEl.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(data.error || 'Draft failed')}</div>`;
+      return;
+    }
+    const bp = data.proposed_blueprint;
+    const sections = (bp.sections || []).map((s, i) =>
+      `<div class="ob-extract-section"><span style="color:var(--dim2);font-size:11px;margin-right:6px">${i+1}.</span>${x(s.claim)}</div>`
+    ).join('');
+    const savedBadge = data.blueprint_id
+      ? `<span style="background:#2d6a4f;color:#b7e4c7;font-size:10px;padding:2px 7px;border-radius:4px;margin-left:8px">saved</span>` : '';
+    propEl.style.display = 'block';
+    propEl.innerHTML = `
+      <div class="ob-extract-proposal">
+        <div class="ob-extract-proposal-title">${x(bp.title)}${savedBadge}</div>
+        <div class="ob-extract-proposal-thesis">"${x(bp.thesis)}"</div>
+        <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2);margin-bottom:6px">Supporting Claims</div>
+        ${sections}
+        <div class="ob-extract-note">
+          A wrong Blueprint is not a planning failure — it is a reading failure.
+          If this reconstruction is inaccurate, capture more of your reading or run again with a different provider.
+        </div>
+        ${data.blueprint_id ? `
+        <div class="ob-extract-actions">
+          <button class="btn-primary" onclick="e10Go('architect')">View in Architect →</button>
+        </div>` : `
+        <div class="ob-extract-actions">
+          <button class="btn-primary" onclick="_crDraftBlueprint(true)">Ratify &amp; Save Blueprint →</button>
+        </div>`}
+      </div>`;
+  } catch (err) {
+    propEl.style.display = 'block';
+    propEl.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(err.message)}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Draft Blueprint'; }
+  }
+}
+window._crLoadBlueprintDraft = _crLoadBlueprintDraft;
+window._crDraftBlueprint = _crDraftBlueprint;
+
 function _crBindBottomWorkstationControls() {
   const bindings = [
     ['cr-bottom-tab-search', () => _crOpenBottomWorkstation('search')],
     ['cr-bottom-tab-timeline', () => _crOpenBottomWorkstation('timeline')],
     ['cr-bottom-tab-fieldnotes', () => _crOpenBottomWorkstation('fieldnotes')],
+    ['cr-bottom-tab-blueprint', () => _crOpenBottomWorkstation('blueprint')],
   ];
   bindings.forEach(([id, handler]) => {
     const el = document.getElementById(id);
