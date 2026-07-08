@@ -7497,16 +7497,10 @@ function _crRenderDocPicker(ws) {
           <button class="cr-nav-btn" id="cr-next-btn" onclick="_crNextPage()" disabled>Next →</button>
         </div>
       </div>
-      <!-- FOLLOW-UP (sidebar geography, Issue #102 §4): this right column is
-           doing too much. The target is for the right sidebar to become
-           Companion-only, with the non-Companion support/navigation panels
-           (Reading Trail, Question, Highlight Inspector, Saved Highlights,
-           Machine Observations) and the onboarding workflow guide migrating
-           into the accessibility/tools sidebar (#a11y-dock) as its expandable
-           home for workspace navigation and larger context panels. That move
-           touches capture/highlight/observation wiring across the Reader, so it
-           is deferred to its own focused PR rather than bundled into this
-           visibility/layout polish. Do not keep adding non-Companion UI here. -->
+      <!-- Right column is Companion-only (Issue #102 §4, done). The non-Companion
+           support/navigation panels (Reading Trail, Question, Highlight Inspector,
+           Saved Highlights, Machine Observations, workflow guide) live in the
+           far-right tools dock (#a11y-dock). Do not add non-Companion UI here. -->
       <div class="cr-side">
         <div class="cr-side-panel cr-companion-dock" id="cr-companion-panel"></div>
       </div>
