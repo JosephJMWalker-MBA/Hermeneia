@@ -93,15 +93,18 @@ def test_search_excludes_muted_documents(tmp_path: Path):
 
 def test_corpus_search_panel_markup_and_trigger_present():
     index = INDEX.read_text()
+    assert 'id="cr-bottom-workstation"' in index
     assert 'id="corpus-search"' in index
     assert 'id="corpus-search-input"' in index
     assert "openCorpusSearch()" in index          # rail trigger
     assert "closeCorpusSearch()" in index
     assert "_corpusRunSearch" in index
     assert "/api/search?q=" in index
-    # The trigger lives in the Reader tool rail, and the panel is beside the book.
+    # The trigger lives in the Reader tool rail, and search opens in the shared
+    # bottom workstation rather than a separate side panel.
     assert "cr-rail-search" in index
     assert 'class="corpus-search"' in index
+    assert "Search Corpus" in index
 
 
 def test_result_click_navigates_the_book_not_a_page_away():

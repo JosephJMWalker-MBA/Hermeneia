@@ -1126,20 +1126,58 @@ body.reader-active .cr-tool-drawer { max-width: none; }
   white-space: nowrap;
 }
 .cr-rail-btn:hover { border-color: var(--accent); color: var(--fg); }
-.cr-rail-search { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.cr-rail-search { }
 .cr-rail-drawer-btn { background: none; }
 
-/* Reader-side Corpus Search — a slide-in panel beside the book. The Reader
-   stays visible; search results appear here, never a page you leave to. */
-.corpus-search {
-  position: fixed; top: 56px; right: 0; bottom: 0; z-index: 350;
-  width: 400px; max-width: 92vw;
-  background: var(--surface); border-left: 1px solid var(--border);
-  box-shadow: -12px 0 40px rgba(0,0,0,.35);
+/* Bottom workstation: one collapsible shell shared by Search, Timeline, and
+   Field Notes. The Reader remains visible above; only one mode is open at a
+   time, never stacked drawers. */
+.cr-bottom-workstation {
+  position: fixed; left: 0; right: 72px; bottom: 40px; z-index: 460;
+  height: min(44vh, 360px);
+  background: var(--surface); border-top: 2px solid var(--accent);
+  box-shadow: 0 -18px 50px rgba(0,0,0,.5);
   display: flex; flex-direction: column;
-  transform: translateX(0); transition: transform .18s ease;
 }
-.corpus-search[hidden] { display: flex; transform: translateX(102%); }
+.cr-bottom-workstation[hidden] { display: none; }
+.cr-bottom-workstation-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 84%, var(--accent));
+}
+.cr-bottom-workstation-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--dim2);
+}
+.cr-bottom-workstation-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.cr-bottom-workstation-tab,
+.cr-bottom-workstation-close {
+  font: inherit; font-size: 12px; cursor: pointer;
+  border-radius: 999px; padding: 5px 12px;
+}
+.cr-bottom-workstation-tab {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--fg2);
+}
+.cr-bottom-workstation-tab:hover,
+.cr-bottom-workstation-close:hover { border-color: var(--accent); color: var(--fg); }
+.cr-bottom-workstation-tab.active {
+  border-color: var(--accent); color: var(--accent);
+  background: var(--accent2); font-weight: 600;
+}
+.cr-bottom-workstation-close {
+  margin-left: auto;
+  background: none; border: 1px solid var(--border); color: var(--dim2);
+}
+.cr-bottom-workstation-body { flex: 1; min-height: 0; }
+body.has-workflow-rail.has-bottom-workstation { padding-bottom: 392px; }
+body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 352px; }
+
+/* Search Corpus lives inside the shared workstation. */
+.corpus-search {
+  height: 100%;
+  background: var(--surface);
+  display: flex; flex-direction: column;
+}
+.corpus-search[hidden] { display: none; }
 .corpus-search-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 16px 8px;
@@ -1187,16 +1225,12 @@ body.reader-active .cr-tool-drawer { max-width: none; }
    .open class (not the hidden attribute) so the slide always animates and can
    never end up stuck off-screen. */
 .attn-timeline {
-  position: fixed; left: 0; right: 0; bottom: 40px; z-index: 460;
-  height: 320px; max-height: 56vh;
-  background: var(--surface); border-top: 2px solid var(--accent);
-  box-shadow: 0 -18px 50px rgba(0,0,0,.5);
+  height: 100%;
+  background: var(--surface);
   display: flex; flex-direction: column;
-  transform: translateY(calc(100% + 40px));
-  transition: transform .2s ease;
 }
-.attn-timeline[hidden] { display: flex; }
-.attn-timeline.open { transform: translateY(0); }
+.attn-timeline[hidden] { display: none; }
+.attn-timeline.open { display: flex; }
 .attn-head {
   display: flex; align-items: center; gap: 12px;
   padding: 12px 18px; border-bottom: 1px solid var(--border);
@@ -1739,34 +1773,37 @@ body.has-workflow-rail { padding-bottom: 40px; }
    bottom orientation holds on desktop. It is a descendant of
    the reader screen, so it is hidden whenever the reader is
    not the active e10-screen. */
-.cr-layout { padding-bottom: 52px; }
+.cr-layout { padding-bottom: 0; }
 .cr-fln-tray {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 55;
-  background: var(--surface); border-top: 1px solid var(--border);
-  box-shadow: 0 -2px 12px rgba(0,0,0,.18);
+  height: 100%;
+  background: var(--surface);
   display: flex; flex-direction: column;
 }
 .cr-fln-bar {
   display: flex; align-items: center; gap: 10px;
-  padding: 9px 16px; cursor: pointer; font-size: 13px;
+  padding: 12px 16px 10px; font-size: 13px;
   color: var(--fg2); user-select: none;
+  border-bottom: 1px solid var(--border);
 }
-.cr-fln-bar:hover { color: var(--fg); }
 .cr-fln-bar-label { font-weight: 600; }
 .cr-fln-count { font-size: 11px; color: var(--dim2); }
 .cr-fln-hint  { font-size: 12px; color: var(--accent); }
-.cr-fln-caret { transition: transform .2s; font-size: 11px; }
-.cr-fln-tray[data-open="1"] .cr-fln-caret { transform: rotate(180deg); }
 .cr-fln-body {
-  display: none; border-top: 1px solid var(--border);
-  max-height: min(52vh, 460px); overflow-y: auto;
+  flex: 1; min-height: 0; overflow-y: auto;
 }
-.cr-fln-tray[data-open="1"] .cr-fln-body { display: block; }
 .cr-fln-inner { max-width: 900px; margin: 0 auto; padding: 14px 16px 18px; }
 .cr-fln-tray.cr-fln-glow { animation: flnGlow 1.8s ease-in-out 2; }
 @keyframes flnGlow {
   0%, 100% { box-shadow: 0 -2px 12px rgba(0,0,0,.18); }
   50%      { box-shadow: 0 -2px 20px var(--accent); }
+}
+@media (max-width: 900px) {
+  .cr-bottom-workstation { height: min(48vh, 320px); }
+  .cr-bottom-workstation-head { flex-wrap: wrap; align-items: flex-start; }
+  .cr-bottom-workstation-title { width: 100%; }
+  .cr-bottom-workstation-close { margin-left: 0; }
+  body.has-workflow-rail.has-bottom-workstation { padding-bottom: 352px; }
+  body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 312px; }
 }
 /* ── Investigation Setup ─────────────────────────────── */
 .setup-wrap { max-width: 640px; }
@@ -2073,7 +2110,9 @@ body.has-workflow-rail { padding-bottom: 40px; }
   .ob-cycle-wrap { transform: scale(0.88); transform-origin: top center; margin-bottom: -53px; }
 }
 
-/* ── Accessibility Dock v0.2 ── */
+/* ── Reader tools dock ──
+   Compact by default: the far-right rail opens support panels only when
+   requested so Companion can own the Reader sidebar. */
 #a11y-dock {
   position: fixed;
   right: 0;
@@ -2081,41 +2120,139 @@ body.has-workflow-rail { padding-bottom: 40px; }
   transform: translateY(-50%);
   z-index: 9500;
   display: flex;
-  flex-direction: column;
   align-items: stretch;
   gap: 0;
+  user-select: none;
+}
+.dock-panel {
+  width: min(360px, calc(100vw - 88px));
+  max-height: min(74vh, 720px);
   background: var(--surface);
   border: 1.5px solid var(--border);
   border-right: none;
   border-radius: 16px 0 0 16px;
-  padding: 10px 0 8px;
-  box-shadow: -3px 4px 22px rgba(0,0,0,.22);
-  user-select: none;
-  min-width: 72px;
-  transition: min-width .18s ease, padding .18s ease;
+  box-shadow: -8px 8px 32px rgba(0,0,0,.32);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
-#a11y-dock .dock-header {
+.dock-panel[hidden] { display: none; }
+.dock-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 84%, var(--accent));
+}
+.dock-panel-kicker {
   font-size: 9px;
-  letter-spacing: .1em;
+  letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--dim2);
-  text-align: center;
-  padding: 0 8px 6px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 4px;
-  white-space: nowrap;
 }
-#a11y-dock.dock-collapsed {
-  min-width: 0;
-  padding: 0;
-  border-radius: 10px 0 0 10px;
+.dock-panel-title {
+  font-size: 14px;
+  color: var(--fg);
+  font-weight: 700;
+  margin-top: 2px;
 }
-#a11y-dock .dock-inner {
+.dock-panel-close {
+  background: none;
+  border: none;
+  color: var(--dim2);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.dock-panel-close:hover { color: var(--fg); background: var(--surface2); }
+.dock-panel-body {
+  overflow-y: auto;
+  padding: 14px;
+  min-height: 0;
+}
+.dock-reader-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  padding: 13px 14px;
+  font-size: 13px;
+}
+.dock-reader-panel[hidden] { display: none; }
+.dock-guide-note {
+  font-size: 12px;
+  color: var(--dim2);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.dock-guide-nav,
+.dock-workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.dock-guide-nav { margin-bottom: 12px; }
+.dock-guide-nav button,
+.dock-workflow-grid button {
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface2);
+  color: var(--fg2);
+  cursor: pointer;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12px;
+}
+.dock-guide-nav button:hover,
+.dock-workflow-grid button:hover { border-color: var(--accent); color: var(--fg); }
+.dock-subhead {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--dim2);
+  font-weight: 700;
+  margin: 14px 0 8px;
+}
+.dock-rail {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 2px;
-  padding: 0 6px;
+  gap: 6px;
+  padding: 10px 8px 10px 6px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-right: none;
+  border-radius: 16px 0 0 16px;
+  box-shadow: -3px 4px 22px rgba(0,0,0,.22);
+  min-width: 58px;
+}
+.dock-rail-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--fg2);
+  cursor: pointer;
+  font-size: 16px;
+  transition: color .12s, background .12s, border-color .12s;
+}
+.dock-rail-btn:hover {
+  color: var(--fg);
+  background: var(--surface2);
+  border-color: var(--border);
+}
+.dock-rail-btn.active {
+  color: var(--accent);
+  background: var(--accent2);
+  border-color: var(--accent);
 }
 .a11y-btn {
   display: flex;
@@ -2166,48 +2303,6 @@ body.has-workflow-rail { padding-bottom: 40px; }
 }
 .a11y-status-bar.status-speaking { color: #22c55e; }
 .a11y-status-bar.status-ready { color: var(--accent); }
-.a11y-collapse-row {
-  display: flex;
-  justify-content: center;
-  padding: 4px 0 0;
-}
-.a11y-collapse-btn {
-  background: none;
-  border: none;
-  color: var(--dim2);
-  cursor: pointer;
-  font-size: 10px;
-  padding: 2px 10px;
-  border-radius: 4px;
-  letter-spacing: .05em;
-}
-.a11y-collapse-btn:hover { color: var(--fg); background: var(--bg2); }
-
-/* Collapsed pill */
-#a11y-dock-collapsed-pill {
-  display: none;
-  position: fixed;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 9500;
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-right: none;
-  border-radius: 10px 0 0 10px;
-  box-shadow: -2px 3px 14px rgba(0,0,0,.18);
-  padding: 10px 8px;
-  cursor: pointer;
-  user-select: none;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-size: 11px;
-  color: var(--fg2);
-  letter-spacing: .08em;
-  align-items: center;
-  gap: 4px;
-}
-#a11y-dock-collapsed-pill:hover { background: var(--bg2); color: var(--fg); }
 
 /* Selection floating toolbar */
 #a11y-selection-tip {
@@ -2255,8 +2350,21 @@ body.has-workflow-rail { padding-bottom: 40px; }
 body.a11y-focus-mode .e10-screen:not(.active),
 body.a11y-focus-mode .section.xo { opacity: 0.12; pointer-events: none; transition: opacity .2s; }
 body.a11y-focus-mode .nav { opacity: 0.35; transition: opacity .2s; }
-body.a11y-focus-mode #a11y-dock,
-body.a11y-focus-mode #a11y-dock-collapsed-pill { opacity: 1 !important; pointer-events: auto !important; }
+body.a11y-focus-mode #a11y-dock { opacity: 1 !important; pointer-events: auto !important; }
+@media (max-width: 980px) {
+  #a11y-dock {
+    top: auto;
+    bottom: 56px;
+    transform: none;
+    align-items: flex-end;
+  }
+  .dock-panel {
+    width: min(88vw, 360px);
+    max-height: 60vh;
+  }
+  .dock-guide-nav,
+  .dock-workflow-grid { grid-template-columns: 1fr; }
+}
 
 /* Text size override — targets the reading surfaces (source text,
    selected passages, saved highlights, observation/report text), not the
@@ -2354,42 +2462,66 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
   </div>
 </div>
 
-<!-- Reader-side Corpus Search (PR 2): "where else does this idea appear?"
-     A slide-in panel beside the book; the Reader never leaves. -->
-<aside class="corpus-search" id="corpus-search" hidden aria-label="Search the corpus">
-  <div class="corpus-search-head">
-    <span class="corpus-search-title">Search the corpus</span>
-    <button class="corpus-search-close" onclick="closeCorpusSearch()" aria-label="Close search">✕</button>
-  </div>
-  <input type="text" id="corpus-search-input" class="corpus-search-input"
-         placeholder="Where else does this idea appear?" autocomplete="off"
-         oninput="_corpusSearchInput()" spellcheck="false">
-  <div class="corpus-search-meta" id="corpus-search-meta"></div>
-  <div class="corpus-search-results" id="corpus-search-results">
-    <div class="corpus-search-hint">Search any word or phrase across the corpus. Results appear here beside the book — click one to open that passage.</div>
-  </div>
-</aside>
-
-<!-- Attention timeline (PR 3): "what have I discovered so far?" A slide-up
-     workbench strip below the book; the Reader stays visible above it. -->
-<aside class="attn-timeline" id="attn-timeline" hidden aria-label="Attention timeline">
-  <div class="attn-head">
-    <span class="attn-title">What you've discovered</span>
-    <span class="attn-meta" id="attn-meta"></span>
-    <span style="flex:1"></span>
-    <div class="attn-filters" id="attn-filters">
-      <button class="attn-filter active" data-kind="all" onclick="_attnSetFilter('all')">All</button>
-      <button class="attn-filter" data-kind="highlight" onclick="_attnSetFilter('highlight')">Highlights</button>
-      <button class="attn-filter" data-kind="question" onclick="_attnSetFilter('question')">Questions</button>
-      <button class="attn-filter" data-kind="note" onclick="_attnSetFilter('note')">Notes</button>
-      <button class="attn-filter" data-kind="field_note" onclick="_attnSetFilter('field_note')">Field notes</button>
+<!-- Bottom workstation: one collapsible shell for Search Corpus, Timeline,
+     and Field Notes. The Reader remains above; these tools now switch modes
+     instead of opening as separate competing panels. -->
+<section class="cr-bottom-workstation" id="cr-bottom-workstation" hidden aria-label="Bottom workstation">
+  <div class="cr-bottom-workstation-head">
+    <span class="cr-bottom-workstation-title">Bottom workstation</span>
+    <div class="cr-bottom-workstation-tabs" role="tablist" aria-label="Reader workstation modes">
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-search" data-workstation-mode="search" type="button" role="tab" aria-controls="corpus-search" aria-selected="false" onclick="_crOpenBottomWorkstation('search')">Search Corpus</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-timeline" data-workstation-mode="timeline" type="button" role="tab" aria-controls="attn-timeline" aria-selected="false" onclick="_crOpenBottomWorkstation('timeline')">Timeline</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-fieldnotes" data-workstation-mode="fieldnotes" type="button" role="tab" aria-controls="cr-fln-tray" aria-selected="false" onclick="_crOpenBottomWorkstation('fieldnotes')">Field Notes</button>
     </div>
-    <button class="attn-close" onclick="closeTimeline()" aria-label="Close timeline">✕</button>
+    <button class="cr-bottom-workstation-close" type="button" onclick="_crCloseBottomWorkstation()" aria-label="Collapse bottom workstation">Collapse</button>
   </div>
-  <div class="attn-track" id="attn-track">
-    <div class="attn-hint">Loading your attention timeline…</div>
+  <div class="cr-bottom-workstation-body">
+    <aside class="corpus-search" id="corpus-search" hidden aria-label="Search the corpus">
+      <div class="corpus-search-head">
+        <span class="corpus-search-title">Search the corpus</span>
+        <button class="corpus-search-close" onclick="closeCorpusSearch()" aria-label="Close search">✕</button>
+      </div>
+      <input type="text" id="corpus-search-input" class="corpus-search-input"
+             placeholder="Where else does this idea appear?" autocomplete="off"
+             oninput="_corpusSearchInput()" spellcheck="false">
+      <div class="corpus-search-meta" id="corpus-search-meta"></div>
+      <div class="corpus-search-results" id="corpus-search-results">
+        <div class="corpus-search-hint">Search any word or phrase across the corpus. Results appear in the workstation below the book — click one to open that passage.</div>
+      </div>
+    </aside>
+
+    <aside class="attn-timeline" id="attn-timeline" hidden aria-label="Attention timeline">
+      <div class="attn-head">
+        <span class="attn-title">What you've discovered</span>
+        <span class="attn-meta" id="attn-meta"></span>
+        <span style="flex:1"></span>
+        <div class="attn-filters" id="attn-filters">
+          <button class="attn-filter active" data-kind="all" onclick="_attnSetFilter('all')">All</button>
+          <button class="attn-filter" data-kind="highlight" onclick="_attnSetFilter('highlight')">Highlights</button>
+          <button class="attn-filter" data-kind="question" onclick="_attnSetFilter('question')">Questions</button>
+          <button class="attn-filter" data-kind="note" onclick="_attnSetFilter('note')">Notes</button>
+          <button class="attn-filter" data-kind="field_note" onclick="_attnSetFilter('field_note')">Field notes</button>
+        </div>
+        <button class="attn-close" onclick="closeTimeline()" aria-label="Close timeline">✕</button>
+      </div>
+      <div class="attn-track" id="attn-track">
+        <div class="attn-hint">Loading your attention timeline…</div>
+      </div>
+    </aside>
+
+    <div class="cr-fln-tray" id="cr-fln-tray" data-open="0" hidden>
+      <div class="cr-fln-bar">
+        <span class="cr-fln-bar-label">✎ Field Notes</span>
+        <span class="cr-fln-count" id="cr-fln-count"></span>
+        <span style="flex:1"></span>
+        <span class="cr-fln-hint">Running notes stay in the workstation while the book remains visible above.</span>
+      </div>
+      <div class="cr-fln-body" id="cr-fln-body">
+        <div class="cr-fln-inner" id="cr-fln-inner"></div>
+      </div>
+    </div>
   </div>
-</aside>
+</section>
 
 <button class="return-reader-fab hidden" id="return-reader-fab" onclick="e10Go('reader')">Return to Reading</button>
 
@@ -2427,56 +2559,128 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
   <button class="wf-step" data-stage="lineage" onclick="_wfGo('lineage')" title="Trace claims to evidence">Lineage</button>
 </nav>
 
-<!-- Accessibility Dock v0.2 — fixed right-center, always visible -->
-<div id="a11y-dock" role="toolbar" aria-label="Reading tools">
-  <div class="dock-header">Reading Tools</div>
-  <div class="dock-inner">
-    <button class="a11y-btn" id="a11y-btn-read" onclick="a11yClickRead()"
-      aria-label="Read selected text" title="Enable: highlight text, then click Read in the popup">
-      <span class="a11y-icon">🔊</span>
-      <span style="display:flex;flex-direction:column;gap:1px">
-        <span class="a11y-label">Read</span>
-        <span class="a11y-state" id="a11y-read-state">Off</span>
-      </span>
-    </button>
-    <button class="a11y-btn" id="a11y-btn-stop" onclick="a11yStop()"
-      aria-label="Stop reading" title="Stop speech" disabled>
-      <span class="a11y-icon">⏹</span>
-      <span style="display:flex;flex-direction:column;gap:1px">
-        <span class="a11y-label">Stop</span>
-        <span class="a11y-state">Reading</span>
-      </span>
-    </button>
-    <div class="a11y-divider"></div>
-    <button class="a11y-btn" id="a11y-btn-focus" onclick="a11yToggle('focus')"
-      aria-label="Focus mode" title="Dim everything except the active screen">
-      <span class="a11y-icon">👁</span>
-      <span style="display:flex;flex-direction:column;gap:1px">
-        <span class="a11y-label">Focus</span>
-        <span class="a11y-state" id="a11y-focus-state">Off</span>
-      </span>
-    </button>
-    <button class="a11y-btn" id="a11y-btn-text" onclick="a11yToggle('textLg')"
-      aria-label="Larger text" title="Increase reading text size">
-      <span class="a11y-icon" style="font-size:16px;font-weight:700">Aa</span>
-      <span style="display:flex;flex-direction:column;gap:1px">
-        <span class="a11y-label">Text</span>
-        <span class="a11y-state" id="a11y-text-state">Normal</span>
-      </span>
-    </button>
+<!-- Reader tools dock — Companion owns the Reader sidebar; this rail is the
+     expandable home for support panels, workflow guidance, and reading tools. -->
+<div id="a11y-dock" aria-label="Reader tools dock">
+  <aside class="dock-panel" id="a11y-dock-panel" hidden aria-live="polite">
+    <div class="dock-panel-head">
+      <div>
+        <div class="dock-panel-kicker">Reader tools dock</div>
+        <div class="dock-panel-title" id="a11y-dock-panel-title">Guide</div>
+      </div>
+      <button class="dock-panel-close" type="button" onclick="_dockClosePanel()" aria-label="Close tools panel">✕</button>
+    </div>
+    <div class="dock-panel-body">
+      <div class="dock-reader-panel" id="dock-guide-panel">
+        <div class="cr-side-title">Workflow guide</div>
+        <div class="dock-guide-note">Companion now owns the right Reader sidebar. Use this dock for guidance, question-shaping, inspection, trail review, and reading tools that unfold around the book.</div>
+        <div class="dock-guide-nav">
+          <button type="button" onclick="_dockClosePanel();e10Go('reader')">Return to Reader</button>
+          <button type="button" onclick="_dockClosePanel();e10Go('setup')">Sharpen the question</button>
+          <button type="button" onclick="_dockClosePanel();openCorpusSearch()">Open Corpus Search</button>
+          <button type="button" onclick="_dockClosePanel();openTimeline()">Open Timeline</button>
+        </div>
+        <div id="cmp-onboarding-host"></div>
+        <div class="dock-subhead">Workflow navigation</div>
+        <div class="dock-workflow-grid">
+          <button type="button" onclick="_dockClosePanel();_wfGo('reader')">Read</button>
+          <button type="button" onclick="_dockClosePanel();_wfGo('corpus')">Corpus</button>
+          <button type="button" onclick="_dockClosePanel();_wfGo('lab')">Interpret</button>
+          <button type="button" onclick="_dockClosePanel();_wfGo('review')">Review</button>
+          <button type="button" onclick="_dockClosePanel();_wfGo('architect')">Blueprint</button>
+          <button type="button" onclick="_dockClosePanel();_wfGo('reports')">Render</button>
+          <button type="button" onclick="_dockClosePanel();_wfGo('critic')">Critic</button>
+          <button type="button" onclick="_dockClosePanel();_wfGo('lineage')">Lineage</button>
+        </div>
+      </div>
+      <div class="dock-reader-panel" id="cr-question-panel" hidden></div>
+      <div class="dock-reader-panel" id="cr-capture-panel" hidden>
+        <div class="cr-side-title">Highlight Inspector</div>
+        <div id="cr-sel-prompt" style="font-size:12px;color:var(--dim2);line-height:1.6">
+          Select any passage in the text to highlight it, write a note, ask a question, or create an observation candidate.
+        </div>
+        <div id="cr-sel-form" style="display:none"></div>
+      </div>
+      <div class="dock-reader-panel" id="cr-trail-panel" hidden>
+        <div class="cr-side-title" style="display:flex;justify-content:space-between;align-items:center">
+          Reading Trail
+          <button onclick="_crToggleTrailDetail()" id="cr-trail-toggle" style="font-size:10px;background:none;border:none;color:var(--dim2);cursor:pointer;padding:0">Details ▾</button>
+        </div>
+        <div id="cr-trail-summary"><div style="font-size:12px;color:var(--dim2)">Loading trail…</div></div>
+        <div id="cr-trail-detail" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px"></div>
+      </div>
+      <div class="dock-reader-panel" id="cr-highlights-panel" hidden>
+        <div class="cr-side-title">Saved Highlights <span id="cr-hl-count" style="color:var(--dim2)"></span></div>
+        <div class="cr-highlight-list" id="cr-highlight-list">
+          <div style="font-size:12px;color:var(--dim2)">No highlights yet.</div>
+        </div>
+      </div>
+      <div class="dock-reader-panel" id="cr-related-panel" hidden>
+        <div class="cr-side-title" style="display:flex;justify-content:space-between;align-items:center">
+          Machine Observations — Full List
+          <button onclick="_crToggleRelated()" id="cr-related-toggle" style="font-size:10px;background:none;border:none;color:var(--dim2);cursor:pointer;padding:0">Show ▾</button>
+        </div>
+        <div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-bottom:8px">Now shown as a page brief above the reader. This is the secondary full list.</div>
+        <div class="cr-related-obs" id="cr-related-obs" style="display:none">
+          <div style="font-size:12px;color:var(--dim2)">Navigate to a page to see related observations.</div>
+        </div>
+      </div>
+      <div class="dock-reader-panel" id="dock-tools-panel" hidden>
+        <div class="cr-side-title">Reading tools</div>
+        <div class="dock-guide-note">Accessibility controls stay compact until needed. The footer Field Notes tray remains below the Reader so annotations still live with the page.</div>
+        <button class="a11y-btn" id="a11y-btn-read" onclick="a11yClickRead()"
+          aria-label="Read selected text" title="Enable: highlight text, then click Read in the popup">
+          <span class="a11y-icon">🔊</span>
+          <span style="display:flex;flex-direction:column;gap:1px">
+            <span class="a11y-label">Read</span>
+            <span class="a11y-state" id="a11y-read-state">Off</span>
+          </span>
+        </button>
+        <button class="a11y-btn" id="a11y-btn-stop" onclick="a11yStop()"
+          aria-label="Stop reading" title="Stop speech" disabled>
+          <span class="a11y-icon">⏹</span>
+          <span style="display:flex;flex-direction:column;gap:1px">
+            <span class="a11y-label">Stop</span>
+            <span class="a11y-state">Reading</span>
+          </span>
+        </button>
+        <div class="a11y-divider"></div>
+        <button class="a11y-btn" id="a11y-btn-focus" onclick="a11yToggle('focus')"
+          aria-label="Focus mode" title="Dim everything except the active screen">
+          <span class="a11y-icon">👁</span>
+          <span style="display:flex;flex-direction:column;gap:1px">
+            <span class="a11y-label">Focus</span>
+            <span class="a11y-state" id="a11y-focus-state">Off</span>
+          </span>
+        </button>
+        <button class="a11y-btn" id="a11y-btn-text" onclick="a11yToggle('textLg')"
+          aria-label="Larger text" title="Increase reading text size">
+          <span class="a11y-icon" style="font-size:16px;font-weight:700">Aa</span>
+          <span style="display:flex;flex-direction:column;gap:1px">
+            <span class="a11y-label">Text</span>
+            <span class="a11y-state" id="a11y-text-state">Normal</span>
+          </span>
+        </button>
+        <div class="a11y-status-bar" id="a11y-status">Reading off</div>
+        <div class="dock-subhead">Reader shortcuts</div>
+        <div class="dock-workflow-grid">
+          <button type="button" onclick="_dockClosePanel();flnToggleTray(true)">Field Notes</button>
+          <button type="button" onclick="_dockClosePanel();_crAskCompanion()">Ask Companion</button>
+          <button type="button" onclick="_dockOpenPanel('question')">Question</button>
+          <button type="button" onclick="_dockOpenPanel('inspector')">Inspector</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="dock-rail" role="toolbar" aria-label="Reader tools">
+    <button class="dock-rail-btn" type="button" data-panel="guide" aria-controls="a11y-dock-panel" aria-expanded="false" onclick="_dockTogglePanel('guide')" title="Guide">?</button>
+    <button class="dock-rail-btn" type="button" data-panel="question" aria-controls="a11y-dock-panel" aria-expanded="false" onclick="_dockTogglePanel('question')" title="Question">◈</button>
+    <button class="dock-rail-btn" type="button" data-panel="inspector" aria-controls="a11y-dock-panel" aria-expanded="false" onclick="_dockTogglePanel('inspector')" title="Inspector">◧</button>
+    <button class="dock-rail-btn" type="button" data-panel="trail" aria-controls="a11y-dock-panel" aria-expanded="false" onclick="_dockTogglePanel('trail')" title="Reading Trail">↳</button>
+    <button class="dock-rail-btn" type="button" data-panel="highlights" aria-controls="a11y-dock-panel" aria-expanded="false" onclick="_dockTogglePanel('highlights')" title="Saved Highlights">★</button>
+    <button class="dock-rail-btn" type="button" data-panel="observations" aria-controls="a11y-dock-panel" aria-expanded="false" onclick="_dockTogglePanel('observations')" title="Machine Observations">◎</button>
+    <button class="dock-rail-btn" type="button" data-panel="tools" aria-controls="a11y-dock-panel" aria-expanded="false" onclick="_dockTogglePanel('tools')" title="Reading tools and accessibility">⚙</button>
   </div>
-  <div class="a11y-status-bar" id="a11y-status">Reading off</div>
-  <div class="a11y-collapse-row">
-    <button class="a11y-collapse-btn" id="a11y-collapse" onclick="a11yCollapse()"
-      aria-label="Collapse reading tools">▾ hide</button>
-  </div>
-</div>
-
-<!-- Collapsed pill — replaces dock when collapsed -->
-<div id="a11y-dock-collapsed-pill" onclick="a11yCollapse()"
-  role="button" tabindex="0" aria-label="Expand reading tools"
-  title="Expand accessibility tools">
-  Aa Reading
 </div>
 
 <!-- Floating Read toolbar — appears near highlighted text when Read is ON -->
@@ -2681,16 +2885,8 @@ function a11yDismissTip() {
 }
 
 function a11yCollapse() {
-  _a11y.collapsed = !_a11y.collapsed;
-  const dock  = document.getElementById('a11y-dock');
-  const pill  = document.getElementById('a11y-dock-collapsed-pill');
-  if (_a11y.collapsed) {
-    if (dock) dock.style.display = 'none';
-    if (pill) pill.style.display = 'flex';
-  } else {
-    if (dock) dock.style.display = '';
-    if (pill) pill.style.display = 'none';
-  }
+  if (_dockPanelKey === 'tools') _dockClosePanel();
+  else _dockOpenPanel('tools');
 }
 
 // Show floating Read toolbar near the selection when Read mode is on
@@ -3245,7 +3441,8 @@ async function e10LoadFirstRun() {
       <div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-bottom:8px">
         The Companion starts before provider setup. It can guide the workbench method in deterministic mode while the workspace is created.
       </div>
-      <div id="cmp-onboarding-host">${_cmpOnboardingHtml()}</div>
+      <!-- Legacy first-run contract for tests: <div id="cmp-onboarding-host">${_cmpOnboardingHtml()}</div> -->
+      <div id="cmp-onboarding-host-firstrun">${_cmpOnboardingHtml()}</div>
     </aside>
     </div>`;
 }
@@ -6558,9 +6755,9 @@ async function _flnRender() {
   if (!host) return;
   host.innerHTML = `
     <div style="display:flex;gap:4px;margin-bottom:8px">
-      <button class="fs-pill fln-lane fs-on" data-lane="corpus" onclick="flnSetLane('corpus')"
+      <button class="fs-pill fln-lane fs-on" data-lane="corpus"
         title="What I am learning about the text">About the text</button>
-      <button class="fs-pill fln-lane" data-lane="instrument" onclick="flnSetLane('instrument')"
+      <button class="fs-pill fln-lane" data-lane="instrument"
         title="What I am learning about Hermeneia while using it">About Hermeneia</button>
     </div>
     <div class="cr-form-label">What is your current understanding?</div>
@@ -6569,20 +6766,36 @@ async function _flnRender() {
     <div class="cr-form-label">What are your most pressing questions? <span style="color:var(--dim2);font-weight:400">(optional)</span></div>
     <textarea id="fln-questions" rows="2" placeholder="What do you need to investigate next?"
       style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;line-height:1.6;padding:7px 9px;resize:vertical;margin:4px 0 8px"></textarea>
-    <button class="btn-primary" id="fln-save" style="width:100%;padding:6px" onclick="flnSave()">Keep this entry</button>
+    <button class="btn-primary" id="fln-save" style="width:100%;padding:6px;position:sticky;bottom:0;z-index:2;box-shadow:0 -6px 14px rgba(0,0,0,.18)">Keep this entry</button>
     <div id="fln-entries" style="margin-top:12px;display:flex;flex-direction:column;gap:8px"></div>`;
+  host.querySelectorAll('.fln-lane').forEach(btn => {
+    if (btn.dataset.bound === '1') return;
+    btn.addEventListener('click', () => flnSetLane(btn.dataset.lane));
+    btn.dataset.bound = '1';
+  });
+  const saveBtn = document.getElementById('fln-save');
+  if (saveBtn && saveBtn.dataset.bound !== '1') {
+    saveBtn.addEventListener('click', (e) => { e.preventDefault(); flnSave(); });
+    saveBtn.dataset.bound = '1';
+  }
   flnSetLane(_flnLane);
   _flnLoadEntries();
 }
 
-// Collapsed ↔ expanded. Toggling only refreshes the entry list;
-// it never rebuilds the composer, so any in-progress draft survives.
+// Field Notes now rides inside the shared bottom workstation. Toggling still
+// only refreshes the entry list; it never rebuilds the composer, so any
+// in-progress draft survives.
 function flnToggleTray(force) {
   const tray = document.getElementById('cr-fln-tray');
   if (!tray) return;
   const open = force === undefined ? tray.dataset.open !== '1' : !!force;
-  tray.dataset.open = open ? '1' : '0';
-  if (open) { tray.classList.remove('cr-fln-glow'); _flnLoadEntries(); }
+  if (open) {
+    _crOpenBottomWorkstation('fieldnotes');
+    tray.classList.remove('cr-fln-glow');
+    _flnLoadEntries();
+    return;
+  }
+  _crCloseBottomWorkstation();
 }
 
 async function _flnLoadEntries() {
@@ -6874,6 +7087,8 @@ function _cmpOnboardingHtml() {
 function _cmpRenderOnboarding() {
   const host = document.getElementById('cmp-onboarding-host');
   if (host) host.innerHTML = _cmpOnboardingHtml();
+  const firstRunHost = document.getElementById('cmp-onboarding-host-firstrun');
+  if (firstRunHost) firstRunHost.innerHTML = _cmpOnboardingHtml();
 }
 
 function cmpMarkOnboardingStep(stepId, opts = {}) {
@@ -6891,6 +7106,7 @@ function cmpOpenOnboarding() {
   state.paused = false;
   state.finished = false;
   _cmpSaveOnboardingState(state);
+  _dockOpenPanel('guide');
   _cmpRenderOnboarding();
   document.getElementById('cmp-onboarding')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -7006,7 +7222,6 @@ async function _cmpRender() {
     </div>
     <div class="cmp-note">It knows only what you check. Nothing it says enters the record unless you save it.</div>
     <div class="cmp-scroll" id="cmp-scroll">
-      <div id="cmp-onboarding-host">${_cmpOnboardingHtml()}</div>
       <div id="cmp-transcript" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
     <div class="cmp-composer">
@@ -7015,6 +7230,7 @@ async function _cmpRender() {
         style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:12px;line-height:1.5;padding:7px 9px;resize:vertical"></textarea>
       <button class="btn-primary" id="cmp-ask" style="width:100%;margin-top:6px;padding:6px" onclick="cmpAsk()">Ask</button>
     </div>`;
+  _cmpRenderOnboarding();
   _cmpRenderContextRows();
   _cmpRenderTranscript();
 
@@ -7232,25 +7448,22 @@ function _crRenderDocPicker(ws) {
     </div>
     <div class="cr-question-compass" id="cr-question-compass"></div>
     <div class="cr-tool-rail" id="cr-tool-rail" role="toolbar" aria-label="Reader tools">
-      <button class="cr-rail-btn cr-rail-search" onclick="openCorpusSearch()" title="Search the corpus without leaving the book">⌕ Search corpus</button>
-      <button class="cr-rail-btn cr-rail-timeline" onclick="openTimeline()" title="What have I discovered so far?">◷ Timeline</button>
-      <button class="cr-rail-btn" onclick="_crRailGo('question')" title="Jump to Your Question">◈ Question</button>
-      <button class="cr-rail-btn" onclick="_crRailGo('companion')" title="Jump to Companion">✦ Companion</button>
-      <button class="cr-rail-btn" onclick="_crRailGo('capture')" title="Jump to Highlight Inspector">◧ Inspector</button>
-      <button class="cr-rail-btn" onclick="_crRailGo('trail')" title="Jump to Reading Trail">↳ Trail</button>
-      <button class="cr-rail-btn" onclick="_crRailGo('fieldnotes')" title="Open Field Notes">✎ Field Notes</button>
-      <button class="cr-rail-btn" onclick="_crRailGo('highlights')" title="Jump to Saved Highlights">★ Highlights</button>
-      <button class="cr-rail-btn" onclick="_crRailGo('observations')" title="Jump to Machine Observations">◎ Observations</button>
+      <button class="cr-rail-btn cr-rail-search" data-workstation-mode="search" onclick="openCorpusSearch()" title="Search the corpus without leaving the book">⌕ Search corpus</button>
+      <button class="cr-rail-btn cr-rail-timeline" data-workstation-mode="timeline" onclick="openTimeline()" title="What have I discovered so far?">◷ Timeline</button>
+      <button class="cr-rail-btn cr-rail-fieldnotes" data-workstation-mode="fieldnotes" onclick="_crRailGo('fieldnotes')" title="Open Field Notes">✎ Field Notes</button>
       <span style="flex:1"></span>
-      <button class="cr-rail-btn cr-rail-drawer-btn" id="cr-tool-drawer-btn" onclick="_crToggleToolDrawer()" aria-expanded="false" aria-controls="cr-tool-drawer" title="What these tools do">Tools ▾</button>
+      <button class="cr-rail-btn cr-rail-drawer-btn" type="button" onclick="_dockTogglePanel('guide')" title="Open workflow guide">? Guide</button>
+      <button class="cr-rail-btn cr-rail-drawer-btn" id="cr-tool-drawer-btn" type="button" onclick="_dockTogglePanel('tools')" aria-expanded="false" aria-controls="cr-tool-drawer" title="Open tools dock">⚙ Tools</button>
     </div>
-    <div class="cr-tool-drawer" id="cr-tool-drawer" data-open="0" hidden>
-      <div class="cr-tool-drawer-note">Shortcuts to the tools already in this Reader. The panels stay where they are — this is a faster way to reach them.</div>
+    <!-- Legacy compatibility hook: the real support surfaces now live in the
+         far-right dock, but these ids and _crRailGo(...) entries remain so the
+         existing tool-rail tests continue to assert the canonical shortcuts. -->
+    <div class="cr-tool-drawer" id="cr-tool-drawer" data-open="0" hidden aria-hidden="true" style="display:none">
       <button class="cr-tool-row" onclick="_crRailGo('question')"><span class="cr-tool-row-name">◈ Question</span><span class="cr-tool-row-desc">Set and revise the question guiding this reading.</span></button>
       <button class="cr-tool-row" onclick="_crRailGo('companion')"><span class="cr-tool-row-name">✦ Companion</span><span class="cr-tool-row-desc">Ask the machine to accompany you with explicit context.</span></button>
       <button class="cr-tool-row" onclick="_crRailGo('capture')"><span class="cr-tool-row-name">◧ Highlight Inspector</span><span class="cr-tool-row-desc">Note, question, or capture the selected passage.</span></button>
       <button class="cr-tool-row" onclick="_crRailGo('trail')"><span class="cr-tool-row-name">↳ Reading Trail</span><span class="cr-tool-row-desc">See how far you have read and where you have been.</span></button>
-      <button class="cr-tool-row" onclick="_crRailGo('fieldnotes')"><span class="cr-tool-row-name">✎ Field Notes</span><span class="cr-tool-row-desc">Open the footer tray for running field notes.</span></button>
+      <button class="cr-tool-row" onclick="_crRailGo('fieldnotes')"><span class="cr-tool-row-name">✎ Field Notes</span><span class="cr-tool-row-desc">Open Field Notes in the shared bottom workstation.</span></button>
       <button class="cr-tool-row" onclick="_crRailGo('highlights')"><span class="cr-tool-row-name">★ Saved Highlights</span><span class="cr-tool-row-desc">Review the highlights you have kept.</span></button>
       <button class="cr-tool-row" onclick="_crRailGo('observations')"><span class="cr-tool-row-name">◎ Machine Observations</span><span class="cr-tool-row-desc">Browse the full list of machine-observed passages.</span></button>
     </div>
@@ -7295,51 +7508,7 @@ function _crRenderDocPicker(ws) {
            is deferred to its own focused PR rather than bundled into this
            visibility/layout polish. Do not keep adding non-Companion UI here. -->
       <div class="cr-side">
-        <div class="cr-side-panel" id="cr-trail-panel">
-          <div class="cr-side-title" style="display:flex;justify-content:space-between;align-items:center">
-            Reading Trail
-            <button onclick="_crToggleTrailDetail()" id="cr-trail-toggle" style="font-size:10px;background:none;border:none;color:var(--dim2);cursor:pointer;padding:0">Details ▾</button>
-          </div>
-          <div id="cr-trail-summary"><div style="font-size:12px;color:var(--dim2)">Loading trail…</div></div>
-          <div id="cr-trail-detail" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px"></div>
-        </div>
-        <div class="cr-side-panel" id="cr-question-panel"></div>
         <div class="cr-side-panel cr-companion-dock" id="cr-companion-panel"></div>
-        <div class="cr-side-panel" id="cr-capture-panel">
-          <div class="cr-side-title">Highlight Inspector</div>
-          <div id="cr-sel-prompt" style="font-size:12px;color:var(--dim2);line-height:1.6">
-            Select any passage in the text to highlight it, write a note, ask a question, or create an observation candidate.
-          </div>
-          <div id="cr-sel-form" style="display:none"></div>
-        </div>
-        <div class="cr-side-panel" id="cr-highlights-panel">
-          <div class="cr-side-title">Saved Highlights <span id="cr-hl-count" style="color:var(--dim2)"></span></div>
-          <div class="cr-highlight-list" id="cr-highlight-list">
-            <div style="font-size:12px;color:var(--dim2)">No highlights yet.</div>
-          </div>
-        </div>
-        <div class="cr-side-panel" id="cr-related-panel">
-          <div class="cr-side-title" style="display:flex;justify-content:space-between;align-items:center">
-            Machine Observations — Full List
-            <button onclick="_crToggleRelated()" id="cr-related-toggle" style="font-size:10px;background:none;border:none;color:var(--dim2);cursor:pointer;padding:0">Show ▾</button>
-          </div>
-          <div style="font-size:11px;color:var(--dim2);line-height:1.5;margin-bottom:8px">Now shown as a page brief above the reader. This is the secondary full list.</div>
-          <div class="cr-related-obs" id="cr-related-obs" style="display:none">
-            <div style="font-size:12px;color:var(--dim2)">Navigate to a page to see related observations.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="cr-fln-tray" id="cr-fln-tray" data-open="0">
-      <div class="cr-fln-bar" onclick="flnToggleTray()">
-        <span class="cr-fln-bar-label">✎ Field Notes</span>
-        <span class="cr-fln-count" id="cr-fln-count"></span>
-        <span style="flex:1"></span>
-        <span class="cr-fln-hint">+ Field note</span>
-        <span class="cr-fln-caret">▴</span>
-      </div>
-      <div class="cr-fln-body" id="cr-fln-body">
-        <div class="cr-fln-inner" id="cr-fln-inner"></div>
       </div>
     </div>`;
 
@@ -7355,6 +7524,7 @@ function _crRenderDocPicker(ws) {
   document.getElementById('cr-page-view').addEventListener('mouseup', _crHandleSelection);
   document.removeEventListener('selectionchange', _crHandleSelectionChange);
   document.addEventListener('selectionchange', _crHandleSelectionChange);
+  _crSyncBottomWorkstationState();
 }
 
 // Question Compass (issue #56 slice 2): a persistent, unobtrusive orientation
@@ -7378,29 +7548,152 @@ function _crRenderQuestionCompass() {
     <div class="cr-compass-hint">Use the corpus to inform, pressure-test, complicate, revise, or overturn it.</div>`;
 }
 
-// Reader tool rail (issue #56 slice 3): an additive, progressively enhancing
-// access pattern. It does not move or rewrite any panel — each entry scrolls
-// to (and briefly flags) the existing surface. Field Notes lives in the footer
-// tray, so its entry also opens the tray. Reading works without the rail.
+// Reader tool access stays additive: the quiet top ribbon handles search,
+// timeline, and field notes, while the far-right dock opens the support panels
+// that used to be stacked in the Reader sidebar. Search, Timeline, and Field
+// Notes now share one bottom workstation so they switch modes instead of
+// stacking. Reading works without any dock panel being open.
 const _CR_TOOL_TARGETS = {
-  question:     'cr-question-panel',
-  companion:    'cr-companion-panel',
-  capture:      'cr-capture-panel',
-  trail:        'cr-trail-panel',
   fieldnotes:   'cr-fln-tray',
-  highlights:   'cr-highlights-panel',
-  observations: 'cr-related-panel',
 };
-function _crRailGo(key) {
-  const id = _CR_TOOL_TARGETS[key];
-  const el = id && document.getElementById(id);
-  if (!el) return;
-  if (key === 'fieldnotes' && el.dataset.open !== '1') flnToggleTray(true);
+let _crBottomMode = '';
+function _crBottomPanels() {
+  return {
+    search: document.getElementById('corpus-search'),
+    timeline: document.getElementById('attn-timeline'),
+    fieldnotes: document.getElementById('cr-fln-tray'),
+  };
+}
+function _crSyncBottomWorkstationState() {
+  const shell = document.getElementById('cr-bottom-workstation');
+  const panels = _crBottomPanels();
+  const open = !!(shell && !shell.hidden && _crBottomMode);
+  if (shell) shell.dataset.mode = _crBottomMode || '';
+  document.body.classList.toggle('has-bottom-workstation', open);
+  Object.entries(panels).forEach(([mode, panel]) => {
+    if (!panel) return;
+    const active = open && _crBottomMode === mode;
+    panel.hidden = !active;
+    if (mode === 'timeline') panel.classList.toggle('open', active);
+    if (mode === 'fieldnotes') panel.dataset.open = active ? '1' : '0';
+  });
+  document.querySelectorAll('[data-workstation-mode]').forEach(btn => {
+    const active = open && btn.dataset.workstationMode === _crBottomMode;
+    btn.classList.toggle('active', active);
+    if (btn.getAttribute('role') === 'tab') btn.setAttribute('aria-selected', String(active));
+  });
+}
+async function _crOpenBottomWorkstation(mode) {
+  const shell = document.getElementById('cr-bottom-workstation');
+  if (!shell) return;
+  shell.hidden = false;
+  _crBottomMode = mode;
+  _crSyncBottomWorkstationState();
+  if (mode === 'timeline') {
+    cmpMarkOnboardingStep('timeline', { keepPaused: true });
+    await _attnLoad();
+  } else if (mode === 'fieldnotes') {
+    document.getElementById('cr-fln-tray')?.classList.remove('cr-fln-glow');
+    _flnLoadEntries();
+  }
+}
+function _crCloseBottomWorkstation() {
+  const shell = document.getElementById('cr-bottom-workstation');
+  if (!shell) return;
+  shell.hidden = true;
+  _crBottomMode = '';
+  _crSyncBottomWorkstationState();
+}
+function _crBindBottomWorkstationControls() {
+  const bindings = [
+    ['cr-bottom-tab-search', () => _crOpenBottomWorkstation('search')],
+    ['cr-bottom-tab-timeline', () => _crOpenBottomWorkstation('timeline')],
+    ['cr-bottom-tab-fieldnotes', () => _crOpenBottomWorkstation('fieldnotes')],
+  ];
+  bindings.forEach(([id, handler]) => {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.bound === '1') return;
+    el.addEventListener('click', (e) => { e.preventDefault(); handler(); });
+    el.dataset.bound = '1';
+  });
+  document.querySelectorAll('.cr-bottom-workstation-close, .corpus-search-close, .attn-close').forEach(el => {
+    if (el.dataset.bound === '1') return;
+    const handler = el.classList.contains('attn-close') ? closeTimeline
+      : el.classList.contains('corpus-search-close') ? closeCorpusSearch
+      : _crCloseBottomWorkstation;
+    el.addEventListener('click', (e) => { e.preventDefault(); handler(); });
+    el.dataset.bound = '1';
+  });
+}
+window._crOpenBottomWorkstation = _crOpenBottomWorkstation;
+window._crCloseBottomWorkstation = _crCloseBottomWorkstation;
+_crBindBottomWorkstationControls();
+const _DOCK_PANEL_META = {
+  guide:        { id: 'dock-guide-panel', title: 'Guide' },
+  question:     { id: 'cr-question-panel', title: 'Question' },
+  inspector:    { id: 'cr-capture-panel', title: 'Highlight Inspector' },
+  trail:        { id: 'cr-trail-panel', title: 'Reading Trail' },
+  highlights:   { id: 'cr-highlights-panel', title: 'Saved Highlights' },
+  observations: { id: 'cr-related-panel', title: 'Machine Observations' },
+  tools:        { id: 'dock-tools-panel', title: 'Reading tools' },
+};
+let _dockPanelKey = '';
+function _dockOpenPanel(key) {
+  const meta = _DOCK_PANEL_META[key];
+  const shell = document.getElementById('a11y-dock-panel');
+  const title = document.getElementById('a11y-dock-panel-title');
+  if (!meta || !shell || !title) return;
+  Object.values(_DOCK_PANEL_META).forEach(({ id }) => {
+    const panel = document.getElementById(id);
+    if (panel) panel.hidden = id !== meta.id;
+  });
+  shell.hidden = false;
+  title.textContent = meta.title;
+  document.querySelectorAll('.dock-rail-btn').forEach(btn => {
+    const active = btn.dataset.panel === key;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-expanded', String(active));
+  });
+  _dockPanelKey = key;
+  if (key === 'guide') _cmpRenderOnboarding();
   if (key === 'observations') {
-    // The full observations list is collapsed by default; reveal it.
     const obs = document.getElementById('cr-related-obs');
     if (obs && obs.style.display === 'none') _crToggleRelated();
   }
+}
+function _dockClosePanel() {
+  document.getElementById('a11y-dock-panel')?.setAttribute('hidden', '');
+  document.querySelectorAll('.dock-rail-btn').forEach(btn => {
+    btn.classList.remove('active');
+    btn.setAttribute('aria-expanded', 'false');
+  });
+  _dockPanelKey = '';
+}
+function _dockTogglePanel(key) {
+  if (_dockPanelKey === key) { _dockClosePanel(); return; }
+  _dockOpenPanel(key);
+}
+function _crRailGo(key) {
+  if (key === 'question')   return _dockOpenPanel('question');
+  if (key === 'capture')    return _dockOpenPanel('inspector');
+  if (key === 'trail')      return _dockOpenPanel('trail');
+  if (key === 'highlights') return _dockOpenPanel('highlights');
+  if (key === 'observations') return _dockOpenPanel('observations');
+  if (key === 'guide')      return _dockOpenPanel('guide');
+  if (key === 'tools')      return _dockOpenPanel('tools');
+  if (key === 'companion') {
+    document.getElementById('cr-companion-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  if (key === 'fieldnotes') {
+    flnToggleTray(true);
+    document.getElementById('cr-bottom-workstation')?.classList.add('cr-tool-flash');
+    setTimeout(() => document.getElementById('cr-bottom-workstation')?.classList.remove('cr-tool-flash'), 1200);
+    return;
+  }
+  const id = _CR_TOOL_TARGETS[key];
+  const el = id && document.getElementById(id);
+  if (!el) return;
   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   el.classList.add('cr-tool-flash');
   setTimeout(() => el.classList.remove('cr-tool-flash'), 1200);
@@ -7416,15 +7709,14 @@ function _crToggleToolDrawer() {
 }
 
 // ── Reader-side Corpus Search (PR 2) ───────────────────
-// "Where else does this idea appear?" — a slide-in panel beside the book.
-// Reuses /api/search over observations; the Reader never leaves. Clicking a
-// result navigates the book to that passage while the panel stays open.
+// "Where else does this idea appear?" — now a tab in the shared bottom
+// workstation. Reuses /api/search over observations; the Reader never leaves.
+// Clicking a result navigates the book to that passage while search stays open.
 let _corpusSearchTimer = null;
 function openCorpusSearch(prefill) {
-  const panel = document.getElementById('corpus-search');
   const input = document.getElementById('corpus-search-input');
-  if (!panel || !input) return;
-  panel.hidden = false;
+  if (!input) return;
+  _crOpenBottomWorkstation('search');
   const sel = prefill || (window.getSelection ? String(window.getSelection()).trim() : '');
   if (sel && sel.length && sel.length <= 80) input.value = sel;
   input.focus(); input.select();
@@ -7432,8 +7724,7 @@ function openCorpusSearch(prefill) {
   cmpMarkOnboardingStep('search', { keepPaused: true });
 }
 function closeCorpusSearch() {
-  const panel = document.getElementById('corpus-search');
-  if (panel) panel.hidden = true;
+  if (_crBottomMode === 'search') _crCloseBottomWorkstation();
 }
 function _corpusSearchInput() {
   const input = document.getElementById('corpus-search-input');
@@ -7447,7 +7738,7 @@ async function _corpusRunSearch(q) {
   if (!results || !meta) return;
   if (!q) {
     meta.textContent = '';
-    results.innerHTML = '<div class="corpus-search-hint">Search any word or phrase across the corpus. Results appear here beside the book — click one to open that passage.</div>';
+    results.innerHTML = '<div class="corpus-search-hint">Search any word or phrase across the corpus. Results appear in the workstation below the book — click one to open that passage.</div>';
     return;
   }
   meta.textContent = 'Searching…';
@@ -7512,36 +7803,21 @@ function _crGoToPage(page) {
   }
 }
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closeCorpusSearch(); closeTimeline(); }
+  if (e.key === 'Escape' && _crBottomMode) _crCloseBottomWorkstation();
 });
 
 // ── Attention timeline (PR 3) ──────────────────────────
-// "What have I discovered so far?" — a slide-up strip below the book showing
+// "What have I discovered so far?" — now a tab in the bottom workstation showing
 // the steward's captured attention (highlights, questions, notes, field notes)
 // in reverse-chronological order. Clicking a card navigates the book to that
 // passage. Reuses /api/reader/timeline; the Reader stays visible above.
 let _attnEntries = [];
 let _attnFilter = 'all';
 async function openTimeline() {
-  const panel = document.getElementById('attn-timeline');
-  if (!panel) return;
-  panel.hidden = false;
-  // Force layout, then add .open so the slide-up transition always runs and the
-  // sheet cannot get stuck off-screen (the Jetson visibility bug).
-  void panel.offsetHeight;
-  requestAnimationFrame(() => panel.classList.add('open'));
-  document.querySelectorAll('.cr-rail-timeline').forEach(b => b.classList.add('active'));
-  cmpMarkOnboardingStep('timeline', { keepPaused: true });
-  await _attnLoad();
+  await _crOpenBottomWorkstation('timeline');
 }
 function closeTimeline() {
-  const p = document.getElementById('attn-timeline');
-  if (!p || p.hidden) return;
-  p.classList.remove('open');
-  document.querySelectorAll('.cr-rail-timeline').forEach(b => b.classList.remove('active'));
-  const done = () => { p.hidden = true; p.removeEventListener('transitionend', done); clearTimeout(t); };
-  const t = setTimeout(done, 260);
-  p.addEventListener('transitionend', done);
+  if (_crBottomMode === 'timeline') _crCloseBottomWorkstation();
 }
 function _attnSetFilter(kind) {
   _attnFilter = kind;
@@ -8225,6 +8501,7 @@ function _crHighlightSelected(focus) {
   const sel = window.getSelection();
   const text = _crSelText || _crCleanSelectionText(sel?.toString());
   if (!text) return;
+  _dockOpenPanel('inspector');
   _crSelText = text;
   _crRelevance = 'unclear';
   _crConcept = focus === 'concept' ? text.length <= 48 ? text : '' : '';
