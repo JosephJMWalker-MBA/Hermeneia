@@ -25,6 +25,7 @@ def test_companion_response_actions_prefill_editable_field_notes_without_saving(
 
     html = INDEX.read_text()
     use_response = _extract_fn(html, "cmpUseResponse")
+    attribution = _extract_fn(html, "_cmpAttribution")
     assert "flnSave" not in use_response
     assert "fetch(" not in use_response
 
@@ -39,10 +40,11 @@ def test_companion_response_actions_prefill_editable_field_notes_without_saving(
         "const _cmpTranscript=["
         "{role:'user',text:'Explain this page.'},"
         "{role:'companion',text:'A provisional explanation.\\n\\nWhat changes next?',"
-        "provider:'Stub (no AI)',context_used:[]}];\n"
+        "provider:'Claude',model:'anthropic/claude',context_used:[]}];\n"
         "let lane='instrument';let trayOpen=false;\n"
         "function flnSetLane(value){lane=value;}\n"
         "function flnToggleTray(value){trayOpen=value;}\n"
+        + attribution
         + use_response
         + "cmpUseResponse(1,'understanding');\n"
         + "const first={understanding:understanding.value,focused:understanding.focused,"
@@ -61,18 +63,20 @@ def test_companion_response_actions_prefill_editable_field_notes_without_saving(
 
     assert result.returncode == 0, result.stderr
     behavior = json.loads(result.stdout)
-    response = "A provisional explanation.\n\nWhat changes next?"
+    # Brought in as an attributed quotation naming the model — honest authorship.
+    quoted = ('Companion — Claude (anthropic/claude) said:\n'
+              '"A provisional explanation.\n\nWhat changes next?"')
     assert behavior["first"] == {
-        "understanding": f"My existing draft.\n\n{response}",
+        "understanding": f"My existing draft.\n\n{quoted}",
         "focused": True,
-        "selection": [len(f"My existing draft.\n\n{response}")] * 2,
+        "selection": [len(f"My existing draft.\n\n{quoted}")] * 2,
         "lane": "corpus",
         "trayOpen": True,
     }
     assert behavior["second"] == {
-        "questions": response,
+        "questions": quoted,
         "focused": True,
-        "selection": [len(response)] * 2,
+        "selection": [len(quoted)] * 2,
         "lane": "corpus",
         "trayOpen": True,
     }
@@ -101,8 +105,9 @@ def test_stub_response_gets_actions_but_error_message_does_not():
         "const document={getElementById(id){return id==='cmp-transcript'?host:null;}};\n"
         "const _cmpBusy=false;\n"
         "const _cmpTranscript=["
-        "{role:'companion',text:'Local provisional reply.',provider:'Stub (no AI)',context_used:[]},"
+        "{role:'companion',text:'Local provisional reply.',provider:'Claude',model:'anthropic/claude',context_used:[]},"
         "{role:'companion',text:'Provider failed.',provider:'error',context_used:[]}];\n"
+        + _extract_fn(html, "_cmpAttribution")
         + _extract_fn(html, "_cmpRenderTranscript")
         + "_cmpRenderTranscript();\n"
         + "process.stdout.write(host.innerHTML);\n"
@@ -117,5 +122,6 @@ def test_stub_response_gets_actions_but_error_message_does_not():
     assert result.returncode == 0, result.stderr
     assert result.stdout.count("Use this response") == 1
     assert result.stdout.count("Add to current understanding") == 1
-    assert "Stub (no AI)" in result.stdout
+    # The transcript names the model that produced the reply.
+    assert "Claude (anthropic/claude)" in result.stdout
     assert "Provider failed." in result.stdout

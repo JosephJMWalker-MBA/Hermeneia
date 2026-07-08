@@ -1168,8 +1168,8 @@ body.reader-active .cr-tool-drawer { max-width: none; }
   background: none; border: 1px solid var(--border); color: var(--dim2);
 }
 .cr-bottom-workstation-body { flex: 1; min-height: 0; }
-body.has-workflow-rail.has-bottom-workstation { padding-bottom: 392px; }
-body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 352px; }
+body.has-workflow-rail.has-bottom-workstation { padding-bottom: 392px; --reader-bottom-inset: 412px; }
+body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 352px; --reader-bottom-inset: 372px; }
 
 /* Search Corpus lives inside the shared workstation. */
 .corpus-search {
@@ -1528,7 +1528,12 @@ body.has-workflow-rail { padding-bottom: 40px; }
    reachable without scrolling past the conversation. */
 .cr-companion-dock {
   display: flex; flex-direction: column;
-  height: min(64vh, 600px);
+  /* Fill the screen from the sticky top offset down to just above the fixed
+     bottom rail / workstation, so the thread gets the full height and the
+     composer sits anchored near the bottom of the screen. --reader-bottom-inset
+     grows when those fixed surfaces reserve space (set on <body> below). */
+  height: calc(100vh - 72px - var(--reader-bottom-inset, 52px));
+  min-height: 260px;
 }
 .cr-companion-dock:empty { height: auto; display: block; }
 .cmp-note { font-size: 11px; color: var(--dim2); margin-bottom: 8px; }
@@ -7275,7 +7280,7 @@ function _cmpRenderTranscript() {
     : `<div style="font-size:12px;color:var(--fg2);line-height:1.6;background:var(--bg);border-radius:var(--r);padding:8px 10px">
          ${x(m.text)}
          <div style="font-size:10px;color:var(--dim2);margin-top:6px;border-top:1px solid var(--border);padding-top:5px">
-           ${x(m.provider)} · context used: ${m.context_used?.length ? m.context_used.map(c => x(c.summary)).join(' · ') : 'none'}
+           ${x(_cmpAttribution(m))} · context used: ${m.context_used?.length ? m.context_used.map(c => x(c.summary)).join(' · ') : 'none'}
          </div>
          ${m.provider !== 'error' ? `
            <div style="margin-top:7px;border-top:1px solid var(--border);padding-top:6px">
@@ -7292,6 +7297,16 @@ function _cmpRenderTranscript() {
   scroller.scrollTop = scroller.scrollHeight;
 }
 
+// Honest authorship: a Companion response is a machine's words, so name the
+// model that produced it. "Claude (anthropic/claude)" — falls back to the
+// provider label alone when no concrete model is known (e.g. the stub).
+function _cmpAttribution(message) {
+  const provider = String(message?.provider || 'Companion');
+  const model = String(message?.model || '').trim();
+  return model && model.toLowerCase() !== provider.toLowerCase()
+    ? `${provider} (${model})` : provider;
+}
+
 function cmpUseResponse(index, target) {
   const message = _cmpTranscript[index];
   if (!message || message.role !== 'companion' || message.provider === 'error') return;
@@ -7302,8 +7317,10 @@ function cmpUseResponse(index, target) {
   const field = document.getElementById(fieldId);
   const text = String(message.text || '').trim();
   if (!field || !text) return;
+  // Bring it in as an attributed quotation, not as the reader's own words.
+  const quoted = `Companion — ${_cmpAttribution(message)} said:\n"${text}"`;
   const existing = field.value;
-  field.value = existing.trim() ? `${existing}\n\n${text}` : text;
+  field.value = existing.trim() ? `${existing}\n\n${quoted}` : quoted;
   flnSetLane('corpus');
   flnToggleTray(true);
   field.focus();
@@ -7334,7 +7351,7 @@ async function cmpAsk() {
     });
     const d = await resp.json();
     if (!resp.ok) throw new Error(d.error || 'Companion unavailable');
-    _cmpTranscript.push({ role: 'companion', text: d.reply, provider: d.provider, context_used: d.context_used });
+    _cmpTranscript.push({ role: 'companion', text: d.reply, provider: d.provider, model: d.model, context_used: d.context_used });
   } catch (e) {
     _cmpTranscript.push({ role: 'companion', text: `⚠ ${e.message}`, provider: 'error', context_used: [] });
   }
