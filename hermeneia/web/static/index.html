@@ -1168,6 +1168,19 @@ body.reader-active .cr-tool-drawer { max-width: none; }
   background: none; border: 1px solid var(--border); color: var(--dim2);
 }
 .cr-bottom-workstation-body { flex: 1; min-height: 0; }
+/* Render Preview — Blueprint as an evidence-backed essay skeleton. */
+.cr-render-doc { max-width: 780px; }
+.cr-render-kicker { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim2); font-weight: 700; }
+.cr-render-plan-badge { text-transform: none; letter-spacing: 0; margin-left: 8px; font-size: 10px; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 20px; padding: 0 8px; }
+.cr-render-title { font-size: 18px; font-weight: 700; color: var(--fg); line-height: 1.35; margin-top: 3px; }
+.cr-render-thesis { font-size: 14px; color: var(--fg2); line-height: 1.55; margin-top: 3px; }
+.cr-render-audit-line { font-size: 12px; color: var(--dim2); margin-top: 10px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--r); background: color-mix(in srgb, var(--surface) 55%, transparent); }
+.cr-render-claim { margin-top: 10px; border-left: 2px solid var(--border2); padding-left: 12px; }
+.cr-render-claim-head { font-size: 14px; color: var(--fg); line-height: 1.5; }
+.cr-render-claim-n { color: var(--dim2); font-size: 12px; margin-right: 4px; }
+.cr-render-evidence { margin-top: 6px; font-size: 12px; color: var(--fg2); line-height: 1.5; background: var(--bg); border-radius: var(--r); padding: 6px 9px; }
+.cr-render-evidence-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim2); display: block; margin-bottom: 2px; }
+.cr-render-gap { margin-top: 6px; font-size: 12px; color: #e0a800; line-height: 1.5; }
 body.has-workflow-rail.has-bottom-workstation { padding-bottom: 392px; --reader-bottom-inset: 412px; }
 body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 352px; --reader-bottom-inset: 372px; }
 
@@ -2478,6 +2491,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-timeline" data-workstation-mode="timeline" type="button" role="tab" aria-controls="attn-timeline" aria-selected="false" onclick="_crOpenBottomWorkstation('timeline')">Timeline</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-fieldnotes" data-workstation-mode="fieldnotes" type="button" role="tab" aria-controls="cr-fln-tray" aria-selected="false" onclick="_crOpenBottomWorkstation('fieldnotes')">Field Notes</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-blueprint" data-workstation-mode="blueprint" type="button" role="tab" aria-controls="cr-blueprint-draft" aria-selected="false" onclick="_crOpenBottomWorkstation('blueprint')">Blueprint</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-render" data-workstation-mode="render" type="button" role="tab" aria-controls="cr-render-preview" aria-selected="false" onclick="_crOpenBottomWorkstation('render')">Render</button>
     </div>
     <button class="cr-bottom-workstation-close" type="button" onclick="_crCloseBottomWorkstation()" aria-label="Collapse bottom workstation">Collapse</button>
   </div>
@@ -2545,6 +2559,20 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
           <button class="btn-primary" id="cr-blueprint-btn" onclick="_crDraftBlueprint(false)">Draft Blueprint</button>
         </div>
         <div id="cr-blueprint-proposal" style="display:none"></div>
+      </div>
+    </aside>
+
+    <aside class="cr-render-preview" id="cr-render-preview" hidden aria-label="Render preview — Blueprint as an essay skeleton">
+      <div class="cr-fln-bar">
+        <span class="cr-fln-bar-label">▤ Render Preview</span>
+        <span class="cr-fln-count" id="cr-render-audit"></span>
+        <span style="flex:1"></span>
+        <select class="ob-extract-provider" id="cr-render-select" style="max-width:260px" onchange="_crRenderBlueprintSkeleton(this.value)"></select>
+        <button class="cr-bottom-workstation-tab" id="cr-render-copy" type="button" onclick="_crCopyRenderSkeleton()" style="margin-left:8px">Copy skeleton</button>
+      </div>
+      <div class="cr-fln-body">
+        <div class="cr-fln-hint" style="margin-bottom:8px">A structure, not a draft — the argument's shape and where its evidence is (or isn't) yet. Nothing here is generated prose.</div>
+        <div id="cr-render-body"></div>
       </div>
     </aside>
   </div>
@@ -7596,6 +7624,7 @@ function _crBottomPanels() {
     timeline: document.getElementById('attn-timeline'),
     fieldnotes: document.getElementById('cr-fln-tray'),
     blueprint: document.getElementById('cr-blueprint-draft'),
+    render: document.getElementById('cr-render-preview'),
   };
 }
 function _crSyncBottomWorkstationState() {
@@ -7631,6 +7660,8 @@ async function _crOpenBottomWorkstation(mode) {
     _flnLoadEntries();
   } else if (mode === 'blueprint') {
     _crLoadBlueprintDraft();
+  } else if (mode === 'render') {
+    _crLoadRenderPreview();
   }
 }
 function _crCloseBottomWorkstation() {
@@ -7744,6 +7775,7 @@ async function _crDraftBlueprint(save) {
       propEl.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(data.error || 'Draft failed')}</div>`;
       return;
     }
+    if (data.blueprint_id) _crActiveBlueprintId = data.blueprint_id;
     const bp = data.proposed_blueprint;
     const sections = (bp.sections || []).map((s, i) =>
       `<div class="ob-extract-section"><span style="color:var(--dim2);font-size:11px;margin-right:6px">${i+1}.</span>${x(s.claim)}</div>`
@@ -7763,7 +7795,8 @@ async function _crDraftBlueprint(save) {
         </div>
         ${data.blueprint_id ? `
         <div class="ob-extract-actions">
-          <button class="btn-primary" onclick="e10Go('architect')">View in Architect →</button>
+          <button class="btn-primary" onclick="_crOpenBottomWorkstation('render')">See it as a skeleton →</button>
+          <button class="btn-trace" onclick="e10Go('architect')">View in Architect →</button>
         </div>` : `
         <div class="ob-extract-actions">
           <button class="btn-primary" onclick="_crDraftBlueprint(true)">Ratify &amp; Save Blueprint →</button>
@@ -7779,12 +7812,159 @@ async function _crDraftBlueprint(save) {
 window._crLoadBlueprintDraft = _crLoadBlueprintDraft;
 window._crDraftBlueprint = _crDraftBlueprint;
 
+// ── Render Preview (bottom workstation "Render" tab) ─────────────────────
+// A saved Blueprint shown as an evidence-backed essay skeleton: title, thesis,
+// the claim sequence, the evidence linked under each claim, and honest warnings
+// where a claim has none. Structure + lineage + gaps — NOT generated prose, no
+// Artist call. Reuses the read-only /api/architect/blueprints endpoints.
+let _crActiveBlueprintId = '';
+let _crRenderSkeleton = null;   // last rendered {title, thesis, claims[]} for copy/export
+
+async function _crLoadRenderPreview() {
+  const sel = document.getElementById('cr-render-select');
+  const body = document.getElementById('cr-render-body');
+  const audit = document.getElementById('cr-render-audit');
+  if (!body) return;
+  let list = [];
+  try {
+    const d = await get('/api/architect/blueprints');
+    list = (d.blueprints || []);
+  } catch (e) {
+    body.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(e.message)}</div>`;
+    return;
+  }
+  if (!list.length) {
+    _crRenderSkeleton = null;
+    if (sel) sel.innerHTML = '';
+    if (audit) audit.textContent = '';
+    body.innerHTML = `<div style="font-size:12px;color:var(--dim2);line-height:1.5">No Blueprint yet. Draft one in the Blueprint tab, then return here to see its skeleton.</div>`;
+    return;
+  }
+  // Most recent first (list is ordered by created_at ascending).
+  const ordered = list.slice().reverse();
+  const active = ordered.some(b => b.id === _crActiveBlueprintId) ? _crActiveBlueprintId : ordered[0].id;
+  if (sel) {
+    sel.innerHTML = ordered.map(b =>
+      `<option value="${x(b.id)}">${x((b.title || 'Untitled').slice(0, 60))}</option>`).join('');
+    sel.value = active;
+  }
+  await _crRenderBlueprintSkeleton(active);
+}
+
+async function _crRenderBlueprintSkeleton(id) {
+  const body = document.getElementById('cr-render-body');
+  const audit = document.getElementById('cr-render-audit');
+  if (!body || !id) return;
+  _crActiveBlueprintId = id;
+  let data;
+  try {
+    data = await get(`/api/architect/blueprints/${encodeURIComponent(id)}`);
+  } catch (e) {
+    body.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(e.message)}</div>`;
+    return;
+  }
+  // The detail endpoint returns a flat object (title/thesis/sections/obs_texts/
+  // interp_texts/architect_plan), not nested under a `blueprint` key.
+  const bp = data || {};
+  const sections = Array.isArray(bp.sections) ? bp.sections : [];
+  const obsTexts = bp.obs_texts || {};
+  const interpTexts = bp.interp_texts || {};
+
+  const claims = sections.map((sec, i) => {
+    const evidence = [];
+    (sec.supporting_observations || []).forEach(oid => {
+      const o = obsTexts[oid];
+      if (o) evidence.push({ kind: 'observation', text: o.text || '', loc: o.source_locator || (o.page != null ? `p.${o.page}` : '') });
+    });
+    (sec.supporting_interpretations || []).forEach(iid => {
+      const it = interpTexts[iid];
+      if (it) evidence.push({ kind: 'interpretation', text: it.text || '', loc: it.perspective || '' });
+    });
+    return { n: i + 1, claim: sec.claim || '', evidence };
+  });
+
+  const supported = claims.filter(c => c.evidence.length > 0).length;
+  const unsupported = claims.filter(c => c.evidence.length === 0).map(c => c.n);
+  _crRenderSkeleton = { title: bp.title || 'Untitled', thesis: bp.thesis || '', claims };
+
+  if (audit) {
+    audit.textContent = `· ${supported} of ${claims.length} claim${claims.length === 1 ? '' : 's'} with evidence`;
+  }
+
+  const claimHtml = claims.map(c => {
+    const ev = c.evidence.length
+      ? c.evidence.map(e => `
+          <div class="cr-render-evidence">
+            <span class="cr-render-evidence-kind">${x(e.kind)}${e.loc ? ` · ${x(e.loc)}` : ''}</span>
+            <div>${x((e.text || '').slice(0, 240))}${(e.text || '').length > 240 ? '…' : ''}</div>
+          </div>`).join('')
+      : `<div class="cr-render-gap">⚠ No evidence linked yet — this claim is unsupported.</div>`;
+    return `
+      <div class="cr-render-claim">
+        <div class="cr-render-claim-head"><span class="cr-render-claim-n">${c.n}.</span> ${x(c.claim)}</div>
+        ${ev}
+      </div>`;
+  }).join('');
+
+  const planNote = data.architect_plan
+    ? `<span class="cr-render-plan-badge">Architect plan compiled</span>` : '';
+  const auditLine = unsupported.length
+    ? `<div class="cr-render-audit-line">Evidence audit: ${supported}/${claims.length} claims supported. Unsupported: ${unsupported.map(n => `#${n}`).join(', ')}.</div>`
+    : `<div class="cr-render-audit-line">Evidence audit: every claim has at least one piece of linked evidence.</div>`;
+
+  body.innerHTML = `
+    <div class="cr-render-doc">
+      <div class="cr-render-kicker">Working title ${planNote}</div>
+      <div class="cr-render-title">${x(bp.title || 'Untitled')}</div>
+      <div class="cr-render-kicker" style="margin-top:10px">Thesis</div>
+      <div class="cr-render-thesis">${x(bp.thesis || '—')}</div>
+      ${auditLine}
+      <div class="cr-render-kicker" style="margin-top:12px">Claim sequence</div>
+      ${claimHtml || '<div style="font-size:12px;color:var(--dim2)">This Blueprint has no claims.</div>'}
+    </div>`;
+}
+
+function _crRenderSkeletonMarkdown() {
+  const s = _crRenderSkeleton;
+  if (!s) return '';
+  const lines = [`# ${s.title}`, '', `**Thesis:** ${s.thesis}`, ''];
+  s.claims.forEach(c => {
+    lines.push(`${c.n}. ${c.claim}`);
+    if (c.evidence.length) {
+      c.evidence.forEach(e => lines.push(`   - (${e.kind}${e.loc ? `, ${e.loc}` : ''}) ${e.text}`));
+    } else {
+      lines.push('   - ⚠ unsupported — no evidence linked yet');
+    }
+    lines.push('');
+  });
+  return lines.join('\n').trim();
+}
+
+async function _crCopyRenderSkeleton() {
+  const md = _crRenderSkeletonMarkdown();
+  if (!md) return;
+  try {
+    await navigator.clipboard.writeText(md);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = md; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch {}
+    ta.remove();
+  }
+  const btn = document.getElementById('cr-render-copy');
+  if (btn) { const t = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = t; }, 1200); }
+}
+window._crLoadRenderPreview = _crLoadRenderPreview;
+window._crRenderBlueprintSkeleton = _crRenderBlueprintSkeleton;
+window._crCopyRenderSkeleton = _crCopyRenderSkeleton;
+
 function _crBindBottomWorkstationControls() {
   const bindings = [
     ['cr-bottom-tab-search', () => _crOpenBottomWorkstation('search')],
     ['cr-bottom-tab-timeline', () => _crOpenBottomWorkstation('timeline')],
     ['cr-bottom-tab-fieldnotes', () => _crOpenBottomWorkstation('fieldnotes')],
     ['cr-bottom-tab-blueprint', () => _crOpenBottomWorkstation('blueprint')],
+    ['cr-bottom-tab-render', () => _crOpenBottomWorkstation('render')],
   ];
   bindings.forEach(([id, handler]) => {
     const el = document.getElementById(id);
