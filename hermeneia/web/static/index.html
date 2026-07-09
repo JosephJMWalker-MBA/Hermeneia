@@ -1181,6 +1181,18 @@ body.reader-active .cr-tool-drawer { max-width: none; }
 .cr-render-evidence { margin-top: 6px; font-size: 12px; color: var(--fg2); line-height: 1.5; background: var(--bg); border-radius: var(--r); padding: 6px 9px; }
 .cr-render-evidence-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim2); display: block; margin-bottom: 2px; }
 .cr-render-gap { margin-top: 6px; font-size: 12px; color: #e0a800; line-height: 1.5; }
+/* Critic audit — structural verdict pills + repair actions. */
+.cr-audit-row { display: flex; align-items: baseline; gap: 8px; margin-top: 8px; font-size: 13px; color: var(--fg2); }
+.cr-audit-row-label { font-size: 11px; color: var(--dim2); min-width: 150px; }
+.cr-audit-pill { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; padding: 1px 9px; border-radius: 20px; border: 1px solid var(--border2); }
+.cr-audit-pill.strong { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, transparent); background: color-mix(in srgb, var(--green) 12%, transparent); }
+.cr-audit-pill.partial { color: #e0a800; border-color: color-mix(in srgb, #e0a800 45%, transparent); background: color-mix(in srgb, #e0a800 12%, transparent); }
+.cr-audit-pill.weak, .cr-audit-pill.none { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, transparent); background: color-mix(in srgb, var(--red) 12%, transparent); }
+.cr-audit-section { margin-top: 14px; }
+.cr-audit-section-title { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim2); font-weight: 700; margin-bottom: 5px; }
+.cr-audit-item { font-size: 12px; color: var(--fg2); line-height: 1.5; padding: 3px 0; }
+.cr-audit-action { font-size: 13px; color: var(--fg); line-height: 1.5; padding: 5px 10px; border-left: 2px solid var(--accent); background: color-mix(in srgb, var(--surface) 55%, transparent); margin-top: 6px; }
+.cr-audit-clean { font-size: 12px; color: var(--green); line-height: 1.5; }
 body.has-workflow-rail.has-bottom-workstation { padding-bottom: 392px; --reader-bottom-inset: 412px; }
 body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 352px; --reader-bottom-inset: 372px; }
 
@@ -2492,6 +2504,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-fieldnotes" data-workstation-mode="fieldnotes" type="button" role="tab" aria-controls="cr-fln-tray" aria-selected="false" onclick="_crOpenBottomWorkstation('fieldnotes')">Field Notes</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-blueprint" data-workstation-mode="blueprint" type="button" role="tab" aria-controls="cr-blueprint-draft" aria-selected="false" onclick="_crOpenBottomWorkstation('blueprint')">Blueprint</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-render" data-workstation-mode="render" type="button" role="tab" aria-controls="cr-render-preview" aria-selected="false" onclick="_crOpenBottomWorkstation('render')">Render</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-critic" data-workstation-mode="critic" type="button" role="tab" aria-controls="cr-critic-audit" aria-selected="false" onclick="_crOpenBottomWorkstation('critic')">Critic</button>
     </div>
     <button class="cr-bottom-workstation-close" type="button" onclick="_crCloseBottomWorkstation()" aria-label="Collapse bottom workstation">Collapse</button>
   </div>
@@ -2573,6 +2586,19 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       <div class="cr-fln-body">
         <div class="cr-fln-hint" style="margin-bottom:8px">A structure, not a draft — the argument's shape and where its evidence is (or isn't) yet. Nothing here is generated prose.</div>
         <div id="cr-render-body"></div>
+      </div>
+    </aside>
+
+    <aside class="cr-critic-audit" id="cr-critic-audit" hidden aria-label="Critic — does this skeleton preserve the thesis and evidence?">
+      <div class="cr-fln-bar">
+        <span class="cr-fln-bar-label">⚖ Critic</span>
+        <span class="cr-fln-count" id="cr-critic-summary"></span>
+        <span style="flex:1"></span>
+        <select class="ob-extract-provider" id="cr-critic-select" style="max-width:260px" onchange="_crAuditBlueprint(this.value)"></select>
+      </div>
+      <div class="cr-fln-body">
+        <div class="cr-fln-hint" style="margin-bottom:8px">Structural signals from evidence links and shared terms — a prompt to look, not a verdict. No prose is judged here.</div>
+        <div id="cr-critic-body"></div>
       </div>
     </aside>
   </div>
@@ -7625,6 +7651,7 @@ function _crBottomPanels() {
     fieldnotes: document.getElementById('cr-fln-tray'),
     blueprint: document.getElementById('cr-blueprint-draft'),
     render: document.getElementById('cr-render-preview'),
+    critic: document.getElementById('cr-critic-audit'),
   };
 }
 function _crSyncBottomWorkstationState() {
@@ -7662,6 +7689,8 @@ async function _crOpenBottomWorkstation(mode) {
     _crLoadBlueprintDraft();
   } else if (mode === 'render') {
     _crLoadRenderPreview();
+  } else if (mode === 'critic') {
+    _crLoadCriticAudit();
   }
 }
 function _crCloseBottomWorkstation() {
@@ -7851,25 +7880,16 @@ async function _crLoadRenderPreview() {
   await _crRenderBlueprintSkeleton(active);
 }
 
-async function _crRenderBlueprintSkeleton(id) {
-  const body = document.getElementById('cr-render-body');
-  const audit = document.getElementById('cr-render-audit');
-  if (!body || !id) return;
-  _crActiveBlueprintId = id;
-  let data;
-  try {
-    data = await get(`/api/architect/blueprints/${encodeURIComponent(id)}`);
-  } catch (e) {
-    body.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(e.message)}</div>`;
-    return;
-  }
-  // The detail endpoint returns a flat object (title/thesis/sections/obs_texts/
-  // interp_texts/architect_plan), not nested under a `blueprint` key.
+// Fetch a saved Blueprint and assemble it into the shared skeleton shape used by
+// both the Render Preview and the Critic audit — one source of truth. The detail
+// endpoint returns a flat object (title/thesis/sections/obs_texts/interp_texts/
+// architect_plan), not nested under a `blueprint` key.
+async function _crFetchSkeleton(id) {
+  const data = await get(`/api/architect/blueprints/${encodeURIComponent(id)}`);
   const bp = data || {};
   const sections = Array.isArray(bp.sections) ? bp.sections : [];
   const obsTexts = bp.obs_texts || {};
   const interpTexts = bp.interp_texts || {};
-
   const claims = sections.map((sec, i) => {
     const evidence = [];
     (sec.supporting_observations || []).forEach(oid => {
@@ -7882,10 +7902,27 @@ async function _crRenderBlueprintSkeleton(id) {
     });
     return { n: i + 1, claim: sec.claim || '', evidence };
   });
+  return { id, title: bp.title || 'Untitled', thesis: bp.thesis || '', claims, hasPlan: !!bp.architect_plan };
+}
+
+async function _crRenderBlueprintSkeleton(id) {
+  const body = document.getElementById('cr-render-body');
+  const audit = document.getElementById('cr-render-audit');
+  if (!body || !id) return;
+  _crActiveBlueprintId = id;
+  let skeleton;
+  try {
+    skeleton = await _crFetchSkeleton(id);
+  } catch (e) {
+    body.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(e.message)}</div>`;
+    return;
+  }
+  const bp = skeleton;
+  const claims = skeleton.claims;
 
   const supported = claims.filter(c => c.evidence.length > 0).length;
   const unsupported = claims.filter(c => c.evidence.length === 0).map(c => c.n);
-  _crRenderSkeleton = { title: bp.title || 'Untitled', thesis: bp.thesis || '', claims };
+  _crRenderSkeleton = { title: bp.title, thesis: bp.thesis, claims };
 
   if (audit) {
     audit.textContent = `· ${supported} of ${claims.length} claim${claims.length === 1 ? '' : 's'} with evidence`;
@@ -7906,7 +7943,7 @@ async function _crRenderBlueprintSkeleton(id) {
       </div>`;
   }).join('');
 
-  const planNote = data.architect_plan
+  const planNote = bp.hasPlan
     ? `<span class="cr-render-plan-badge">Architect plan compiled</span>` : '';
   const auditLine = unsupported.length
     ? `<div class="cr-render-audit-line">Evidence audit: ${supported}/${claims.length} claims supported. Unsupported: ${unsupported.map(n => `#${n}`).join(', ')}.</div>`
@@ -7958,6 +7995,161 @@ window._crLoadRenderPreview = _crLoadRenderPreview;
 window._crRenderBlueprintSkeleton = _crRenderBlueprintSkeleton;
 window._crCopyRenderSkeleton = _crCopyRenderSkeleton;
 
+// ── Critic Preview (bottom workstation "Critic" tab) ─────────────────────
+// Audits the current skeleton against the governing question, the Blueprint
+// thesis, and its linked evidence — BEFORE any prose exists. Deterministic and
+// client-side: every signal (grounding, drift) is a transparent structural
+// check (evidence links / shared terms), never a hidden AI judgment. No Artist,
+// no LLM, no generated prose. Voice/witness fidelity (#93) is a later layer.
+const _CR_AUDIT_STOPWORDS = new Set(['the','and','that','this','these','those','with','from','into','than','then','they','them','their','there','here','have','has','had','been','being','were','was','are','will','shall','would','should','could','can','may','might','must','not','but','for','nor','yet','out','off','over','under','through','between','among','while','about','above','below','also','such','some','any','each','both','all','only','own','same','other','one','two','does','did','done','how','what','which','who','whom','when','where','why','because','so','if','it','its','his','her','she','you','your','our','we','he']);
+function _crSignificantTerms(text) {
+  const out = new Set();
+  String(text || '').toLowerCase().split(/[^a-z]+/).forEach(w => {
+    if (w.length >= 4 && !_CR_AUDIT_STOPWORDS.has(w)) out.add(w);
+  });
+  return out;
+}
+function _crTermOverlap(a, b) {
+  let n = 0; a.forEach(t => { if (b.has(t)) n++; }); return n;
+}
+// Pure: given a shared skeleton + governing question, return the structural audit.
+function _crComputeAudit(skeleton, governingQuestion) {
+  const claims = (skeleton && skeleton.claims) || [];
+  const thesisTerms = _crSignificantTerms(skeleton && skeleton.thesis);
+  const questionTerms = _crSignificantTerms(governingQuestion);
+
+  const gqShared = [];
+  thesisTerms.forEach(t => { if (questionTerms.has(t)) gqShared.push(t); });
+  let governingAlignment;
+  if (!governingQuestion || questionTerms.size === 0) {
+    governingAlignment = { level: 'none', shared: [], note: 'no governing question set' };
+  } else {
+    const ratio = gqShared.length / questionTerms.size;
+    const level = gqShared.length === 0 ? 'weak' : ratio >= 0.5 ? 'strong' : 'partial';
+    governingAlignment = { level, shared: gqShared, note: '' };
+  }
+
+  const perClaim = claims.map(c => {
+    const terms = _crSignificantTerms(c.claim);
+    return { n: c.n, terms, supported: ((c.evidence || []).length > 0), sharesThesis: _crTermOverlap(terms, thesisTerms) > 0 };
+  });
+
+  const total = perClaim.length;
+  const supported = perClaim.filter(c => c.supported).length;
+  const unsupported = perClaim.filter(c => !c.supported).map(c => c.n);
+  const connected = perClaim.filter(c => c.sharesThesis).length;
+  const drift = perClaim.filter(c => !c.sharesThesis).map(c => c.n);
+
+  let thesisPreservation;
+  if (total === 0 || thesisTerms.size === 0) thesisPreservation = 'weak';
+  else {
+    const ratio = connected / total;
+    thesisPreservation = ratio >= 0.75 ? 'strong' : ratio >= 0.4 ? 'partial' : 'weak';
+  }
+
+  const missingBridge = [];
+  for (let i = 1; i < perClaim.length; i++) {
+    if (_crTermOverlap(perClaim[i - 1].terms, perClaim[i].terms) === 0) {
+      missingBridge.push([perClaim[i - 1].n, perClaim[i].n]);
+    }
+  }
+
+  const readerActions = [];
+  if (unsupported.length) {
+    readerActions.push(unsupported.length === total
+      ? 'Attach evidence to every claim — capture highlights or observations that ground them.'
+      : `Attach evidence to claim${unsupported.length > 1 ? 's' : ''} ${unsupported.map(n => '#' + n).join(', ')} — capture highlights or observations that ground ${unsupported.length > 1 ? 'them' : 'it'}.`);
+  }
+  drift.forEach(n => readerActions.push(`Revisit claim #${n} — it shares no key term with your thesis. Tighten it toward the thesis, or revise the thesis.`));
+  if (governingAlignment.level === 'weak') {
+    readerActions.push('The Blueprint thesis shares no key term with your governing question — check that the Blueprint still answers what you set out to ask.');
+  }
+  missingBridge.forEach(([a, b]) => readerActions.push(`Add connective reasoning between claims #${a} and #${b} — they share no key terms, so the argument may jump.`));
+  if (!readerActions.length) readerActions.push('Structure looks grounded and on-thesis. Next: take it into a draft — carefully.');
+
+  return { total, supported, unsupported, connected, drift, thesisPreservation, governingAlignment, missingBridge, readerActions };
+}
+
+async function _crLoadCriticAudit() {
+  const sel = document.getElementById('cr-critic-select');
+  const body = document.getElementById('cr-critic-body');
+  const summary = document.getElementById('cr-critic-summary');
+  if (!body) return;
+  let list = [];
+  try {
+    const d = await get('/api/architect/blueprints');
+    list = d.blueprints || [];
+  } catch (e) {
+    body.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(e.message)}</div>`;
+    return;
+  }
+  if (!list.length) {
+    if (sel) sel.innerHTML = '';
+    if (summary) summary.textContent = '';
+    body.innerHTML = `<div style="font-size:12px;color:var(--dim2);line-height:1.5">No Blueprint yet. Draft one, then audit its structure here.</div>`;
+    return;
+  }
+  const ordered = list.slice().reverse();
+  const active = ordered.some(b => b.id === _crActiveBlueprintId) ? _crActiveBlueprintId : ordered[0].id;
+  if (sel) {
+    sel.innerHTML = ordered.map(b => `<option value="${x(b.id)}">${x((b.title || 'Untitled').slice(0, 60))}</option>`).join('');
+    sel.value = active;
+  }
+  await _crAuditBlueprint(active);
+}
+
+async function _crAuditBlueprint(id) {
+  const body = document.getElementById('cr-critic-body');
+  const summary = document.getElementById('cr-critic-summary');
+  if (!body || !id) return;
+  _crActiveBlueprintId = id;
+  let skeleton;
+  try {
+    skeleton = await _crFetchSkeleton(id);
+  } catch (e) {
+    body.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(e.message)}</div>`;
+    return;
+  }
+  const audit = _crComputeAudit(skeleton, invLoad()?.thesis || '');
+  if (summary) summary.textContent = `· ${audit.supported}/${audit.total} grounded · thesis ${audit.thesisPreservation}`;
+  _crRenderCriticAudit(audit);
+}
+
+function _crRenderCriticAudit(audit) {
+  const body = document.getElementById('cr-critic-body');
+  if (!body) return;
+  const pill = (level) => `<span class="cr-audit-pill ${x(level)}">${x(level)}</span>`;
+  const section = (title, items) => items.length ? `
+    <div class="cr-audit-section">
+      <div class="cr-audit-section-title">${x(title)}</div>
+      ${items.map(i => `<div class="cr-audit-item">${x(i)}</div>`).join('')}
+    </div>` : '';
+  const groundingLevel = (audit.total > 0 && audit.supported === audit.total) ? 'strong'
+    : audit.supported === 0 ? 'weak' : 'partial';
+  const gqNote = audit.governingAlignment.note
+    ? audit.governingAlignment.note
+    : `${audit.governingAlignment.shared.length} shared term${audit.governingAlignment.shared.length === 1 ? '' : 's'}`;
+  const unsupported = audit.unsupported.length ? [`Claims with no linked evidence: ${audit.unsupported.map(n => '#' + n).join(', ')}.`] : [];
+  const drift = audit.drift.map(n => `Claim #${n} shares no key term with the thesis — possible drift.`);
+  const bridge = audit.missingBridge.map(([a, b]) => `Claims #${a} → #${b} share no key terms — the thread may be missing a bridge.`);
+  body.innerHTML = `
+    <div class="cr-render-doc">
+      <div class="cr-audit-row"><span class="cr-audit-row-label">Thesis preservation</span> ${pill(audit.thesisPreservation)} <span style="font-size:12px;color:var(--dim2)">${audit.connected}/${audit.total} claims connect to the thesis</span></div>
+      <div class="cr-audit-row"><span class="cr-audit-row-label">Governing-question alignment</span> ${pill(audit.governingAlignment.level)} <span style="font-size:12px;color:var(--dim2)">${x(gqNote)}</span></div>
+      <div class="cr-audit-row"><span class="cr-audit-row-label">Evidence grounding</span> ${pill(groundingLevel)} <span style="font-size:12px;color:var(--dim2)">${audit.supported} of ${audit.total} claims supported</span></div>
+      ${section('Unsupported claims', unsupported)}
+      ${section('Drift warnings', drift)}
+      ${section('Missing bridges', bridge)}
+      <div class="cr-audit-section">
+        <div class="cr-audit-section-title">What to fix next</div>
+        ${audit.readerActions.map(a => `<div class="cr-audit-action">${x(a)}</div>`).join('')}
+      </div>
+    </div>`;
+}
+window._crLoadCriticAudit = _crLoadCriticAudit;
+window._crAuditBlueprint = _crAuditBlueprint;
+window._crComputeAudit = _crComputeAudit;
+
 function _crBindBottomWorkstationControls() {
   const bindings = [
     ['cr-bottom-tab-search', () => _crOpenBottomWorkstation('search')],
@@ -7965,6 +8157,7 @@ function _crBindBottomWorkstationControls() {
     ['cr-bottom-tab-fieldnotes', () => _crOpenBottomWorkstation('fieldnotes')],
     ['cr-bottom-tab-blueprint', () => _crOpenBottomWorkstation('blueprint')],
     ['cr-bottom-tab-render', () => _crOpenBottomWorkstation('render')],
+    ['cr-bottom-tab-critic', () => _crOpenBottomWorkstation('critic')],
   ];
   bindings.forEach(([id, handler]) => {
     const el = document.getElementById(id);
