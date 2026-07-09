@@ -315,3 +315,83 @@ def check_profile_fidelity(text: str, profile: dict) -> dict:
         "profile_fidelity_score": score,
         "profile_approved": passed == len(results),  # all checks must pass
     }
+
+
+# ── Witness fidelity (steward-authored voice constraints) ───────────────────────
+# The Reader "Voice" tab captures preserve/avoid phrases into the profile's
+# artist_prompt under fixed labels. These functions read them back and judge a
+# draft against them deterministically — no LLM, no persistence. This is the
+# "did the draft keep the witness?" audit that must run before a draft is saved.
+
+def parse_witness_constraints(artist_prompt: str) -> dict:
+    """Extract preserve/avoid phrases from a composed profile directive.
+
+    The Voice tab writes them under two fixed headers, each followed by '- '
+    bullets and terminated by a blank line. Returns {"preserve": [...],
+    "avoid": [...]}; empty lists for built-in profiles (prose directives).
+    """
+    preserve: list[str] = []
+    avoid: list[str] = []
+    target: list[str] | None = None
+    for raw in str(artist_prompt or "").splitlines():
+        line = raw.strip()
+        if line.startswith("Preserve these phrases"):
+            target = preserve
+            continue
+        if line.startswith("Avoid") and "never do this" in line:
+            target = avoid
+            continue
+        if not line:
+            target = None
+            continue
+        if target is not None:
+            if line.startswith("- "):
+                phrase = line[2:].strip()
+                if phrase:
+                    target.append(phrase)
+            else:
+                target = None  # a non-bullet line ends the section
+    return {"preserve": preserve, "avoid": avoid}
+
+
+def check_witness_fidelity(text: str, profile: dict) -> dict:
+    """Judge a draft against the witness constraints captured in a profile.
+
+    Deterministic and self-contained: preserve/avoid are literal (case-
+    insensitive) phrase checks; ``style`` reuses the built-in expression checks;
+    ``expectations`` is surfaced for human judgment, not auto-scored.
+    """
+    text_lower = str(text or "").lower()
+    constraints = parse_witness_constraints(profile.get("artist_prompt", ""))
+    preserve = [
+        {"phrase": p, "present": p.lower() in text_lower}
+        for p in constraints["preserve"]
+    ]
+    avoid = [
+        {"phrase": p, "present": p.lower() in text_lower}
+        for p in constraints["avoid"]
+    ]
+    missing_preserve = [p["phrase"] for p in preserve if not p["present"]]
+    violations = [a["phrase"] for a in avoid if a["present"]]
+
+    style = check_profile_fidelity(text, profile)
+    style_ok = style.get("profile_approved")  # True / False / None (no checks)
+
+    if violations and missing_preserve:
+        verdict = "weak"
+    elif violations or missing_preserve or style_ok is False:
+        verdict = "partial"
+    else:
+        verdict = "strong"
+
+    return {
+        "profile_name": profile.get("name", profile.get("slug", "")),
+        "profile_slug": profile.get("slug", ""),
+        "preserve": preserve,
+        "avoid": avoid,
+        "missing_preserve": missing_preserve,
+        "violations": violations,
+        "style": style,
+        "expectations": profile.get("critic_expectations") or "",
+        "verdict": verdict,
+    }

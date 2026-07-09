@@ -1245,6 +1245,8 @@ body.reader-active .cr-tool-drawer { max-width: none; }
   background: color-mix(in srgb, var(--surface) 40%, transparent);
   border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px;
 }
+.cr-draft-judge-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.cr-draft-critic-report { border-top: 1px solid var(--border); margin-top: 12px; }
 body.has-workflow-rail.has-bottom-workstation { padding-bottom: 392px; --reader-bottom-inset: 412px; }
 body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 352px; --reader-bottom-inset: 372px; }
 
@@ -8468,10 +8470,20 @@ async function _crPreviewArtistDraft() {
     const d = await resp.json();
     if (!resp.ok) { out.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(d.error || 'preview failed')}</div>`; if (status) status.textContent = '· ✗'; return; }
     const profLabel = d.profile_name ? `${d.profile_name} (${d.profile_slug || ''})` : (d.profile_slug || 'no profile');
+    // Hold the exact previewed draft so the witness critic judges THIS text.
+    _crLastArtistDraft = { text: d.text || '', profileSlug: d.profile_slug || '', profileName: d.profile_name || '' };
+    const canJudge = !!(d.profile_slug);
     out.innerHTML = `
       <div class="cr-draft-preview-banner">◷ Artist draft · preview — not saved, not accepted</div>
       <div class="cr-draft-meta">Voice: <b>${x(profLabel)}</b> · Provider: <b>${x(d.provider)}</b>${d.persisted === false ? ' · nothing was written to the record' : ''}</div>
-      <div class="cr-draft-text">${x(d.text || '')}</div>`;
+      <div class="cr-draft-text">${x(d.text || '')}</div>
+      <div class="cr-draft-judge-row">
+        ${canJudge
+          ? `<button class="cr-bottom-workstation-tab" id="cr-draft-judge-btn" type="button" onclick="_crCheckVoiceFidelity()">⚖ Check against the voice</button>
+             <span class="cr-voice-hint">Judge the draft before you ever save it.</span>`
+          : `<span class="cr-voice-hint">Pick an Expression Profile to check this draft against a voice.</span>`}
+      </div>
+      <div id="cr-draft-critic"></div>`;
     if (status) status.textContent = '· preview (unsaved)';
   } catch (e) {
     out.innerHTML = `<div style="color:#f87171">${x(e.message)}</div>`;
@@ -8480,8 +8492,51 @@ async function _crPreviewArtistDraft() {
     if (btn) { btn.disabled = false; btn.textContent = 'Preview Artist Draft'; }
   }
 }
+// ── Voice/Witness Critic (inside the Draft tab) ──────────────────────────
+// Judge the previewed draft against the ExpressionProfile's witness constraints
+// BEFORE any save. Deterministic: preserve/avoid phrase checks + built-in style
+// checks + surfaced critic_expectations. No LLM, no generation, no persistence.
+let _crLastArtistDraft = null;
+async function _crCheckVoiceFidelity() {
+  const host = document.getElementById('cr-draft-critic');
+  const btn = document.getElementById('cr-draft-judge-btn');
+  if (!host || !_crLastArtistDraft || !_crLastArtistDraft.text || !_crLastArtistDraft.profileSlug) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+  try {
+    const resp = await fetch('/api/critic/voice-preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: _crLastArtistDraft.text, profile_slug: _crLastArtistDraft.profileSlug }),
+    });
+    const r = await resp.json();
+    if (!resp.ok) { host.innerHTML = `<div style="color:#f87171;font-size:13px;margin-top:10px">✗ ${x(r.error || 'check failed')}</div>`; return; }
+    const pill = (lvl) => `<span class="cr-audit-pill ${x(lvl)}">${x(lvl)}</span>`;
+    const preserveRows = (r.preserve || []).map(p =>
+      `<div class="cr-audit-item">${p.present ? '✓' : '⚠'} "${x(p.phrase)}"${p.present ? '' : ' — not found in the draft'}</div>`).join('')
+      || '<div class="cr-audit-item" style="color:var(--dim2)">No preserve phrases were specified.</div>';
+    const avoidRows = (r.avoid || []).map(a =>
+      `<div class="cr-audit-item">${a.present ? '✗' : '✓'} "${x(a.phrase)}"${a.present ? ' — appears in the draft (violation)' : ''}</div>`).join('')
+      || '<div class="cr-audit-item" style="color:var(--dim2)">No avoid phrases were specified.</div>';
+    const styleChecks = (r.style && Array.isArray(r.style.checks) && r.style.checks.length)
+      ? r.style.checks.map(c => `<div class="cr-audit-item">${c.passed ? '✓' : '✗'} ${x(c.expectation || '')}${c.passed ? '' : ` — ${x(c.evidence || '')}`}</div>`).join('')
+      : '<div class="cr-audit-item" style="color:var(--dim2)">No built-in style checks for this profile.</div>';
+    host.innerHTML = `
+      <div class="cr-draft-critic-report">
+        <div class="cr-audit-row" style="margin-top:14px"><span class="cr-audit-row-label">Witness fidelity</span> ${pill(r.verdict)}
+          <span style="font-size:12px;color:var(--dim2)">${(r.violations||[]).length} violation(s) · ${(r.missing_preserve||[]).length} missing</span></div>
+        <div class="cr-audit-section"><div class="cr-audit-section-title">Preserved</div>${preserveRows}</div>
+        <div class="cr-audit-section"><div class="cr-audit-section-title">Avoided</div>${avoidRows}</div>
+        <div class="cr-audit-section"><div class="cr-audit-section-title">Style checks</div>${styleChecks}</div>
+        ${r.expectations ? `<div class="cr-audit-section"><div class="cr-audit-section-title">Expectations — judge these yourself</div><div class="cr-audit-item" style="color:var(--fg2)">${x(r.expectations)}</div><div class="cr-voice-hint">Hermeneia can check phrases; only you can judge whether the witness survived.</div></div>` : ''}
+      </div>`;
+  } catch (e) {
+    host.innerHTML = `<div style="color:#f87171;font-size:13px;margin-top:10px">✗ ${x(e.message)}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⚖ Check against the voice'; }
+  }
+}
 window._crLoadArtistDraft = _crLoadArtistDraft;
 window._crPreviewArtistDraft = _crPreviewArtistDraft;
+window._crCheckVoiceFidelity = _crCheckVoiceFidelity;
 
 function _crBindBottomWorkstationControls() {
   const bindings = [

@@ -5233,6 +5233,41 @@ Return ONLY valid JSON, no markdown, no explanation:
         finally:
             conn.close()
 
+    @app.route("/api/critic/voice-preview", methods=["POST"])
+    def api_critic_voice_preview():
+        """Judge an Artist draft against an ExpressionProfile's witness constraints.
+
+        Body: { text: "<draft>", profile_slug: "<slug>" }
+
+        Deterministic voice/witness audit: preserve/avoid phrase checks + the
+        built-in profile expression checks + surfaced critic_expectations. Reads
+        only; writes nothing. Runs on a previewed (unsaved) draft, before ratify —
+        so discernment comes before persistence.
+        """
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(silent=True) or {}
+        text = str(payload.get("text", "")).strip()
+        profile_slug = str(payload.get("profile_slug", "")).strip()
+        if not text:
+            return jsonify({"error": "text is required"}), 400
+        if not profile_slug:
+            return jsonify({"error": "profile_slug is required"}), 400
+
+        from ..narrative.profiles import get_profile
+        from ..compiler.critic.profile_fidelity import check_witness_fidelity
+
+        conn = _conn()
+        try:
+            profile = get_profile(profile_slug, conn)
+            if profile is None:
+                return jsonify({"error": f"profile '{profile_slug}' not found"}), 404
+            report = check_witness_fidelity(text, dict(profile))
+        finally:
+            conn.close()
+        report.update({"preview": True, "persisted": False})
+        return jsonify(report), 200
+
     @app.route("/api/pipeline/run-artist-all-profiles", methods=["POST"])
     def api_pipeline_run_artist_all_profiles():
         """Render the same ArchitectPlan with every available Expression Profile.
