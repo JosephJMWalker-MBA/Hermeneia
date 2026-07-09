@@ -96,11 +96,16 @@ def render_for_plan(
     model: str | None = None,
     provider_kwargs: dict[str, Any] | None = None,
     recursive: bool = False,
+    persist: bool = True,
 ) -> ArtistRenderResult:
     """Render a RenderedNarrative directly from an ArchitectPlan ID.
 
     Used when the caller has already selected a specific plan (e.g. from the
     Architect blueprint manager) rather than arriving via an OBS-N reference.
+
+    When ``persist`` is False, the narrative is rendered and returned but NOT
+    written to ``rendered_narratives`` — used by the Reader "Preview Artist
+    Draft" surface, which shows a draft without committing it to the record.
     """
     plan = conn.execute(
         "SELECT * FROM architect_plans WHERE id = ?", (plan_id,)
@@ -168,18 +173,19 @@ def render_for_plan(
         "execution_config": json.dumps(execution_config),
         "created_at": execution_ts,
     }
-    conn.execute(
-        """
-        INSERT OR IGNORE INTO rendered_narratives
-            (id, architect_plan_id, provider, expression_profile_id,
-             text, prompt_used, execution_config, created_at)
-        VALUES
-            (:id, :architect_plan_id, :provider, :expression_profile_id,
-             :text, :prompt_used, :execution_config, :created_at)
-        """,
-        row,
-    )
-    conn.commit()
+    if persist:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO rendered_narratives
+                (id, architect_plan_id, provider, expression_profile_id,
+                 text, prompt_used, execution_config, created_at)
+            VALUES
+                (:id, :architect_plan_id, :provider, :expression_profile_id,
+                 :text, :prompt_used, :execution_config, :created_at)
+            """,
+            row,
+        )
+        conn.commit()
 
     return ArtistRenderResult(
         row=row,

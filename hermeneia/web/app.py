@@ -5173,6 +5173,66 @@ Return ONLY valid JSON, no markdown, no explanation:
         finally:
             conn.close()
 
+    @app.route("/api/pipeline/preview-artist", methods=["POST"])
+    def api_pipeline_preview_artist():
+        """Preview an Artist draft WITHOUT persisting it (Reader "Draft" tab).
+
+        Body: { plan_id: "<id>", profile: "<slug>"?, provider: "null"? }
+
+        Renders the ArchitectPlan under the chosen ExpressionProfile and returns
+        the full draft text. Nothing is written to `rendered_narratives`: this is
+        a preview, not an accepted narrative. Provider defaults to the stub
+        ("null") so the preview is safe and free unless a provider is chosen.
+        """
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(silent=True) or {}
+        plan_id = str(payload.get("plan_id", "")).strip()
+        provider = str(payload.get("provider", "null")).strip() or "null"
+        profile = str(payload.get("profile", "")).strip() or None
+        if not plan_id:
+            return jsonify({"error": "plan_id is required"}), 400
+
+        from ..narrative.artist_service import ArtistRenderError, render_for_plan
+        import traceback as _tb
+
+        # Read-only connection: structurally guarantees the preview writes nothing.
+        conn = _conn()
+        try:
+            with runtime_provider_keys_lock:
+                runtime_key = runtime_provider_keys.get(provider)
+            provider_kwargs: dict = {}
+            if runtime_key:
+                provider_kwargs["api_key"] = runtime_key
+            result = render_for_plan(
+                plan_id,
+                conn,
+                provider_name=provider,
+                profile_slug=profile,
+                provider_kwargs=provider_kwargs,
+                persist=False,
+            )
+            prof = result.profile
+            return jsonify({
+                "preview": True,
+                "persisted": False,
+                "plan_id": plan_id,
+                "provider": result.row["provider"],
+                "profile_slug": profile,
+                "profile_name": (prof["name"] if prof else None),
+                "text": result.row["text"],
+            }), 200
+        except ArtistRenderError as exc:
+            return jsonify({"error": str(exc), "error_type": type(exc).__name__}), 400
+        except Exception as exc:
+            return jsonify({
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+                "detail": _tb.format_exc(),
+            }), 500
+        finally:
+            conn.close()
+
     @app.route("/api/pipeline/run-artist-all-profiles", methods=["POST"])
     def api_pipeline_run_artist_all_profiles():
         """Render the same ArchitectPlan with every available Expression Profile.
