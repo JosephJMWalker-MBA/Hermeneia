@@ -1193,6 +1193,36 @@ body.reader-active .cr-tool-drawer { max-width: none; }
 .cr-audit-item { font-size: 12px; color: var(--fg2); line-height: 1.5; padding: 3px 0; }
 .cr-audit-action { font-size: 13px; color: var(--fg); line-height: 1.5; padding: 5px 10px; border-left: 2px solid var(--accent); background: color-mix(in srgb, var(--surface) 55%, transparent); margin-top: 6px; }
 .cr-audit-clean { font-size: 12px; color: var(--green); line-height: 1.5; }
+/* Voice — capture the witness constraints (ExpressionProfile) before drafting. */
+.cr-voice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 720px) { .cr-voice-grid { grid-template-columns: 1fr; } }
+.cr-voice-col { display: flex; flex-direction: column; gap: 10px; }
+.cr-voice-field { display: flex; flex-direction: column; }
+.cr-voice-hint { font-size: 10px; color: var(--dim2); text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 6px; }
+.cr-voice-input, .cr-voice-textarea {
+  width: 100%; box-sizing: border-box; margin-top: 4px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r);
+  color: var(--fg); font: inherit; font-size: 13px; line-height: 1.5; padding: 7px 9px;
+}
+.cr-voice-textarea { resize: vertical; }
+.cr-voice-input:focus, .cr-voice-textarea:focus { outline: none; border-color: var(--accent); }
+.cr-voice-preview-wrap { margin-top: 14px; }
+.cr-voice-preview {
+  margin-top: 4px; white-space: pre-wrap; word-break: break-word;
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  border: 1px solid var(--border); border-left: 2px solid var(--accent); border-radius: var(--r);
+  color: var(--fg2); font-size: 12px; line-height: 1.55; padding: 9px 11px; max-height: 220px; overflow-y: auto;
+}
+.cr-voice-preview:empty::before { content: 'Fill the fields above — the directive the Artist will honor appears here.'; color: var(--dim2); }
+.cr-voice-existing { margin-top: 14px; }
+.cr-voice-profile-item {
+  display: flex; align-items: baseline; gap: 8px; font-size: 12px; color: var(--fg2);
+  padding: 5px 0; border-top: 1px solid var(--border); cursor: pointer;
+}
+.cr-voice-profile-item:hover { color: var(--fg); }
+.cr-voice-profile-name { font-weight: 650; color: var(--fg); }
+.cr-voice-profile-source { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim2); }
+.cr-voice-profile-source.steward { color: var(--accent); }
 body.has-workflow-rail.has-bottom-workstation { padding-bottom: 392px; --reader-bottom-inset: 412px; }
 body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 352px; --reader-bottom-inset: 372px; }
 
@@ -2505,6 +2535,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-blueprint" data-workstation-mode="blueprint" type="button" role="tab" aria-controls="cr-blueprint-draft" aria-selected="false" onclick="_crOpenBottomWorkstation('blueprint')">Blueprint</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-render" data-workstation-mode="render" type="button" role="tab" aria-controls="cr-render-preview" aria-selected="false" onclick="_crOpenBottomWorkstation('render')">Render</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-critic" data-workstation-mode="critic" type="button" role="tab" aria-controls="cr-critic-audit" aria-selected="false" onclick="_crOpenBottomWorkstation('critic')">Critic</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-voice" data-workstation-mode="voice" type="button" role="tab" aria-controls="cr-voice-profile" aria-selected="false" onclick="_crOpenBottomWorkstation('voice')">Voice</button>
     </div>
     <button class="cr-bottom-workstation-close" type="button" onclick="_crCloseBottomWorkstation()" aria-label="Collapse bottom workstation">Collapse</button>
   </div>
@@ -2599,6 +2630,46 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       <div class="cr-fln-body">
         <div class="cr-fln-hint" style="margin-bottom:8px">Structural signals from evidence links and shared terms — a prompt to look, not a verdict. No prose is judged here.</div>
         <div id="cr-critic-body"></div>
+      </div>
+    </aside>
+
+    <aside class="cr-voice-profile" id="cr-voice-profile" hidden aria-label="Voice — capture the witness constraints before any drafting">
+      <div class="cr-fln-bar">
+        <span class="cr-fln-bar-label">◈ Voice</span>
+        <span class="cr-fln-count" id="cr-voice-status"></span>
+        <span style="flex:1"></span>
+        <button class="cr-bottom-workstation-tab" id="cr-voice-save" type="button" onclick="_crSaveVoiceProfile()" style="margin-left:8px">Save as Expression Profile</button>
+      </div>
+      <div class="cr-fln-body">
+        <div class="cr-fln-hint" style="margin-bottom:10px">Capture the witness the future draft must not erase — voice, audience, and the words and moves that may not be flattened into generic prose. Saved as an Expression Profile the Artist and Critic will honor later. No drafting happens here.</div>
+        <div class="cr-voice-grid">
+          <div class="cr-voice-col">
+            <div class="cr-voice-field"><label class="cr-form-label" for="cr-voice-name">Profile name</label>
+              <input id="cr-voice-name" class="cr-voice-input" placeholder="e.g. Field-witness, plain and unhurried" oninput="_crVoiceDraftChanged()"></div>
+            <div class="cr-voice-field"><label class="cr-form-label" for="cr-voice-voice">Voice</label>
+              <input id="cr-voice-voice" class="cr-voice-input" placeholder="e.g. first-person, testimonial, unhurried" oninput="_crVoiceDraftChanged()"></div>
+            <div class="cr-voice-field"><label class="cr-form-label" for="cr-voice-audience">Audience</label>
+              <input id="cr-voice-audience" class="cr-voice-input" placeholder="e.g. a reader who was not in the room" oninput="_crVoiceDraftChanged()"></div>
+            <div class="cr-voice-field"><label class="cr-form-label" for="cr-voice-nonneg">Non-negotiables <span class="cr-voice-hint">one per line</span></label>
+              <textarea id="cr-voice-nonneg" class="cr-voice-textarea" rows="3" placeholder="Keep the testimony in the witness's own frame.&#10;Never attribute certainty the source did not claim." oninput="_crVoiceDraftChanged()"></textarea></div>
+          </div>
+          <div class="cr-voice-col">
+            <div class="cr-voice-field"><label class="cr-form-label" for="cr-voice-preserve">Phrases / moves to preserve <span class="cr-voice-hint">one per line</span></label>
+              <textarea id="cr-voice-preserve" class="cr-voice-textarea" rows="3" placeholder="&quot;I only know what I saw&quot;&#10;the hesitation before naming it" oninput="_crVoiceDraftChanged()"></textarea></div>
+            <div class="cr-voice-field"><label class="cr-form-label" for="cr-voice-avoid">Phrases / styles to avoid <span class="cr-voice-hint">one per line</span></label>
+              <textarea id="cr-voice-avoid" class="cr-voice-textarea" rows="3" placeholder="do not turn this into consultant language&#10;no &quot;leverage&quot;, &quot;stakeholders&quot;, &quot;key takeaways&quot;" oninput="_crVoiceDraftChanged()"></textarea></div>
+            <div class="cr-voice-field"><label class="cr-form-label" for="cr-voice-critic">Critic expectations <span class="cr-voice-hint">what the Critic should verify</span></label>
+              <textarea id="cr-voice-critic" class="cr-voice-textarea" rows="2" placeholder="Flag any sentence that sounds like a press release or a strategy memo." oninput="_crVoiceDraftChanged()"></textarea></div>
+          </div>
+        </div>
+        <div class="cr-voice-preview-wrap">
+          <div class="cr-form-label">Artist directive preview <span class="cr-voice-hint">this exact text is what gets saved</span></div>
+          <pre class="cr-voice-preview" id="cr-voice-preview"></pre>
+        </div>
+        <div class="cr-voice-existing">
+          <div class="cr-form-label">Existing Expression Profiles</div>
+          <div id="cr-voice-list"></div>
+        </div>
       </div>
     </aside>
   </div>
@@ -7652,6 +7723,7 @@ function _crBottomPanels() {
     blueprint: document.getElementById('cr-blueprint-draft'),
     render: document.getElementById('cr-render-preview'),
     critic: document.getElementById('cr-critic-audit'),
+    voice: document.getElementById('cr-voice-profile'),
   };
 }
 function _crSyncBottomWorkstationState() {
@@ -7691,6 +7763,8 @@ async function _crOpenBottomWorkstation(mode) {
     _crLoadRenderPreview();
   } else if (mode === 'critic') {
     _crLoadCriticAudit();
+  } else if (mode === 'voice') {
+    _crLoadVoiceProfile();
   }
 }
 function _crCloseBottomWorkstation() {
@@ -8150,6 +8224,130 @@ window._crLoadCriticAudit = _crLoadCriticAudit;
 window._crAuditBlueprint = _crAuditBlueprint;
 window._crComputeAudit = _crComputeAudit;
 
+// ── Voice / Expression Profile (bottom workstation "Voice" tab, #93) ─────
+// Capture the witness constraints a future draft must not erase, and save them
+// as a real (immutable) ExpressionProfile the Artist/Critic pipeline consumes.
+// Design-first: NO drafting, NO LLM, NO voice critique here — just capture.
+const _CR_VOICE_DRAFT_KEY = 'hermeneia_voice_draft';
+function _crVoiceLines(text) {
+  return String(text || '').split('\n').map(s => s.trim()).filter(Boolean);
+}
+// Pure: compose the labeled Artist directive from the structured witness fields.
+// Single source of truth — this exact text is both previewed and saved.
+function _crComposeVoiceDirective(fields) {
+  const f = fields || {};
+  const lines = [];
+  if (f.voice) lines.push(`Voice: ${f.voice}`);
+  if (f.audience) lines.push(`Audience: ${f.audience}`);
+  const nonneg = _crVoiceLines(f.nonNegotiables);
+  if (nonneg.length) { lines.push('', 'Non-negotiables:'); nonneg.forEach(l => lines.push(`- ${l}`)); }
+  const preserve = _crVoiceLines(f.preserve);
+  if (preserve.length) { lines.push('', 'Preserve these phrases and moves — do not paraphrase them away:'); preserve.forEach(l => lines.push(`- ${l}`)); }
+  const avoid = _crVoiceLines(f.avoid);
+  if (avoid.length) { lines.push('', 'Avoid — never do this:'); avoid.forEach(l => lines.push(`- ${l}`)); }
+  return lines.join('\n').trim();
+}
+function _crVoiceFields() {
+  return {
+    name: document.getElementById('cr-voice-name')?.value.trim() || '',
+    voice: document.getElementById('cr-voice-voice')?.value.trim() || '',
+    audience: document.getElementById('cr-voice-audience')?.value.trim() || '',
+    nonNegotiables: document.getElementById('cr-voice-nonneg')?.value || '',
+    preserve: document.getElementById('cr-voice-preserve')?.value || '',
+    avoid: document.getElementById('cr-voice-avoid')?.value || '',
+    criticExpectations: document.getElementById('cr-voice-critic')?.value.trim() || '',
+  };
+}
+function _crRenderVoicePreview() {
+  const pre = document.getElementById('cr-voice-preview');
+  if (pre) pre.textContent = _crComposeVoiceDirective(_crVoiceFields());
+}
+function _crVoiceDraftChanged() {
+  _crRenderVoicePreview();
+  try { localStorage.setItem(_CR_VOICE_DRAFT_KEY, JSON.stringify(_crVoiceFields())); } catch {}
+  const status = document.getElementById('cr-voice-status');
+  if (status) status.textContent = '· unsaved draft';
+}
+function _crVoiceRestoreDraft() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(_CR_VOICE_DRAFT_KEY) || 'null'); } catch {}
+  if (!d) return;
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+  set('cr-voice-name', d.name); set('cr-voice-voice', d.voice); set('cr-voice-audience', d.audience);
+  set('cr-voice-nonneg', d.nonNegotiables); set('cr-voice-preserve', d.preserve);
+  set('cr-voice-avoid', d.avoid); set('cr-voice-critic', d.criticExpectations);
+}
+async function _crRenderVoiceList() {
+  const host = document.getElementById('cr-voice-list');
+  if (!host) return;
+  let profiles = [];
+  try { const d = await get('/api/profiles'); profiles = d.profiles || []; } catch {}
+  if (!profiles.length) { host.innerHTML = '<div style="font-size:12px;color:var(--dim2)">None yet.</div>'; return; }
+  host.innerHTML = profiles.map(p => {
+    const steward = p.source === 'steward-authored';
+    return `<div class="cr-voice-profile-item" onclick="_crVoicePrefillFrom('${x(p.slug)}')" title="Use as a starting point for a new version">
+      <span class="cr-voice-profile-name">${x(p.name || p.slug)}</span>
+      <span class="cr-voice-profile-source ${steward ? 'steward' : ''}">${steward ? 'steward-authored' : 'built-in'}</span>
+      ${p.audience ? `<span style="color:var(--dim2)">${x(p.audience)}</span>` : ''}
+    </div>`;
+  }).join('');
+}
+async function _crVoicePrefillFrom(slug) {
+  try {
+    const d = await get('/api/profiles');
+    const p = (d.profiles || []).find(pp => pp.slug === slug);
+    if (!p) return;
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    set('cr-voice-name', p.name ? `${p.name} (revised)` : '');
+    set('cr-voice-voice', p.voice); set('cr-voice-audience', p.audience);
+    set('cr-voice-critic', p.critic_expectations);
+    // The composed directive lives in artist_prompt; drop it into non-negotiables
+    // as an editable starting point (structure is not stored per-field).
+    set('cr-voice-nonneg', p.artist_prompt);
+    set('cr-voice-preserve', ''); set('cr-voice-avoid', '');
+    _crVoiceDraftChanged();
+  } catch {}
+}
+async function _crLoadVoiceProfile() {
+  _crVoiceRestoreDraft();
+  _crRenderVoicePreview();
+  const status = document.getElementById('cr-voice-status');
+  if (status && !_crVoiceFields().name && !_crVoiceFields().voice) status.textContent = '';
+  await _crRenderVoiceList();
+}
+async function _crSaveVoiceProfile() {
+  const fields = _crVoiceFields();
+  const btn = document.getElementById('cr-voice-save');
+  const status = document.getElementById('cr-voice-status');
+  const artist_prompt = _crComposeVoiceDirective(fields);
+  if (!fields.name) { if (status) status.textContent = '· name the profile first'; document.getElementById('cr-voice-name')?.focus(); return; }
+  if (!artist_prompt) { if (status) status.textContent = '· add at least a voice or one constraint'; return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const resp = await fetch('/api/profiles', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: fields.name, voice: fields.voice || null, audience: fields.audience || null,
+        artist_prompt, critic_expectations: fields.criticExpectations || null,
+      }),
+    });
+    const d = await resp.json();
+    if (!resp.ok) { if (status) status.textContent = `· ✗ ${d.error || 'save failed'}`; return; }
+    if (status) status.textContent = `· saved as “${d.name}”`;
+    try { localStorage.removeItem(_CR_VOICE_DRAFT_KEY); } catch {}
+    await _crRenderVoiceList();
+  } catch (e) {
+    if (status) status.textContent = `· ✗ ${e.message}`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save as Expression Profile'; }
+  }
+}
+window._crLoadVoiceProfile = _crLoadVoiceProfile;
+window._crSaveVoiceProfile = _crSaveVoiceProfile;
+window._crVoiceDraftChanged = _crVoiceDraftChanged;
+window._crVoicePrefillFrom = _crVoicePrefillFrom;
+window._crComposeVoiceDirective = _crComposeVoiceDirective;
+
 function _crBindBottomWorkstationControls() {
   const bindings = [
     ['cr-bottom-tab-search', () => _crOpenBottomWorkstation('search')],
@@ -8158,6 +8356,7 @@ function _crBindBottomWorkstationControls() {
     ['cr-bottom-tab-blueprint', () => _crOpenBottomWorkstation('blueprint')],
     ['cr-bottom-tab-render', () => _crOpenBottomWorkstation('render')],
     ['cr-bottom-tab-critic', () => _crOpenBottomWorkstation('critic')],
+    ['cr-bottom-tab-voice', () => _crOpenBottomWorkstation('voice')],
   ];
   bindings.forEach(([id, handler]) => {
     const el = document.getElementById(id);

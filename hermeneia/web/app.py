@@ -2446,6 +2446,70 @@ def create_app(
         conn.close()
         return jsonify({"profiles": profiles})
 
+    @app.route("/api/profiles", methods=["POST"])
+    def api_profiles_create():
+        """Create a steward-authored ExpressionProfile from the Reader "Voice" tab.
+
+        #93 — capture the witness constraints (voice, audience, non-negotiables,
+        phrases to preserve / avoid, critic expectations) the future Artist must
+        honor and the Critic must verify. The witness fields are composed into the
+        `artist_prompt` directive client-side (so the saved text equals the live
+        preview); this endpoint validates and persists. ExpressionProfiles are
+        immutable by table trigger — revising means saving a new version.
+        """
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+
+        payload = request.get_json(silent=True) or {}
+        name = str(payload.get("name") or "").strip()
+        artist_prompt = str(payload.get("artist_prompt") or "").strip()
+        if not name:
+            return jsonify({"error": "name is required"}), 400
+        if not artist_prompt:
+            return jsonify({"error": "artist_prompt is required"}), 400
+
+        language = str(payload.get("language") or "en").strip() or "en"
+        audience = (str(payload.get("audience") or "").strip() or None)
+        tone = (str(payload.get("tone") or "").strip() or None)
+        voice = (str(payload.get("voice") or "").strip() or None)
+        reading_level = (str(payload.get("reading_level") or "").strip() or None)
+        description = (str(payload.get("description") or "").strip() or None)
+        critic_expectations = (str(payload.get("critic_expectations") or "").strip() or None)
+
+        from ..storage.hashing import make_expression_profile_id
+        from datetime import datetime, timezone
+        import re as _re
+
+        base_slug = _re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "voice"
+
+        conn = _conn_rw()
+        try:
+            # Unique slug: append a short time token on collision (honest versioning).
+            slug = base_slug
+            exists = conn.execute(
+                "SELECT 1 FROM expression_profiles WHERE slug = ?", (slug,)
+            ).fetchone()
+            if exists:
+                slug = f"{base_slug}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+
+            profile_id = make_expression_profile_id(slug)
+            now = datetime.now(timezone.utc).isoformat()
+            conn.execute(
+                """
+                INSERT INTO expression_profiles
+                    (id, slug, name, description, language, audience, reading_level,
+                     tone, voice, artist_prompt, critic_expectations, source, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'steward-authored', ?)
+                """,
+                (profile_id, slug, name, description, language, audience, reading_level,
+                 tone, voice, artist_prompt, critic_expectations, now),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        return jsonify({"id": profile_id, "slug": slug, "name": name}), 201
+
     # ── /api/ecology ─────────────────────────────────────────────────────────
     # Non-epistemic, read-only projection of locally registered Artist adapters.
     # Registration conveys no trust, rank, provenance, or semantic standing.
