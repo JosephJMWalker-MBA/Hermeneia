@@ -1247,6 +1247,10 @@ body.reader-active .cr-tool-drawer { max-width: none; }
 }
 .cr-draft-judge-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .cr-draft-critic-report { border-top: 1px solid var(--border); margin-top: 12px; }
+.cr-draft-ratify { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 4px; }
+.cr-draft-ratify-audits { margin: 4px 0 12px; }
+.cr-draft-ratify-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cr-draft-ratified { margin-top: 12px; }
 body.has-workflow-rail.has-bottom-workstation { padding-bottom: 392px; --reader-bottom-inset: 412px; }
 body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 352px; --reader-bottom-inset: 372px; }
 
@@ -8470,8 +8474,12 @@ async function _crPreviewArtistDraft() {
     const d = await resp.json();
     if (!resp.ok) { out.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(d.error || 'preview failed')}</div>`; if (status) status.textContent = '· ✗'; return; }
     const profLabel = d.profile_name ? `${d.profile_name} (${d.profile_slug || ''})` : (d.profile_slug || 'no profile');
-    // Hold the exact previewed draft so the witness critic judges THIS text.
-    _crLastArtistDraft = { text: d.text || '', profileSlug: d.profile_slug || '', profileName: d.profile_name || '' };
+    // Hold the EXACT previewed draft + its provenance so the critic judges — and
+    // ratification saves — THIS text, never a re-render.
+    _crLastArtistDraft = {
+      text: d.text || '', profileSlug: d.profile_slug || '', profileName: d.profile_name || '',
+      planId: sk.planId || '', provider: d.provider || 'null', skeleton: sk,
+    };
     const canJudge = !!(d.profile_slug);
     out.innerHTML = `
       <div class="cr-draft-preview-banner">◷ Artist draft · preview — not saved, not accepted</div>
@@ -8483,8 +8491,18 @@ async function _crPreviewArtistDraft() {
              <span class="cr-voice-hint">Judge the draft before you ever save it.</span>`
           : `<span class="cr-voice-hint">Pick an Expression Profile to check this draft against a voice.</span>`}
       </div>
-      <div id="cr-draft-critic"></div>`;
+      <div id="cr-draft-critic"></div>
+      <div class="cr-draft-ratify" id="cr-draft-ratify">
+        <div class="cr-audit-section-title" style="margin-top:14px">Before you ratify — the draft's two audits</div>
+        <div class="cr-draft-ratify-audits" id="cr-draft-ratify-audits"><span class="cr-voice-hint">Checking…</span></div>
+        <div class="cr-draft-ratify-row">
+          <button class="btn-primary" id="cr-draft-ratify-btn" type="button" onclick="_crRatifyDraft()">Ratify &amp; Save Draft</button>
+          <span class="cr-voice-hint">Saving records the exact draft above — verbatim, immutable. It is not re-generated.</span>
+        </div>
+        <div id="cr-draft-ratify-result"></div>
+      </div>`;
     if (status) status.textContent = '· preview (unsaved)';
+    _crRenderRatifyAudits();
   } catch (e) {
     out.innerHTML = `<div style="color:#f87171">${x(e.message)}</div>`;
     if (status) status.textContent = '· ✗';
@@ -8534,9 +8552,69 @@ async function _crCheckVoiceFidelity() {
     if (btn) { btn.disabled = false; btn.textContent = '⚖ Check against the voice'; }
   }
 }
+// Show BOTH audit states before ratification: the structural grounding (computed
+// from the skeleton) and the voice/witness verdict (deterministic endpoint). The
+// steward ratifies with the audits in view — discernment before persistence.
+async function _crRenderRatifyAudits() {
+  const host = document.getElementById('cr-draft-ratify-audits');
+  const d = _crLastArtistDraft;
+  if (!host || !d) return;
+  // Structural grounding — client-side, from the same skeleton the draft renders.
+  let structural = '—';
+  try {
+    const audit = _crComputeAudit(d.skeleton, invLoad()?.thesis || '');
+    structural = `${audit.supported}/${audit.total} claims grounded · thesis ${audit.thesisPreservation}`;
+  } catch {}
+  // Voice/witness verdict — only when a profile was used.
+  let voice = 'no profile selected';
+  if (d.profileSlug && d.text) {
+    try {
+      const resp = await fetch('/api/critic/voice-preview', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: d.text, profile_slug: d.profileSlug }),
+      });
+      const r = await resp.json();
+      if (resp.ok) voice = `${r.verdict} · ${(r.violations || []).length} violation(s), ${(r.missing_preserve || []).length} missing`;
+    } catch {}
+  }
+  host.innerHTML = `
+    <div class="cr-audit-row"><span class="cr-audit-row-label">Structural / grounding</span> <span style="font-size:12px;color:var(--fg2)">${x(structural)}</span></div>
+    <div class="cr-audit-row"><span class="cr-audit-row-label">Voice / witness</span> <span style="font-size:12px;color:var(--fg2)">${x(voice)}</span></div>`;
+}
+
+async function _crRatifyDraft() {
+  const d = _crLastArtistDraft;
+  const btn = document.getElementById('cr-draft-ratify-btn');
+  const result = document.getElementById('cr-draft-ratify-result');
+  if (!d || !d.text || !d.planId || !result) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Ratifying…'; }
+  try {
+    const resp = await fetch('/api/pipeline/ratify-draft', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      // The EXACT previewed bytes — never re-rendered.
+      body: JSON.stringify({ plan_id: d.planId, provider: d.provider, profile_slug: d.profileSlug || null, text: d.text }),
+    });
+    const r = await resp.json();
+    if (!resp.ok) { result.innerHTML = `<div style="color:#f87171;font-size:13px;margin-top:8px">✗ ${x(r.error || 'ratify failed')}</div>`; return; }
+    const already = r.status === 'already_ratified';
+    result.innerHTML = `
+      <div class="cr-draft-ratified">
+        <div class="cr-draft-preview-banner" style="color:var(--green);border-color:color-mix(in srgb,var(--green) 45%,transparent);background:color-mix(in srgb,var(--green) 12%,transparent)">✓ ${already ? 'Already ratified' : 'Ratified & saved to the record'}</div>
+        <div class="cr-draft-meta">RenderedNarrative <b>${x((r.id || '').slice(0, 12))}…</b> · Voice: <b>${x(d.profileName || d.profileSlug || 'none')}</b> · Provider: <b>${x(r.provider)}</b> · Plan: <b>${x((r.plan_id || '').slice(0, 12))}…</b></div>
+        <div class="cr-voice-hint">The exact draft was recorded verbatim. RenderedNarratives are immutable — it cannot be edited after saving.</div>
+      </div>`;
+    if (btn) { btn.textContent = already ? 'Already ratified' : 'Ratified ✓'; return; }
+  } catch (e) {
+    result.innerHTML = `<div style="color:#f87171;font-size:13px;margin-top:8px">✗ ${x(e.message)}</div>`;
+  } finally {
+    if (btn && btn.textContent === 'Ratifying…') { btn.disabled = false; btn.textContent = 'Ratify & Save Draft'; }
+  }
+}
 window._crLoadArtistDraft = _crLoadArtistDraft;
 window._crPreviewArtistDraft = _crPreviewArtistDraft;
 window._crCheckVoiceFidelity = _crCheckVoiceFidelity;
+window._crRatifyDraft = _crRatifyDraft;
+window._crRenderRatifyAudits = _crRenderRatifyAudits;
 
 function _crBindBottomWorkstationControls() {
   const bindings = [

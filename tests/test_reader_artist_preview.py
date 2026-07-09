@@ -61,11 +61,12 @@ def test_preview_path_saves_nothing_and_uses_preview_endpoint():
     index = _index()
     region = _extract_fn(index, "_crPreviewArtistDraft")
     assert "'/api/pipeline/preview-artist'" in region
-    # No save / accept / persist path in the preview action.
+    # The preview itself persists nothing — it never calls a saving endpoint.
+    # (It may render a separate "Ratify & Save Draft" affordance, but that is a
+    # distinct explicit action handled by _crRatifyDraft, not the preview.)
     low = region.lower()
-    assert "run-artist" not in low          # not the persisting endpoint
-    assert "ratif" not in low
-    assert "accept" not in low or "not saved, not accepted" in index
+    assert "run-artist" not in low
+    assert "ratify-draft" not in low        # preview never saves
     # The output is labeled as an unsaved preview.
     assert "not saved, not accepted" in index
 

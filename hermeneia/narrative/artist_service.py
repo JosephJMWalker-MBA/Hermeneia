@@ -321,3 +321,77 @@ def render_for_observation(
         prompt=prompt,
         created=True,
     )
+
+
+def ratify_draft(
+    plan_id: str,
+    conn: Connection,
+    *,
+    provider: str,
+    profile_slug: str | None,
+    text: str,
+) -> dict[str, Any]:
+    """Persist the EXACT previewed draft bytes as a RenderedNarrative.
+
+    Ratification is the moment a generated artifact enters the durable record.
+    It must save the artifact the steward actually saw and judged — so this does
+    NOT call the provider and NEVER re-renders. The supplied ``text`` is stored
+    verbatim; ``prompt_used`` is reconstructed deterministically (no LLM) for
+    provenance. The narrative id is deterministic on (plan, provider, profile),
+    so a second ratify is idempotent and the immutable table is never rewritten.
+
+    Returns {"row": <dict>, "created": bool}.
+    """
+    plan = conn.execute(
+        "SELECT * FROM architect_plans WHERE id = ?", (plan_id,)
+    ).fetchone()
+    if plan is None:
+        raise ArtistRenderError(f"Architect Plan not found: {plan_id}")
+    plan_dict = dict(plan)
+
+    profile = get_profile(profile_slug, conn) if profile_slug else None
+    if profile_slug and profile is None:
+        raise ArtistRenderError(f"Expression profile '{profile_slug}' not found.")
+    expression_profile_id = profile["id"] if profile else None
+
+    narrative_id = make_rendered_narrative_id(plan_dict["id"], provider, expression_profile_id)
+    existing = conn.execute(
+        "SELECT * FROM rendered_narratives WHERE id = ?", (narrative_id,)
+    ).fetchone()
+    if existing is not None:
+        # Already ratified for this (plan, provider, profile) — the record is
+        # immutable, so return it unchanged rather than overwriting.
+        return {"row": dict(existing), "created": False}
+
+    paragraphs = [
+        dict(row)
+        for row in conn.execute(
+            "SELECT * FROM architect_plan_paragraphs WHERE plan_id = ? ORDER BY order_idx",
+            (plan_dict["id"],),
+        ).fetchall()
+    ]
+    prompt = generate_prompt(plan_dict, paragraphs, conn, theme=profile)
+    now = datetime.now(timezone.utc).isoformat()
+    row = {
+        "id": narrative_id,
+        "architect_plan_id": plan_dict["id"],
+        "provider": provider,
+        "expression_profile_id": expression_profile_id,
+        "text": text,
+        "prompt_used": prompt,
+        "execution_config": json.dumps({"source": "ratified_preview", "provider": provider}),
+        "created_at": now,
+    }
+    conn.execute(
+        """
+        INSERT INTO rendered_narratives
+            (id, architect_plan_id, provider, expression_profile_id,
+             text, prompt_used, execution_config, created_at)
+        VALUES
+            (:id, :architect_plan_id, :provider, :expression_profile_id,
+             :text, :prompt_used, :execution_config, :created_at)
+        """,
+        row,
+    )
+    conn.commit()
+    return {"row": row, "created": True, "blueprint_id": plan_dict.get("blueprint_id")}

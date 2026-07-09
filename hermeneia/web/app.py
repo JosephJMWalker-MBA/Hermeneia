@@ -5233,6 +5233,51 @@ Return ONLY valid JSON, no markdown, no explanation:
         finally:
             conn.close()
 
+    @app.route("/api/pipeline/ratify-draft", methods=["POST"])
+    def api_pipeline_ratify_draft():
+        """Ratify & save the EXACT previewed Artist draft as a RenderedNarrative.
+
+        Body: { plan_id, provider, profile_slug?, text }
+
+        Persists the bytes the steward saw and judged — verbatim, no re-render,
+        no provider call. Deterministic id means a second ratify is idempotent;
+        the record is immutable (no post-save mutation). Explicit action only.
+        """
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(silent=True) or {}
+        plan_id = str(payload.get("plan_id", "")).strip()
+        provider = str(payload.get("provider", "")).strip() or "null"
+        profile_slug = str(payload.get("profile_slug", "")).strip() or None
+        text = payload.get("text")
+        if not plan_id:
+            return jsonify({"error": "plan_id is required"}), 400
+        if not isinstance(text, str) or not text.strip():
+            return jsonify({"error": "text is required"}), 400
+
+        from ..narrative.artist_service import ArtistRenderError, ratify_draft
+
+        conn = _conn_rw()
+        try:
+            result = ratify_draft(
+                plan_id, conn, provider=provider, profile_slug=profile_slug, text=text,
+            )
+        except ArtistRenderError as exc:
+            return jsonify({"error": str(exc), "error_type": type(exc).__name__}), 400
+        finally:
+            conn.close()
+
+        row = result["row"]
+        return jsonify({
+            "id": row["id"],
+            "created": result["created"],
+            "status": "ratified" if result["created"] else "already_ratified",
+            "provider": row["provider"],
+            "profile_slug": profile_slug,
+            "plan_id": plan_id,
+            "blueprint_id": result.get("blueprint_id"),
+        }), (201 if result["created"] else 200)
+
     @app.route("/api/critic/voice-preview", methods=["POST"])
     def api_critic_voice_preview():
         """Judge an Artist draft against an ExpressionProfile's witness constraints.
