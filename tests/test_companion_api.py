@@ -192,6 +192,9 @@ def test_stub_provider_answers_without_ai(tmp_path):
     body = r.get_json()
     assert body["reply"]
     assert body["provider"] == "Stub (no AI)"
+    # Authorship is reported honestly: the stub has no model.
+    assert "model" in body
+    assert body["model"] is None
 
 
 def test_validation(tmp_path):

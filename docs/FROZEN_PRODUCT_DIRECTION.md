@@ -173,11 +173,14 @@ that the work now is shaping the *experience*.
 
 ```
 PR 1  ✅ Reader cleanup                         (#91 — merged)
-PR 2  ▶  Reader-side Corpus Search              (next)
-PR 3     Observation / attention timeline
-PR 4     Bottom workflow rail
-PR 5     Companion onboarding
-PR 6     Thesis → Blueprint workflow
+PR 2  ✅ Reader-side Corpus Search              (#95 — merged)
+PR 3  ✅ Observation / attention timeline       (#96 — merged)
+PR 4  ✅ Bottom workflow rail                    (#97 — merged)
+PR 5  ✅ Companion onboarding                    (#100 — merged)
+       ✅ Workbench layout integration           (#103/#104/#105 merged;
+          Companion docked chat, far-right tools dock, and Search/Timeline/
+          Field Notes unified into one bottom workstation — see #112)
+PR 6  ▶  Thesis → Blueprint workflow             (next)
 PR 7     Blueprint editor
 PR 8     Meta-synthesis
 ```

@@ -5994,11 +5994,12 @@ Return ONLY valid JSON, no markdown, no explanation:
         raw_provider = str(payload.get("provider") or "").strip()
         if raw_provider.lower() == "stub":
             participant_key, participant_label, provider_id = "stub", "Stub (no AI)", "null"
+            model_id = None
         else:
             participant = _e10_participant(raw_provider)
             if participant is None:
                 return jsonify({"error": f"unsupported provider: {raw_provider}"}), 400
-            participant_key, participant_label, _model = participant
+            participant_key, participant_label, model_id = participant
             provider_id = _E10_PARTICIPANTS[participant_key][1]
 
         try:
@@ -6129,6 +6130,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         return jsonify({
             "reply": reply,
             "provider": participant_label,
+            "model": model_id,
             "context_used": context_used,
         })
 
