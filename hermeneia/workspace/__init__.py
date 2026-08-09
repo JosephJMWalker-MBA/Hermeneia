@@ -25,6 +25,19 @@ from .identity import (
     read_workspace_identity,
     set_workspace_name,
 )
+from .lifecycle import (
+    DEFAULT_LEGACY_DB,
+    DEFAULT_WORKSPACE_ROOT,
+    WORKSPACE_DB_NAME,
+    WorkspaceLifecycleError,
+    WorkspaceRecord,
+    create_workspace,
+    inspect_workspace,
+    list_workspaces,
+    resolve_serve_db,
+    resolve_workspace_db,
+    slugify_workspace_name,
+)
 
 __all__ = [
     "WBS_VERSION",
@@ -40,4 +53,15 @@ __all__ = [
     "read_workspace_id",
     "read_workspace_identity",
     "set_workspace_name",
+    "DEFAULT_LEGACY_DB",
+    "DEFAULT_WORKSPACE_ROOT",
+    "WORKSPACE_DB_NAME",
+    "WorkspaceLifecycleError",
+    "WorkspaceRecord",
+    "create_workspace",
+    "inspect_workspace",
+    "list_workspaces",
+    "resolve_serve_db",
+    "resolve_workspace_db",
+    "slugify_workspace_name",
 ]

@@ -80,11 +80,13 @@ The LLM occupies exactly one stage. Every other stage is deterministic, human-go
 
 **Interfaces**
 
+- Reader workbench with Companion, Corpus Search, attention timeline, Blueprint, Render, Critic, Voice, Draft, Ratify, and Record surfaces
 - Web UI with Expression Matrix (Blueprint × Profile grid), Semantic Contract Audit, Trust Card, Lineage Explorer
-- CLI: `herm architect`, `herm artist`, `herm critic`, `herm extract`, `herm profile`, `herm trace`
+- Workspace Bundle export/import, durable workspace identity, and CLI/runtime workspace lifecycle
+- CLI: `herm architect`, `herm artist`, `herm critic`, `herm extract`, `herm profile`, `herm trace`, `herm workspace`, `herm serve`
 - REST API for all pipeline operations
 
-**557 automated tests** validate constitutional invariants, semantic contracts, provenance, and end-to-end traceability.
+**1009 automated tests** validate constitutional invariants, semantic contracts, provenance, and end-to-end traceability.
 
 ---
 
@@ -122,6 +124,10 @@ herm critic OBS-1
 
 # Launch the web UI
 herm serve
+
+# Create and launch an isolated named workspace
+herm workspace create "The Second Sale"
+herm serve --workspace "The Second Sale"
 ```
 
 ---
@@ -163,6 +169,8 @@ SCF benchmark: [`docs/papers/scf_position_paper.md`](docs/papers/scf_position_pa
 | Translation profile support | ✓ |
 | End-to-end traceability | ✓ |
 | Semantic fidelity reporting | ✓ |
+| Durable workspace identity and WBS export/import | ✓ |
+| Reader Blueprint → Record chain | ✓ |
 | White paper draft | ✓ |
 | Live demonstration video | — |
 | Pitch deck | — |
