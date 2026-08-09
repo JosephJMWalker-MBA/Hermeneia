@@ -67,9 +67,17 @@ Interpret
   ↓
 Blueprint
   ↓
+Render Skeleton
+  ↓
 Critic
   ↓
-Meta-synthesis
+Voice
+  ↓
+Draft Preview
+  ↓
+Ratify
+  ↓
+Record
 ```
 
 Onboarding, when it comes, teaches *this workflow* — not the buttons.
@@ -180,9 +188,16 @@ PR 5  ✅ Companion onboarding                    (#100 — merged)
        ✅ Workbench layout integration           (#103/#104/#105 merged;
           Companion docked chat, far-right tools dock, and Search/Timeline/
           Field Notes unified into one bottom workstation — see #112)
-PR 6  ▶  Thesis → Blueprint workflow             (next)
-PR 7     Blueprint editor
-PR 8     Meta-synthesis
+PR 6  ✅ Reader Synthesis Workstation            (#113 — Blueprint, Render, Critic)
+PR 7  ✅ Voice / ExpressionProfile capture       (#114 — witness constraints)
+PR 8  ✅ Artist Draft preview                    (#115 — preview only, not saved)
+PR 9  ✅ Voice/Witness Critic                    (#116 — deterministic audit)
+PR 10 ✅ Ratify & Save Draft                     (#117 — exact previewed bytes)
+PR 11 ✅ Record ledger                           (#118 — provenance + lineage)
+PR 12 ▶  Workspace lifecycle                     (list/create/inspect/launch)
+PR 13    Fast Treatment Note while reading       (use existing highlight/field-note substrate)
+PR 14    Export Annotated Reading → Markdown     (derived projection, no source mutation)
+PR 15    Evidence Board / true study lineage     (#111)
 ```
 
 ### Why this order
@@ -197,6 +212,15 @@ PR 8     Meta-synthesis
 - **Then onboarding.** Only after Corpus Search and the timeline exist, because
   then onboarding teaches a *workflow* ("set your thesis, read, notice, capture,
   search, interpret, repeat") rather than explaining controls.
+- **Then the accountable writing chain.** PRs #113-#118 already landed the
+  Blueprint → Render Skeleton → Critic → Voice → Draft Preview → Ratify → Record
+  sequence. Future sessions must treat that chain as existing product reality,
+  not pending roadmap.
+- **Now isolate real workspaces.** Durable workspace identity and WBS export/import
+  already exist. The next slice is a first-class runtime lifecycle so Gatsby can
+  remain untouched while a fresh workspace (for example, *The Second Sale*) gets
+  its own DB, uploads, calibration, and identity. This is CLI/runtime selection,
+  not live browser switching.
 
 ## 6. Parallel frozen design — voice fidelity / witness preservation
 

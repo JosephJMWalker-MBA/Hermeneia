@@ -37,6 +37,13 @@ from hermeneia.cli.coverage_cmd import cmd_coverage
 from hermeneia.cli.release_cmd import cmd_release
 from hermeneia.cli.preserve_cmd import cmd_preserve_verify, cmd_preserve_export
 from hermeneia.cli.edition_cmd import cmd_edition_status, cmd_edition_record, cmd_edition_designate
+from hermeneia.cli.workspace_cmd import (
+    cmd_workspace_create,
+    cmd_workspace_inspect,
+    cmd_workspace_list,
+    resolve_cli_serve_db,
+)
+from hermeneia.workspace import WorkspaceLifecycleError
 
 
 def main() -> None:
@@ -46,6 +53,23 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("health", help="Epistemic pipeline confidence dashboard")
+
+    p_serve = sub.add_parser("serve", help="Launch the Hermeneia web UI")
+    p_serve.add_argument("--db", dest="serve_db", default=None, help="Path to hermeneia.db")
+    p_serve.add_argument(
+        "--workspace",
+        default=None,
+        help="Named workspace to launch (slug, name, id, or Gatsby)",
+    )
+    p_serve.add_argument("--port", type=int, default=5173)
+
+    p_workspace = sub.add_parser("workspace", help="List, create, and inspect runtime workspaces")
+    workspace_sub = p_workspace.add_subparsers(dest="workspace_command", required=True)
+    workspace_sub.add_parser("list", help="List known workspaces")
+    p_workspace_create = workspace_sub.add_parser("create", help="Create an empty managed workspace")
+    p_workspace_create.add_argument("name", help='Workspace name, e.g. "The Second Sale"')
+    p_workspace_inspect = workspace_sub.add_parser("inspect", help="Inspect one workspace")
+    p_workspace_inspect.add_argument("selector", help="Workspace slug, name, id, or Gatsby")
 
     p_stats = sub.add_parser("stats", help="Corpus summary")
     p_stats.add_argument("bundle", help=".herm bundle dir or hermeneia.db path")
@@ -201,6 +225,29 @@ def main() -> None:
 
     if args.command == "health":
         cmd_health(bundle_or_db=db)
+    elif args.command == "serve":
+        try:
+            serve_db = resolve_cli_serve_db(
+                global_db=args.db,
+                command_db=args.serve_db,
+                workspace_selector=args.workspace,
+            )
+        except WorkspaceLifecycleError as exc:
+            print(str(exc))
+            sys.exit(2)
+        from hermeneia.web.app import create_app
+
+        app = create_app(db_path=serve_db)
+        print(f"  Hermeneia -> http://localhost:{args.port}")
+        print(f"  Database  -> {serve_db}")
+        app.run(port=args.port, debug=False)
+    elif args.command == "workspace":
+        if args.workspace_command == "list":
+            cmd_workspace_list()
+        elif args.workspace_command == "create":
+            cmd_workspace_create(args.name)
+        elif args.workspace_command == "inspect":
+            cmd_workspace_inspect(args.selector)
     elif args.command == "stats":
         cmd_stats(args.bundle)
     elif args.command == "search":

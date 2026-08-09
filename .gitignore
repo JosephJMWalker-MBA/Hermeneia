@@ -29,6 +29,7 @@ dist/
 # Local output/cache directories
 outputs/
 .cache/
+workspaces/
 
 # Nested old repo backup
 hermeneia/.git_NESTED_BACKUP_do_not_delete/
