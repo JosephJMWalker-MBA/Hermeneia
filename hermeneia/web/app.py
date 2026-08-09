@@ -52,7 +52,7 @@ from ..explorer.interpreter import (
 )
 from ..explorer.bucketer import BucketingError, generate_candidate_buckets
 from ..study import compile_study, compile_synthesis_packet
-from .reader_projection import project_reader_extractions
+from .reader_projection import project_reader_page
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -5705,7 +5705,13 @@ Return ONLY valid JSON, no markdown, no explanation:
             """SELECT id, page, region, raw_text, source_locator
                FROM source_extractions
                WHERE document_id = ?
-               ORDER BY page, source_locator""",
+               ORDER BY page,
+                        CASE
+                          WHEN region GLOB 'block:[0-9]*'
+                          THEN CAST(substr(region, 7) AS INTEGER)
+                          ELSE 2147483647
+                        END,
+                        source_locator""",
             (doc_id,)
         ).fetchall()
 
@@ -5717,8 +5723,8 @@ Return ONLY valid JSON, no markdown, no explanation:
         for ex in extractions:
             pg = ex["page"] or 1
             raw_by_page.setdefault(pg, []).append(dict(ex))
-        pages: dict[int, list] = {
-            pg: project_reader_extractions(rows)
+        pages: dict[int, dict[str, object]] = {
+            pg: project_reader_page(rows)
             for pg, rows in raw_by_page.items()
         }
 
@@ -5744,8 +5750,13 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "excluded": bool(doc["excluded_from_analysis"]),
             },
             "pages": [
-                {"page": pg, "extractions": texts, "highlights": highlights_by_page.get(pg, [])}
-                for pg, texts in sorted(pages.items())
+                {
+                    "page": pg,
+                    "extractions": page["extractions"],
+                    "projection_coverage": page["projection_coverage"],
+                    "highlights": highlights_by_page.get(pg, []),
+                }
+                for pg, page in sorted(pages.items())
             ],
             "total_pages": doc["total_pages"] or 1,
         })

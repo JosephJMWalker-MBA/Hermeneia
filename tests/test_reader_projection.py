@@ -14,7 +14,11 @@ import pytest
 
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.web.app import create_app
-from hermeneia.web.reader_projection import project_reader_extractions
+from hermeneia.web.reader_projection import (
+    ReaderProjectionCoverageError,
+    project_reader_extractions,
+    reader_projection_coverage,
+)
 
 
 def _extraction(
@@ -87,6 +91,25 @@ def test_reader_projection_does_not_merge_unsafe_pairs(
     assert all(item["reader_projection"] is None for item in projected)
 
 
+def test_reader_projection_coverage_detects_dropped_extractions() -> None:
+    canonical = [
+        _extraction("ext-heading", 39, 1, "CHAPTER 12\n"),
+        _extraction("ext-title", 39, 2, "The Platform\n"),
+    ]
+    projected = [
+        {
+            "region": "block:1",
+            "text": "CHAPTER 12\n",
+            "source_locator": "page:39:block:1",
+            "source_extraction_id": "ext-heading",
+            "reader_projection": None,
+        }
+    ]
+
+    with pytest.raises(ReaderProjectionCoverageError, match="lost source extraction"):
+        reader_projection_coverage(canonical, projected)
+
+
 def test_reader_api_projects_drop_cap_without_mutating_evidence(tmp_path: Path) -> None:
     db_path = tmp_path / "reader_projection.db"
     store = SQLiteStore(db_path)
@@ -154,9 +177,15 @@ def test_reader_api_projects_drop_cap_without_mutating_evidence(tmp_path: Path) 
 
     assert response.status_code == 200
     display_blocks = response.get_json()["pages"][0]["extractions"]
+    coverage = response.get_json()["pages"][0]["projection_coverage"]
     assert len(display_blocks) == 1
     assert display_blocks[0]["text"] == "I" + continuation + "\n"
     assert display_blocks[0]["reader_projection"]["kind"] == "drop_cap_merge"
+    assert [entry["source_extraction_id"] for entry in coverage] == [
+        "ext-I",
+        "ext-rest",
+    ]
+    assert {entry["status"] for entry in coverage} == {"incorporated"}
 
     verify = sqlite3.connect(db_path)
     canonical_extractions = verify.execute(
@@ -172,3 +201,91 @@ def test_reader_api_projects_drop_cap_without_mutating_evidence(tmp_path: Path) 
         ("ext-rest", continuation + "\n"),
     ]
     assert canonical_observation == ("ext-rest", continuation)
+
+
+def test_reader_api_orders_blocks_numerically_and_accounts_for_chapter_page(
+    tmp_path: Path,
+) -> None:
+    """Regression for issue #123: source_locator text order put block:10 before
+    block:2, making intervening manuscript prose look absent in the Reader.
+    """
+    db_path = tmp_path / "reader_projection_order.db"
+    store = SQLiteStore(db_path)
+    store.close()
+    now = datetime.now(timezone.utc).isoformat()
+    doc_id = "b" * 64
+    blocks = [
+        (1, "39THE SECOND SALE\n\nCHAPTER 12\n"),
+        (2, "The Platform\n"),
+        (3, "Vale's agency held the platform meeting in a room with no books.\n"),
+        (
+            4,
+            "The walls displayed photographs of clients on stages, television sets, "
+            "conference screens, university lecterns, and magazine covers. A monitor "
+            "showed a dashboard titled POST-PUBLICATION CONVERSION PLAN.\n",
+        ),
+        (
+            8,
+            "Elias attended because Harbor & Quill needed to coordinate direct sales, "
+            "signed stock, donor messages, and the author's media calendar. Derek sat "
+            "beside Vale's agent, Martin Saye, who wore the satisfied expression of a "
+            "person whose client had not yet ",
+        ),
+        (10, "become a bestseller but had already begun charging as if he had.\n"),
+        (11, "Saye advanced the first slide.\n"),
+    ]
+
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """INSERT INTO source_documents
+           (id, original_filename, file_hash, total_pages, registered_at,
+            compiler_version, source_role, excluded_from_analysis)
+           VALUES (?,?,?,?,?,?,?,?)""",
+        (doc_id, "the-second-sale.pdf", doc_id, 39, now, "test", "primary", 0),
+    )
+    for block, raw_text in blocks:
+        extraction_id = f"ext-{block:02d}"
+        conn.execute(
+            """INSERT INTO source_extractions
+               (id, document_id, page, region, raw_text, parser, parser_version,
+                coordinates, source_locator, source_hash, hash, extracted_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                extraction_id,
+                doc_id,
+                39,
+                f"block:{block}",
+                raw_text,
+                "pymupdf",
+                "test",
+                "{}",
+                f"page:39:block:{block}",
+                doc_id,
+                extraction_id,
+                now,
+            ),
+        )
+    conn.commit()
+    conn.close()
+
+    response = create_app(db_path=db_path).test_client().get(
+        f"/api/reader/documents/{doc_id}/pages"
+    )
+
+    assert response.status_code == 200
+    page = response.get_json()["pages"][0]
+    rendered_text = "".join(block["text"] for block in page["extractions"])
+    assert rendered_text.index("CHAPTER 12") < rendered_text.index("The Platform")
+    assert rendered_text.index("The Platform") < rendered_text.index("Vale's agency")
+    assert rendered_text.index("Vale's agency") < rendered_text.index("The walls displayed")
+    assert rendered_text.index("had not yet") < rendered_text.index("become a bestseller")
+    assert rendered_text.index("become a bestseller") < rendered_text.index(
+        "Saye advanced the first slide"
+    )
+
+    expected_ids = [f"ext-{block:02d}" for block, _ in blocks]
+    assert [block["source_extraction_id"] for block in page["extractions"]] == expected_ids
+    assert [
+        entry["source_extraction_id"] for entry in page["projection_coverage"]
+    ] == expected_ids
+    assert {entry["status"] for entry in page["projection_coverage"]} == {"displayed"}
