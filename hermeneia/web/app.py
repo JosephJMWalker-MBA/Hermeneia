@@ -53,6 +53,7 @@ from ..explorer.interpreter import (
 from ..explorer.bucketer import BucketingError, generate_candidate_buckets
 from ..study import compile_study, compile_synthesis_packet
 from .reader_projection import project_reader_page
+from .reader_structure import infer_reader_structure
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -5759,6 +5760,43 @@ Return ONLY valid JSON, no markdown, no explanation:
                 for pg, page in sorted(pages.items())
             ],
             "total_pages": doc["total_pages"] or 1,
+        })
+
+    @app.route("/api/reader/documents/<doc_id>/structure")
+    def api_reader_document_structure(doc_id: str):
+        """Return derived authored-structure candidates for Reader inspection."""
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        conn = _conn_rw()
+        try:
+            doc = require_active_document(conn, doc_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+        extractions = conn.execute(
+            """SELECT id, document_id, page, region, raw_text, coordinates, source_locator
+               FROM source_extractions
+               WHERE document_id = ?
+               ORDER BY page,
+                        CASE
+                          WHEN region GLOB 'block:[0-9]*'
+                          THEN CAST(substr(region, 7) AS INTEGER)
+                          ELSE 2147483647
+                        END,
+                        source_locator""",
+            (doc_id,)
+        ).fetchall()
+        structure = infer_reader_structure(doc_id, [dict(row) for row in extractions])
+        conn.close()
+        return jsonify({
+            "document": {
+                "id": doc["id"],
+                "filename": doc["original_filename"],
+                "source_role": doc["source_role"] or "primary",
+                "total_pages": doc["total_pages"] or 1,
+                "excluded": bool(doc["excluded_from_analysis"]),
+            },
+            "structure": structure,
         })
 
     @app.route("/api/reader/highlights", methods=["POST"])
