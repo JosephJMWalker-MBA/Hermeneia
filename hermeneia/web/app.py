@@ -1907,6 +1907,11 @@ def create_app(
         covered, total, fraction = coverage_metrics(conn)
 
         data = {
+            "db_path": str(db_path),
+            "runtime": {
+                "endpoint_reachable": True,
+                "database_available": True,
+            },
             "compiler_ok": ok,
             "compiler_note": note,
             "document": {

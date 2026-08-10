@@ -811,6 +811,21 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   color: var(--red); padding: 12px 14px; font-size: 14px;
 }
 .app-error.open { display: block; }
+.runtime-connection-status {
+  position: sticky; top: 56px; z-index: 150;
+  width: min(1100px, calc(100% - 32px)); margin: 10px auto 0;
+  border: 1px solid var(--yellow, #f4c542); border-radius: var(--r);
+  background: color-mix(in srgb, var(--surface) 92%, var(--yellow, #f4c542) 8%);
+  color: var(--fg); padding: 8px 12px; box-shadow: var(--shadow);
+  font-size: 12px; line-height: 1.45;
+}
+.runtime-connection-status[hidden] { display: none; }
+.runtime-connection-title { font-weight: 700; color: var(--fg); }
+.runtime-connection-detail { color: var(--dim2); margin-top: 2px; }
+.runtime-connection-status.reconnected {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--surface) 92%, var(--green) 8%);
+}
 .e10-select {
   height: 40px; background: var(--surface); color: var(--fg);
   border: 1px solid var(--border2); border-radius: var(--r); padding: 0 12px;
@@ -2562,6 +2577,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
 <!-- Persistent study compass: the governing question, visible on every screen.
      Gently prompts the steward to set one when none exists (issue: reader-first). -->
 <div id="thesis-bar" class="thesis-bar" hidden onclick="_thesisBarClick()"></div>
+<div id="runtime-connection-status" class="runtime-connection-status" hidden role="status" aria-live="polite"></div>
 
 <!-- Workspace drawer (issue #56 slice 4): an additive grouping of the older
      pipeline surfaces behind one clear entry point. Reader stays primary; the
@@ -2994,6 +3010,486 @@ let _e10Selected = null, _e10Detail = null, _e10ActiveProposal = null;
 let _e10Providers = null;
 let _e10ProviderNotices = {};
 
+// ── Runtime connectivity and local authored drafts ────
+const _RUNTIME_HEALTH_URL = '/api/health';
+const _RUNTIME_RECONNECT_BASE_MS = 1500;
+const _RUNTIME_RECONNECT_MAX_MS = 12000;
+const _RUNTIME_RECONNECTED_VISIBLE_MS = 2600;
+const _AUTHORED_DRAFT_PREFIX = 'hermeneia_authored_draft_v1';
+let _runtimeConnectionState = 'connected';
+let _runtimeReconnectTimer = null;
+let _runtimeReconnectDelayMs = _RUNTIME_RECONNECT_BASE_MS;
+let _runtimeReconnectQuietTimer = null;
+let _runtimeLastEndpointError = null;
+let _runtimeDraftWorkspaceScope = 'workspace:current';
+
+class RuntimeEndpointError extends Error {
+  constructor(message = 'Connection to Hermeneia lost. Your unsaved text is preserved in this browser.', cause = null) {
+    super(message);
+    this.name = 'RuntimeEndpointError';
+    this.endpointUnreachable = true;
+    if (cause) this.cause = cause;
+  }
+}
+
+class RuntimeHttpError extends Error {
+  constructor(message, response, data = null) {
+    super(message || `HTTP ${response?.status || ''}`.trim());
+    this.name = 'RuntimeHttpError';
+    this.status = response?.status || 0;
+    this.data = data;
+  }
+}
+
+function _runtimeEndpointLostMessage() {
+  return 'Connection to Hermeneia lost. Your unsaved text is preserved in this browser.';
+}
+
+function _runtimeIsFetchNetworkError(error) {
+  if (!error) return false;
+  const message = String(error.message || '');
+  return error instanceof TypeError
+    || /Failed to fetch|NetworkError|Load failed|fetch failed|Failed to load/i.test(message);
+}
+
+function _runtimeIsEndpointError(error) {
+  return !!error?.endpointUnreachable || error instanceof RuntimeEndpointError;
+}
+
+function _runtimeRenderConnectionStatus() {
+  const host = document.getElementById('runtime-connection-status');
+  if (!host) return;
+  if (_runtimeConnectionState === 'connected') {
+    host.hidden = true;
+    host.className = 'runtime-connection-status';
+    host.innerHTML = '';
+    return;
+  }
+  const reconnected = _runtimeConnectionState === 'reconnected';
+  host.hidden = false;
+  host.className = `runtime-connection-status ${reconnected ? 'reconnected' : 'unreachable'}`;
+  const title = reconnected ? 'Reconnected to Hermeneia.' : 'Connection to Hermeneia lost.';
+  const detail = reconnected
+    ? 'Save again when you are ready. Unsaved text was not replayed automatically.'
+    : 'Your unsaved text is preserved in this browser. The local endpoint is unreachable; if you use a tunnel, the tunnel or Hermeneia process may need attention.';
+  host.innerHTML = `<div class="runtime-connection-title">${x(title)}</div><div class="runtime-connection-detail">${x(detail)}</div>`;
+}
+
+function _runtimeSetConnectionState(state) {
+  if (_runtimeConnectionState === state) {
+    _runtimeRenderConnectionStatus();
+    return;
+  }
+  _runtimeConnectionState = state;
+  _runtimeRenderConnectionStatus();
+}
+
+function _runtimeMarkReachable() {
+  const wasDisconnected = _runtimeConnectionState === 'unreachable' || _runtimeConnectionState === 'reconnecting';
+  _runtimeLastEndpointError = null;
+  _runtimeReconnectDelayMs = _RUNTIME_RECONNECT_BASE_MS;
+  if (_runtimeReconnectTimer) {
+    clearTimeout(_runtimeReconnectTimer);
+    _runtimeReconnectTimer = null;
+  }
+  if (wasDisconnected) {
+    _runtimeSetConnectionState('reconnected');
+    clearTimeout(_runtimeReconnectQuietTimer);
+    _runtimeReconnectQuietTimer = setTimeout(() => _runtimeSetConnectionState('connected'), _RUNTIME_RECONNECTED_VISIBLE_MS);
+    return;
+  }
+  _runtimeSetConnectionState('connected');
+}
+
+function _runtimeMarkUnreachable(error) {
+  _runtimeLastEndpointError = error || null;
+  clearTimeout(_runtimeReconnectQuietTimer);
+  _runtimeReconnectQuietTimer = null;
+  if (_runtimeConnectionState !== 'unreachable' && _runtimeConnectionState !== 'reconnecting') {
+    _runtimeSetConnectionState('unreachable');
+  } else {
+    _runtimeRenderConnectionStatus();
+  }
+  _runtimeScheduleReconnectCheck();
+}
+
+function _runtimeScheduleReconnectCheck() {
+  if (_runtimeReconnectTimer) return;
+  _runtimeReconnectTimer = setTimeout(async () => {
+    _runtimeReconnectTimer = null;
+    if (_runtimeConnectionState === 'unreachable') _runtimeSetConnectionState('reconnecting');
+    try {
+      await fetch(_RUNTIME_HEALTH_URL, { cache: 'no-store' });
+      _runtimeMarkReachable();
+    } catch (error) {
+      if (!_runtimeIsFetchNetworkError(error)) throw error;
+      _runtimeReconnectDelayMs = Math.min(_runtimeReconnectDelayMs * 1.6, _RUNTIME_RECONNECT_MAX_MS);
+      _runtimeSetConnectionState('unreachable');
+      _runtimeScheduleReconnectCheck();
+    }
+  }, _runtimeReconnectDelayMs);
+}
+
+async function runtimeApiFetch(url, options = {}) {
+  try {
+    const response = await fetch(url, options);
+    _runtimeMarkReachable();
+    return response;
+  } catch (error) {
+    if (_runtimeIsFetchNetworkError(error)) {
+      _runtimeMarkUnreachable(error);
+      throw new RuntimeEndpointError(_runtimeEndpointLostMessage(), error);
+    }
+    throw error;
+  }
+}
+
+function _runtimeSetDraftWorkspaceScope(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return;
+  _runtimeDraftWorkspaceScope = value;
+  try { document.body.dataset.workspaceDraftScope = _authoredDraftFingerprint(value); } catch {}
+}
+
+function _authoredDraftFingerprint(value) {
+  const s = String(value ?? '');
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
+}
+
+function _authoredDraftStorage(fn, fallback = null) {
+  try {
+    if (typeof localStorage === 'undefined') return fallback;
+    return fn(localStorage);
+  } catch {
+    return fallback;
+  }
+}
+
+function _authoredDraftKey(parts) {
+  const scope = document.body?.dataset?.workspaceDraftScope
+    || _authoredDraftFingerprint(_runtimeDraftWorkspaceScope || window.location?.origin || 'workspace:current');
+  return [_AUTHORED_DRAFT_PREFIX, scope, ...parts]
+    .map(part => encodeURIComponent(String(part ?? '')))
+    .join(':');
+}
+
+function _authoredDraftHasValue(fields) {
+  return Object.values(fields || {}).some(value => {
+    if (typeof value === 'boolean') return value;
+    if (Array.isArray(value)) return value.length > 0;
+    return String(value ?? '').trim() !== '';
+  });
+}
+
+function _authoredDraftSave(key, payload) {
+  if (!key) return;
+  const fields = payload?.fields || {};
+  if (!_authoredDraftHasValue(fields)) {
+    _authoredDraftClear(key);
+    return;
+  }
+  _authoredDraftStorage(store => store.setItem(key, JSON.stringify({
+    ...payload,
+    schema: 1,
+    saved_at: new Date().toISOString(),
+  })));
+}
+
+function _authoredDraftLoad(key) {
+  if (!key) return null;
+  return _authoredDraftStorage(store => {
+    const raw = store.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  }, null);
+}
+
+function _authoredDraftClear(key) {
+  if (!key) return;
+  _authoredDraftStorage(store => store.removeItem(key));
+}
+
+function _draftValue(id) {
+  return document.getElementById(id)?.value || '';
+}
+
+function _draftSetValue(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.value = value == null ? '' : String(value);
+}
+
+function _draftSetChecked(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.checked = !!value;
+}
+
+function _draftBindInputs(root, handler) {
+  if (!root?.querySelectorAll) return;
+  root.querySelectorAll('input, textarea, select').forEach(el => {
+    el.addEventListener('input', handler);
+    el.addEventListener('change', handler);
+  });
+}
+
+function _draftFormNotice(id, message) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = message;
+  el.style.color = 'var(--green)';
+}
+
+function _crNewHighlightDraftKey(selection = null) {
+  const text = selection?.text || _crSelText || '';
+  const locator = _crEncodeReaderSpanLocator(selection || _crReaderSelectionState) || '';
+  return _authoredDraftKey([
+    'reader-highlight-new',
+    _crDocId || 'no-document',
+    _crPage || 'no-page',
+    _authoredDraftFingerprint(`${locator}|${text}`),
+  ]);
+}
+
+function _crReadNewHighlightDraftFields() {
+  return {
+    concept: _draftValue('cr-concept-input'),
+    important: !!document.getElementById('cr-important-input')?.checked,
+    tags: _draftValue('cr-tags-input'),
+    rank: _draftValue('cr-rank-input'),
+    theme_bucket: _draftValue('cr-theme-input'),
+    note_text: _draftValue('cr-note-input'),
+    question_text: _draftValue('cr-q-input'),
+    relevance: _crRelevance || 'unclear',
+  };
+}
+
+function _crApplyRelevanceDraft(value) {
+  const rel = value || 'unclear';
+  _crRelevance = rel;
+  document.querySelectorAll?.('.cr-relevance-btns .cr-rel-btn').forEach(btn => {
+    const label = String(btn.textContent || '').trim();
+    btn.classList.toggle('active', label === rel);
+  });
+}
+
+function _crApplyNewHighlightDraft(fields = {}) {
+  _draftSetValue('cr-concept-input', fields.concept || '');
+  _draftSetChecked('cr-important-input', fields.important);
+  _draftSetValue('cr-tags-input', fields.tags || '');
+  _draftSetValue('cr-rank-input', fields.rank || '');
+  _draftSetValue('cr-theme-input', fields.theme_bucket || '');
+  _draftSetValue('cr-note-input', fields.note_text || '');
+  _draftSetValue('cr-q-input', fields.question_text || '');
+  _crApplyRelevanceDraft(fields.relevance || 'unclear');
+}
+
+function _crStoreNewHighlightDraft(key, selection = null) {
+  const fields = _crReadNewHighlightDraftFields();
+  if (fields.relevance === 'unclear') fields.relevance = '';
+  _authoredDraftSave(key, {
+    form_type: 'reader-highlight-new',
+    document_id: _crDocId || null,
+    page: _crPage || null,
+    record_id: _authoredDraftFingerprint(`${selection?.text || _crSelText || ''}|${_crPage || ''}`),
+    selected_text: selection?.text || _crSelText || '',
+    fields,
+  });
+}
+
+function _crBindNewHighlightDraft(selection = null) {
+  const toolbar = document.getElementById('cr-sel-toolbar');
+  if (!toolbar) return null;
+  const key = _crNewHighlightDraftKey(selection);
+  toolbar.dataset.draftKey = key;
+  toolbar.dataset.draftKind = 'reader-highlight-new';
+  const draft = _authoredDraftLoad(key);
+  if (draft?.fields) {
+    _crApplyNewHighlightDraft(draft.fields);
+    _draftFormNotice('cr-capture-msg', 'Recovered unsaved highlight text from this browser.');
+  }
+  _draftBindInputs(toolbar, () => _crStoreNewHighlightDraft(key, selection));
+  return key;
+}
+
+function _crHighlightEditDraftKey(highlight) {
+  const h = typeof highlight === 'object' ? highlight : { id: highlight };
+  return _authoredDraftKey([
+    'reader-highlight-edit',
+    h.source_document_id || _crDocId || 'no-document',
+    h.id || 'no-highlight',
+  ]);
+}
+
+function _crHighlightEditBase(h = {}) {
+  const tags = _crHighlightTags(h);
+  const typedTags = tags.filter(t => t.startsWith('tag:')).map(t => t.slice(4)).join(', ');
+  return {
+    note_text: h.note_text || '',
+    question_text: h.question_text || '',
+    relevance: h.relevance || 'unclear',
+    tags: typedTags,
+    important: tags.includes('important'),
+    rank: h.rank == null ? '' : String(h.rank),
+    theme_bucket: h.theme_bucket || '',
+  };
+}
+
+function _crReadHighlightEditDraftFields() {
+  return {
+    important: !!document.getElementById('cr-edit-important')?.checked,
+    tags: _draftValue('cr-edit-tags'),
+    rank: _draftValue('cr-edit-rank'),
+    theme_bucket: _draftValue('cr-edit-theme'),
+    note_text: _draftValue('cr-edit-note'),
+    question_text: _draftValue('cr-edit-q'),
+    relevance: _crRelevance || 'unclear',
+  };
+}
+
+function _crHighlightEditBaseMatches(h, draft) {
+  const base = draft?.base || {};
+  const current = _crHighlightEditBase(h);
+  return Object.keys(current).every(key => String(current[key] ?? '') === String(base[key] ?? ''));
+}
+
+function _crApplyHighlightEditDraft(h, draft) {
+  if (!draft?.fields) return false;
+  if (!_crHighlightEditBaseMatches(h, draft)) {
+    _draftFormNotice('cr-edit-msg', 'Unsaved browser draft preserved, but the saved highlight changed. Review before replacing it.');
+    return false;
+  }
+  const f = draft.fields;
+  _draftSetChecked('cr-edit-important', f.important);
+  _draftSetValue('cr-edit-tags', f.tags || '');
+  _draftSetValue('cr-edit-rank', f.rank || '');
+  _draftSetValue('cr-edit-theme', f.theme_bucket || '');
+  _draftSetValue('cr-edit-note', f.note_text || '');
+  _draftSetValue('cr-edit-q', f.question_text || '');
+  _crApplyRelevanceDraft(f.relevance || 'unclear');
+  _draftFormNotice('cr-edit-msg', 'Recovered unsaved highlight text from this browser.');
+  return true;
+}
+
+function _crStoreHighlightEditDraft(key, h = null) {
+  const highlight = h || (_crHighlights || []).find(row => row.id === document.getElementById('cr-sel-form')?.dataset?.highlightId) || {};
+  const base = _crHighlightEditBase(highlight);
+  const fields = _crReadHighlightEditDraftFields();
+  const changed = Object.keys(base).some(k => String(fields[k] ?? '') !== String(base[k] ?? ''));
+  if (!changed) {
+    _authoredDraftClear(key);
+    return;
+  }
+  _authoredDraftSave(key, {
+    form_type: 'reader-highlight-edit',
+    document_id: highlight.source_document_id || _crDocId || null,
+    page: highlight.page || _crPage || null,
+    record_id: highlight.id || null,
+    base,
+    fields,
+  });
+}
+
+function _crBindHighlightEditDraft(h) {
+  const form = document.getElementById('cr-sel-form');
+  if (!form || !h) return null;
+  const key = _crHighlightEditDraftKey(h);
+  form.dataset.draftKey = key;
+  form.dataset.draftKind = 'reader-highlight-edit';
+  form.dataset.highlightId = h.id || '';
+  _crApplyHighlightEditDraft(h, _authoredDraftLoad(key));
+  _draftBindInputs(form, () => _crStoreHighlightEditDraft(key, h));
+  return key;
+}
+
+function _crStoreActiveReaderDraft() {
+  const toolbar = document.getElementById('cr-sel-toolbar');
+  if (toolbar?.dataset?.draftKind === 'reader-highlight-new') {
+    _crStoreNewHighlightDraft(toolbar.dataset.draftKey, _crGetReaderSelection({ refresh: false, fallback: true }));
+  }
+  const form = document.getElementById('cr-sel-form');
+  if (form?.dataset?.draftKind === 'reader-highlight-edit') {
+    const h = (_crHighlights || []).find(row => row.id === form.dataset.highlightId);
+    _crStoreHighlightEditDraft(form.dataset.draftKey, h);
+  }
+}
+
+function _flnDraftKey(lane = _flnLane) {
+  return _authoredDraftKey([
+    'field-notes',
+    _crDocId || 'no-document',
+    _crPage || 'no-page',
+    lane || 'corpus',
+  ]);
+}
+
+function _flnReadDraftFields() {
+  return {
+    understanding: _draftValue('fln-understanding'),
+    pressing_questions: _draftValue('fln-questions'),
+  };
+}
+
+function _flnPersistDraft(lane = _flnLane) {
+  const fields = _flnReadDraftFields();
+  _authoredDraftSave(_flnDraftKey(lane), {
+    form_type: 'field-notes',
+    document_id: _crDocId || null,
+    page: _crPage || null,
+    record_id: lane || 'corpus',
+    fields,
+  });
+}
+
+function _flnApplyDraft(lane = _flnLane) {
+  const draft = _authoredDraftLoad(_flnDraftKey(lane));
+  if (!draft?.fields) {
+    _draftSetValue('fln-understanding', '');
+    _draftSetValue('fln-questions', '');
+    return;
+  }
+  _draftSetValue('fln-understanding', draft.fields.understanding || '');
+  _draftSetValue('fln-questions', draft.fields.pressing_questions || '');
+}
+
+function _flnBindDrafts() {
+  ['fln-understanding', 'fln-questions'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.draftBound === '1') return;
+    el.addEventListener('input', () => _flnPersistDraft());
+    el.dataset.draftBound = '1';
+  });
+}
+
+function _cmpDraftKey() {
+  return _authoredDraftKey([
+    'companion-message',
+    _crDocId || 'no-document',
+    _crPage || 'no-page',
+  ]);
+}
+
+function _cmpPersistDraft() {
+  const input = document.getElementById('cmp-input');
+  _authoredDraftSave(_cmpDraftKey(), {
+    form_type: 'companion-message',
+    document_id: _crDocId || null,
+    page: _crPage || null,
+    record_id: 'composer',
+    fields: { message: input?.value || '' },
+  });
+}
+
+function _cmpBindDraft() {
+  const input = document.getElementById('cmp-input');
+  if (!input) return;
+  const draft = _authoredDraftLoad(_cmpDraftKey());
+  if (draft?.fields?.message && !input.value) input.value = draft.fields.message;
+  input.addEventListener('input', _cmpPersistDraft);
+}
+
 // ── Accessibility Dock v0.2 ────────────────────────────
 const _a11y = { read: false, focus: false, textLg: false, speaking: false, collapsed: false };
 let _a11yHintTimer = null;
@@ -3340,6 +3836,7 @@ function mount(h) {
   const fn    = h.document?.filename || '';
   const title = fn.replace(/\.pdf$/i,'').replace(/[_-]/g,' ')
                   .replace(/\b\w/g, c => c.toUpperCase()) || 'Hermeneia';
+  _runtimeSetDraftWorkspaceScope(h.runtime?.workspace_id || h.workspace_id || h.db_path || fn || window.location?.origin);
 
   document.getElementById('root').innerHTML = `
 <header class="page-head">
@@ -3610,6 +4107,7 @@ async function e10LoadFirstRun() {
     host.innerHTML = '<div class="e10-empty" style="color:var(--red)">The server is not reachable.</div>';
     return;
   }
+  _runtimeSetDraftWorkspaceScope(s.db_path);
 
   const step = (n, title, body, done) => `
     <div style="display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--border)">
@@ -6966,10 +7464,12 @@ function _flnMark() {
   _flnHidePrompt();
 }
 
-function flnSetLane(lane) {
+function flnSetLane(lane, opts = {}) {
+  if (!opts.skipPersist) _flnPersistDraft();
   _flnLane = lane === 'instrument' ? 'instrument' : 'corpus';
   document.querySelectorAll('.fln-lane').forEach(b =>
     b.classList.toggle('fs-on', b.dataset.lane === _flnLane));
+  _flnApplyDraft();
 }
 
 async function _flnRender() {
@@ -7000,7 +7500,8 @@ async function _flnRender() {
     saveBtn.addEventListener('click', (e) => { e.preventDefault(); flnSave(); });
     saveBtn.dataset.bound = '1';
   }
-  flnSetLane(_flnLane);
+  _flnBindDrafts();
+  flnSetLane(_flnLane, { skipPersist: true });
   _flnLoadEntries();
 }
 
@@ -7054,21 +7555,22 @@ async function flnSave() {
   const pressing = qEl?.value.trim() || '';
   if (!understanding && !pressing) { uEl?.focus(); return; }
   const btn = document.getElementById('fln-save');
+  const draftKey = _flnDraftKey(_flnLane);
   btn?.setAttribute('disabled', 'disabled');
   try {
-    const resp = await fetch('/api/investigation-log', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    _flnPersistDraft(_flnLane);
+    await requestJSON('/api/investigation-log', {
+      method: 'POST',
+      body: {
         lane: _flnLane,
         understanding,
         pressing_questions: pressing,
         source_document_id: _crDocId || null,
         page: _crPage || null,
         governing_question: invLoad()?.thesis || '',
-      }),
+      },
     });
-    const d = await resp.json();
-    if (!resp.ok) throw new Error(d.error || 'save failed');
+    _authoredDraftClear(draftKey);
     if (uEl) uEl.value = '';
     if (qEl) qEl.value = '';
     _flnMark();
@@ -7450,6 +7952,7 @@ async function _cmpRender() {
   _cmpRenderOnboarding();
   _cmpRenderContextRows();
   _cmpRenderTranscript();
+  _cmpBindDraft();
 
   const sel = document.getElementById('cmp-provider');
   if (sel) {
@@ -7507,11 +8010,12 @@ function cmpUseResponse(index, target) {
   const field = document.getElementById(fieldId);
   const text = String(message.text || '').trim();
   if (!field || !text) return;
+  flnSetLane('corpus');
   // Bring it in as an attributed quotation, not as the reader's own words.
   const quoted = `Companion — ${_cmpAttribution(message)} said:\n"${text}"`;
   const existing = field.value;
   field.value = existing.trim() ? `${existing}\n\n${quoted}` : quoted;
-  flnSetLane('corpus');
+  if (typeof _flnPersistDraft === 'function') _flnPersistDraft();
   flnToggleTray(true);
   field.focus();
   field.setSelectionRange(field.value.length, field.value.length);
@@ -7523,13 +8027,14 @@ async function cmpAsk() {
   if (!message || _cmpBusy) return;
   _cmpTranscript.push({ role: 'user', text: message });
   _cmpBusy = true;
+  _cmpPersistDraft();
   input.value = '';
   document.getElementById('cmp-ask')?.setAttribute('disabled', 'disabled');
   _cmpRenderTranscript();
   try {
-    const resp = await fetch('/api/companion/ask', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const d = await requestJSON('/api/companion/ask', {
+      method: 'POST',
+      body: {
         provider: _cmpProvider || 'stub',
         message,
         document_id: _crDocId,
@@ -7537,12 +8042,15 @@ async function cmpAsk() {
         context_flags: _cmpFlags,
         selected_text: _cmpFlags.selected_passage ? _crCurrentReaderSelectionText({ refresh: true, fallback: true }) : '',
         governing_question_text: _cmpFlags.governing_question ? (invLoad()?.thesis || '') : '',
-      }),
+      },
     });
-    const d = await resp.json();
-    if (!resp.ok) throw new Error(d.error || 'Companion unavailable');
+    _authoredDraftClear(_cmpDraftKey());
     _cmpTranscript.push({ role: 'companion', text: d.reply, provider: d.provider, model: d.model, context_used: d.context_used });
   } catch (e) {
+    if (input && !input.value) {
+      input.value = message;
+      _cmpPersistDraft();
+    }
     _cmpTranscript.push({ role: 'companion', text: `⚠ ${e.message}`, provider: 'error', context_used: [] });
   }
   _cmpBusy = false;
@@ -9485,7 +9993,7 @@ function _crRenderPage() {
 
   // Record progress
   if (_crDocId) {
-    fetch(`/api/reader/progress`, {
+    runtimeApiFetch(`/api/reader/progress`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ document_id: _crDocId, page: _crPage }),
@@ -10197,6 +10705,7 @@ function _crHighlightSelected(focus) {
       <div id="cr-capture-msg" style="font-size:12px;margin-top:6px"></div>
     </div>`;
 
+  if (typeof _crBindNewHighlightDraft === 'function') _crBindNewHighlightDraft(selection);
   requestAnimationFrame(() => _crPlaceToolbar(tb, _crSelectionRect));
   if (focusNote) setTimeout(() => document.getElementById('cr-note-input')?.focus(), 50);
   if (focusQ)    setTimeout(() => document.getElementById('cr-q-input')?.focus(), 50);
@@ -10207,6 +10716,7 @@ function _crSetRelevance(val, btn) {
   _crRelevance = val;
   btn.closest('.cr-relevance-btns')?.querySelectorAll('.cr-rel-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  if (typeof _crStoreActiveReaderDraft === 'function') _crStoreActiveReaderDraft();
 }
 
 function _crCancelHighlight() {
@@ -10247,6 +10757,7 @@ function _crUniqueTags(tags) {
 async function _crSaveHighlight(asCandidate) {
   const selection = _crGetReaderSelection({ refresh: false, fallback: true });
   const selectedText = selection?.text || _crSelText;
+  const draftKey = _crNewHighlightDraftKey(selection);
   const note = document.getElementById('cr-note-input')?.value?.trim() || '';
   const question = document.getElementById('cr-q-input')?.value?.trim() || '';
   const important = !!document.getElementById('cr-important-input')?.checked;
@@ -10284,19 +10795,17 @@ async function _crSaveHighlight(asCandidate) {
   try {
     const msg = document.getElementById('cr-capture-msg');
     if (msg) { msg.textContent = 'Saving…'; msg.style.color = 'var(--dim2)'; }
-    const res = await fetch('/api/reader/highlights', {
+    _crStoreNewHighlightDraft(draftKey, selection);
+    const d = await requestJSON('/api/reader/highlights', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: payload,
     });
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.error || 'Save failed');
 
     if (asCandidate) {
-      const promote = await fetch(`/api/reader/highlights/${encodeURIComponent(d.id)}/promote`, { method: 'POST' });
-      if (!promote.ok) throw new Error((await promote.json()).error || 'Promotion failed');
+      await requestJSON(`/api/reader/highlights/${encodeURIComponent(d.id)}/promote`, { method: 'POST' });
     }
 
+    _authoredDraftClear(draftKey);
     await _crLoadHighlightList();
     _crRenderPage();
     _crRefreshTrail();
@@ -10393,6 +10902,7 @@ async function _crShowHighlightDetail(highlightId) {
     </div>`;
 
   _crRelevance = h.relevance || 'unclear';
+  if (typeof _crBindHighlightEditDraft === 'function') _crBindHighlightEditDraft(h);
   form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   return true;
 }
@@ -10413,20 +10923,21 @@ async function _crUpdateHighlight(id) {
   ]);
   const msg = document.getElementById('cr-edit-msg');
   if (msg) { msg.textContent = 'Saving…'; msg.style.color = 'var(--dim2)'; }
+  const draftKey = _crHighlightEditDraftKey(existing || { id, source_document_id: _crDocId });
   try {
-    const res = await fetch(`/api/reader/highlights/${encodeURIComponent(id)}`, {
+    _crStoreHighlightEditDraft(draftKey, existing);
+    await requestJSON(`/api/reader/highlights/${encodeURIComponent(id)}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         note_text: note,
         question_text: question,
         relevance: _crRelevance,
         tags,
         rank,
         theme_bucket: themeBucket,
-      }),
+      },
     });
-    if (!res.ok) throw new Error((await res.json()).error || 'Update failed');
+    _authoredDraftClear(draftKey);
     if (msg) { msg.textContent = '✓ Saved'; msg.style.color = 'var(--green)'; }
     await _crLoadHighlightList();
     _crRenderPage();
@@ -10440,7 +10951,7 @@ async function _crUpdateHighlight(id) {
 async function _crPromoteHighlight(id) {
   const msg = document.getElementById('cr-edit-msg');
   try {
-    await fetch(`/api/reader/highlights/${encodeURIComponent(id)}/promote`, { method: 'POST' });
+    await requestJSON(`/api/reader/highlights/${encodeURIComponent(id)}/promote`, { method: 'POST' });
     if (msg) { msg.textContent = '✓ Marked as observation candidate'; msg.style.color = 'var(--green)'; }
     await _crLoadHighlightList();
     _crRenderPage();
@@ -10454,7 +10965,7 @@ async function _crPromoteHighlight(id) {
 async function _crDismissHighlight(id) {
   if (!confirm('Dismiss this highlight? It will be hidden from the list.')) return;
   try {
-    await fetch(`/api/reader/highlights/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    await requestJSON(`/api/reader/highlights/${encodeURIComponent(id)}`, { method: 'DELETE' });
     _crCancelHighlight();
     await _crLoadHighlightList();
     _crRenderPage();
@@ -11254,17 +11765,13 @@ async function requestJSON(url, options = {}) {
     requestOptions.body = JSON.stringify(requestOptions.body || {});
   }
   try {
-    const response = await fetch(url, requestOptions);
+    const response = await runtimeApiFetch(url, requestOptions);
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    if (!response.ok) throw new RuntimeHttpError(data.error || `HTTP ${response.status}`, response, data);
     clearAppError();
     return data;
   } catch (error) {
-    showAppError(
-      error instanceof TypeError
-        ? 'Hermeneia server is unavailable. Restart the local server and reload this page.'
-        : error.message
-    );
+    showAppError(_runtimeIsEndpointError(error) ? _runtimeEndpointLostMessage() : error.message);
     throw error;
   }
 }
