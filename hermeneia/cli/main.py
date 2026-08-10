@@ -62,6 +62,11 @@ def main() -> None:
         help="Named workspace to launch (slug, name, id, or Gatsby)",
     )
     p_serve.add_argument("--port", type=int, default=5173)
+    p_serve.add_argument(
+        "--supervised",
+        action="store_true",
+        help="Run a stable public supervisor that hands off between workspace child runtimes",
+    )
 
     p_workspace = sub.add_parser("workspace", help="List, create, and inspect runtime workspaces")
     workspace_sub = p_workspace.add_subparsers(dest="workspace_command", required=True)
@@ -235,6 +240,33 @@ def main() -> None:
         except WorkspaceLifecycleError as exc:
             print(str(exc))
             sys.exit(2)
+        if args.supervised:
+            from hermeneia.web.supervisor import (
+                WorkspaceRuntimeSupervisor,
+                create_supervisor_app,
+                runtime_target_from_serve_args,
+            )
+
+            supervisor = WorkspaceRuntimeSupervisor(
+                initial_target=runtime_target_from_serve_args(
+                    db_path=serve_db,
+                    workspace_selector=args.workspace,
+                )
+            )
+            try:
+                supervisor.start()
+            except Exception as exc:
+                print(f"failed to start workspace supervisor: {exc}")
+                sys.exit(2)
+            app = create_supervisor_app(supervisor)
+            print(f"  Hermeneia -> http://localhost:{args.port}")
+            print(f"  Database  -> {serve_db}")
+            print("  Runtime   -> supervised workspace handoff")
+            try:
+                app.run(port=args.port, debug=False)
+            finally:
+                supervisor.shutdown()
+            return
         from hermeneia.web.app import create_app
 
         app = create_app(db_path=serve_db)
