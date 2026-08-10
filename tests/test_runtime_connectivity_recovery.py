@@ -443,8 +443,13 @@ def test_health_success_reports_runtime_endpoint_and_database(tmp_path: Path) ->
 
     body = create_app(db_path=db_path).test_client().get("/api/health").get_json()
 
-    assert body["runtime"] == {
-        "endpoint_reachable": True,
-        "database_available": True,
+    assert body["runtime"]["endpoint_reachable"] is True
+    assert body["runtime"]["database_available"] is True
+    assert body["runtime"]["workspace"] == {
+        "id": None,
+        "name": "Custom workspace",
+        "slug": None,
+        "kind": "custom",
+        "managed": False,
     }
     assert body["db_path"] == str(db_path)

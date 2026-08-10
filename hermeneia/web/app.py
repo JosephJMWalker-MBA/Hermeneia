@@ -44,6 +44,12 @@ from ..compiler.projections.interpretive_divergence import (
     interpretive_divergence_projection,
 )
 from ..storage.sqlite import SQLiteStore
+from ..workspace import (
+    DEFAULT_LEGACY_DB,
+    WorkspaceRecord,
+    list_workspaces,
+    read_workspace_identity,
+)
 from ..explorer.interpreter import (
     ExplorerError,
     _call_provider,
@@ -393,6 +399,88 @@ def create_app(
 
     def _store() -> SQLiteStore:
         return SQLiteStore(db_path)
+
+    def _canonical_path(path: Path) -> Path:
+        return path.expanduser().resolve()
+
+    def _same_runtime_db(candidate: Path) -> bool:
+        try:
+            return _canonical_path(candidate) == _canonical_path(db_path)
+        except OSError:
+            return False
+
+    def _runtime_workspace_identity() -> dict | None:
+        if not db_path.exists():
+            return None
+        conn = None
+        try:
+            conn = _conn()
+            return read_workspace_identity(conn)
+        except sqlite3.DatabaseError:
+            return None
+        finally:
+            if conn is not None:
+                conn.close()
+
+    def _workspace_payload(
+        record: WorkspaceRecord,
+        *,
+        is_active: bool | None = None,
+    ) -> dict:
+        payload = {
+            "id": record.workspace_id,
+            "name": record.name,
+            "slug": record.slug,
+            "kind": record.kind,
+            "managed": record.kind == "managed",
+        }
+        if is_active is not None:
+            payload["is_active"] = is_active
+        if record.created_at:
+            payload["created_at"] = record.created_at
+        if record.updated_at:
+            payload["updated_at"] = record.updated_at
+        return payload
+
+    def _legacy_runtime_workspace_payload() -> dict:
+        identity = _runtime_workspace_identity() or {}
+        return {
+            "id": identity.get("workspace_id"),
+            "name": identity.get("workspace_name") or "Gatsby",
+            "slug": "gatsby",
+            "kind": "legacy",
+            "managed": False,
+        }
+
+    def _custom_runtime_workspace_payload() -> dict:
+        identity = _runtime_workspace_identity() or {}
+        return {
+            "id": identity.get("workspace_id"),
+            "name": identity.get("workspace_name") or "Custom workspace",
+            "slug": None,
+            "kind": "custom",
+            "managed": False,
+        }
+
+    def _runtime_workspace_payload(
+        records: list[WorkspaceRecord] | None = None,
+    ) -> dict:
+        discovered = records if records is not None else list_workspaces(
+            include_document_count=False
+        )
+        for record in discovered:
+            if _same_runtime_db(record.db_path):
+                return _workspace_payload(record)
+        if _same_runtime_db(DEFAULT_LEGACY_DB):
+            return _legacy_runtime_workspace_payload()
+        return _custom_runtime_workspace_payload()
+
+    def _workspace_catalog_payload() -> list[dict]:
+        records = list_workspaces(include_document_count=False)
+        return [
+            _workspace_payload(record, is_active=_same_runtime_db(record.db_path))
+            for record in records
+        ]
 
     def _scope_error_response(exc: _ScopeAccessError):
         payload = {"error": str(exc)}
@@ -1845,6 +1933,9 @@ def create_app(
             "database_exists": exists,
             "document_count": doc_count,
             "db_path": str(db_path),
+            "runtime": {
+                "workspace": _runtime_workspace_payload(),
+            },
             "demo_available": _DEMO_CORPUS.exists(),
             "first_run": (not exists) or doc_count == 0,
         }
@@ -1885,6 +1976,14 @@ def create_app(
             return jsonify({"error": f"demo compile failed: {exc}"}), 500
         return jsonify(_setup_state_payload())
 
+    @app.route("/api/runtime/workspace")
+    def api_runtime_workspace():
+        return jsonify({"workspace": _runtime_workspace_payload()})
+
+    @app.route("/api/workspaces")
+    def api_workspaces():
+        return jsonify({"workspaces": _workspace_catalog_payload()})
+
     @app.route("/api/health")
     def api_health():
         if not db_path.exists():
@@ -1903,6 +2002,7 @@ def create_app(
             "runtime": {
                 "endpoint_reachable": True,
                 "database_available": True,
+                "workspace": _runtime_workspace_payload(),
             },
             "compiler_ok": ok,
             "compiler_note": note,

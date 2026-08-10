@@ -28,6 +28,7 @@ from .identity import (
 from .lifecycle import (
     DEFAULT_LEGACY_DB,
     DEFAULT_WORKSPACE_ROOT,
+    RESERVED_WORKSPACE_SELECTORS,
     WORKSPACE_DB_NAME,
     WorkspaceLifecycleError,
     WorkspaceRecord,
@@ -55,6 +56,7 @@ __all__ = [
     "set_workspace_name",
     "DEFAULT_LEGACY_DB",
     "DEFAULT_WORKSPACE_ROOT",
+    "RESERVED_WORKSPACE_SELECTORS",
     "WORKSPACE_DB_NAME",
     "WorkspaceLifecycleError",
     "WorkspaceRecord",
