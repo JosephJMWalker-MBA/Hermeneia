@@ -103,6 +103,13 @@ def _node_base() -> str:
     function _runtimeIsEndpointError(error) {{
       return !!error?.endpointUnreachable || error instanceof RuntimeEndpointError;
     }}
+    let draftScope = 'managed:ws-a';
+    let draftScopeApplyCalls = 0;
+    function _runtimeApplyWorkspaceDraftScope(workspace) {{
+      draftScopeApplyCalls += 1;
+      if (workspace?.runtime_scope) draftScope = workspace.runtime_scope;
+      return true;
+    }}
     let _wsCurrentWorkspace = null;
     let _wsCatalog = [];
     let _wsCatalogLoading = false;
@@ -192,6 +199,8 @@ def test_workspace_create_success_posts_refreshes_catalog_and_keeps_current_chip
             inputCleared: elements['workspace-create-name'].value === '',
             status: elements['workspace-create-status'].textContent,
             createdInactive: created && created.is_active === false,
+            draftScope,
+            draftScopeApplyCalls,
             catalogHtml: elements['workspace-catalog'].innerHTML,
           }));
         })();
@@ -204,6 +213,8 @@ def test_workspace_create_success_posts_refreshes_catalog_and_keeps_current_chip
     assert out["getUrls"] == ["/api/workspaces"]
     assert out["chip"] == "The Second Sale"
     assert out["currentSlug"] == "the-second-sale"
+    assert out["draftScope"] == "managed:ws-a"
+    assert out["draftScopeApplyCalls"] == 1
     assert out["inputCleared"] is True
     assert out["createdInactive"] is True
     assert "Workspace created: Research Notes." in out["status"]
