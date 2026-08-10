@@ -2975,25 +2975,20 @@ const _a11y = { read: false, focus: false, textLg: false, speaking: false, colla
 let _a11yHintTimer = null;
 let _a11yHintShown = false;
 let _a11yLastReaderSelection = '';
+let _crReaderSelectionState = null;
+let _crReaderSelectionGeneration = 0;
+let _crSelectionResolveTimer = null;
 
 function _a11yGetSelectedText() {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return '';
-  return sel.toString().replace(/\s+/g, ' ').trim();
+  return _crCurrentReaderSelectionText({ refresh: true, fallback: false });
 }
 
 function _a11yCacheReaderSelection() {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-  const range = sel.getRangeAt(0);
-  const pageView = document.getElementById('cr-page-view');
-  if (!pageView || !pageView.contains(range.commonAncestorContainer)) return;
-  const text = _a11yGetSelectedText();
-  if (text) _a11yLastReaderSelection = text;
+  _crResolveAndCacheReaderSelection(null, { showToolbar: false, showTip: false });
 }
 
 function _a11yGetDockReadText() {
-  return _a11yGetSelectedText() || _a11yLastReaderSelection;
+  return _crCurrentReaderSelectionText({ refresh: true, fallback: true });
 }
 
 function _a11ySetStatus(msg, cls) {
@@ -3071,10 +3066,7 @@ function a11yClickRead() {
       }
     }
   }
-  const text = _a11yGetDockReadText();
-  if (text) {
-    a11ySpeak(text);
-  } else {
+  if (!speakSelectedReaderText()) {
     _a11ySetStatus('Select text first.', 'status-ready');
     setTimeout(() => _a11y.read && _a11ySetStatus('Select text to read', 'status-ready'), 1800);
   }
@@ -3108,8 +3100,7 @@ function a11yReadSelection() {
   // Clicking Read from the selection popup should just work — auto-enable what
   // is needed rather than requiring the global Read toggle first.
   if (!_a11y.read) { _a11y.read = true; _a11ySync(); }
-  const text = _a11yGetSelectedText();
-  a11ySpeak(text);
+  speakSelectedReaderText();
 }
 
 function a11yStop() {
@@ -3133,43 +3124,13 @@ function a11yCollapse() {
   else _dockOpenPanel('tools');
 }
 
-// Show floating Read toolbar near the selection when Read mode is on
-document.addEventListener('mouseup', (e) => {
-  // Don't trigger if click was inside dock or tip
-  if (e.target.closest('#a11y-dock, #a11y-dock-collapsed-pill, #a11y-selection-tip')) return;
-  if (_a11y.speaking) return;
-  // Show the Read popup on any content selection — the popup's Read button
-  // auto-enables read mode, so the global toggle need not be on first. Skip
-  // selections inside form fields.
-  if (e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
-  const text = _a11yGetSelectedText();
-  const tip  = document.getElementById('a11y-selection-tip');
-  if (!tip) return;
-  if (!text) { tip.style.display = 'none'; return; }
-
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return;
-  const rect = sel.getRangeAt(0).getBoundingClientRect();
-
-  // Position above selection, clamped to viewport
-  const tipW = 160;
-  const tipH = 44;
-  let left = rect.left + rect.width / 2 - tipW / 2;
-  let top  = rect.top + window.scrollY - tipH - 8;
-  left = Math.max(8, Math.min(left, window.innerWidth - tipW - 90)); // keep clear of dock
-  top  = Math.max(window.scrollY + 8, top);
-
-  tip.style.left    = `${left}px`;
-  tip.style.top     = `${top}px`;
-  tip.style.display = 'flex';
-});
-
 // Dismiss tip when user clicks away
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('#a11y-selection-tip')) a11yDismissTip();
 });
 
-document.addEventListener('selectionchange', _a11yCacheReaderSelection);
+document.addEventListener('pointerdown', _crHandleReaderSelectionPointerDown, true);
+document.addEventListener('selectionchange', _crHandleSelectionChange);
 
 // Cancel speech on tab hide or screen navigation
 document.addEventListener('visibilitychange', () => { if (document.hidden) a11yStop(); });
@@ -6914,7 +6875,7 @@ function _crMarkPending() {
 function _crClearPending() {
   try { window.CSS?.highlights?.delete('hermeneia-pending'); } catch {}
   window.getSelection()?.removeAllRanges();
-  _crSelRange = null;
+  _crClearReaderSelection({ hideToolbar: false, clearNative: false });
 }
 
 async function e10LoadCloseReader() {
@@ -7368,7 +7329,7 @@ function cmpRestartOnboarding() {
 }
 
 function _cmpSearchSeed() {
-  const selected = (_crSelText || (window.getSelection ? String(window.getSelection()).trim() : '')).trim();
+  const selected = _crCurrentReaderSelectionText({ refresh: true, fallback: true }).trim();
   if (selected && selected.length <= 80) return selected;
   const thesis = (invLoad()?.thesis || '').trim();
   const words = thesis.split(/\s+/).map(w => w.replace(/[^\w-]/g, '')).filter(w => w.length > 3);
@@ -7451,7 +7412,7 @@ function _cmpRenderContextRows() {
   host.innerHTML = _CMP_CONTEXT_LABELS.map(([key, label]) => `
     <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:${_cmpFlags[key] ? 'var(--fg2)' : 'var(--dim2)'};cursor:pointer;padding:2px 0">
       <input type="checkbox" ${_cmpFlags[key] ? 'checked' : ''} onchange="cmpToggleFlag('${key}')" style="flex-shrink:0">
-      ${label}${key === 'selected_passage' && _crSelText ? ` <span style="color:var(--accent)">·</span>` : ''}
+      ${label}${key === 'selected_passage' && _crReaderSelectionState?.text ? ` <span style="color:var(--accent)">·</span>` : ''}
     </label>`).join('');
 }
 
@@ -7562,7 +7523,7 @@ async function cmpAsk() {
         document_id: _crDocId,
         page: _crPage,
         context_flags: _cmpFlags,
-        selected_text: _cmpFlags.selected_passage ? (_crSelText || '') : '',
+        selected_text: _cmpFlags.selected_passage ? _crCurrentReaderSelectionText({ refresh: true, fallback: true }) : '',
         governing_question_text: _cmpFlags.governing_question ? (invLoad()?.thesis || '') : '',
       }),
     });
@@ -7578,6 +7539,7 @@ async function cmpAsk() {
 }
 
 function _crAskCompanion() {
+  _crGetReaderSelection({ refresh: true, fallback: true });
   _crHideToolbar();
   if (!_cmpFlags.selected_passage) cmpToggleFlag('selected_passage');
   _cmpRenderContextRows();
@@ -7770,8 +7732,14 @@ function _crRenderDocPicker(ws) {
   if (_drawer) { _drawer.setAttribute('data-open', '0'); _drawer.hidden = true; }
   document.getElementById('cr-tool-drawer-btn')?.setAttribute('aria-expanded', 'false');
 
-  // Selection listener
-  document.getElementById('cr-page-view').addEventListener('mouseup', _crHandleSelection);
+  // Reader selection listeners. selectionchange observes the browser state;
+  // pointer/keyboard events only ask for a stable post-gesture resolution.
+  const pageView = document.getElementById('cr-page-view');
+  pageView.removeEventListener('mouseup', _crHandleSelection);
+  pageView.removeEventListener('pointerup', _crHandleSelection);
+  pageView.removeEventListener('keyup', _crHandleSelection);
+  pageView.addEventListener('pointerup', _crHandleSelection);
+  pageView.addEventListener('keyup', _crHandleSelection);
   document.removeEventListener('selectionchange', _crHandleSelectionChange);
   document.addEventListener('selectionchange', _crHandleSelectionChange);
   _crSyncBottomWorkstationState();
@@ -8892,7 +8860,7 @@ function openCorpusSearch(prefill) {
   const input = document.getElementById('corpus-search-input');
   if (!input) return;
   _crOpenBottomWorkstation('search');
-  const sel = prefill || (window.getSelection ? String(window.getSelection()).trim() : '');
+  const sel = prefill || _crCurrentReaderSelectionText({ refresh: true, fallback: true });
   if (sel && sel.length && sel.length <= 80) input.value = sel;
   input.focus(); input.select();
   if (input.value.trim()) _corpusRunSearch(input.value.trim());
@@ -9269,6 +9237,7 @@ function _crToggleLens() {
 function _crRenderPage() {
   const view = document.getElementById('cr-page-view');
   const pageData = _crPages.find(p => p.page === _crPage) || _crPages[_crPage - 1];
+  if (!_crCaptureOpen) _crClearReaderSelection({ clearNative: false, hideToolbar: true });
 
   if (!pageData) {
     view.innerHTML = `<div class="e10-empty">No extracted text for page ${_crPage}.</div>`;
@@ -9573,9 +9542,7 @@ function _crCaptureBlock(blockIndex) {
   _crCaptureOpen = false;
   _crHideToolbar(true);
   _crClearPending();
-  _crSelText = text;
-  _crSelRange = null;
-  _crSelectionRect = textEl.getBoundingClientRect();
+  _crSetReaderSelectionState(_crCreateBlockReaderSelection(block, textEl, text));
   _crShowToolbar(_crSelectionRect);
   _crHighlightSelected('note');
 }
@@ -9598,35 +9565,219 @@ function _crSelectionInsideReader(range) {
 }
 
 function _crCleanSelectionText(text) {
-  return (text || '').trim();
+  return (text || '').replace(/\s+/g, ' ').trim();
+}
+
+function _crReaderBlockInfo(el) {
+  const block = _crNodeElement(el)?.closest?.('.cr-text-block');
+  if (!block) return null;
+  const index = Number(block.dataset?.crBlock);
+  const ex = Number.isFinite(index) ? (_crCurrentExtractions || [])[index] : null;
+  return {
+    block_index: Number.isFinite(index) ? index : null,
+    source_locator: block.dataset?.crLocator || ex?.source_locator || '',
+    extraction_id: ex?.id || ex?.source_extraction_id || '',
+    region: ex?.region || '',
+    page: _crPage || null,
+    source_document_id: _crDocId || '',
+    element: block,
+  };
+}
+
+function _crSelectionBlockInfos(startInfo, endInfo) {
+  if (!startInfo || !endInfo) return [];
+  const start = Number(startInfo.block_index);
+  const end = Number(endInfo.block_index);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return [startInfo, endInfo].filter(Boolean);
+  const low = Math.min(start, end);
+  const high = Math.max(start, end);
+  const infos = [];
+  for (let i = low; i <= high; i++) {
+    const block = document.querySelector(`[data-cr-block="${i}"]`);
+    const info = _crReaderBlockInfo(block);
+    if (info) infos.push(info);
+  }
+  return infos;
+}
+
+function _crUsableRect(rect) {
+  return rect && Number.isFinite(rect.left) && Number.isFinite(rect.top) &&
+    Number.isFinite(rect.bottom) && Number.isFinite(rect.right);
+}
+
+function _crRangeRect(range, fallbackEl) {
+  try {
+    const rect = range?.getBoundingClientRect?.();
+    if (_crUsableRect(rect) && (rect.width || rect.height || rect.bottom !== rect.top)) return rect;
+    const rects = Array.from(range?.getClientRects?.() || []);
+    const first = rects.find(_crUsableRect);
+    if (first) return first;
+  } catch {}
+  return fallbackEl?.getBoundingClientRect?.() || null;
+}
+
+function _crCreateReaderSelectionFromRange(sel, range) {
+  if (!range || !_crSelectionInsideReader(range)) return null;
+  const text = _crCleanSelectionText(sel?.toString?.() || '');
+  if (!text) return null;
+  const startInfo = _crReaderBlockInfo(range.startContainer);
+  const endInfo = _crReaderBlockInfo(range.endContainer);
+  const blocks = _crSelectionBlockInfos(startInfo, endInfo);
+  const rect = _crRangeRect(range, startInfo?.element || endInfo?.element);
+  return {
+    valid: true,
+    text,
+    range: range.cloneRange?.() || null,
+    rect,
+    page: _crPage || null,
+    source_document_id: _crDocId || '',
+    start: startInfo,
+    end: endInfo,
+    blocks,
+    source_locators: blocks.map(b => b.source_locator).filter(Boolean),
+    extraction_ids: blocks.map(b => b.extraction_id).filter(Boolean),
+    timestamp: Date.now(),
+  };
+}
+
+function _crCreateBlockReaderSelection(block, textEl, text) {
+  const info = _crReaderBlockInfo(block);
+  const rect = textEl?.getBoundingClientRect?.() || block?.getBoundingClientRect?.() || null;
+  return {
+    valid: true,
+    text,
+    range: null,
+    rect,
+    page: _crPage || null,
+    source_document_id: _crDocId || '',
+    start: info,
+    end: info,
+    blocks: info ? [info] : [],
+    source_locators: info?.source_locator ? [info.source_locator] : [],
+    extraction_ids: info?.extraction_id ? [info.extraction_id] : [],
+    timestamp: Date.now(),
+  };
+}
+
+function _crResolveReaderSelection() {
+  const sel = window.getSelection?.();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+  return _crCreateReaderSelectionFromRange(sel, sel.getRangeAt(0));
+}
+
+function _crSetReaderSelectionState(selection, opts = {}) {
+  if (!selection?.valid || !selection.text) return null;
+  selection.generation = ++_crReaderSelectionGeneration;
+  _crReaderSelectionState = selection;
+  _crSelText = selection.text;
+  _crSelRange = selection.range || null;
+  _crSelectionRect = selection.rect || null;
+  _a11yLastReaderSelection = selection.text;
+  if (opts.renderContext !== false) _cmpRenderContextRows?.();
+  return selection;
+}
+
+function _crClearReaderSelection(opts = {}) {
+  _crReaderSelectionState = null;
+  _crSelText = '';
+  _crSelRange = null;
+  _crSelectionRect = null;
+  _a11yLastReaderSelection = '';
+  if (opts.hideToolbar !== false) _crHideToolbar(true);
+  if (opts.hideTip !== false) a11yDismissTip();
+  if (opts.clearNative) {
+    try { window.getSelection?.()?.removeAllRanges?.(); } catch {}
+  }
+  if (opts.renderContext !== false) _cmpRenderContextRows?.();
+}
+
+function _crShowA11ySelectionTip(selection) {
+  if (_a11y.speaking) return;
+  const tip = document.getElementById('a11y-selection-tip');
+  const rect = selection?.rect;
+  if (!tip || !selection?.text || !_crUsableRect(rect)) return;
+  const tipW = 160;
+  const tipH = 44;
+  let left = rect.left + (rect.width || 0) / 2 - tipW / 2;
+  let top = rect.top + window.scrollY - tipH - 8;
+  left = Math.max(8, Math.min(left, window.innerWidth - tipW - 90));
+  top = Math.max(window.scrollY + 8, top);
+  tip.style.left = `${left}px`;
+  tip.style.top = `${top}px`;
+  tip.style.display = 'flex';
+}
+
+function _crShowReaderSelectionAffordances(selection, e, opts = {}) {
+  if (!selection?.valid || !selection.text) return;
+  if (opts.showToolbar !== false && !_crCaptureOpen) {
+    _crShowToolbar(selection.rect, e?.clientX, e?.clientY);
+  }
+  if (opts.showTip !== false) _crShowA11ySelectionTip(selection);
+}
+
+function _crResolveAndCacheReaderSelection(e = null, opts = {}) {
+  if (_crCaptureOpen && !opts.force) return _crReaderSelectionState;
+  const sel = window.getSelection?.();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+  const selection = _crCreateReaderSelectionFromRange(sel, sel.getRangeAt(0));
+  if (selection) {
+    _crSetReaderSelectionState(selection);
+    _crShowReaderSelectionAffordances(selection, e, opts);
+    return selection;
+  }
+  _crClearReaderSelection({ clearNative: false });
+  return null;
+}
+
+function _crGetReaderSelection(opts = {}) {
+  const refresh = opts.refresh !== false;
+  const current = refresh
+    ? _crResolveAndCacheReaderSelection(null, { showToolbar: false, showTip: false })
+    : null;
+  return current || (opts.fallback === false ? null : _crReaderSelectionState);
+}
+
+function _crCurrentReaderSelectionText(opts = {}) {
+  return _crGetReaderSelection(opts)?.text || '';
+}
+
+function _crScheduleReaderSelectionResolve() {
+  clearTimeout(_crSelectionResolveTimer);
+  _crSelectionResolveTimer = setTimeout(() => {
+    _crResolveAndCacheReaderSelection(null);
+  }, 0);
 }
 
 function _crHandleSelection(e) {
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
-    if (!_crCaptureOpen) _crHideToolbar();
-    return;
-  }
-  const range = sel.getRangeAt(0);
-  if (!_crSelectionInsideReader(range)) {
-    if (!_crCaptureOpen) _crHideToolbar();
-    return;
-  }
-  const text = _crCleanSelectionText(sel.toString());
-  if (!text || text.length < 3) {
-    if (!_crCaptureOpen) _crHideToolbar();
-    return;
-  }
-  _crSelText = text;
-  _crSelRange = range.cloneRange();
-  _crSelectionRect = range.getBoundingClientRect();
-  _crShowToolbar(_crSelectionRect, e?.clientX, e?.clientY);
+  _crResolveAndCacheReaderSelection(e);
 }
 
 function _crHandleSelectionChange() {
-  if (_crCaptureOpen) return;
-  const sel = window.getSelection();
-  if (!sel || sel.isCollapsed) _crHideToolbar();
+  _crScheduleReaderSelectionResolve();
+}
+
+function _crReaderSelectionControlTarget(target) {
+  const el = _crNodeElement(target);
+  return !!el?.closest?.('#cr-sel-toolbar, #a11y-selection-tip, #a11y-dock, #a11y-dock-collapsed-pill, #cr-companion-panel');
+}
+
+function _crHandleReaderSelectionPointerDown(e) {
+  if (_crReaderSelectionControlTarget(e?.target)) return;
+  const pageView = document.getElementById('cr-page-view');
+  const el = _crNodeElement(e?.target);
+  if (pageView && el && pageView.contains(el)) return;
+  _crClearReaderSelection({ clearNative: false });
+}
+
+function speakSelectedReaderText() {
+  if (!_a11y.read) { _a11y.read = true; _a11ySync(); }
+  const text = _crCurrentReaderSelectionText({ refresh: true, fallback: true });
+  if (!text) {
+    _a11ySetStatus('Select text first.', 'status-ready');
+    return false;
+  }
+  a11ySpeak(text);
+  return true;
 }
 
 function _crPlaceToolbar(tb, rect, fallbackX, fallbackY) {
@@ -9660,7 +9811,7 @@ function _crShowToolbar(rect, fallbackX, fallbackY) {
       <button class="cr-sel-btn" onclick="_crHighlightSelected('concept')">✦ Concept</button>
       <button class="cr-sel-btn" onclick="_crHighlightSelected('candidate')" style="color:var(--accent)">→ Observation</button>
       <button class="cr-sel-btn" onclick="_crAskCompanion()" title="Ask the Companion about only this passage">⁘ Ask</button>
-      <button class="cr-sel-btn" onclick="ttsSpeak(_crSelText)" title="Read aloud">▶ Read</button>
+      <button class="cr-sel-btn" onclick="speakSelectedReaderText()" title="Read aloud">▶ Read</button>
     </div>`;
   document.body.appendChild(tb);
   _crSelToolbar = tb;
@@ -9673,11 +9824,11 @@ function _crHideToolbar(force = false) {
 }
 
 function _crHighlightSelected(focus) {
-  const sel = window.getSelection();
-  const text = _crSelText || _crCleanSelectionText(sel?.toString());
+  const selection = _crGetReaderSelection({ refresh: true, fallback: true });
+  const text = selection?.text || '';
   if (!text) return;
   _dockOpenPanel('inspector');
-  _crSelText = text;
+  _crSetReaderSelectionState(selection, { renderContext: false });
   _crRelevance = 'unclear';
   _crConcept = focus === 'concept' ? text.length <= 48 ? text : '' : '';
   _crCaptureOpen = true;
@@ -9803,6 +9954,8 @@ function _crUniqueTags(tags) {
 }
 
 async function _crSaveHighlight(asCandidate) {
+  const selection = _crGetReaderSelection({ refresh: false, fallback: true });
+  const selectedText = selection?.text || _crSelText;
   const note = document.getElementById('cr-note-input')?.value?.trim() || '';
   const question = document.getElementById('cr-q-input')?.value?.trim() || '';
   const important = !!document.getElementById('cr-important-input')?.checked;
@@ -9812,9 +9965,9 @@ async function _crSaveHighlight(asCandidate) {
 
   // Get surrounding context from page text
   const fullText = _crPageReadingText();
-  const idx = fullText.indexOf(_crSelText);
+  const idx = fullText.indexOf(selectedText);
   const contextBefore = idx > 0 ? fullText.slice(Math.max(0, idx - 100), idx).trim() : '';
-  const contextAfter  = idx > -1 ? fullText.slice(idx + _crSelText.length, idx + _crSelText.length + 100).trim() : '';
+  const contextAfter  = idx > -1 ? fullText.slice(idx + selectedText.length, idx + selectedText.length + 100).trim() : '';
 
   const conceptName = document.getElementById('cr-concept-input')?.value?.trim() || '';
   const tags = _crUniqueTags([
@@ -9825,7 +9978,7 @@ async function _crSaveHighlight(asCandidate) {
   const payload = {
     source_document_id: _crDocId,
     page: _crPage,
-    selected_text: _crSelText,
+    selected_text: selectedText,
     context_before: contextBefore,
     context_after: contextAfter,
     note_text: note || null,
