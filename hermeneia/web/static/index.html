@@ -6957,20 +6957,13 @@ function _crDismissReaderBanner() {
 // Append-only snapshots of evolving understanding, in two lanes:
 // 'corpus' (what I am learning about the text) and 'instrument'
 // (what I am learning about Hermeneia while using it). A gentle,
-// dismissible footer prompt appears after reading activity — an
-// attention-stewardship pattern, never a nag: fixed disclosed rule,
-// snoozable, and it only ever points here.
+// Field Notes remains manually available from the Reader workstation. Automatic
+// reflection is intentionally disabled until the Reader can prove a forward
+// crossing of an accepted authored-structure boundary; page changes alone are
+// not semantic completion.
 let _flnLane = 'corpus';
-let _flnActivity = 0;                 // reading actions since last prompt/entry
-const _FLN_ACTIVITY_THRESHOLD = 6;    // page turns + saves before the prompt may appear
-const _FLN_MIN_INTERVAL_MS = 8 * 60 * 1000;
-
-function _flnLastMark() {
-  try { return parseInt(localStorage.getItem('hermeneia_fieldnotes_last') || '0', 10); } catch { return 0; }
-}
 function _flnMark() {
-  try { localStorage.setItem('hermeneia_fieldnotes_last', String(Date.now())); } catch {}
-  _flnActivity = 0;
+  _flnHidePrompt();
 }
 
 function flnSetLane(lane) {
@@ -7089,22 +7082,17 @@ async function flnSave() {
   btn?.removeAttribute('disabled');
 }
 
-// The gentle footer. Fixed rule, fully disclosed: appears after ~6
-// reading actions and no sooner than 8 minutes since the last entry
-// or prompt. It never blocks reading and never returns after "Later"
-// until the rule is satisfied again.
+// Automatic Field Notes reflection is disabled for now. The Reader currently
+// tracks page navigation and rendered block locators, but not a trustworthy
+// "reader crossed this source locator moving forward" event. Without that
+// primitive, opening reflection from page changes would confuse "entered the
+// page" with "completed the preceding authored section."
 function _flnActivityTick() {
-  _flnActivity += 1;
-  if (_flnActivity < _FLN_ACTIVITY_THRESHOLD) return;
-  if (Date.now() - _flnLastMark() < _FLN_MIN_INTERVAL_MS) return;
-  if (document.querySelector('.e10-screen.active')?.id !== 'reader') return;
-  _flnShowPrompt();
+  return;
 }
 
-// The prompt now lives inside the tray itself — one surface, not two.
-// When the disclosed rule fires, the tray opens and glows gently,
-// inviting the entry without a separate blocking bar. The reader can
-// always ignore it; it never returns until the rule is satisfied again.
+// Future semantic checkpoints should reuse the tray rather than adding another
+// modal/popover, but only after a reliable accepted-boundary crossing exists.
 function _flnShowPrompt() {
   const tray = document.getElementById('cr-fln-tray');
   if (!tray || tray.dataset.open === '1') return;
