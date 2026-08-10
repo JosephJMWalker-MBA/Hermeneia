@@ -79,6 +79,23 @@ body.reader-active .wrap { max-width: 1180px; padding: 0 20px; }
   flex-shrink: 0;
 }
 .nav-right { display: flex; align-items: center; gap: 8px; }
+.nav-workspace-chip {
+  display: flex; align-items: center; gap: 6px;
+  min-width: 0; max-width: 220px;
+  padding: 5px 10px; border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--bg2); color: var(--fg2);
+  font-size: 12px; white-space: nowrap;
+}
+.nav-workspace-chip span:last-child {
+  overflow: hidden; text-overflow: ellipsis;
+}
+.nav-workspace-chip .nav-workspace-prefix {
+  color: var(--dim2); flex-shrink: 0;
+}
+.nav-workspace-chip[data-kind="custom"] {
+  border-color: color-mix(in srgb, #e0a800 45%, var(--border));
+}
 
 .reader-home-btn {
   min-height: 38px;
@@ -263,6 +280,31 @@ body.reader-active .wrap { max-width: 1180px; padding: 0 20px; }
 .workspace-drawer-item:hover .workspace-drawer-name { color: var(--accent); }
 .workspace-drawer-name { font-size: 14px; color: var(--fg); font-weight: 600; }
 .workspace-drawer-desc { font-size: 12px; color: var(--dim2); }
+.workspace-catalog {
+  border-top: 1px solid var(--border);
+  margin-top: 8px; padding-top: 10px;
+}
+.workspace-catalog-head {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--dim2); margin-bottom: 6px;
+}
+.workspace-catalog-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 7px 2px; border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.workspace-catalog-row:first-of-type { border-top: none; }
+.workspace-catalog-name {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--fg2); font-size: 13px;
+}
+.workspace-catalog-badge {
+  flex-shrink: 0; font-size: 10px; color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 999px; padding: 2px 7px; background: var(--accent2);
+}
+.workspace-catalog-empty {
+  font-size: 12px; color: var(--dim2); line-height: 1.45; padding: 4px 0;
+}
 
 /* Import Workspace modal — inspect before acting. */
 .ws-import-overlay {
@@ -2558,6 +2600,10 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
 
 <nav class="nav">
   <span class="nav-brand" onclick="e10Go('onboarding')" style="cursor:pointer">Hermeneia</span>
+  <div class="nav-workspace-chip" id="runtime-workspace-chip" title="Current workspace reported by the running backend" hidden>
+    <span class="nav-workspace-prefix">Workspace</span>
+    <span id="runtime-workspace-name"></span>
+  </div>
   <!-- Hidden nav-step buttons preserved for JS .active class toggling -->
   <button class="nav-step" id="navstep-corpus"    onclick="e10Go('corpus')">Corpus</button>
   <button class="nav-step" id="navstep-reader"    onclick="e10Go('reader')">Reader</button>
@@ -2608,6 +2654,10 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
   <button class="workspace-drawer-item" role="menuitem" onclick="_wsGo('lineage')"><span class="workspace-drawer-name">Lineage</span><span class="workspace-drawer-desc">trace claims back to evidence</span></button>
   <button class="workspace-drawer-item workspace-drawer-export" role="menuitem" onclick="exportWorkspace()"><span class="workspace-drawer-name">⬇ Export workspace</span><span class="workspace-drawer-desc">download a portable .zip bundle of your work</span></button>
   <button class="workspace-drawer-item workspace-drawer-export" role="menuitem" onclick="importWorkspace()"><span class="workspace-drawer-name">⬆ Import workspace</span><span class="workspace-drawer-desc">preview and restore a .zip bundle into a fresh workspace</span></button>
+  <div class="workspace-catalog" id="workspace-catalog" aria-label="Known workspaces">
+    <div class="workspace-catalog-head">Known Workspaces</div>
+    <div class="workspace-catalog-empty">Loading workspaces...</div>
+  </div>
 </div>
 <input type="file" id="ws-import-file" accept=".zip,application/zip" hidden>
 <div class="ws-import-overlay" id="ws-import-overlay" hidden>
@@ -3112,6 +3162,7 @@ function _runtimeMarkReachable() {
     _runtimeSetConnectionState('reconnected');
     clearTimeout(_runtimeReconnectQuietTimer);
     _runtimeReconnectQuietTimer = setTimeout(() => _runtimeSetConnectionState('connected'), _RUNTIME_RECONNECTED_VISIBLE_MS);
+    if (typeof _wsRefreshWorkspaceShell === 'function') _wsRefreshWorkspaceShell();
     return;
   }
   _runtimeSetConnectionState('connected');
@@ -3674,14 +3725,17 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) a11yS
 // ── Boot ───────────────────────────────────────────────
 (async () => {
   try {
-    mount(await get('/api/health'));
+    const health = await get('/api/health');
+    mount(health);
+    setTimeout(() => _wsRefreshWorkspaceShell(health.runtime?.workspace), 0);
   } catch(e) {
     // A missing database is not an error — it is a fresh environment.
     // Route to first-run onboarding instead of a dead screen.
     try {
       const s = await get('/api/setup/state');
       if (!s.database_exists) {
-        mount({ document: { filename: null }, _noDatabase: true });
+        mount({ document: { filename: null }, _noDatabase: true, runtime: s.runtime || null });
+        setTimeout(() => _wsRefreshWorkspaceShell(s.runtime?.workspace), 0);
         return;
       }
     } catch {}
@@ -3709,6 +3763,63 @@ function toggleExpert() {
 // Additive progressive disclosure: group the older pipeline surfaces behind
 // one clear entry point without changing routing. Every entry reuses the
 // existing e10Go() navigation; the existing nav buttons stay in place.
+let _wsCurrentWorkspace = null;
+let _wsCatalog = [];
+let _wsCatalogLoading = false;
+
+function _wsApplyCurrentWorkspace(workspace) {
+  if (!workspace) return;
+  _wsCurrentWorkspace = workspace;
+  const chip = document.getElementById('runtime-workspace-chip');
+  const name = document.getElementById('runtime-workspace-name');
+  if (name) name.textContent = workspace.name || 'Workspace';
+  if (chip) {
+    chip.hidden = false;
+    chip.dataset.kind = workspace.kind || '';
+    chip.title = `Current workspace: ${workspace.name || 'Workspace'}`;
+  }
+  _wsRenderWorkspaceCatalog();
+}
+
+function _wsRenderWorkspaceCatalog() {
+  const host = document.getElementById('workspace-catalog');
+  if (!host) return;
+  const rows = (_wsCatalog || []).map(workspace => `
+    <div class="workspace-catalog-row" aria-current="${workspace.is_active ? 'true' : 'false'}">
+      <span class="workspace-catalog-name">${x(workspace.name || workspace.slug || 'Workspace')}</span>
+      ${workspace.is_active ? '<span class="workspace-catalog-badge">Current</span>' : ''}
+    </div>
+  `).join('');
+  host.innerHTML = `
+    <div class="workspace-catalog-head">Known Workspaces</div>
+    ${rows || '<div class="workspace-catalog-empty">No managed workspaces found yet.</div>'}
+  `;
+}
+
+async function _wsRefreshRuntimeWorkspace(seed = null) {
+  if (seed) _wsApplyCurrentWorkspace(seed);
+  const data = await get('/api/runtime/workspace');
+  _wsApplyCurrentWorkspace(data.workspace);
+}
+
+async function _wsRefreshWorkspaceCatalog() {
+  if (_wsCatalogLoading) return;
+  _wsCatalogLoading = true;
+  try {
+    const data = await get('/api/workspaces');
+    _wsCatalog = data.workspaces || [];
+    _wsRenderWorkspaceCatalog();
+  } finally {
+    _wsCatalogLoading = false;
+  }
+}
+
+function _wsRefreshWorkspaceShell(seed = null) {
+  if (seed) _wsApplyCurrentWorkspace(seed);
+  _wsRefreshRuntimeWorkspace().catch(() => {});
+  _wsRefreshWorkspaceCatalog().catch(() => {});
+}
+
 function _wsCloseMenu() {
   const d = document.getElementById('workspace-drawer');
   if (d) { d.dataset.open = '0'; d.hidden = true; }
@@ -3722,6 +3833,7 @@ function toggleWorkspaceMenu() {
   d.dataset.open = open ? '0' : '1';
   d.hidden = open;
   if (b) b.setAttribute('aria-expanded', String(!open));
+  if (open === false) _wsRefreshWorkspaceCatalog();
 }
 // Close the Workspace drawer on outside click or Escape — it is a tool drawer,
 // not a persistent navigation surface (issue: reader-first cleanup).

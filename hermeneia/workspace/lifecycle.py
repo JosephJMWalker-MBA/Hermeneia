@@ -19,6 +19,7 @@ from .identity import read_workspace_identity, set_workspace_name
 DEFAULT_WORKSPACE_ROOT = Path("workspaces")
 DEFAULT_LEGACY_DB = Path("build/hermeneia.db")
 WORKSPACE_DB_NAME = "hermeneia.db"
+RESERVED_WORKSPACE_SELECTORS = frozenset({"gatsby", "legacy", "current", "default"})
 
 
 class WorkspaceLifecycleError(RuntimeError):
@@ -53,6 +54,7 @@ def list_workspaces(
     *,
     workspace_root: str | Path = DEFAULT_WORKSPACE_ROOT,
     legacy_db: str | Path = DEFAULT_LEGACY_DB,
+    include_document_count: bool = True,
 ) -> list[WorkspaceRecord]:
     """List the legacy DB plus managed workspaces without mutating them."""
     root = Path(workspace_root)
@@ -66,6 +68,7 @@ def list_workspaces(
             default_name="Gatsby",
             db_path=legacy,
             root_path=legacy.parent,
+            include_document_count=include_document_count,
         ))
 
     if root.is_dir():
@@ -78,6 +81,7 @@ def list_workspaces(
                     default_name=child.name.replace("-", " ").title(),
                     db_path=db_path,
                     root_path=child,
+                    include_document_count=include_document_count,
                 ))
 
     return records
@@ -191,7 +195,7 @@ def _matching_workspaces(
         if record.workspace_id:
             keys.add(record.workspace_id)
         if record.kind == "legacy":
-            keys.update({"legacy", "current", "default", "gatsby"})
+            keys.update(RESERVED_WORKSPACE_SELECTORS)
         if raw in keys or normalized in keys or slug in keys:
             matches.append(record)
     return matches
@@ -204,6 +208,7 @@ def _record_for_db(
     default_name: str,
     db_path: Path,
     root_path: Path,
+    include_document_count: bool,
 ) -> WorkspaceRecord:
     identity = _read_identity_ro(db_path)
     return WorkspaceRecord(
@@ -215,7 +220,7 @@ def _record_for_db(
         workspace_id=(identity or {}).get("workspace_id"),
         created_at=(identity or {}).get("created_at"),
         updated_at=(identity or {}).get("updated_at"),
-        document_count=_document_count(db_path),
+        document_count=_document_count(db_path) if include_document_count else 0,
     )
 
 

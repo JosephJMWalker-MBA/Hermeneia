@@ -14,6 +14,7 @@ import pytest
 
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.workspace import (
+    RESERVED_WORKSPACE_SELECTORS,
     WorkspaceLifecycleError,
     create_workspace,
     inspect_workspace,
@@ -116,3 +117,9 @@ def test_workspace_slug_is_stable_and_strict():
     assert slugify_workspace_name("The Second Sale") == "the-second-sale"
     with pytest.raises(WorkspaceLifecycleError):
         slugify_workspace_name("   ")
+
+
+def test_reserved_workspace_selectors_are_centralized_for_future_browser_create():
+    assert RESERVED_WORKSPACE_SELECTORS == frozenset(
+        {"gatsby", "legacy", "current", "default"}
+    )

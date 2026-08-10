@@ -51,6 +51,8 @@ def test_workspace_drawer_markup_exists():
     index = _index()
     assert 'id="workspace-drawer"' in index
     assert 'id="workspace-menu-btn"' in index
+    assert 'id="runtime-workspace-chip"' in index
+    assert 'id="runtime-workspace-name"' in index
     assert "toggleWorkspaceMenu()" in index
     assert 'aria-controls="workspace-drawer"' in index
     assert "Workspace" in index
@@ -65,6 +67,18 @@ def test_workspace_drawer_includes_expected_pipeline_entries():
         assert f"_wsGo('{stage}')" in index, stage
     for label in ("Corpus", "Lab", "Review", "Architect", "Reports", "Critic", "Lineage"):
         assert label in index, label
+
+
+def test_workspace_drawer_includes_read_only_catalog_without_switching():
+    index = _index()
+    assert 'id="workspace-catalog"' in index
+    assert "Known Workspaces" in index
+    assert "/api/runtime/workspace" in index
+    assert "/api/workspaces" in index
+    assert "workspace-catalog-badge" in index
+    assert "Switch workspace" not in index
+    assert "_wsSwitch" not in index
+    assert "_wsOpenWorkspace" not in index
 
 
 def test_workspace_drawer_entries_reuse_existing_navigation():
@@ -148,6 +162,7 @@ def test_workspace_drawer_toggle_opens_and_closes():
         return null;
       }},
     }};
+    function _wsRefreshWorkspaceCatalog() {{}}
     {toggle}
     toggleWorkspaceMenu();
     const opened = _state.drawer.dataset.open === '1' && _state.drawer.hidden === false
