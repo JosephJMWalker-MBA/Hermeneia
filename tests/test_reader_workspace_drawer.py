@@ -72,6 +72,10 @@ def test_workspace_drawer_includes_expected_pipeline_entries():
 def test_workspace_drawer_includes_read_only_catalog_without_switching():
     index = _index()
     assert 'id="workspace-catalog"' in index
+    assert 'id="workspace-create-form"' in index
+    assert 'id="workspace-create-name"' in index
+    assert 'id="workspace-create-submit"' in index
+    assert "+ New workspace" in index
     assert "Known Workspaces" in index
     assert "/api/runtime/workspace" in index
     assert "/api/workspaces" in index
@@ -79,6 +83,22 @@ def test_workspace_drawer_includes_read_only_catalog_without_switching():
     assert "Switch workspace" not in index
     assert "_wsSwitch" not in index
     assert "_wsOpenWorkspace" not in index
+
+
+def test_workspace_create_flow_does_not_reframe_current_upload_or_navigation():
+    index = _index()
+    drawer = index[
+        index.index('<div class="workspace-drawer"') : index.index(
+            '<input type="file" id="ws-import-file"'
+        )
+    ]
+    create_fn = _extract_function(index, "async function _wsCreateWorkspace(")
+    assert '_wsCloseMenu();obOpenUploadArea()' in drawer
+    assert "Add document to this workspace" in index
+    assert "Open workspace" not in drawer
+    assert "Switch" not in drawer
+    assert "obOpenUploadArea" not in create_fn
+    assert "e10Go(" not in create_fn
 
 
 def test_workspace_drawer_entries_reuse_existing_navigation():
