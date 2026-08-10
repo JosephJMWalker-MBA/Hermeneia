@@ -305,6 +305,50 @@ body.reader-active .wrap { max-width: 1180px; padding: 0 20px; }
 .workspace-catalog-empty {
   font-size: 12px; color: var(--dim2); line-height: 1.45; padding: 4px 0;
 }
+.workspace-create {
+  border-top: 1px solid var(--border);
+  margin-top: 10px; padding-top: 10px;
+}
+.workspace-create-toggle {
+  width: 100%; text-align: left; cursor: pointer;
+  background: none; border: 1px solid var(--border); color: var(--fg);
+  border-radius: var(--r); padding: 8px 10px; font-size: 13px;
+}
+.workspace-create-toggle:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
+}
+.workspace-create-form {
+  margin-top: 10px; display: flex; flex-direction: column; gap: 8px;
+}
+.workspace-create-form[hidden] { display: none; }
+.workspace-create-label {
+  font-size: 12px; color: var(--fg2); font-weight: 600;
+}
+.workspace-create-input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface2); color: var(--fg); padding: 8px 10px;
+  font-size: 13px;
+}
+.workspace-create-input::placeholder { color: var(--dim2); }
+.workspace-create-actions { display: flex; gap: 8px; }
+.workspace-create-btn {
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface2); color: var(--fg); padding: 7px 10px;
+  font-size: 12px; cursor: pointer;
+}
+.workspace-create-btn.primary {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  color: var(--accent);
+}
+.workspace-create-btn:disabled { opacity: .55; cursor: default; }
+.workspace-create-status {
+  font-size: 12px; line-height: 1.45; color: var(--dim2);
+}
+.workspace-create-status[hidden] { display: none; }
+.workspace-create-status[data-kind="success"] { color: var(--green); }
+.workspace-create-status[data-kind="error"] { color: var(--red); }
 
 /* Import Workspace modal — inspect before acting. */
 .ws-import-overlay {
@@ -2658,6 +2702,18 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
     <div class="workspace-catalog-head">Known Workspaces</div>
     <div class="workspace-catalog-empty">Loading workspaces...</div>
   </div>
+  <div class="workspace-create" id="workspace-create">
+    <button class="workspace-create-toggle" id="workspace-create-toggle" type="button" onclick="_wsShowCreateForm()">+ New workspace</button>
+    <div class="workspace-create-form" id="workspace-create-form" hidden>
+      <label class="workspace-create-label" for="workspace-create-name">Workspace name</label>
+      <input class="workspace-create-input" id="workspace-create-name" type="text" autocomplete="off" placeholder="The Second Sale">
+      <div class="workspace-create-actions">
+        <button class="workspace-create-btn primary" id="workspace-create-submit" type="button" onclick="_wsCreateWorkspace()">Create workspace</button>
+        <button class="workspace-create-btn" type="button" onclick="_wsHideCreateForm()">Cancel</button>
+      </div>
+      <div class="workspace-create-status" id="workspace-create-status" role="status" aria-live="polite" hidden></div>
+    </div>
+  </div>
 </div>
 <input type="file" id="ws-import-file" accept=".zip,application/zip" hidden>
 <div class="ws-import-overlay" id="ws-import-overlay" hidden>
@@ -3211,6 +3267,9 @@ async function runtimeApiFetch(url, options = {}) {
   }
 }
 
+// Slice B keeps authored draft keys unchanged. Before live workspace switching,
+// draft scope must move to stable /api/runtime/workspace identity with explicit
+// legacy handling; today mount still falls back through /api/health db_path.
 function _runtimeSetDraftWorkspaceScope(raw) {
   const value = String(raw || '').trim();
   if (!value) return;
@@ -3766,6 +3825,7 @@ function toggleExpert() {
 let _wsCurrentWorkspace = null;
 let _wsCatalog = [];
 let _wsCatalogLoading = false;
+let _wsCreateInFlight = false;
 
 function _wsApplyCurrentWorkspace(workspace) {
   if (!workspace) return;
@@ -3818,6 +3878,80 @@ function _wsRefreshWorkspaceShell(seed = null) {
   if (seed) _wsApplyCurrentWorkspace(seed);
   _wsRefreshRuntimeWorkspace().catch(() => {});
   _wsRefreshWorkspaceCatalog().catch(() => {});
+}
+
+function _wsSetCreateStatus(message = '', kind = '') {
+  const host = document.getElementById('workspace-create-status');
+  if (!host) return;
+  host.textContent = message;
+  host.dataset.kind = kind;
+  host.hidden = !message;
+}
+
+function _wsShowCreateForm() {
+  const form = document.getElementById('workspace-create-form');
+  const input = document.getElementById('workspace-create-name');
+  if (form) form.hidden = false;
+  _wsSetCreateStatus('');
+  if (input && typeof input.focus === 'function') input.focus();
+}
+
+function _wsHideCreateForm() {
+  const form = document.getElementById('workspace-create-form');
+  const input = document.getElementById('workspace-create-name');
+  if (form) form.hidden = true;
+  if (input) input.value = '';
+  _wsSetCreateStatus('');
+}
+
+function _wsCreateErrorMessage(error) {
+  if (_runtimeIsEndpointError(error)) {
+    return 'Workspace creation was not confirmed. The name remains here; reconnect will refresh known workspaces.';
+  }
+  if (error?.status === 409) {
+    const existing = error.data?.workspace?.name || error.data?.workspace?.slug || '';
+    return existing ? `Workspace already exists: ${existing}.` : 'Workspace already exists.';
+  }
+  return error?.message || 'Workspace could not be created.';
+}
+
+async function _wsCreateWorkspace() {
+  const input = document.getElementById('workspace-create-name');
+  const submit = document.getElementById('workspace-create-submit');
+  const name = String(input?.value || '').trim();
+  if (!name) {
+    _wsSetCreateStatus('Workspace name is required.', 'error');
+    return;
+  }
+  if (_wsCreateInFlight) return;
+  _wsCreateInFlight = true;
+  if (submit) submit.disabled = true;
+  _wsSetCreateStatus('Creating workspace...', 'pending');
+  try {
+    const response = await runtimeApiFetch('/api/workspaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new RuntimeHttpError(data.error || `HTTP ${response.status}`, response, data);
+    }
+    const workspace = data.workspace || {};
+    const createdName = workspace.name || name;
+    const currentName = _wsCurrentWorkspace?.name || 'current workspace';
+    if (input) input.value = '';
+    _wsSetCreateStatus(
+      `Workspace created: ${createdName}. Current workspace remains: ${currentName}.`,
+      'success'
+    );
+    await _wsRefreshWorkspaceCatalog().catch(() => {});
+  } catch (error) {
+    _wsSetCreateStatus(_wsCreateErrorMessage(error), 'error');
+  } finally {
+    _wsCreateInFlight = false;
+    if (submit) submit.disabled = false;
+  }
 }
 
 function _wsCloseMenu() {

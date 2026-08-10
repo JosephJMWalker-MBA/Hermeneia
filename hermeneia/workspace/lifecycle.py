@@ -26,6 +26,22 @@ class WorkspaceLifecycleError(RuntimeError):
     """Raised when a workspace cannot be created or resolved safely."""
 
 
+class WorkspaceNameReservedError(WorkspaceLifecycleError):
+    """Raised when a requested workspace name collides with runtime selectors."""
+
+    def __init__(self, slug: str) -> None:
+        self.slug = slug
+        super().__init__(f"workspace name is reserved: {slug}")
+
+
+class WorkspaceAlreadyExistsError(WorkspaceLifecycleError):
+    """Raised when a requested managed workspace slug already exists."""
+
+    def __init__(self, slug: str) -> None:
+        self.slug = slug
+        super().__init__(f"workspace already exists: {slug}")
+
+
 @dataclass(frozen=True)
 class WorkspaceRecord:
     """A runtime workspace container discovered on disk."""
@@ -95,10 +111,12 @@ def create_workspace(
 ) -> WorkspaceRecord:
     """Create an empty isolated managed workspace with durable identity."""
     slug = slugify_workspace_name(name)
+    if slug in RESERVED_WORKSPACE_SELECTORS:
+        raise WorkspaceNameReservedError(slug)
     root = Path(workspace_root)
     workspace_dir = root / slug
     if workspace_dir.exists():
-        raise WorkspaceLifecycleError(f"workspace already exists: {slug}")
+        raise WorkspaceAlreadyExistsError(slug)
 
     workspace_dir.mkdir(parents=True)
     (workspace_dir / "uploads").mkdir()

@@ -46,7 +46,12 @@ from ..compiler.projections.interpretive_divergence import (
 from ..storage.sqlite import SQLiteStore
 from ..workspace import (
     DEFAULT_LEGACY_DB,
+    WorkspaceAlreadyExistsError,
+    WorkspaceLifecycleError,
+    WorkspaceNameReservedError,
     WorkspaceRecord,
+    create_workspace,
+    inspect_workspace,
     list_workspaces,
     read_workspace_identity,
 )
@@ -1988,8 +1993,38 @@ def create_app(
     def api_runtime_workspace():
         return jsonify({"workspace": _runtime_workspace_payload()})
 
-    @app.route("/api/workspaces")
+    def _workspace_create_conflict_payload(slug: str) -> dict:
+        payload: dict = {"error": f"workspace already exists: {slug}"}
+        try:
+            record = inspect_workspace(slug)
+        except WorkspaceLifecycleError:
+            return payload
+        payload["workspace"] = _workspace_payload(
+            record,
+            is_active=_same_runtime_db(record.db_path),
+        )
+        return payload
+
+    @app.route("/api/workspaces", methods=["GET", "POST"])
     def api_workspaces():
+        if request.method == "POST":
+            body = request.get_json(silent=True) or {}
+            raw_name = body.get("name") if isinstance(body, dict) else None
+            name = str(raw_name or "").strip()
+            try:
+                record = create_workspace(name)
+            except WorkspaceAlreadyExistsError as exc:
+                return jsonify(_workspace_create_conflict_payload(exc.slug)), 409
+            except WorkspaceNameReservedError as exc:
+                return jsonify({"error": str(exc)}), 400
+            except WorkspaceLifecycleError as exc:
+                return jsonify({"error": str(exc)}), 400
+            return jsonify({
+                "workspace": _workspace_payload(
+                    record,
+                    is_active=_same_runtime_db(record.db_path),
+                )
+            }), 201
         return jsonify({"workspaces": _workspace_catalog_payload()})
 
     @app.route("/api/health")
