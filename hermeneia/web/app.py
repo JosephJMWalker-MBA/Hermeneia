@@ -2049,7 +2049,10 @@ def create_app(
 
     @app.route("/api/runtime/workspace")
     def api_runtime_workspace():
-        return jsonify({"workspace": _runtime_workspace_payload()})
+        return jsonify({
+            "workspace": _runtime_workspace_payload(),
+            "capabilities": {"workspace_switch": False},
+        })
 
     def _workspace_create_conflict_payload(slug: str) -> dict:
         payload: dict = {"error": f"workspace already exists: {slug}"}
