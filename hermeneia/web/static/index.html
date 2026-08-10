@@ -1140,6 +1140,25 @@ body.reader-active .cr-tool-drawer { max-width: none; }
   display: flex; flex-direction: column;
 }
 .cr-bottom-workstation[hidden] { display: none; }
+.cr-bottom-collapse-handle {
+  position: fixed;
+  left: 50%;
+  bottom: calc(40px + min(44vh, 360px) - 15px);
+  transform: translateX(-50%);
+  z-index: 9702;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 4px 18px rgba(0,0,0,.34);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  padding: 5px 14px;
+}
+.cr-bottom-collapse-handle:hover { background: var(--accent2); color: var(--fg); }
+.cr-bottom-collapse-handle[hidden] { display: none; }
 .cr-bottom-workstation-head {
   display: flex; align-items: center; gap: 12px;
   padding: 10px 16px; border-bottom: 1px solid var(--border);
@@ -1908,6 +1927,7 @@ body.has-workflow-rail { padding-bottom: 40px; }
 }
 @media (max-width: 900px) {
   .cr-bottom-workstation { height: min(48vh, 320px); }
+  .cr-bottom-collapse-handle { bottom: calc(40px + min(48vh, 320px) - 15px); }
   .cr-bottom-workstation-head { flex-wrap: wrap; align-items: flex-start; }
   .cr-bottom-workstation-title { width: 100%; }
   .cr-bottom-workstation-close { margin-left: 0; }
@@ -2574,19 +2594,22 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
 <!-- Bottom workstation: one collapsible shell for Search Corpus, Timeline,
      and Field Notes. The Reader remains above; these tools now switch modes
      instead of opening as separate competing panels. -->
+<button class="cr-bottom-collapse-handle" id="cr-bottom-collapse-handle" type="button"
+        onclick="_crCloseBottomWorkstation()" hidden aria-controls="cr-bottom-workstation"
+        aria-expanded="false" aria-label="Collapse bottom workstation">Collapse</button>
 <section class="cr-bottom-workstation" id="cr-bottom-workstation" hidden aria-label="Bottom workstation">
   <div class="cr-bottom-workstation-head">
     <span class="cr-bottom-workstation-title">Bottom workstation</span>
     <div class="cr-bottom-workstation-tabs" role="tablist" aria-label="Reader workstation modes">
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-search" data-workstation-mode="search" type="button" role="tab" aria-controls="corpus-search" aria-selected="false" onclick="_crOpenBottomWorkstation('search')">Search Corpus</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-timeline" data-workstation-mode="timeline" type="button" role="tab" aria-controls="attn-timeline" aria-selected="false" onclick="_crOpenBottomWorkstation('timeline')">Timeline</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-fieldnotes" data-workstation-mode="fieldnotes" type="button" role="tab" aria-controls="cr-fln-tray" aria-selected="false" onclick="_crOpenBottomWorkstation('fieldnotes')">Field Notes</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-blueprint" data-workstation-mode="blueprint" type="button" role="tab" aria-controls="cr-blueprint-draft" aria-selected="false" onclick="_crOpenBottomWorkstation('blueprint')">Blueprint</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-render" data-workstation-mode="render" type="button" role="tab" aria-controls="cr-render-preview" aria-selected="false" onclick="_crOpenBottomWorkstation('render')">Render</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-critic" data-workstation-mode="critic" type="button" role="tab" aria-controls="cr-critic-audit" aria-selected="false" onclick="_crOpenBottomWorkstation('critic')">Critic</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-voice" data-workstation-mode="voice" type="button" role="tab" aria-controls="cr-voice-profile" aria-selected="false" onclick="_crOpenBottomWorkstation('voice')">Voice</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-draft" data-workstation-mode="draft" type="button" role="tab" aria-controls="cr-artist-draft" aria-selected="false" onclick="_crOpenBottomWorkstation('draft')">Draft</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-record" data-workstation-mode="record" type="button" role="tab" aria-controls="cr-record-ledger" aria-selected="false" onclick="_crOpenBottomWorkstation('record')">Record</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-search" data-workstation-mode="search" type="button" role="tab" aria-controls="corpus-search" aria-selected="false" onclick="_crToggleBottomWorkstation('search')">Search Corpus</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-timeline" data-workstation-mode="timeline" type="button" role="tab" aria-controls="attn-timeline" aria-selected="false" onclick="_crToggleBottomWorkstation('timeline')">Timeline</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-fieldnotes" data-workstation-mode="fieldnotes" type="button" role="tab" aria-controls="cr-fln-tray" aria-selected="false" onclick="_crToggleBottomWorkstation('fieldnotes')">Field Notes</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-blueprint" data-workstation-mode="blueprint" type="button" role="tab" aria-controls="cr-blueprint-draft" aria-selected="false" onclick="_crToggleBottomWorkstation('blueprint')">Blueprint</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-render" data-workstation-mode="render" type="button" role="tab" aria-controls="cr-render-preview" aria-selected="false" onclick="_crToggleBottomWorkstation('render')">Render</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-critic" data-workstation-mode="critic" type="button" role="tab" aria-controls="cr-critic-audit" aria-selected="false" onclick="_crToggleBottomWorkstation('critic')">Critic</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-voice" data-workstation-mode="voice" type="button" role="tab" aria-controls="cr-voice-profile" aria-selected="false" onclick="_crToggleBottomWorkstation('voice')">Voice</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-draft" data-workstation-mode="draft" type="button" role="tab" aria-controls="cr-artist-draft" aria-selected="false" onclick="_crToggleBottomWorkstation('draft')">Draft</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-record" data-workstation-mode="record" type="button" role="tab" aria-controls="cr-record-ledger" aria-selected="false" onclick="_crToggleBottomWorkstation('record')">Record</button>
     </div>
     <button class="cr-bottom-workstation-close" type="button" onclick="_crCloseBottomWorkstation()" aria-label="Collapse bottom workstation">Collapse</button>
   </div>
@@ -7793,9 +7816,14 @@ function _crBottomPanels() {
 }
 function _crSyncBottomWorkstationState() {
   const shell = document.getElementById('cr-bottom-workstation');
+  const handle = document.getElementById('cr-bottom-collapse-handle');
   const panels = _crBottomPanels();
   const open = !!(shell && !shell.hidden && _crBottomMode);
   if (shell) shell.dataset.mode = _crBottomMode || '';
+  if (handle) {
+    handle.hidden = !open;
+    handle.setAttribute('aria-expanded', String(open));
+  }
   document.body.classList.toggle('has-bottom-workstation', open);
   Object.entries(panels).forEach(([mode, panel]) => {
     if (!panel) return;
@@ -7809,6 +7837,14 @@ function _crSyncBottomWorkstationState() {
     btn.classList.toggle('active', active);
     if (btn.getAttribute('role') === 'tab') btn.setAttribute('aria-selected', String(active));
   });
+}
+async function _crToggleBottomWorkstation(mode) {
+  const shell = document.getElementById('cr-bottom-workstation');
+  if (shell && !shell.hidden && _crBottomMode === mode) {
+    _crCloseBottomWorkstation();
+    return;
+  }
+  return _crOpenBottomWorkstation(mode);
 }
 async function _crOpenBottomWorkstation(mode) {
   const shell = document.getElementById('cr-bottom-workstation');
@@ -8746,20 +8782,20 @@ window._crCopyRecordText = _crCopyRecordText;
 
 function _crBindBottomWorkstationControls() {
   const bindings = [
-    ['cr-bottom-tab-search', () => _crOpenBottomWorkstation('search')],
-    ['cr-bottom-tab-timeline', () => _crOpenBottomWorkstation('timeline')],
-    ['cr-bottom-tab-fieldnotes', () => _crOpenBottomWorkstation('fieldnotes')],
-    ['cr-bottom-tab-blueprint', () => _crOpenBottomWorkstation('blueprint')],
-    ['cr-bottom-tab-render', () => _crOpenBottomWorkstation('render')],
-    ['cr-bottom-tab-critic', () => _crOpenBottomWorkstation('critic')],
-    ['cr-bottom-tab-voice', () => _crOpenBottomWorkstation('voice')],
-    ['cr-bottom-tab-draft', () => _crOpenBottomWorkstation('draft')],
-    ['cr-bottom-tab-record', () => _crOpenBottomWorkstation('record')],
+    ['cr-bottom-tab-search', () => _crToggleBottomWorkstation('search')],
+    ['cr-bottom-tab-timeline', () => _crToggleBottomWorkstation('timeline')],
+    ['cr-bottom-tab-fieldnotes', () => _crToggleBottomWorkstation('fieldnotes')],
+    ['cr-bottom-tab-blueprint', () => _crToggleBottomWorkstation('blueprint')],
+    ['cr-bottom-tab-render', () => _crToggleBottomWorkstation('render')],
+    ['cr-bottom-tab-critic', () => _crToggleBottomWorkstation('critic')],
+    ['cr-bottom-tab-voice', () => _crToggleBottomWorkstation('voice')],
+    ['cr-bottom-tab-draft', () => _crToggleBottomWorkstation('draft')],
+    ['cr-bottom-tab-record', () => _crToggleBottomWorkstation('record')],
   ];
   bindings.forEach(([id, handler]) => {
     const el = document.getElementById(id);
     if (!el || el.dataset.bound === '1') return;
-    el.addEventListener('click', (e) => { e.preventDefault(); handler(); });
+    el.onclick = (e) => { e.preventDefault(); handler(); };
     el.dataset.bound = '1';
   });
   document.querySelectorAll('.cr-bottom-workstation-close, .corpus-search-close, .attn-close').forEach(el => {
@@ -8772,6 +8808,7 @@ function _crBindBottomWorkstationControls() {
   });
 }
 window._crOpenBottomWorkstation = _crOpenBottomWorkstation;
+window._crToggleBottomWorkstation = _crToggleBottomWorkstation;
 window._crCloseBottomWorkstation = _crCloseBottomWorkstation;
 _crBindBottomWorkstationControls();
 const _DOCK_PANEL_META = {
@@ -8948,9 +8985,37 @@ function _crGoToPage(page) {
     setTimeout(() => view.classList.remove('cr-tool-flash'), 1200);
   }
 }
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && _crBottomMode) _crCloseBottomWorkstation();
-});
+function _crCloseTransientReaderChrome() {
+  const tip = document.getElementById('a11y-selection-tip');
+  const tipVisible = !!tip && tip.style.display && tip.style.display !== 'none';
+  if (_crCaptureOpen || _crSelToolbar || document.getElementById('cr-sel-toolbar')) {
+    _crCancelHighlight();
+    return true;
+  }
+  if (tipVisible) {
+    try { a11yDismissTip(); } catch {}
+    return true;
+  }
+  return false;
+}
+function _crHandleReaderEscape(e) {
+  if (e.key !== 'Escape') return;
+  if (_crCloseTransientReaderChrome()) {
+    e.preventDefault();
+    return;
+  }
+  if (_dockPanelKey) {
+    _dockClosePanel();
+    e.preventDefault();
+    return;
+  }
+  if (_crBottomMode) {
+    _crCloseBottomWorkstation();
+    e.preventDefault();
+  }
+}
+document.addEventListener('keydown', _crHandleReaderEscape);
+window._crHandleReaderEscape = _crHandleReaderEscape;
 
 // ── Attention timeline (PR 3) ──────────────────────────
 // "What have I discovered so far?" — now a tab in the bottom workstation showing

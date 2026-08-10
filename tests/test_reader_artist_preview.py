@@ -29,7 +29,7 @@ def test_draft_tab_and_panel_present():
     assert 'id="cr-bottom-tab-draft"' in index
     assert 'data-workstation-mode="draft"' in index
     assert 'aria-controls="cr-artist-draft"' in index
-    assert "_crOpenBottomWorkstation('draft')" in index
+    assert "_crToggleBottomWorkstation('draft')" in index
     assert 'id="cr-artist-draft"' in index
     assert 'id="cr-artist-draft" hidden' in index
 
@@ -38,7 +38,7 @@ def test_draft_is_a_workstation_mode_not_a_separate_drawer():
     index = _index()
     assert "draft: document.getElementById('cr-artist-draft')" in index
     assert "else if (mode === 'draft')" in index
-    assert "['cr-bottom-tab-draft', () => _crOpenBottomWorkstation('draft')]" in index
+    assert "['cr-bottom-tab-draft', () => _crToggleBottomWorkstation('draft')]" in index
 
 
 def test_draft_lets_the_steward_choose_skeleton_and_profile():

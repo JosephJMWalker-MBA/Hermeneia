@@ -26,7 +26,7 @@ def test_render_tab_and_panel_present():
     assert 'id="cr-bottom-tab-render"' in index
     assert 'data-workstation-mode="render"' in index
     assert 'aria-controls="cr-render-preview"' in index
-    assert "_crOpenBottomWorkstation('render')" in index
+    assert "_crToggleBottomWorkstation('render')" in index
     assert 'id="cr-render-preview"' in index
     assert 'id="cr-render-preview" hidden' in index
 
@@ -35,7 +35,7 @@ def test_render_is_a_workstation_mode_not_a_separate_drawer():
     index = _index()
     assert "render: document.getElementById('cr-render-preview')" in index
     assert "else if (mode === 'render')" in index
-    assert "['cr-bottom-tab-render', () => _crOpenBottomWorkstation('render')]" in index
+    assert "['cr-bottom-tab-render', () => _crToggleBottomWorkstation('render')]" in index
 
 
 def test_render_reuses_existing_endpoints_without_new_routes():

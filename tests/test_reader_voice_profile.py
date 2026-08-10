@@ -34,7 +34,7 @@ def test_voice_tab_and_panel_present():
     assert 'id="cr-bottom-tab-voice"' in index
     assert 'data-workstation-mode="voice"' in index
     assert 'aria-controls="cr-voice-profile"' in index
-    assert "_crOpenBottomWorkstation('voice')" in index
+    assert "_crToggleBottomWorkstation('voice')" in index
     assert 'id="cr-voice-profile"' in index
     assert 'id="cr-voice-profile" hidden' in index
 
@@ -43,7 +43,7 @@ def test_voice_is_a_workstation_mode_not_a_separate_drawer():
     index = _index()
     assert "voice: document.getElementById('cr-voice-profile')" in index
     assert "else if (mode === 'voice')" in index
-    assert "['cr-bottom-tab-voice', () => _crOpenBottomWorkstation('voice')]" in index
+    assert "['cr-bottom-tab-voice', () => _crToggleBottomWorkstation('voice')]" in index
 
 
 def test_voice_captures_all_witness_fields():

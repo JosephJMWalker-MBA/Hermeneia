@@ -27,7 +27,7 @@ def test_record_tab_and_panel_present():
     assert 'id="cr-bottom-tab-record"' in index
     assert 'data-workstation-mode="record"' in index
     assert 'aria-controls="cr-record-ledger"' in index
-    assert "_crOpenBottomWorkstation('record')" in index
+    assert "_crToggleBottomWorkstation('record')" in index
     assert 'id="cr-record-ledger"' in index
     assert 'id="cr-record-ledger" hidden' in index
 
@@ -36,7 +36,7 @@ def test_record_is_a_workstation_mode_not_a_separate_drawer():
     index = _index()
     assert "record: document.getElementById('cr-record-ledger')" in index
     assert "else if (mode === 'record')" in index
-    assert "['cr-bottom-tab-record', () => _crOpenBottomWorkstation('record')]" in index
+    assert "['cr-bottom-tab-record', () => _crToggleBottomWorkstation('record')]" in index
 
 
 def test_record_uses_readonly_narrative_endpoints():

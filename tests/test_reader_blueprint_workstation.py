@@ -24,7 +24,7 @@ def test_blueprint_tab_and_panel_present():
     assert 'id="cr-bottom-tab-blueprint"' in index
     assert 'data-workstation-mode="blueprint"' in index
     assert 'aria-controls="cr-blueprint-draft"' in index
-    assert "_crOpenBottomWorkstation('blueprint')" in index
+    assert "_crToggleBottomWorkstation('blueprint')" in index
     # Panel exists and starts hidden.
     assert 'id="cr-blueprint-draft"' in index
     assert 'id="cr-blueprint-draft" hidden' in index
@@ -36,7 +36,7 @@ def test_blueprint_is_a_workstation_mode_not_a_separate_drawer():
     # tab bindings — so _crSyncBottomWorkstationState shows only one at a time.
     assert "blueprint: document.getElementById('cr-blueprint-draft')" in index
     assert "else if (mode === 'blueprint')" in index
-    assert "['cr-bottom-tab-blueprint', () => _crOpenBottomWorkstation('blueprint')]" in index
+    assert "['cr-bottom-tab-blueprint', () => _crToggleBottomWorkstation('blueprint')]" in index
 
 
 def test_blueprint_reuses_existing_endpoint_without_a_new_route():
