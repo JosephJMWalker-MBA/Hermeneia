@@ -82,6 +82,7 @@ def test_runtime_connectivity_distinguishes_endpoint_loss_from_http_errors() -> 
     script = (
         _js_dom_prelude()
         + _extract_runtime_region(html)
+        + "_runtimeApplyWorkspaceDraftScope({runtime_scope:'managed:ws-a',draft_migration_scope:'oldscopea'});\n"
         + _extract_fn(html, "showAppError")
         + _extract_fn(html, "clearAppError")
         + _extract_fn(html, "requestJSON")
@@ -226,6 +227,7 @@ function _crShowHighlightDetail(){}
 function cmpMarkOnboardingStep(){}
 """
         + _extract_runtime_region(html)
+        + "_runtimeApplyWorkspaceDraftScope({runtime_scope:'managed:ws-a',draft_migration_scope:'oldscopea'});\n"
         + _extract_fn(html, "showAppError")
         + _extract_fn(html, "clearAppError")
         + _extract_fn(html, "requestJSON")
@@ -318,6 +320,7 @@ let _crRelevance='supports';
 function _crHighlightTags(h){return Array.isArray(h&&h.tags)?h.tags:[];}
 """
         + _extract_runtime_region(html)
+        + "_runtimeApplyWorkspaceDraftScope({runtime_scope:'managed:ws-a',draft_migration_scope:'oldscopea'});\n"
         + r"""
 const h={id:'hl-1',source_document_id:'doc-1',page:7,note_text:'saved note',question_text:'saved question',relevance:'supports',tags:[]};
 const noDraftNote=elements['cr-edit-note'].value;
@@ -382,6 +385,7 @@ let _crPage=5;
 let _flnLane='corpus';
 """
         + _extract_runtime_region(html)
+        + "_runtimeApplyWorkspaceDraftScope({runtime_scope:'managed:ws-a',draft_migration_scope:'oldscopea'});\n"
         + _extract_fn(html, "flnSetLane")
         + r"""
 const key=_flnDraftKey('corpus');
@@ -445,11 +449,11 @@ def test_health_success_reports_runtime_endpoint_and_database(tmp_path: Path) ->
 
     assert body["runtime"]["endpoint_reachable"] is True
     assert body["runtime"]["database_available"] is True
-    assert body["runtime"]["workspace"] == {
-        "id": None,
-        "name": "Custom workspace",
-        "slug": None,
-        "kind": "custom",
-        "managed": False,
-    }
+    assert body["runtime"]["workspace"]["id"] is None
+    assert body["runtime"]["workspace"]["name"] == "Custom workspace"
+    assert body["runtime"]["workspace"]["slug"] is None
+    assert body["runtime"]["workspace"]["kind"] == "custom"
+    assert body["runtime"]["workspace"]["managed"] is False
+    assert body["runtime"]["workspace"]["runtime_scope"].startswith("custom:")
+    assert "hermeneia.db" not in body["runtime"]["workspace"]["runtime_scope"]
     assert body["db_path"] == str(db_path)

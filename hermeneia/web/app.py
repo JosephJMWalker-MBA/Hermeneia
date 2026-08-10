@@ -11,6 +11,7 @@ Start with: python scripts/herm_server.py
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import tempfile
@@ -422,6 +423,54 @@ def create_app(
         except OSError:
             return False
 
+    def _browser_draft_fingerprint(value: str) -> str:
+        """Match the old browser FNV-1a base36 draft-scope fingerprint."""
+        h = 2166136261
+        for ch in value:
+            h ^= ord(ch)
+            h = (h * 16777619) & 0xFFFFFFFF
+        if h == 0:
+            return "0"
+        chars = "0123456789abcdefghijklmnopqrstuvwxyz"
+        out = ""
+        while h:
+            h, rem = divmod(h, 36)
+            out = chars[rem] + out
+        return out
+
+    def _opaque_runtime_token(value: str) -> str:
+        return hashlib.sha256(value.encode("utf-8")).hexdigest()[:32]
+
+    def _runtime_scope_for(
+        *,
+        kind: str,
+        workspace_id: str | None,
+        slug: str | None,
+        runtime_db: Path,
+    ) -> str:
+        if kind == "legacy":
+            return "legacy:gatsby"
+        if workspace_id:
+            prefix = "managed" if kind == "managed" else "custom"
+            return f"{prefix}:{workspace_id}"
+        if kind == "managed" and slug:
+            token = _opaque_runtime_token(f"managed:{_canonical_path(runtime_db)}")
+            return f"managed:{token}"
+        token = _opaque_runtime_token(f"custom:{_canonical_path(runtime_db)}")
+        return f"custom:{token}"
+
+    def _with_runtime_draft_scope(payload: dict, *, runtime_db: Path) -> dict:
+        return {
+            **payload,
+            "runtime_scope": _runtime_scope_for(
+                kind=str(payload.get("kind") or "custom"),
+                workspace_id=payload.get("id"),
+                slug=payload.get("slug"),
+                runtime_db=runtime_db,
+            ),
+            "draft_migration_scope": _browser_draft_fingerprint(str(db_path)),
+        }
+
     def _runtime_workspace_identity() -> dict | None:
         if not db_path.exists():
             return None
@@ -483,10 +532,19 @@ def create_app(
         )
         for record in discovered:
             if _same_runtime_db(record.db_path):
-                return _workspace_payload(record)
+                return _with_runtime_draft_scope(
+                    _workspace_payload(record),
+                    runtime_db=record.db_path,
+                )
         if _same_runtime_db(DEFAULT_LEGACY_DB):
-            return _legacy_runtime_workspace_payload()
-        return _custom_runtime_workspace_payload()
+            return _with_runtime_draft_scope(
+                _legacy_runtime_workspace_payload(),
+                runtime_db=db_path,
+            )
+        return _with_runtime_draft_scope(
+            _custom_runtime_workspace_payload(),
+            runtime_db=db_path,
+        )
 
     def _workspace_catalog_payload() -> list[dict]:
         records = list_workspaces(include_document_count=False)

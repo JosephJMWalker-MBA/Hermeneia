@@ -3137,13 +3137,17 @@ const _RUNTIME_HEALTH_URL = '/api/health';
 const _RUNTIME_RECONNECT_BASE_MS = 1500;
 const _RUNTIME_RECONNECT_MAX_MS = 12000;
 const _RUNTIME_RECONNECTED_VISIBLE_MS = 2600;
-const _AUTHORED_DRAFT_PREFIX = 'hermeneia_authored_draft_v1';
+const _AUTHORED_DRAFT_PREFIX_V1 = 'hermeneia_authored_draft_v1';
+const _AUTHORED_DRAFT_PREFIX = 'hermeneia:draft:v2';
 let _runtimeConnectionState = 'connected';
 let _runtimeReconnectTimer = null;
 let _runtimeReconnectDelayMs = _RUNTIME_RECONNECT_BASE_MS;
 let _runtimeReconnectQuietTimer = null;
 let _runtimeLastEndpointError = null;
-let _runtimeDraftWorkspaceScope = 'workspace:current';
+let _runtimeDraftWorkspaceScope = '';
+let _runtimeDraftMigrationScope = '';
+let _runtimeDraftScopeReady = false;
+const _authoredDraftKeyParts = new Map();
 
 class RuntimeEndpointError extends Error {
   constructor(message = 'Connection to Hermeneia lost. Your unsaved text is preserved in this browser.', cause = null) {
@@ -3267,14 +3271,73 @@ async function runtimeApiFetch(url, options = {}) {
   }
 }
 
-// Slice B keeps authored draft keys unchanged. Before live workspace switching,
-// draft scope must move to stable /api/runtime/workspace identity with explicit
-// legacy handling; today mount still falls back through /api/health db_path.
-function _runtimeSetDraftWorkspaceScope(raw) {
-  const value = String(raw || '').trim();
-  if (!value) return;
-  _runtimeDraftWorkspaceScope = value;
-  try { document.body.dataset.workspaceDraftScope = _authoredDraftFingerprint(value); } catch {}
+function _runtimeDraftScopeIsSafe(scope) {
+  const value = String(scope || '').trim();
+  if (!value || value.includes('/') || value.includes('\\')) return false;
+  if (/hermeneia\.db|uploads|\/private|\/home|\/users/i.test(value)) return false;
+  return /^[a-z][a-z0-9_-]*:[A-Za-z0-9._:-]+$/.test(value);
+}
+
+function _runtimeDraftScopeFromWorkspace(workspace) {
+  if (!workspace || typeof workspace !== 'object') return '';
+  const direct = String(workspace.runtime_scope || '').trim();
+  if (_runtimeDraftScopeIsSafe(direct)) return direct;
+  const kind = String(workspace.kind || '').trim().toLowerCase();
+  const slug = String(workspace.slug || '').trim().toLowerCase();
+  const id = String(workspace.id || '').trim();
+  if (kind === 'legacy' && slug === 'gatsby') return 'legacy:gatsby';
+  if (id && !/[\\/]/.test(id)) {
+    const prefix = kind === 'managed' ? 'managed' : 'custom';
+    const scope = `${prefix}:${id}`;
+    if (_runtimeDraftScopeIsSafe(scope)) return scope;
+  }
+  return '';
+}
+
+function _runtimeDraftMigrationScopeFromWorkspace(workspace) {
+  const value = String(workspace?.draft_migration_scope || '').trim();
+  return /^[a-z0-9]+$/i.test(value) ? value : '';
+}
+
+function _runtimeApplyWorkspaceDraftScope(workspace, options = {}) {
+  const nextScope = _runtimeDraftScopeFromWorkspace(workspace);
+  if (!nextScope) return false;
+  const previousScope = _runtimeDraftWorkspaceScope;
+  const changed = _runtimeDraftScopeReady && previousScope && previousScope !== nextScope;
+  if (changed) _runtimeFlushActiveDraftsForScope(previousScope);
+  _runtimeDraftWorkspaceScope = nextScope;
+  _runtimeDraftMigrationScope = _runtimeDraftMigrationScopeFromWorkspace(workspace);
+  _runtimeDraftScopeReady = true;
+  try {
+    document.body.dataset.workspaceDraftScope = _authoredDraftFingerprint(nextScope);
+    document.body.dataset.workspaceDraftScopeVersion = '2';
+  } catch {}
+  if (changed && options.hydrate !== false) _runtimeHydrateActiveDraftsForScope(nextScope);
+  return true;
+}
+
+function _runtimeFlushActiveDraftsForScope(scope) {
+  if (!_runtimeDraftScopeReady || scope !== _runtimeDraftWorkspaceScope) return;
+  if (typeof _crStoreActiveReaderDraft === 'function') _crStoreActiveReaderDraft();
+  if (typeof _flnPersistDraft === 'function'
+      && (document.getElementById('fln-understanding') || document.getElementById('fln-questions'))) {
+    _flnPersistDraft(typeof _flnLane === 'undefined' ? 'corpus' : _flnLane);
+  }
+  if (typeof _cmpPersistDraft === 'function' && document.getElementById('cmp-input')) {
+    _cmpPersistDraft();
+  }
+}
+
+function _runtimeHydrateActiveDraftsForScope(scope = _runtimeDraftWorkspaceScope) {
+  if (!_runtimeDraftScopeReady || scope !== _runtimeDraftWorkspaceScope) return;
+  if (typeof _crHydrateActiveReaderDraft === 'function') _crHydrateActiveReaderDraft();
+  if (typeof _flnApplyDraft === 'function'
+      && (document.getElementById('fln-understanding') || document.getElementById('fln-questions'))) {
+    _flnApplyDraft(typeof _flnLane === 'undefined' ? 'corpus' : _flnLane);
+  }
+  if (typeof _cmpApplyDraft === 'function' && document.getElementById('cmp-input')) {
+    _cmpApplyDraft({ replace: true });
+  }
 }
 
 function _authoredDraftFingerprint(value) {
@@ -3297,11 +3360,40 @@ function _authoredDraftStorage(fn, fallback = null) {
 }
 
 function _authoredDraftKey(parts) {
-  const scope = document.body?.dataset?.workspaceDraftScope
-    || _authoredDraftFingerprint(_runtimeDraftWorkspaceScope || window.location?.origin || 'workspace:current');
-  return [_AUTHORED_DRAFT_PREFIX, scope, ...parts]
-    .map(part => encodeURIComponent(String(part ?? '')))
-    .join(':');
+  if (!_runtimeDraftScopeReady || !_runtimeDraftWorkspaceScope) return '';
+  const normalizedParts = (parts || []).map(part => String(part ?? ''));
+  const key = [
+    _AUTHORED_DRAFT_PREFIX,
+    encodeURIComponent(_runtimeDraftWorkspaceScope),
+    ...normalizedParts.map(part => encodeURIComponent(part)),
+  ].join(':');
+  _authoredDraftKeyParts.set(key, normalizedParts);
+  return key;
+}
+
+function _authoredDraftV1Key(parts) {
+  if (!_runtimeDraftMigrationScope) return '';
+  return [
+    _AUTHORED_DRAFT_PREFIX_V1,
+    encodeURIComponent(_runtimeDraftMigrationScope),
+    ...(parts || []).map(part => encodeURIComponent(String(part ?? ''))),
+  ].join(':');
+}
+
+function _authoredDraftMigrateV1(key) {
+  if (!key || !_runtimeDraftMigrationScope) return;
+  const parts = _authoredDraftKeyParts.get(key);
+  if (!parts) return;
+  _authoredDraftStorage(store => {
+    if (store.getItem(key) !== null) return false;
+    const oldKey = _authoredDraftV1Key(parts);
+    if (!oldKey || oldKey === key) return false;
+    const oldRaw = store.getItem(oldKey);
+    if (oldRaw === null) return false;
+    store.setItem(key, oldRaw);
+    if (store.getItem(key) === oldRaw) store.removeItem(oldKey);
+    return true;
+  }, false);
 }
 
 function _authoredDraftHasValue(fields) {
@@ -3321,13 +3413,14 @@ function _authoredDraftSave(key, payload) {
   }
   _authoredDraftStorage(store => store.setItem(key, JSON.stringify({
     ...payload,
-    schema: 1,
+    schema: 2,
     saved_at: new Date().toISOString(),
   })));
 }
 
 function _authoredDraftLoad(key) {
   if (!key) return null;
+  _authoredDraftMigrateV1(key);
   return _authoredDraftStorage(store => {
     const raw = store.getItem(key);
     return raw ? JSON.parse(raw) : null;
@@ -3499,6 +3592,17 @@ function _crApplyHighlightEditDraft(h, draft) {
   return true;
 }
 
+function _crApplyHighlightEditBaseDraft(h = {}) {
+  const f = _crHighlightEditBase(h);
+  _draftSetChecked('cr-edit-important', f.important);
+  _draftSetValue('cr-edit-tags', f.tags || '');
+  _draftSetValue('cr-edit-rank', f.rank || '');
+  _draftSetValue('cr-edit-theme', f.theme_bucket || '');
+  _draftSetValue('cr-edit-note', f.note_text || '');
+  _draftSetValue('cr-edit-q', f.question_text || '');
+  _crApplyRelevanceDraft(f.relevance || 'unclear');
+}
+
 function _crStoreHighlightEditDraft(key, h = null) {
   const highlight = h || (_crHighlights || []).find(row => row.id === document.getElementById('cr-sel-form')?.dataset?.highlightId) || {};
   const base = _crHighlightEditBase(highlight);
@@ -3539,6 +3643,32 @@ function _crStoreActiveReaderDraft() {
   if (form?.dataset?.draftKind === 'reader-highlight-edit') {
     const h = (_crHighlights || []).find(row => row.id === form.dataset.highlightId);
     _crStoreHighlightEditDraft(form.dataset.draftKey, h);
+  }
+}
+
+function _crHydrateActiveReaderDraft() {
+  const toolbar = document.getElementById('cr-sel-toolbar');
+  if (toolbar?.dataset?.draftKind === 'reader-highlight-new') {
+    const selection = typeof _crGetReaderSelection === 'function'
+      ? _crGetReaderSelection({ refresh: false, fallback: true })
+      : null;
+    const key = _crNewHighlightDraftKey(selection);
+    toolbar.dataset.draftKey = key;
+    _crApplyNewHighlightDraft({});
+    const draft = _authoredDraftLoad(key);
+    if (draft?.fields) {
+      _crApplyNewHighlightDraft(draft.fields);
+      _draftFormNotice('cr-capture-msg', 'Recovered unsaved highlight text from this browser.');
+    }
+  }
+  const form = document.getElementById('cr-sel-form');
+  if (form?.dataset?.draftKind === 'reader-highlight-edit') {
+    const h = (_crHighlights || []).find(row => row.id === form.dataset.highlightId);
+    if (!h) return;
+    const key = _crHighlightEditDraftKey(h);
+    form.dataset.draftKey = key;
+    _crApplyHighlightEditBaseDraft(h);
+    _crApplyHighlightEditDraft(h, _authoredDraftLoad(key));
   }
 }
 
@@ -3611,9 +3741,17 @@ function _cmpPersistDraft() {
 function _cmpBindDraft() {
   const input = document.getElementById('cmp-input');
   if (!input) return;
-  const draft = _authoredDraftLoad(_cmpDraftKey());
-  if (draft?.fields?.message && !input.value) input.value = draft.fields.message;
+  _cmpApplyDraft();
+  if (input.dataset.draftBound === '1') return;
   input.addEventListener('input', _cmpPersistDraft);
+  input.dataset.draftBound = '1';
+}
+
+function _cmpApplyDraft(options = {}) {
+  const input = document.getElementById('cmp-input');
+  if (!input) return;
+  const draft = _authoredDraftLoad(_cmpDraftKey());
+  if (options.replace || !input.value) input.value = draft?.fields?.message || '';
 }
 
 // ── Accessibility Dock v0.2 ────────────────────────────
@@ -3829,6 +3967,7 @@ let _wsCreateInFlight = false;
 
 function _wsApplyCurrentWorkspace(workspace) {
   if (!workspace) return;
+  _runtimeApplyWorkspaceDraftScope(workspace);
   _wsCurrentWorkspace = workspace;
   const chip = document.getElementById('runtime-workspace-chip');
   const name = document.getElementById('runtime-workspace-name');
@@ -4098,7 +4237,7 @@ function mount(h) {
   const fn    = h.document?.filename || '';
   const title = fn.replace(/\.pdf$/i,'').replace(/[_-]/g,' ')
                   .replace(/\b\w/g, c => c.toUpperCase()) || 'Hermeneia';
-  _runtimeSetDraftWorkspaceScope(h.runtime?.workspace_id || h.workspace_id || h.db_path || fn || window.location?.origin);
+  _runtimeApplyWorkspaceDraftScope(h.runtime?.workspace, { hydrate: false });
   _obCanUploadDocuments = !h._noDatabase;
 
   document.getElementById('root').innerHTML = `
@@ -4370,7 +4509,7 @@ async function e10LoadFirstRun() {
     host.innerHTML = '<div class="e10-empty" style="color:var(--red)">The server is not reachable.</div>';
     return;
   }
-  _runtimeSetDraftWorkspaceScope(s.db_path);
+  _runtimeApplyWorkspaceDraftScope(s.runtime?.workspace);
 
   const step = (n, title, body, done) => `
     <div style="display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--border)">

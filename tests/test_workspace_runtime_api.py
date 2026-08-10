@@ -34,6 +34,18 @@ def _assert_sanitized(payload: dict) -> None:
         assert key not in text
 
 
+def _assert_runtime_scope_safe(workspace: dict) -> None:
+    for key in ("runtime_scope", "draft_migration_scope"):
+        assert key in workspace
+    text = json.dumps({
+        "runtime_scope": workspace["runtime_scope"],
+        "draft_migration_scope": workspace["draft_migration_scope"],
+    })
+    for forbidden in ("/private", "/home", "hermeneia.db", "uploads", "build/"):
+        assert forbidden not in text
+    assert "/" not in workspace["runtime_scope"]
+
+
 def test_runtime_workspace_reports_managed_backend_truth(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     record = create_workspace("The Second Sale")
@@ -46,7 +58,32 @@ def test_runtime_workspace_reports_managed_backend_truth(tmp_path, monkeypatch):
     assert body["workspace"]["slug"] == "the-second-sale"
     assert body["workspace"]["kind"] == "managed"
     assert body["workspace"]["managed"] is True
+    assert body["workspace"]["runtime_scope"] == f"managed:{record.workspace_id}"
+    _assert_runtime_scope_safe(body["workspace"])
     _assert_sanitized(body)
+
+
+def test_runtime_workspace_scope_is_stable_for_same_managed_workspace_and_distinct(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    first = create_workspace("The Second Sale")
+    second = create_workspace("Research Notes")
+
+    first_scope = create_app(db_path=first.db_path).test_client().get(
+        "/api/runtime/workspace"
+    ).get_json()["workspace"]["runtime_scope"]
+    first_reload_scope = create_app(db_path=first.db_path).test_client().get(
+        "/api/runtime/workspace"
+    ).get_json()["workspace"]["runtime_scope"]
+    second_scope = create_app(db_path=second.db_path).test_client().get(
+        "/api/runtime/workspace"
+    ).get_json()["workspace"]["runtime_scope"]
+
+    assert first_scope == f"managed:{first.workspace_id}"
+    assert first_reload_scope == first_scope
+    assert second_scope == f"managed:{second.workspace_id}"
+    assert second_scope != first_scope
 
 
 def test_runtime_workspace_reports_legacy_gatsby_without_mutating_it(tmp_path, monkeypatch):
@@ -61,18 +98,35 @@ def test_runtime_workspace_reports_legacy_gatsby_without_mutating_it(tmp_path, m
     catalog = client.get("/api/workspaces").get_json()
     second_catalog = client.get("/api/workspaces").get_json()
 
-    assert body["workspace"] == {
-        "id": None,
-        "name": "Gatsby",
-        "slug": "gatsby",
-        "kind": "legacy",
-        "managed": False,
-    }
+    assert body["workspace"]["id"] is None
+    assert body["workspace"]["name"] == "Gatsby"
+    assert body["workspace"]["slug"] == "gatsby"
+    assert body["workspace"]["kind"] == "legacy"
+    assert body["workspace"]["managed"] is False
+    assert body["workspace"]["runtime_scope"] == "legacy:gatsby"
+    _assert_runtime_scope_safe(body["workspace"])
     assert second == body
     assert second_catalog == catalog
     assert _identity_rows(legacy) == []
     _assert_sanitized(body)
     _assert_sanitized(catalog)
+
+
+def test_runtime_workspace_legacy_scope_is_deterministic(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    legacy = tmp_path / "build" / "hermeneia.db"
+    SQLiteStore(legacy).close()
+
+    first = create_app(db_path=Path("build/hermeneia.db")).test_client().get(
+        "/api/runtime/workspace"
+    ).get_json()
+    second = create_app(db_path=Path("build/hermeneia.db")).test_client().get(
+        "/api/runtime/workspace"
+    ).get_json()
+
+    assert first["workspace"]["runtime_scope"] == "legacy:gatsby"
+    assert second["workspace"]["runtime_scope"] == "legacy:gatsby"
+    _assert_runtime_scope_safe(first["workspace"])
 
 
 def test_runtime_workspace_reports_custom_db_without_path_leak(tmp_path, monkeypatch):
@@ -85,16 +139,44 @@ def test_runtime_workspace_reports_custom_db_without_path_leak(tmp_path, monkeyp
     current = client.get("/api/runtime/workspace").get_json()
     catalog = client.get("/api/workspaces").get_json()
 
-    assert current["workspace"] == {
-        "id": None,
-        "name": "Custom workspace",
-        "slug": None,
-        "kind": "custom",
-        "managed": False,
-    }
+    assert current["workspace"]["id"] is None
+    assert current["workspace"]["name"] == "Custom workspace"
+    assert current["workspace"]["slug"] is None
+    assert current["workspace"]["kind"] == "custom"
+    assert current["workspace"]["managed"] is False
+    assert current["workspace"]["runtime_scope"].startswith("custom:")
+    _assert_runtime_scope_safe(current["workspace"])
     assert all(workspace["is_active"] is False for workspace in catalog["workspaces"])
+    assert all("runtime_scope" not in workspace for workspace in catalog["workspaces"])
     _assert_sanitized(current)
     _assert_sanitized(catalog)
+
+
+def test_custom_runtime_scope_without_identity_is_safe_stable_and_path_opaque(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    first_custom = tmp_path / "custom" / "outside.db"
+    second_custom = tmp_path / "custom" / "other.db"
+    SQLiteStore(first_custom).close()
+    SQLiteStore(second_custom).close()
+
+    first = create_app(db_path=first_custom).test_client().get(
+        "/api/runtime/workspace"
+    ).get_json()["workspace"]
+    first_reload = create_app(db_path=first_custom).test_client().get(
+        "/api/runtime/workspace"
+    ).get_json()["workspace"]
+    second = create_app(db_path=second_custom).test_client().get(
+        "/api/runtime/workspace"
+    ).get_json()["workspace"]
+
+    assert first["runtime_scope"].startswith("custom:")
+    assert first_reload["runtime_scope"] == first["runtime_scope"]
+    assert second["runtime_scope"].startswith("custom:")
+    assert second["runtime_scope"] != first["runtime_scope"]
+    _assert_runtime_scope_safe(first)
+    _assert_runtime_scope_safe(second)
 
 
 def test_runtime_workspace_uses_custom_durable_identity_when_present(tmp_path, monkeypatch):
@@ -115,6 +197,8 @@ def test_runtime_workspace_uses_custom_durable_identity_when_present(tmp_path, m
     assert body["workspace"]["slug"] is None
     assert body["workspace"]["kind"] == "custom"
     assert body["workspace"]["managed"] is False
+    assert body["workspace"]["runtime_scope"] == f"custom:{identity['workspace_id']}"
+    _assert_runtime_scope_safe(body["workspace"])
     _assert_sanitized(body)
 
 
@@ -132,6 +216,8 @@ def test_workspace_catalog_is_sanitized_and_marks_only_actual_active(tmp_path, m
     assert [row["slug"] for row in rows] == ["gatsby", "research-notes", "the-second-sale"]
     assert [row["is_active"] for row in rows] == [False, False, True]
     assert all("document_count" not in row for row in rows)
+    assert all("runtime_scope" not in row for row in rows)
+    assert all("draft_migration_scope" not in row for row in rows)
     assert rows[0]["managed"] is False
     assert rows[-1]["managed"] is True
     _assert_sanitized(body)
@@ -163,6 +249,22 @@ def test_workspace_post_creates_managed_workspace_without_switching(tmp_path, mo
     _assert_sanitized(body)
     _assert_sanitized(runtime)
     _assert_sanitized(catalog)
+
+
+def test_workspace_post_does_not_change_active_runtime_draft_scope(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    active = create_workspace("The Second Sale")
+    client = create_app(db_path=active.db_path).test_client()
+
+    before = client.get("/api/runtime/workspace").get_json()["workspace"]
+    created = client.post("/api/workspaces", json={"name": "Research Notes"})
+    after = client.get("/api/runtime/workspace").get_json()["workspace"]
+
+    assert created.status_code == 201
+    assert "runtime_scope" not in created.get_json()["workspace"]
+    assert before["runtime_scope"] == f"managed:{active.workspace_id}"
+    assert after["runtime_scope"] == before["runtime_scope"]
+    assert after["name"] == "The Second Sale"
 
 
 def test_workspace_post_duplicate_returns_conflict_with_sanitized_identity(
