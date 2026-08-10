@@ -27,9 +27,16 @@ def _reader_selection_harness() -> str:
         "a11yDismissTip",
         "a11yClickRead",
         "a11yReadSelection",
+        "_crStringList",
+        "_crUniqueStringList",
+        "_crProjectionExtractionIds",
+        "_crProjectionSourceLocators",
+        "_crReaderBlockContext",
         "_crNodeElement",
         "_crSelectionInsideReader",
         "_crCleanSelectionText",
+        "_crReaderTextElement",
+        "_crTextOffsetWithin",
         "_crReaderBlockInfo",
         "_crSelectionBlockInfos",
         "_crUsableRect",
@@ -98,7 +105,9 @@ def _reader_selection_harness() -> str:
         "const statusEl={textContent:'',className:''};\n"
         "const _a11y={read:false,speaking:false};let _a11yHintShown=true;let _a11yHintTimer=null;let _a11yLastReaderSelection='';\n"
         "let _crReaderSelectionState=null;let _crReaderSelectionGeneration=0;let _crSelectionResolveTimer=null;"
-        "let _crDocId='doc-1';let _crPage=1;let _crCurrentExtractions=[{id:'ex-1',source_locator:'p.1.s.1',region:'body'},{id:'ex-2',source_locator:'p.1.s.2',region:'body'}];"
+        "let _crDocId='doc-1';let _crPage=1;let _crCurrentExtractions=["
+        "{source_locator:'p.1.s.1 + p.1.s.1b',region:'body',reader_projection:{kind:'drop_cap_merge',source_extraction_ids:['ex-1a','ex-1b'],source_locators:['p.1.s.1','p.1.s.1b']}},"
+        "{source_extraction_id:'ex-2',source_locator:'p.1.s.2',region:'body'}];"
         "let _crSelText='';let _crSelRange=null;let _crSelectionRect=null;let _crSelToolbar=null;let _crCaptureOpen=false;"
         "let spoken=[];let fetchCalls=0;\n"
         "function _cmpRenderContextRows(){}function _a11ySync(){}function _a11ySetStatus(message,cls){statusEl.textContent=message;statusEl.className=cls||'';}"
@@ -157,8 +166,8 @@ process.stdout.write(JSON.stringify({cases,repeated,fetchCalls}));
     ]
     assert all(case["toolbar"] and case["toolbarHasRead"] for case in behavior["cases"])
     assert all(case["tip"] == "flex" for case in behavior["cases"])
-    assert behavior["cases"][0]["extractions"] == ["ex-1"]
-    assert behavior["cases"][3]["extractions"] == ["ex-1", "ex-2"]
+    assert behavior["cases"][0]["extractions"] == ["ex-1a", "ex-1b"]
+    assert behavior["cases"][3]["extractions"] == ["ex-1a", "ex-1b", "ex-2"]
     assert behavior["cases"][3]["start"] == 0 and behavior["cases"][3]["end"] == 1
     assert [case["text"] for case in behavior["repeated"]] == ["repeated word"] * 4
     assert len({case["generation"] for case in behavior["repeated"]}) == 4

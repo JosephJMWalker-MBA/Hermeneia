@@ -44,10 +44,25 @@ def _run_lens(text, highlights, machine_obs):
     if not node:
         pytest.skip("node not available for behavioural lens test")
     html = INDEX.read_text()
+    helpers = [
+        "_crStringList",
+        "_crUniqueStringList",
+        "_crReaderSpanPoint",
+        "_crEncodeReaderSpanLocator",
+        "_crDecodeReaderSpanLocator",
+        "_crFiniteNumber",
+        "_crTextOffset",
+        "_crHasAnyValue",
+        "_crBlockMatchesSpanPoint",
+        "_crSpanRangeForBlock",
+        "_crPushNonOverlappingRange",
+    ]
     harness = (
         "function x(s){return String(s==null?'':s)"
         ".replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}\n"
         "function _crHighlightTags(h){return (h&&h.tags)||[];}\n"
+        "const _CR_READER_SPAN_LOCATOR_PREFIX='reader-span:v1:';\n"
+        + "".join(_extract_fn(html, name) for name in helpers)
         + _extract_fn(html, "_crInlineHighlightClass")
         + _extract_fn(html, "_crRenderTextWithHighlights")
         + _extract_fn(html, "_crMachineHighlightClass")

@@ -9080,6 +9080,85 @@ function _crHighlightTags(h) {
   return Array.isArray(h?.tags) ? h.tags.filter(t => typeof t === 'string') : [];
 }
 
+const _CR_READER_SPAN_LOCATOR_PREFIX = 'reader-span:v1:';
+
+function _crStringList(raw) {
+  return Array.isArray(raw)
+    ? raw.map(v => String(v || '').trim()).filter(Boolean)
+    : [];
+}
+
+function _crUniqueStringList(values) {
+  return Array.from(new Set((values || []).map(v => String(v || '').trim()).filter(Boolean)));
+}
+
+function _crProjectionExtractionIds(ex) {
+  const projectionIds = _crStringList(ex?.reader_projection?.source_extraction_ids);
+  return _crUniqueStringList([...projectionIds, ex?.source_extraction_id || ex?.id || '']);
+}
+
+function _crProjectionSourceLocators(ex, fallbackLocator = '') {
+  const projectionLocators = _crStringList(ex?.reader_projection?.source_locators);
+  return _crUniqueStringList([...projectionLocators, ex?.source_locator || '', fallbackLocator]);
+}
+
+function _crReaderBlockContext(ex, blockIndex, page = _crPage) {
+  return {
+    block_index: Number.isFinite(Number(blockIndex)) ? Number(blockIndex) : null,
+    page: page || null,
+    source_locator: ex?.source_locator || '',
+    source_locators: _crProjectionSourceLocators(ex),
+    extraction_ids: _crProjectionExtractionIds(ex),
+  };
+}
+
+function _crReaderSpanPoint(info) {
+  const blockIndex = Number(info?.block_index);
+  const offset = Number(info?.offset);
+  return {
+    block_index: Number.isFinite(blockIndex) ? blockIndex : null,
+    source_locator: info?.source_locator || '',
+    source_locators: _crUniqueStringList([
+      ..._crStringList(info?.source_locators),
+      info?.source_locator || '',
+    ]),
+    extraction_ids: _crUniqueStringList([
+      ..._crStringList(info?.extraction_ids),
+      info?.extraction_id || '',
+    ]),
+    offset: Number.isFinite(offset) ? offset : null,
+  };
+}
+
+function _crEncodeReaderSpanLocator(selection) {
+  if (!selection?.valid || !selection.blocks?.length) return selection?.start?.source_locator || '';
+  const span = {
+    page: selection.page || null,
+    start: _crReaderSpanPoint(selection.start),
+    end: _crReaderSpanPoint(selection.end),
+    source_locators: _crUniqueStringList(selection.source_locators || []),
+    extraction_ids: _crUniqueStringList(selection.extraction_ids || []),
+  };
+  try {
+    return _CR_READER_SPAN_LOCATOR_PREFIX + encodeURIComponent(JSON.stringify(span));
+  } catch {
+    return selection.start?.source_locator || '';
+  }
+}
+
+function _crDecodeReaderSpanLocator(sourceLocator) {
+  const raw = String(sourceLocator || '');
+  if (!raw.startsWith(_CR_READER_SPAN_LOCATOR_PREFIX)) return null;
+  const body = raw.slice(_CR_READER_SPAN_LOCATOR_PREFIX.length);
+  try {
+    const span = JSON.parse(decodeURIComponent(body));
+    if (!span || typeof span !== 'object') return null;
+    return span;
+  } catch {
+    return null;
+  }
+}
+
 const _CR_RANK_LABELS = {
   1: 'Speculative',
   2: 'Minor',
@@ -9129,11 +9208,78 @@ function _crInlineHighlightClass(h) {
   return parts.join(' ');
 }
 
+function _crFiniteNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function _crTextOffset(value, text) {
+  const n = _crFiniteNumber(value);
+  if (n === null) return null;
+  return Math.max(0, Math.min(text.length, n));
+}
+
+function _crHasAnyValue(needles, haystack) {
+  const available = new Set(_crStringList(haystack));
+  return _crStringList(needles).some(v => available.has(v));
+}
+
+function _crBlockMatchesSpanPoint(blockCtx, point) {
+  const blockIndex = _crFiniteNumber(blockCtx?.block_index);
+  const pointIndex = _crFiniteNumber(point?.block_index);
+  if (blockIndex !== null && pointIndex !== null && blockIndex === pointIndex) return true;
+  return _crHasAnyValue(point?.source_locators, blockCtx?.source_locators) ||
+    _crHasAnyValue(point?.extraction_ids, blockCtx?.extraction_ids);
+}
+
+function _crSpanRangeForBlock(span, blockCtx, text) {
+  if (!span || !blockCtx || !text) return null;
+  const spanPage = _crFiniteNumber(span.page);
+  const blockPage = _crFiniteNumber(blockCtx.page);
+  if (spanPage !== null && blockPage !== null && spanPage !== blockPage) return null;
+
+  const blockIndex = _crFiniteNumber(blockCtx.block_index);
+  const startIndex = _crFiniteNumber(span.start?.block_index);
+  const endIndex = _crFiniteNumber(span.end?.block_index);
+  let inside = false;
+  if (blockIndex !== null && startIndex !== null && endIndex !== null) {
+    inside = blockIndex >= Math.min(startIndex, endIndex) && blockIndex <= Math.max(startIndex, endIndex);
+  } else {
+    inside = _crHasAnyValue(span.source_locators, blockCtx.source_locators) ||
+      _crHasAnyValue(span.extraction_ids, blockCtx.extraction_ids);
+  }
+  if (!inside) return null;
+
+  const isStart = _crBlockMatchesSpanPoint(blockCtx, span.start);
+  const isEnd = _crBlockMatchesSpanPoint(blockCtx, span.end);
+  let start = 0;
+  let end = text.length;
+  if (isStart) {
+    start = _crTextOffset(span.start?.offset, text);
+    if (start === null) return null;
+  }
+  if (isEnd) {
+    end = _crTextOffset(span.end?.offset, text);
+    if (end === null) return null;
+  }
+  if (end <= start) return null;
+  return { start, end };
+}
+
+function _crPushNonOverlappingRange(ranges, start, end, entry) {
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return false;
+  const overlaps = ranges.some(r => start < r.end && end > r.start);
+  if (overlaps) return false;
+  ranges.push({ ...entry, start, end });
+  return true;
+}
+
 // Renders a block's text non-destructively from source: user highlights are
-// wrapped by exact-substring match, and — when the Machine Lens is on — machine
+// wrapped from saved Reader span locators, falling back to exact-substring
+// matches for legacy rows, and — when the Machine Lens is on — machine
 // observations are wrapped too, in a visually distinct style. User marks take
 // precedence on any overlap; rejected machine observations are never drawn.
-function _crRenderTextWithHighlights(text, highlights, machineObs) {
+function _crRenderTextWithHighlights(text, highlights, machineObs, blockCtx = {}) {
   if (!text) return '';
   const active = (highlights || []).filter(h =>
     h && h.status !== 'dismissed' && typeof h.selected_text === 'string' && h.selected_text.trim().length
@@ -9142,15 +9288,17 @@ function _crRenderTextWithHighlights(text, highlights, machineObs) {
   const ranges = [];
   // User highlights first — they win any overlap with machine attention.
   active.forEach(h => {
+    const span = _crDecodeReaderSpanLocator(h.source_locator);
+    const spanRange = _crSpanRangeForBlock(span, blockCtx, text);
+    if (spanRange) {
+      _crPushNonOverlappingRange(ranges, spanRange.start, spanRange.end, { kind: 'user', highlight: h });
+      return;
+    }
     const selected = h.selected_text;
     let start = text.indexOf(selected);
     while (start >= 0) {
       const end = start + selected.length;
-      const overlaps = ranges.some(r => start < r.end && end > r.start);
-      if (!overlaps) {
-        ranges.push({ start, end, kind: 'user', highlight: h });
-        break;
-      }
+      if (_crPushNonOverlappingRange(ranges, start, end, { kind: 'user', highlight: h })) break;
       start = text.indexOf(selected, start + 1);
     }
   });
@@ -9164,8 +9312,7 @@ function _crRenderTextWithHighlights(text, highlights, machineObs) {
     let start = text.indexOf(seg);
     while (start >= 0) {
       const end = start + seg.length;
-      const overlaps = ranges.some(r => start < r.end && end > r.start);
-      if (!overlaps) { ranges.push({ start, end, kind: 'machine', obs: o }); break; }
+      if (_crPushNonOverlappingRange(ranges, start, end, { kind: 'machine', obs: o })) break;
       start = text.indexOf(seg, start + 1);
     }
   });
@@ -9217,7 +9364,12 @@ function _crApplyLens() {
     const ex = _crCurrentExtractions[idx];
     const textEl = block.querySelector('.cr-page-text');
     if (ex && textEl) {
-      textEl.innerHTML = _crRenderTextWithHighlights(ex.text || '', pageHighlights, machineObs);
+      textEl.innerHTML = _crRenderTextWithHighlights(
+        ex.text || '',
+        pageHighlights,
+        machineObs,
+        _crReaderBlockContext(ex, idx)
+      );
     }
   });
 }
@@ -9248,7 +9400,7 @@ function _crRenderPage() {
       `<div class="cr-text-block" data-cr-block="${idx}" data-cr-locator="${x(ex.source_locator || '')}">
          <button class="cr-block-capture" onclick="_crCaptureBlock(${idx})" title="Capture this passage if text selection is unreliable">Capture this passage</button>
          <div class="cr-page-region">${x(ex.region || '')} ${ex.source_locator ? '· ' + x(ex.source_locator) : ''}</div>
-         <div class="cr-page-text">${_crRenderTextWithHighlights(ex.text || '', pageHighlights)}</div>
+         <div class="cr-page-text">${_crRenderTextWithHighlights(ex.text || '', pageHighlights, [], _crReaderBlockContext(ex, idx))}</div>
        </div>`
     ).join('');
     view.innerHTML = `
@@ -9568,15 +9720,37 @@ function _crCleanSelectionText(text) {
   return (text || '').replace(/\s+/g, ' ').trim();
 }
 
+function _crReaderTextElement(node) {
+  return _crNodeElement(node)?.closest?.('.cr-page-text') || null;
+}
+
+function _crTextOffsetWithin(textEl, container, offset) {
+  if (!textEl || !container) return null;
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(textEl);
+    range.setEnd(container, offset);
+    return range.toString().length;
+  } catch {
+    return null;
+  }
+}
+
 function _crReaderBlockInfo(el) {
   const block = _crNodeElement(el)?.closest?.('.cr-text-block');
   if (!block) return null;
   const index = Number(block.dataset?.crBlock);
   const ex = Number.isFinite(index) ? (_crCurrentExtractions || [])[index] : null;
+  const domLocator = block.dataset?.crLocator || ex?.source_locator || '';
+  const ctx = _crReaderBlockContext(ex, index);
+  const sourceLocators = _crUniqueStringList([domLocator, ...(ctx.source_locators || [])]);
+  const extractionIds = _crUniqueStringList(ctx.extraction_ids || []);
   return {
     block_index: Number.isFinite(index) ? index : null,
-    source_locator: block.dataset?.crLocator || ex?.source_locator || '',
-    extraction_id: ex?.id || ex?.source_extraction_id || '',
+    source_locator: domLocator,
+    source_locators: sourceLocators,
+    extraction_id: extractionIds[0] || '',
+    extraction_ids: extractionIds,
     region: ex?.region || '',
     page: _crPage || null,
     source_document_id: _crDocId || '',
@@ -9622,6 +9796,16 @@ function _crCreateReaderSelectionFromRange(sel, range) {
   if (!text) return null;
   const startInfo = _crReaderBlockInfo(range.startContainer);
   const endInfo = _crReaderBlockInfo(range.endContainer);
+  if (startInfo) startInfo.offset = _crTextOffsetWithin(
+    _crReaderTextElement(range.startContainer),
+    range.startContainer,
+    range.startOffset
+  );
+  if (endInfo) endInfo.offset = _crTextOffsetWithin(
+    _crReaderTextElement(range.endContainer),
+    range.endContainer,
+    range.endOffset
+  );
   const blocks = _crSelectionBlockInfos(startInfo, endInfo);
   const rect = _crRangeRect(range, startInfo?.element || endInfo?.element);
   return {
@@ -9634,14 +9818,21 @@ function _crCreateReaderSelectionFromRange(sel, range) {
     start: startInfo,
     end: endInfo,
     blocks,
-    source_locators: blocks.map(b => b.source_locator).filter(Boolean),
-    extraction_ids: blocks.map(b => b.extraction_id).filter(Boolean),
+    source_locators: _crUniqueStringList(blocks.flatMap(b =>
+      (b.source_locators && b.source_locators.length) ? b.source_locators : [b.source_locator]
+    )),
+    extraction_ids: _crUniqueStringList(blocks.flatMap(b =>
+      (b.extraction_ids && b.extraction_ids.length) ? b.extraction_ids : [b.extraction_id]
+    )),
     timestamp: Date.now(),
   };
 }
 
 function _crCreateBlockReaderSelection(block, textEl, text) {
   const info = _crReaderBlockInfo(block);
+  const rawLength = (textEl?.textContent || '').length;
+  const start = info ? { ...info, offset: 0 } : null;
+  const end = info ? { ...info, offset: rawLength } : null;
   const rect = textEl?.getBoundingClientRect?.() || block?.getBoundingClientRect?.() || null;
   return {
     valid: true,
@@ -9650,11 +9841,15 @@ function _crCreateBlockReaderSelection(block, textEl, text) {
     rect,
     page: _crPage || null,
     source_document_id: _crDocId || '',
-    start: info,
-    end: info,
+    start,
+    end,
     blocks: info ? [info] : [],
-    source_locators: info?.source_locator ? [info.source_locator] : [],
-    extraction_ids: info?.extraction_id ? [info.extraction_id] : [],
+    source_locators: info ? _crUniqueStringList(
+      info.source_locators?.length ? info.source_locators : [info.source_locator]
+    ) : [],
+    extraction_ids: info ? _crUniqueStringList(
+      info.extraction_ids?.length ? info.extraction_ids : [info.extraction_id]
+    ) : [],
     timestamp: Date.now(),
   };
 }
@@ -9978,6 +10173,7 @@ async function _crSaveHighlight(asCandidate) {
   const payload = {
     source_document_id: _crDocId,
     page: _crPage,
+    source_locator: _crEncodeReaderSpanLocator(selection),
     selected_text: selectedText,
     context_before: contextBefore,
     context_after: contextAfter,
