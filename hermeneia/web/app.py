@@ -53,7 +53,14 @@ from ..explorer.interpreter import (
 from ..explorer.bucketer import BucketingError, generate_candidate_buckets
 from ..study import compile_study, compile_synthesis_packet
 from .reader_projection import project_reader_page
-from .reader_structure import infer_reader_structure
+from .reader_structure import candidate_snapshot, infer_reader_structure
+from .reader_structure_stewardship import (
+    VALID_STRUCTURE_VERDICTS,
+    decision_payload,
+    decision_row,
+    enrich_structure_with_stewardship,
+    load_structure_decisions,
+)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -5762,17 +5769,7 @@ Return ONLY valid JSON, no markdown, no explanation:
             "total_pages": doc["total_pages"] or 1,
         })
 
-    @app.route("/api/reader/documents/<doc_id>/structure")
-    def api_reader_document_structure(doc_id: str):
-        """Return derived authored-structure candidates for Reader inspection."""
-        if not db_path.exists():
-            return jsonify({"error": "database not found"}), 404
-        conn = _conn_rw()
-        try:
-            doc = require_active_document(conn, doc_id)
-        except _ScopeAccessError as exc:
-            conn.close()
-            return _scope_error_response(exc)
+    def _reader_structure_for_document(conn: sqlite3.Connection, doc_id: str) -> dict[str, object]:
         extractions = conn.execute(
             """SELECT id, document_id, page, region, raw_text, coordinates, source_locator
                FROM source_extractions
@@ -5787,6 +5784,21 @@ Return ONLY valid JSON, no markdown, no explanation:
             (doc_id,)
         ).fetchall()
         structure = infer_reader_structure(doc_id, [dict(row) for row in extractions])
+        decisions = load_structure_decisions(conn, doc_id)
+        return enrich_structure_with_stewardship(structure, decisions)
+
+    @app.route("/api/reader/documents/<doc_id>/structure")
+    def api_reader_document_structure(doc_id: str):
+        """Return derived authored-structure candidates for Reader inspection."""
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        conn = _conn_rw()
+        try:
+            doc = require_active_document(conn, doc_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+        structure = _reader_structure_for_document(conn, doc_id)
         conn.close()
         return jsonify({
             "document": {
@@ -5798,6 +5810,93 @@ Return ONLY valid JSON, no markdown, no explanation:
             },
             "structure": structure,
         })
+
+    @app.route("/api/reader/structure/<candidate_id>/decisions", methods=["POST"])
+    def api_reader_structure_decision(candidate_id: str):
+        """Append a steward decision about a current derived structure candidate."""
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(silent=True) or {}
+        doc_id = str(payload.get("document_id") or "").strip()
+        verdict = str(payload.get("verdict") or "").strip()
+        rationale = str(payload.get("rationale") or payload.get("comment") or "").strip()
+        steward_id = str(payload.get("steward_id") or "web-steward").strip()
+        if not doc_id:
+            return jsonify({"error": "document_id is required"}), 400
+        if verdict not in VALID_STRUCTURE_VERDICTS:
+            return jsonify({"error": "verdict must be accepted or rejected"}), 400
+        if not rationale:
+            return jsonify({"error": "rationale is required"}), 400
+        if not steward_id:
+            return jsonify({"error": "steward_id is required"}), 400
+
+        conn = _conn_rw()
+        try:
+            require_active_document(conn, doc_id)
+        except _ScopeAccessError as exc:
+            conn.close()
+            return _scope_error_response(exc)
+
+        structure = _reader_structure_for_document(conn, doc_id)
+        candidates = [
+            item for item in structure.get("items", [])
+            if str(item.get("candidate_id") or item.get("id") or "") == candidate_id
+        ]
+        if not candidates:
+            conn.close()
+            return jsonify({
+                "error": "structure candidate not found for current source evidence"
+            }), 404
+        candidate = candidates[0]
+        stewardship = candidate.get("stewardship") or {}
+        effective = stewardship.get("effective_decision")
+        supersedes_id = (
+            str(effective.get("decision_id"))
+            if isinstance(effective, dict) and effective.get("decision_id")
+            else None
+        )
+        decided_at = _now_iso()
+        row = decision_row(
+            candidate=candidate,
+            candidate_snapshot=candidate_snapshot(candidate),
+            verdict=verdict,
+            rationale=rationale,
+            steward_id=steward_id,
+            decided_at=decided_at,
+            supersedes_decision_id=supersedes_id,
+        )
+        try:
+            conn.execute(
+                """INSERT INTO reader_structure_decisions
+                   (id, candidate_id, document_id, candidate_snapshot,
+                    candidate_inference_version, verdict, rationale, steward_id,
+                    decided_at, supersedes_decision_id, created_at)
+                   VALUES (:id, :candidate_id, :document_id, :candidate_snapshot,
+                           :candidate_inference_version, :verdict, :rationale,
+                           :steward_id, :decided_at, :supersedes_decision_id,
+                           :created_at)""",
+                row,
+            )
+            conn.commit()
+        except sqlite3.IntegrityError as exc:
+            conn.close()
+            return jsonify({"error": str(exc)}), 400
+        stored = conn.execute(
+            "SELECT * FROM reader_structure_decisions WHERE id = ?", (row["id"],)
+        ).fetchone()
+        structure = _reader_structure_for_document(conn, doc_id)
+        updated_candidate = next(
+            (
+                item for item in structure.get("items", [])
+                if str(item.get("candidate_id") or item.get("id") or "") == candidate_id
+            ),
+            None,
+        )
+        conn.close()
+        return jsonify({
+            "decision": decision_payload(dict(stored)),
+            "candidate": updated_candidate,
+        }), 201
 
     @app.route("/api/reader/highlights", methods=["POST"])
     def api_reader_save_highlight():

@@ -8,9 +8,11 @@ writing anything.
 
 Restored verbatim: the canonical substrate (source_documents, source_extractions,
 observations) and the authored records (reader_highlights, investigation_log,
-workspace_investigation), plus the uploaded source files. Derived artifacts
-(synthesis, lineage, evaluation) are regenerated on demand, never restored as
-truth. Reports/governance artifacts are not part of WBS v1.
+workspace_investigation, reader_structure_decisions), plus the uploaded source
+files. Derived artifacts (synthesis, lineage, evaluation) are regenerated on
+demand, never restored as truth. Recomputable Reader structure candidates are
+not restored; steward decisions carry the historical candidate snapshots they
+judged.
 """
 from __future__ import annotations
 
@@ -22,14 +24,24 @@ from pathlib import Path
 from typing import Any
 
 from ..storage.sqlite import SQLiteStore
+from ..web.reader_structure import (
+    make_structure_candidate_id,
+    structure_evidence_fingerprint,
+)
+from ..web.reader_structure_stewardship import (
+    VALID_STRUCTURE_VERDICTS,
+    make_reader_structure_decision_id,
+)
 
 
 # Restore order respects foreign keys:
-#   documents → extractions → observations → highlights → field notes → investigation
+#   documents → extractions → observations → structure decisions → highlights
+#   → field notes → investigation
 _TABLE_FILES: list[tuple[str, str]] = [
     ("source_documents", "corpus/documents.json"),
     ("source_extractions", "corpus/extractions.json"),
     ("observations", "corpus/observations.json"),
+    ("reader_structure_decisions", "governance/reader_structure_decisions.json"),
     ("reader_highlights", "study/highlights.json"),
     ("investigation_log", "study/field_notes.json"),
 ]
@@ -89,7 +101,12 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
 
     def _load(rel: str) -> Any:
         path = root / rel
-        return json.loads(path.read_text()) if path.is_file() else None
+        if not path.is_file():
+            return None
+        try:
+            return json.loads(path.read_text())
+        except json.JSONDecodeError as exc:
+            raise RestoreError(f"malformed JSON in {rel}: {exc}") from exc
 
     tables = {table: (_load(rel) or []) for table, rel in _TABLE_FILES}
     investigation = _load("investigation.json")
@@ -126,6 +143,7 @@ def _workspace_is_empty(conn: sqlite3.Connection) -> bool:
 def preview_restore(db_path: str | Path, bundle_dir: str | Path) -> dict[str, Any]:
     """Report what a restore would create, without writing anything."""
     bundle = read_bundle(bundle_dir)
+    _validate_reader_structure_decisions(bundle["tables"])
     db_path = Path(db_path)
     target_empty = True
     if db_path.exists():
@@ -158,6 +176,7 @@ def restore_workspace(
     """
     db_path = Path(db_path)
     bundle = read_bundle(bundle_dir)
+    _validate_reader_structure_decisions(bundle["tables"])
 
     # Ensure schema exists (creates the DB and all tables if absent).
     SQLiteStore(db_path).close()
@@ -212,6 +231,258 @@ def _insert_rows(
         )
         count += 1
     return count
+
+
+def _validate_reader_structure_decisions(
+    tables: dict[str, Any],
+) -> None:
+    rows = tables.get("reader_structure_decisions", [])
+    if rows is None:
+        tables["reader_structure_decisions"] = []
+        return
+    if not isinstance(rows, list):
+        raise RestoreError(
+            "governance/reader_structure_decisions.json must contain a JSON list"
+        )
+    if not rows:
+        return
+
+    document_ids = {
+        str(row.get("id") or "")
+        for row in tables.get("source_documents", [])
+        if isinstance(row, dict)
+    }
+    extractions = {
+        str(row.get("id") or ""): row
+        for row in tables.get("source_extractions", [])
+        if isinstance(row, dict)
+    }
+    by_id: dict[str, dict[str, Any]] = {}
+    canonical_seen: dict[str, str] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise RestoreError("reader_structure_decisions entries must be objects")
+        decision_id = _required_text(row, "id")
+        if decision_id in canonical_seen:
+            canonical = json.dumps(row, sort_keys=True, ensure_ascii=False)
+            if canonical_seen[decision_id] != canonical:
+                raise RestoreError(
+                    "duplicate conflicting deterministic reader structure decision id"
+                )
+            raise RestoreError("duplicate reader structure decision id")
+        canonical_seen[decision_id] = json.dumps(row, sort_keys=True, ensure_ascii=False)
+        by_id[decision_id] = row
+
+        candidate_id = _required_text(row, "candidate_id")
+        document_id = _required_text(row, "document_id")
+        if document_id not in document_ids:
+            raise RestoreError("reader structure decision references absent document")
+        verdict = _required_text(row, "verdict")
+        if verdict not in VALID_STRUCTURE_VERDICTS:
+            raise RestoreError("reader structure decision verdict is invalid")
+        rationale = _required_text(row, "rationale")
+        steward_id = _required_text(row, "steward_id")
+        decided_at = _required_text(row, "decided_at")
+        _required_text(row, "created_at")
+        inference_version = _required_text(row, "candidate_inference_version")
+        supersedes = _optional_text(row, "supersedes_decision_id")
+        expected_id = make_reader_structure_decision_id(
+            candidate_id=candidate_id,
+            verdict=verdict,
+            rationale=rationale,
+            steward_id=steward_id,
+            decided_at=decided_at,
+            supersedes_decision_id=supersedes,
+        )
+        if expected_id != decision_id:
+            raise RestoreError(
+                "reader structure decision id does not match deterministic fields"
+            )
+
+        snapshot = _candidate_snapshot(row)
+        _validate_candidate_snapshot(
+            row=row,
+            snapshot=snapshot,
+            candidate_id=candidate_id,
+            document_id=document_id,
+            inference_version=inference_version,
+            extractions=extractions,
+        )
+
+    _validate_reader_structure_supersessions(by_id)
+    tables["reader_structure_decisions"] = _topological_decision_order(rows)
+
+
+def _candidate_snapshot(row: dict[str, Any]) -> dict[str, Any]:
+    snapshot_raw = row.get("candidate_snapshot")
+    if not isinstance(snapshot_raw, str):
+        raise RestoreError("reader structure decision candidate_snapshot must be JSON text")
+    try:
+        snapshot = json.loads(snapshot_raw)
+    except json.JSONDecodeError as exc:
+        raise RestoreError("reader structure decision candidate_snapshot is malformed") from exc
+    if not isinstance(snapshot, dict):
+        raise RestoreError("reader structure decision candidate_snapshot must be an object")
+    return snapshot
+
+
+def _validate_candidate_snapshot(
+    *,
+    row: dict[str, Any],
+    snapshot: dict[str, Any],
+    candidate_id: str,
+    document_id: str,
+    inference_version: str,
+    extractions: dict[str, dict[str, Any]],
+) -> None:
+    if str(snapshot.get("candidate_id") or "") != candidate_id:
+        raise RestoreError("reader structure decision snapshot candidate_id mismatch")
+    if str(snapshot.get("document_id") or "") != document_id:
+        raise RestoreError("reader structure decision snapshot document_id mismatch")
+    if str(snapshot.get("inference_version") or "") != inference_version:
+        raise RestoreError("reader structure decision snapshot inference version mismatch")
+
+    kind = _snapshot_text(snapshot, "kind")
+    heading_text = _snapshot_text(snapshot, "heading_text")
+    start_locator = _snapshot_text(snapshot, "start_locator")
+    contributing_ids = _snapshot_text_list(snapshot, "contributing_extraction_ids")
+    contributing_locators = _snapshot_text_list(snapshot, "contributing_locators")
+    evidence_blocks = snapshot.get("evidence_blocks")
+    if not isinstance(evidence_blocks, list) or not evidence_blocks:
+        raise RestoreError("reader structure decision snapshot evidence_blocks invalid")
+
+    block_ids: list[str] = []
+    block_locators: list[str] = []
+    for block in evidence_blocks:
+        if not isinstance(block, dict):
+            raise RestoreError("reader structure decision evidence block invalid")
+        _snapshot_text(block, "role")
+        extraction_id = _snapshot_text(block, "source_extraction_id")
+        extraction = extractions.get(extraction_id)
+        if extraction is None:
+            raise RestoreError("reader structure decision references absent evidence")
+        if str(extraction.get("document_id") or "") != document_id:
+            raise RestoreError("reader structure decision evidence document mismatch")
+        source_locator = _snapshot_text(block, "source_locator")
+        raw_text = str(block.get("raw_text") if block.get("raw_text") is not None else "")
+        if source_locator != str(extraction.get("source_locator") or ""):
+            raise RestoreError("reader structure decision evidence locator mismatch")
+        if raw_text != str(extraction.get("raw_text") or ""):
+            raise RestoreError("reader structure decision evidence text mismatch")
+        block_ids.append(extraction_id)
+        block_locators.append(source_locator)
+
+    if contributing_ids != block_ids:
+        raise RestoreError("reader structure decision contributing evidence mismatch")
+    if contributing_locators != block_locators:
+        raise RestoreError("reader structure decision contributing locator mismatch")
+
+    evidence_fingerprint = _snapshot_text(snapshot, "evidence_fingerprint")
+    if evidence_fingerprint != structure_evidence_fingerprint(evidence_blocks):
+        raise RestoreError("reader structure decision evidence fingerprint mismatch")
+
+    expected_candidate_id = make_structure_candidate_id(
+        document_id=document_id,
+        kind=kind,
+        source_locator=start_locator,
+        heading_text=heading_text,
+        title_text=snapshot.get("title_text"),
+        contributing_ids=contributing_ids,
+        contributing_locators=contributing_locators,
+        evidence_fingerprint=evidence_fingerprint,
+        inference_version=inference_version,
+    )
+    if expected_candidate_id != candidate_id:
+        raise RestoreError("reader structure decision candidate_id is not deterministic")
+
+    if row.get("candidate_snapshot") != json.dumps(
+        snapshot,
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ):
+        raise RestoreError("reader structure decision candidate_snapshot is not canonical")
+
+
+def _validate_reader_structure_supersessions(
+    rows_by_id: dict[str, dict[str, Any]],
+) -> None:
+    supersedes_by_id: dict[str, str] = {}
+    for decision_id, row in rows_by_id.items():
+        supersedes = _optional_text(row, "supersedes_decision_id")
+        if not supersedes:
+            continue
+        if supersedes == decision_id:
+            raise RestoreError("reader structure decision cannot supersede itself")
+        prior = rows_by_id.get(supersedes)
+        if prior is None:
+            raise RestoreError("broken reader structure decision supersession reference")
+        if prior.get("candidate_id") != row.get("candidate_id"):
+            raise RestoreError("reader structure supersession candidate mismatch")
+        if prior.get("document_id") != row.get("document_id"):
+            raise RestoreError("reader structure supersession document mismatch")
+        supersedes_by_id[decision_id] = supersedes
+
+    for decision_id in supersedes_by_id:
+        seen: set[str] = set()
+        current: str | None = decision_id
+        while current in supersedes_by_id:
+            if current in seen:
+                raise RestoreError("reader structure decision supersession cycle")
+            seen.add(current)
+            current = supersedes_by_id.get(current)
+
+
+def _topological_decision_order(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    remaining = {str(row["id"]): row for row in rows}
+    ordered: list[dict[str, Any]] = []
+    inserted: set[str] = set()
+    while remaining:
+        progressed = False
+        for decision_id, row in list(remaining.items()):
+            supersedes = _optional_text(row, "supersedes_decision_id")
+            if supersedes and supersedes not in inserted:
+                continue
+            ordered.append(row)
+            inserted.add(decision_id)
+            del remaining[decision_id]
+            progressed = True
+        if not progressed:
+            raise RestoreError("reader structure decision supersession cycle")
+    return ordered
+
+
+def _required_text(row: dict[str, Any], key: str) -> str:
+    value = row.get(key)
+    if value is None or not str(value).strip():
+        raise RestoreError(f"reader structure decision {key} is required")
+    return str(value)
+
+
+def _optional_text(row: dict[str, Any], key: str) -> str | None:
+    value = row.get(key)
+    if value is None:
+        return None
+    if not str(value).strip():
+        raise RestoreError(f"reader structure decision {key} must not be empty")
+    return str(value)
+
+
+def _snapshot_text(snapshot: dict[str, Any], key: str) -> str:
+    value = snapshot.get(key)
+    if value is None or not str(value).strip():
+        raise RestoreError(f"reader structure snapshot {key} is required")
+    return str(value)
+
+
+def _snapshot_text_list(snapshot: dict[str, Any], key: str) -> list[str]:
+    value = snapshot.get(key)
+    if not isinstance(value, list) or not value:
+        raise RestoreError(f"reader structure snapshot {key} must be a non-empty list")
+    result = [str(item) for item in value]
+    if any(not item.strip() for item in result):
+        raise RestoreError(f"reader structure snapshot {key} contains an empty value")
+    return result
 
 
 def _restore_investigation(conn: sqlite3.Connection, investigation: dict) -> None:

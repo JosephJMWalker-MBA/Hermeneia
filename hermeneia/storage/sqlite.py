@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .hashing import make_semantic_hash
 
-SCHEMA_VERSION = 16  # bumped from 15: critic_reports operational artifact (Sprint E9)
+SCHEMA_VERSION = 17  # bumped from 16: reader_structure_decisions governance
 
 # Supersession triggers must be dropped and recreated whenever the canonical object
 # list grows. SQLite has no ALTER TRIGGER.
@@ -1077,6 +1077,59 @@ CREATE TABLE IF NOT EXISTS reading_progress (
 
 CREATE INDEX IF NOT EXISTS idx_reading_progress_doc
     ON reading_progress(document_id);
+
+CREATE TABLE IF NOT EXISTS reader_structure_decisions (
+    id                          TEXT PRIMARY KEY,
+    candidate_id                TEXT NOT NULL,
+    document_id                 TEXT NOT NULL REFERENCES source_documents(id),
+    candidate_snapshot          TEXT NOT NULL,
+    candidate_inference_version TEXT NOT NULL,
+    verdict                     TEXT NOT NULL CHECK(verdict IN ('accepted','rejected')),
+    rationale                   TEXT NOT NULL CHECK(length(trim(rationale)) > 0),
+    steward_id                  TEXT NOT NULL CHECK(length(trim(steward_id)) > 0),
+    decided_at                  TEXT NOT NULL,
+    supersedes_decision_id      TEXT REFERENCES reader_structure_decisions(id),
+    created_at                  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_rsd_candidate
+    ON reader_structure_decisions(candidate_id, decided_at, id);
+
+CREATE INDEX IF NOT EXISTS idx_rsd_document
+    ON reader_structure_decisions(document_id, decided_at, id);
+
+CREATE TRIGGER IF NOT EXISTS reader_structure_decisions_no_update
+BEFORE UPDATE ON reader_structure_decisions
+BEGIN
+    SELECT RAISE(ABORT, 'ReaderStructureDecision immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS reader_structure_decisions_no_delete
+BEFORE DELETE ON reader_structure_decisions
+BEGIN
+    SELECT RAISE(ABORT, 'ReaderStructureDecision immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS reader_structure_decisions_no_self_supersession
+BEFORE INSERT ON reader_structure_decisions
+WHEN NEW.supersedes_decision_id IS NOT NULL
+BEGIN
+    SELECT RAISE(ABORT, 'ReaderStructureDecision cannot supersede itself')
+    WHERE NEW.supersedes_decision_id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS reader_structure_decisions_supersedes_same_candidate
+BEFORE INSERT ON reader_structure_decisions
+WHEN NEW.supersedes_decision_id IS NOT NULL
+BEGIN
+    SELECT RAISE(ABORT, 'ReaderStructureDecision supersession target missing or mismatched')
+    WHERE NOT EXISTS (
+        SELECT 1 FROM reader_structure_decisions prior
+        WHERE prior.id = NEW.supersedes_decision_id
+          AND prior.candidate_id = NEW.candidate_id
+          AND prior.document_id = NEW.document_id
+    );
+END;
 """)
     conn.commit()
 

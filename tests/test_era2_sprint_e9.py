@@ -2,7 +2,7 @@
 Era II Sprint E9 — Interpretation Grounding Critic tests.
 
 Verifies:
-- Schema version 16 (critic_reports table present)
+- Schema version 17 (reader_structure_decisions governance table present)
 - make_critic_report_id: deterministic ID generation
 - critic_reports DDL: table exists with correct columns
 - critic_reports immutability: UPDATE of core fields rejected; DELETE rejected
@@ -87,8 +87,8 @@ def store_with_proposal(tmp_path):
 
 # ── Schema version ────────────────────────────────────────────────────────────
 
-def test_schema_version_is_16():
-    assert SCHEMA_VERSION == 16
+def test_schema_version_is_17():
+    assert SCHEMA_VERSION == 17
 
 
 def test_critic_reports_table_exists(store):

@@ -7,6 +7,7 @@ asserted byte-for-byte.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +15,14 @@ from pathlib import Path
 import pytest
 
 from hermeneia.storage.sqlite import SQLiteStore
+from hermeneia.web.reader_structure import (
+    make_structure_candidate_id,
+    structure_evidence_fingerprint,
+)
+from hermeneia.web.reader_structure_stewardship import (
+    canonical_json,
+    make_reader_structure_decision_id,
+)
 from hermeneia.workspace import (
     RestoreError,
     export_workspace_bundle,
@@ -95,6 +104,102 @@ def _rowdicts(db_path: Path, sql: str) -> list[dict]:
         conn.close()
 
 
+def _reader_structure_decision(
+    doc_id: str,
+    *,
+    rationale: str = "Historical structure boundary accepted.",
+    supersedes_decision_id: str | None = None,
+) -> dict:
+    evidence_blocks = [
+        {
+            "role": "heading",
+            "source_extraction_id": "ext-1",
+            "page": 2,
+            "region": "block:4",
+            "source_locator": "page:2:block:4",
+            "raw_text": "the green light",
+        }
+    ]
+    fingerprint = structure_evidence_fingerprint(evidence_blocks)
+    candidate_id = make_structure_candidate_id(
+        document_id=doc_id,
+        kind="chapter",
+        source_locator="page:2:block:4",
+        heading_text="the green light",
+        title_text=None,
+        contributing_ids=["ext-1"],
+        contributing_locators=["page:2:block:4"],
+        evidence_fingerprint=fingerprint,
+        inference_version="reader-structure@1",
+    )
+    snapshot = {
+        "candidate_id": candidate_id,
+        "document_id": doc_id,
+        "kind": "chapter",
+        "heading_text": "the green light",
+        "title_text": None,
+        "start_page": 2,
+        "start_locator": "page:2:block:4",
+        "start_context_page": 2,
+        "start_context_locator": "page:2:block:4",
+        "start_status": "inferred_from_source_evidence",
+        "end_page": None,
+        "end_locator": None,
+        "end_status": "open",
+        "confidence": "candidate",
+        "confidence_score": 1,
+        "confidence_model": "deterministic additive basis count",
+        "basis": ["heading_shape"],
+        "contributing_extraction_ids": ["ext-1"],
+        "contributing_locators": ["page:2:block:4"],
+        "evidence_fingerprint": fingerprint,
+        "evidence_blocks": evidence_blocks,
+        "status": "derived",
+        "inference_version": "reader-structure@1",
+    }
+    decided_at = "2026-07-01T00:00:00+00:00"
+    decision_id = make_reader_structure_decision_id(
+        candidate_id=candidate_id,
+        verdict="accepted",
+        rationale=rationale,
+        steward_id="test-steward",
+        decided_at=decided_at,
+        supersedes_decision_id=supersedes_decision_id,
+    )
+    return {
+        "id": decision_id,
+        "candidate_id": candidate_id,
+        "document_id": doc_id,
+        "candidate_snapshot": canonical_json(snapshot),
+        "candidate_inference_version": "reader-structure@1",
+        "verdict": "accepted",
+        "rationale": rationale,
+        "steward_id": "test-steward",
+        "decided_at": decided_at,
+        "supersedes_decision_id": supersedes_decision_id,
+        "created_at": decided_at,
+    }
+
+
+def _insert_reader_structure_decision(db_path: Path, doc_id: str) -> dict:
+    row = _reader_structure_decision(doc_id)
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """INSERT INTO reader_structure_decisions
+           (id, candidate_id, document_id, candidate_snapshot,
+            candidate_inference_version, verdict, rationale, steward_id,
+            decided_at, supersedes_decision_id, created_at)
+           VALUES (:id, :candidate_id, :document_id, :candidate_snapshot,
+                   :candidate_inference_version, :verdict, :rationale,
+                   :steward_id, :decided_at, :supersedes_decision_id,
+                   :created_at)""",
+        row,
+    )
+    conn.commit()
+    conn.close()
+    return row
+
+
 # ── Round-trip conformance ─────────────────────────────────────────────────
 
 
@@ -119,6 +224,28 @@ def test_round_trip_preserves_canonical_and_authored(tmp_path: Path):
         "SELECT thesis, purpose, lenses, reconsider, created_at FROM workspace_investigation",
     ):
         assert _rowdicts(src, sql) == _rowdicts(dst, sql), sql
+
+
+def test_round_trip_preserves_reader_structure_decisions(tmp_path: Path):
+    src = tmp_path / "src" / "workspace.db"
+    src.parent.mkdir(parents=True)
+    doc_id = _seed(src)
+    _insert_reader_structure_decision(src, doc_id)
+    bundle = tmp_path / "bundle"
+    _export(src, bundle)
+
+    dst = tmp_path / "dst" / "workspace.db"
+    dst.parent.mkdir(parents=True)
+    result = restore_workspace(dst, bundle)
+
+    assert result["restored"]["reader_structure_decisions"] == 1
+    assert _rowdicts(
+        src,
+        "SELECT * FROM reader_structure_decisions ORDER BY id",
+    ) == _rowdicts(
+        dst,
+        "SELECT * FROM reader_structure_decisions ORDER BY id",
+    )
 
 
 def test_round_trip_preserves_uploads(tmp_path: Path):
@@ -152,6 +279,7 @@ def test_restored_workspace_re_exports_identically(tmp_path: Path):
     for rel in (
         "corpus/documents.json",
         "corpus/extractions.json",
+        "governance/reader_structure_decisions.json",
         "study/highlights.json",
         "study/field_notes.json",
         "investigation.json",
@@ -172,6 +300,7 @@ def test_preview_reports_what_would_be_created(tmp_path: Path):
     preview = preview_restore(tmp_path / "fresh.db", bundle)
     assert preview["target_empty"] is True
     assert preview["would_create"]["source_documents"] == 1
+    assert preview["would_create"]["reader_structure_decisions"] == 0
     assert preview["would_create"]["uploads"] == 1
     assert preview["has_investigation"] is True
     assert preview["wbs_version"] == "1.0"
@@ -204,3 +333,122 @@ def test_preview_flags_nonempty_target(tmp_path: Path):
     _seed(dst)
 
     assert preview_restore(dst, bundle)["target_empty"] is False
+
+
+def test_restore_accepts_older_bundle_without_reader_structure_decisions(
+    tmp_path: Path,
+):
+    src = tmp_path / "src" / "workspace.db"
+    src.parent.mkdir(parents=True)
+    _seed(src)
+    bundle = tmp_path / "bundle"
+    _export(src, bundle)
+    (bundle / "governance" / "reader_structure_decisions.json").unlink()
+    manifest_path = bundle / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["files"] = [
+        item for item in manifest["files"]
+        if item["path"] != "governance/reader_structure_decisions.json"
+    ]
+    manifest["counts"].pop("reader_structure_decisions", None)
+    manifest_path.write_text(
+        json.dumps(manifest, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
+    )
+
+    dst = tmp_path / "dst" / "workspace.db"
+    dst.parent.mkdir(parents=True)
+    result = restore_workspace(dst, bundle)
+
+    assert result["restored"]["reader_structure_decisions"] == 0
+    assert _rowdicts(dst, "SELECT * FROM reader_structure_decisions") == []
+
+
+def test_restore_fails_closed_for_malformed_reader_structure_governance(
+    tmp_path: Path,
+):
+    src = tmp_path / "src" / "workspace.db"
+    src.parent.mkdir(parents=True)
+    _seed(src)
+    bundle = tmp_path / "bundle"
+    _export(src, bundle)
+    governance_file = bundle / "governance" / "reader_structure_decisions.json"
+    governance_file.write_text(json.dumps([{"id": "not-a-valid-decision"}]))
+
+    dst = tmp_path / "dst" / "workspace.db"
+    dst.parent.mkdir(parents=True)
+    with pytest.raises(RestoreError):
+        restore_workspace(dst, bundle)
+    assert not dst.exists()
+
+
+def test_restore_fails_closed_for_invalid_reader_structure_snapshot(
+    tmp_path: Path,
+):
+    src = tmp_path / "src" / "workspace.db"
+    src.parent.mkdir(parents=True)
+    doc_id = _seed(src)
+    bundle = tmp_path / "bundle"
+    _export(src, bundle)
+    decision = _reader_structure_decision(doc_id)
+    decision["candidate_snapshot"] = "{}"
+    governance_file = bundle / "governance" / "reader_structure_decisions.json"
+    governance_file.write_text(
+        json.dumps([decision], sort_keys=True, indent=2, ensure_ascii=False) + "\n"
+    )
+
+    dst = tmp_path / "dst" / "workspace.db"
+    dst.parent.mkdir(parents=True)
+    with pytest.raises(RestoreError):
+        restore_workspace(dst, bundle)
+    assert not dst.exists()
+
+
+def test_restore_fails_closed_for_duplicate_conflicting_structure_decision_id(
+    tmp_path: Path,
+):
+    src = tmp_path / "src" / "workspace.db"
+    src.parent.mkdir(parents=True)
+    doc_id = _seed(src)
+    bundle = tmp_path / "bundle"
+    _export(src, bundle)
+    first = _reader_structure_decision(doc_id)
+    second = dict(first)
+    second["candidate_snapshot"] = first["candidate_snapshot"].replace(
+        "heading_shape",
+        "different_shape",
+    )
+    governance_file = bundle / "governance" / "reader_structure_decisions.json"
+    governance_file.write_text(
+        json.dumps([first, second], sort_keys=True, indent=2, ensure_ascii=False)
+        + "\n"
+    )
+
+    dst = tmp_path / "dst" / "workspace.db"
+    dst.parent.mkdir(parents=True)
+    with pytest.raises(RestoreError):
+        restore_workspace(dst, bundle)
+    assert not dst.exists()
+
+
+def test_restore_fails_closed_for_broken_structure_supersession(
+    tmp_path: Path,
+):
+    src = tmp_path / "src" / "workspace.db"
+    src.parent.mkdir(parents=True)
+    doc_id = _seed(src)
+    bundle = tmp_path / "bundle"
+    _export(src, bundle)
+    decision = _reader_structure_decision(
+        doc_id,
+        supersedes_decision_id="missing-decision",
+    )
+    governance_file = bundle / "governance" / "reader_structure_decisions.json"
+    governance_file.write_text(
+        json.dumps([decision], sort_keys=True, indent=2, ensure_ascii=False) + "\n"
+    )
+
+    dst = tmp_path / "dst" / "workspace.db"
+    dst.parent.mkdir(parents=True)
+    with pytest.raises(RestoreError):
+        restore_workspace(dst, bundle)
+    assert not dst.exists()

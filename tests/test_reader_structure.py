@@ -7,9 +7,17 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from hermeneia.storage.sqlite import SQLiteStore
+from hermeneia.workspace import export_workspace_bundle, restore_workspace
 from hermeneia.web.app import create_app
-from hermeneia.web.reader_structure import infer_reader_structure
+from hermeneia.web.reader_structure import (
+    STRUCTURE_INFERENCE_VERSION,
+    candidate_snapshot,
+    infer_reader_structure,
+)
+from hermeneia.web.reader_structure_stewardship import decision_row
 
 
 def _extraction(
@@ -36,6 +44,118 @@ def _extraction(
 
 def _items(extractions: list[dict[str, object]], doc_id: str = "doc-structure") -> list[dict[str, object]]:
     return infer_reader_structure(doc_id, extractions)["items"]
+
+
+def _second_sale_sequence(doc_id: str = "doc-structure") -> list[dict[str, object]]:
+    return [
+        _extraction("ext-c12", 41, 1, "CHAPTER 12\n", doc_id),
+        _extraction("ext-t12", 41, 2, "The First Sale\n", doc_id),
+        _extraction(
+            "ext-p12",
+            41,
+            3,
+            "Saye closed the presentation before the donor questions began.\n",
+            doc_id,
+        ),
+        _extraction("ext-c13", 42, 1, "CHAPTER 13\n", doc_id),
+        _extraction("ext-t13", 42, 2, "The Donor Room\n", doc_id),
+        _extraction(
+            "ext-p13",
+            42,
+            3,
+            "Meridian Civic Group held its launch reception in a bright donor room.\n",
+            doc_id,
+        ),
+    ]
+
+
+def _seed_structure_workspace(tmp_path: Path) -> tuple[Path, str, list[dict[str, object]]]:
+    db_path = tmp_path / "reader_structure.db"
+    SQLiteStore(db_path).close()
+    now = datetime.now(timezone.utc).isoformat()
+    doc_id = "s" * 64
+    rows = _second_sale_sequence(doc_id)
+
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """INSERT INTO source_documents
+           (id, original_filename, file_hash, total_pages, registered_at,
+            compiler_version, source_role, excluded_from_analysis)
+           VALUES (?,?,?,?,?,?,?,?)""",
+        (doc_id, "the-second-sale.pdf", doc_id, 42, now, "test", "primary", 0),
+    )
+    for row in rows:
+        conn.execute(
+            """INSERT INTO source_extractions
+               (id, document_id, page, region, raw_text, parser, parser_version,
+                coordinates, source_locator, source_hash, hash, extracted_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                row["id"],
+                doc_id,
+                row["page"],
+                row["region"],
+                row["raw_text"],
+                "pymupdf",
+                "test",
+                row["coordinates"],
+                row["source_locator"],
+                doc_id,
+                row["id"],
+                now,
+            ),
+        )
+    conn.commit()
+    conn.close()
+    return db_path, doc_id, rows
+
+
+def _insert_structure_decision(
+    db_path: Path,
+    candidate: dict[str, object],
+    *,
+    verdict: str = "accepted",
+    rationale: str = "Confirmed by steward.",
+    decided_at: str = "2026-07-01T00:00:00+00:00",
+    supersedes_decision_id: str | None = None,
+) -> dict[str, object]:
+    row = decision_row(
+        candidate=candidate,
+        candidate_snapshot=candidate_snapshot(candidate),
+        verdict=verdict,
+        rationale=rationale,
+        steward_id="test-steward",
+        decided_at=decided_at,
+        supersedes_decision_id=supersedes_decision_id,
+    )
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """INSERT INTO reader_structure_decisions
+           (id, candidate_id, document_id, candidate_snapshot,
+            candidate_inference_version, verdict, rationale, steward_id,
+            decided_at, supersedes_decision_id, created_at)
+           VALUES (:id, :candidate_id, :document_id, :candidate_snapshot,
+                   :candidate_inference_version, :verdict, :rationale,
+                   :steward_id, :decided_at, :supersedes_decision_id,
+                   :created_at)""",
+        row,
+    )
+    conn.commit()
+    conn.close()
+    return row
+
+
+def _source_rows(db_path: Path) -> list[tuple]:
+    conn = sqlite3.connect(db_path)
+    try:
+        return conn.execute(
+            """SELECT id, document_id, page, region, raw_text, coordinates,
+                      source_locator
+                 FROM source_extractions
+                ORDER BY page, region, id"""
+        ).fetchall()
+    finally:
+        conn.close()
 
 
 def test_second_sale_sequence_inflects_strong_chapter_start_with_provenance() -> None:
@@ -222,6 +342,30 @@ def test_output_is_deterministic_over_identical_evidence() -> None:
     )
 
 
+def test_candidate_identity_tracks_evidence_and_inference_version() -> None:
+    rows = _second_sale_sequence()
+
+    original = _items(rows)[0]
+    identical = _items(copy.deepcopy(rows))[0]
+    material_change = copy.deepcopy(rows)
+    material_change[2]["raw_text"] = (
+        "Saye ended the presentation after the donor questions began.\n"
+    )
+    changed = _items(material_change)[0]
+    next_version = infer_reader_structure(
+        "doc-structure",
+        rows,
+        inference_version="reader-structure@2",
+    )["items"][0]
+
+    assert original["candidate_id"] == original["id"]
+    assert original["candidate_id"] == identical["candidate_id"]
+    assert original["candidate_id"] != changed["candidate_id"]
+    assert original["candidate_id"] != next_version["candidate_id"]
+    assert original["inference_version"] == STRUCTURE_INFERENCE_VERSION
+    assert original["evidence_fingerprint"] != changed["evidence_fingerprint"]
+
+
 def test_reader_structure_api_is_read_only_and_inspectable(tmp_path: Path) -> None:
     db_path = tmp_path / "reader_structure.db"
     store = SQLiteStore(db_path)
@@ -278,6 +422,9 @@ def test_reader_structure_api_is_read_only_and_inspectable(tmp_path: Path) -> No
     ).fetchall()
     before_highlights = conn.execute("SELECT COUNT(*) FROM reader_highlights").fetchone()[0]
     before_log = conn.execute("SELECT COUNT(*) FROM investigation_log").fetchone()[0]
+    before_decisions = conn.execute(
+        "SELECT COUNT(*) FROM reader_structure_decisions"
+    ).fetchone()[0]
     conn.close()
 
     client = create_app(db_path=db_path).test_client()
@@ -294,6 +441,9 @@ def test_reader_structure_api_is_read_only_and_inspectable(tmp_path: Path) -> No
     assert structure["items"][0]["heading_text"] == "CHAPTER 13"
     assert structure["items"][0]["title_text"] == "The Donor Room"
     assert structure["items"][0]["confidence"] == "high"
+    assert structure["items"][0]["stewardship"]["status"] == "undecided"
+    assert structure["items"][0]["stewardship"]["history"] == []
+    assert structure["accepted_structure"] == []
     assert "probable_running_header" in structure["items"][0]["basis"]
     assert "ext-header" in structure["items"][0]["contributing_extraction_ids"]
 
@@ -303,15 +453,215 @@ def test_reader_structure_api_is_read_only_and_inspectable(tmp_path: Path) -> No
     ).fetchall()
     after_highlights = verify.execute("SELECT COUNT(*) FROM reader_highlights").fetchone()[0]
     after_log = verify.execute("SELECT COUNT(*) FROM investigation_log").fetchone()[0]
-    tables = {
-        row[0]
-        for row in verify.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%structure%'"
-        ).fetchall()
-    }
+    after_decisions = verify.execute(
+        "SELECT COUNT(*) FROM reader_structure_decisions"
+    ).fetchone()[0]
     verify.close()
 
     assert after_rows == before_rows
     assert after_highlights == before_highlights
     assert after_log == before_log
-    assert tables == set()
+    assert after_decisions == before_decisions == 0
+
+
+def test_reader_structure_decisions_append_and_resolve_effective_status(
+    tmp_path: Path,
+) -> None:
+    db_path, doc_id, _rows = _seed_structure_workspace(tmp_path)
+    before_source = _source_rows(db_path)
+    conn = sqlite3.connect(db_path)
+    before_highlights = conn.execute("SELECT COUNT(*) FROM reader_highlights").fetchone()[0]
+    before_log = conn.execute("SELECT COUNT(*) FROM investigation_log").fetchone()[0]
+    conn.close()
+
+    client = create_app(db_path=db_path).test_client()
+    initial = client.get(f"/api/reader/documents/{doc_id}/structure").get_json()
+    candidates = initial["structure"]["items"]
+    assert len(candidates) == 2
+    assert {item["confidence"] for item in candidates} == {"high"}
+    assert {item["stewardship"]["status"] for item in candidates} == {"undecided"}
+
+    first = candidates[0]
+    second = candidates[1]
+    accept = client.post(
+        f"/api/reader/structure/{first['candidate_id']}/decisions",
+        json={
+            "document_id": doc_id,
+            "verdict": "accepted",
+            "rationale": "Chapter boundary confirmed by the steward.",
+            "steward_id": "joseph",
+        },
+    )
+    assert accept.status_code == 201
+    accepted_decision = accept.get_json()["decision"]
+    assert accept.get_json()["candidate"]["stewardship"]["status"] == "accepted"
+
+    reject = client.post(
+        f"/api/reader/structure/{second['candidate_id']}/decisions",
+        json={
+            "document_id": doc_id,
+            "verdict": "rejected",
+            "rationale": "The sequence is visible but not accepted for this study.",
+            "steward_id": "joseph",
+        },
+    )
+    assert reject.status_code == 201
+    assert reject.get_json()["candidate"]["stewardship"]["status"] == "rejected"
+
+    superseding = client.post(
+        f"/api/reader/structure/{first['candidate_id']}/decisions",
+        json={
+            "document_id": doc_id,
+            "verdict": "rejected",
+            "rationale": "Reconsidered after reviewing the preceding page.",
+            "steward_id": "joseph",
+        },
+    )
+    assert superseding.status_code == 201
+    superseding_decision = superseding.get_json()["decision"]
+    assert superseding_decision["supersedes_decision_id"] == accepted_decision["decision_id"]
+
+    reloaded = client.get(f"/api/reader/documents/{doc_id}/structure").get_json()
+    by_id = {
+        item["candidate_id"]: item
+        for item in reloaded["structure"]["items"]
+    }
+    first_stewardship = by_id[first["candidate_id"]]["stewardship"]
+    assert first_stewardship["status"] == "rejected"
+    assert first_stewardship["effective_decision"]["rationale"] == (
+        "Reconsidered after reviewing the preceding page."
+    )
+    assert len(first_stewardship["history"]) == 2
+    assert first_stewardship["history"][0]["superseded"] is True
+    assert first_stewardship["history"][1]["superseded"] is False
+    assert len(reloaded["structure"]["rejected_candidates"]) == 2
+    assert reloaded["structure"]["accepted_structure"] == []
+
+    verify = sqlite3.connect(db_path)
+    try:
+        after_highlights = verify.execute(
+            "SELECT COUNT(*) FROM reader_highlights"
+        ).fetchone()[0]
+        after_log = verify.execute("SELECT COUNT(*) FROM investigation_log").fetchone()[0]
+        assert after_highlights == before_highlights
+        assert after_log == before_log
+    finally:
+        verify.close()
+    assert _source_rows(db_path) == before_source
+
+    immutable = sqlite3.connect(db_path)
+    try:
+        with pytest.raises(sqlite3.IntegrityError):
+            immutable.execute(
+                "UPDATE reader_structure_decisions SET verdict = 'accepted' WHERE id = ?",
+                (superseding_decision["decision_id"],),
+            )
+        immutable.rollback()
+        with pytest.raises(sqlite3.IntegrityError):
+            immutable.execute(
+                "DELETE FROM reader_structure_decisions WHERE id = ?",
+                (superseding_decision["decision_id"],),
+            )
+    finally:
+        immutable.close()
+
+
+def test_prior_inference_version_decision_does_not_bind_to_current_candidate(
+    tmp_path: Path,
+) -> None:
+    db_path, doc_id, rows = _seed_structure_workspace(tmp_path)
+    old_candidate = infer_reader_structure(
+        doc_id,
+        rows,
+        inference_version="reader-structure@previous",
+    )["items"][0]
+    _insert_structure_decision(db_path, old_candidate)
+
+    client = create_app(db_path=db_path).test_client()
+    payload = client.get(f"/api/reader/documents/{doc_id}/structure").get_json()
+    current = payload["structure"]["items"][0]
+
+    assert current["candidate_id"] != old_candidate["candidate_id"]
+    assert current["stewardship"]["status"] == "undecided"
+    assert current["stewardship"]["history"] == []
+    conn = sqlite3.connect(db_path)
+    try:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM reader_structure_decisions"
+        ).fetchone()[0] == 1
+    finally:
+        conn.close()
+
+
+def test_reader_structure_decisions_round_trip_through_wbs(tmp_path: Path) -> None:
+    db_path, doc_id, _rows = _seed_structure_workspace(tmp_path)
+    client = create_app(db_path=db_path).test_client()
+    initial = client.get(f"/api/reader/documents/{doc_id}/structure").get_json()
+    target = initial["structure"]["items"][0]
+    rejected_target = initial["structure"]["items"][1]
+    response = client.post(
+        f"/api/reader/structure/{target['candidate_id']}/decisions",
+        json={
+            "document_id": doc_id,
+            "verdict": "accepted",
+            "rationale": "Second Sale chapter boundary accepted.",
+            "steward_id": "joseph",
+        },
+    )
+    assert response.status_code == 201
+    reject_response = client.post(
+        f"/api/reader/structure/{rejected_target['candidate_id']}/decisions",
+        json={
+            "document_id": doc_id,
+            "verdict": "rejected",
+            "rationale": "Second Sale adjacent candidate rejected.",
+            "steward_id": "joseph",
+        },
+    )
+    assert reject_response.status_code == 201
+
+    bundle = tmp_path / "bundle"
+    manifest = export_workspace_bundle(
+        db_path,
+        bundle,
+        generated_at="2026-07-04T15:00:00+00:00",
+        workspace_id="second-sale",
+    )
+    governance_file = bundle / "governance" / "reader_structure_decisions.json"
+    assert governance_file.is_file()
+    assert manifest["wbs_version"] == "1.0"
+    assert manifest["counts"]["reader_structure_decisions"] == 2
+    roles = {entry["path"]: entry["role"] for entry in manifest["files"]}
+    assert roles["governance/reader_structure_decisions.json"] == "authored"
+
+    restored_db = tmp_path / "restored" / "workspace.db"
+    restored_db.parent.mkdir(parents=True)
+    result = restore_workspace(restored_db, bundle)
+    assert result["restored"]["reader_structure_decisions"] == 2
+
+    restored_client = create_app(db_path=restored_db).test_client()
+    restored = restored_client.get(f"/api/reader/documents/{doc_id}/structure").get_json()
+    restored_by_id = {
+        item["candidate_id"]: item
+        for item in restored["structure"]["items"]
+    }
+    restored_target = restored_by_id[target["candidate_id"]]
+    restored_rejected = restored_by_id[rejected_target["candidate_id"]]
+    assert restored_target["candidate_id"] == target["candidate_id"]
+    assert restored_target["stewardship"]["status"] == "accepted"
+    assert restored_target["stewardship"]["effective_decision"]["rationale"] == (
+        "Second Sale chapter boundary accepted."
+    )
+    assert restored_rejected["stewardship"]["status"] == "rejected"
+    assert restored_rejected in restored["structure"]["rejected_candidates"]
+
+    reexported = tmp_path / "reexported"
+    export_workspace_bundle(
+        restored_db,
+        reexported,
+        generated_at="2026-07-04T15:00:00+00:00",
+        workspace_id="second-sale",
+    )
+    assert governance_file.read_bytes() == (
+        reexported / "governance" / "reader_structure_decisions.json"
+    ).read_bytes()

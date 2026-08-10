@@ -14,7 +14,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 
-STRUCTURE_INFERENCE_VERSION = "reader-authored-structure-v1"
+STRUCTURE_INFERENCE_VERSION = "reader-structure@1"
 
 _BLOCK_REGION = re.compile(r"block:(\d+)")
 _LOCATOR_BLOCK = re.compile(r"page:(\d+):block:(\d+)")
@@ -146,7 +146,10 @@ class StructureCandidate:
     def start_context(self) -> SourceBlock:
         return self.start_context_block or self.heading_block
 
-    def to_item(self) -> dict[str, object]:
+    def to_item(
+        self,
+        inference_version: str = STRUCTURE_INFERENCE_VERSION,
+    ) -> dict[str, object]:
         evidence_blocks = _dedupe_evidence_blocks(
             [
                 ("preceding_prose", self.preceding_prose_block),
@@ -158,13 +161,21 @@ class StructureCandidate:
         )
         contributing_ids = [block["source_extraction_id"] for block in evidence_blocks]
         contributing_locators = [block["source_locator"] for block in evidence_blocks]
+        evidence_fingerprint = structure_evidence_fingerprint(evidence_blocks)
+        candidate_id = make_structure_candidate_id(
+            document_id=self.document_id,
+            kind=self.kind,
+            source_locator=self.heading_block.source_locator,
+            heading_text=self.heading_text,
+            title_text=self.title_text,
+            contributing_ids=contributing_ids,
+            contributing_locators=contributing_locators,
+            evidence_fingerprint=evidence_fingerprint,
+            inference_version=inference_version,
+        )
         return {
-            "id": _structure_id(
-                self.document_id,
-                self.kind,
-                self.heading_block.source_locator,
-                self.heading_text,
-            ),
+            "id": candidate_id,
+            "candidate_id": candidate_id,
             "document_id": self.document_id,
             "kind": self.kind,
             "heading_text": self.heading_text,
@@ -183,26 +194,29 @@ class StructureCandidate:
             "basis": self.basis,
             "contributing_extraction_ids": contributing_ids,
             "contributing_locators": contributing_locators,
+            "evidence_fingerprint": evidence_fingerprint,
             "evidence_blocks": evidence_blocks,
             "status": "derived",
-            "inference_version": STRUCTURE_INFERENCE_VERSION,
+            "inference_version": inference_version,
         }
 
 
 def infer_reader_structure(
     document_id: str,
     extractions: Sequence[Mapping[str, object]],
+    *,
+    inference_version: str = STRUCTURE_INFERENCE_VERSION,
 ) -> dict[str, object]:
     """Infer authored structure from ordered SourceExtraction rows."""
     blocks = _source_blocks(document_id, extractions)
     candidates = _initial_candidates(document_id, blocks)
     _apply_repetition(candidates)
-    items = [candidate.to_item() for candidate in candidates]
+    items = [candidate.to_item(inference_version) for candidate in candidates]
     _apply_derived_ends(items, candidates, blocks)
     return {
         "document_id": document_id,
         "status": "derived",
-        "inference_version": STRUCTURE_INFERENCE_VERSION,
+        "inference_version": inference_version,
         "storage": "computed_on_demand",
         "evidence_available": {
             "source_extraction_ids": True,
@@ -215,6 +229,37 @@ def infer_reader_structure(
             "line_level_typography": False,
         },
         "items": items,
+    }
+
+
+def candidate_snapshot(candidate: Mapping[str, object]) -> dict[str, object]:
+    """Return the durable inference snapshot a steward actually judged."""
+    return {
+        "candidate_id": candidate.get("candidate_id") or candidate.get("id"),
+        "document_id": candidate.get("document_id"),
+        "kind": candidate.get("kind"),
+        "heading_text": candidate.get("heading_text"),
+        "title_text": candidate.get("title_text"),
+        "start_page": candidate.get("start_page"),
+        "start_locator": candidate.get("start_locator"),
+        "start_context_page": candidate.get("start_context_page"),
+        "start_context_locator": candidate.get("start_context_locator"),
+        "start_status": candidate.get("start_status"),
+        "end_page": candidate.get("end_page"),
+        "end_locator": candidate.get("end_locator"),
+        "end_status": candidate.get("end_status"),
+        "confidence": candidate.get("confidence"),
+        "confidence_score": candidate.get("confidence_score"),
+        "confidence_model": candidate.get("confidence_model"),
+        "basis": list(candidate.get("basis") or []),
+        "contributing_extraction_ids": list(
+            candidate.get("contributing_extraction_ids") or []
+        ),
+        "contributing_locators": list(candidate.get("contributing_locators") or []),
+        "evidence_fingerprint": candidate.get("evidence_fingerprint"),
+        "evidence_blocks": list(candidate.get("evidence_blocks") or []),
+        "status": candidate.get("status"),
+        "inference_version": candidate.get("inference_version"),
     }
 
 
@@ -628,20 +673,52 @@ def _dedupe_evidence_blocks(
     return evidence
 
 
-def _structure_id(
+def make_structure_candidate_id(
+    *,
     document_id: str,
     kind: str,
     source_locator: str,
     heading_text: str,
+    title_text: str | None,
+    contributing_ids: Sequence[str],
+    contributing_locators: Sequence[str],
+    evidence_fingerprint: str,
+    inference_version: str,
 ) -> str:
+    """Deterministic identity for one derived Reader structure candidate."""
     payload = json.dumps(
         {
             "document_id": document_id,
+            "evidence_fingerprint": evidence_fingerprint,
+            "inference_version": inference_version,
             "kind": kind,
             "source_locator": source_locator,
             "heading_text": heading_text,
-            "version": STRUCTURE_INFERENCE_VERSION,
+            "title_text": title_text,
+            "contributing_extraction_ids": list(contributing_ids),
+            "contributing_locators": list(contributing_locators),
         },
+        sort_keys=True,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def structure_evidence_fingerprint(
+    evidence_blocks: Sequence[Mapping[str, object]],
+) -> str:
+    """Fingerprint the exact SourceExtraction evidence used by a candidate."""
+    payload = json.dumps(
+        [
+            {
+                "role": block.get("role"),
+                "source_extraction_id": block.get("source_extraction_id"),
+                "source_locator": block.get("source_locator"),
+                "raw_text": block.get("raw_text"),
+            }
+            for block in evidence_blocks
+        ],
         sort_keys=True,
         ensure_ascii=True,
         separators=(",", ":"),

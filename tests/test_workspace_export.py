@@ -107,6 +107,7 @@ def test_export_produces_the_v1_bundle_layout(tmp_path: Path):
         "study/questions.json",
         "study/buckets.json",
         "study/rankings.json",
+        "governance/reader_structure_decisions.json",
         "synthesis/packet-study.json",
         "lineage/lineage.json",
         "evaluation/report.json",
@@ -116,6 +117,7 @@ def test_export_produces_the_v1_bundle_layout(tmp_path: Path):
     assert manifest["wbs_version"] == WBS_VERSION
     assert manifest["counts"]["documents"] == 1
     assert manifest["counts"]["highlights"] == 1
+    assert manifest["counts"]["reader_structure_decisions"] == 0
 
 
 def test_no_workspace_db_or_secrets_or_localstorage_in_bundle(tmp_path: Path):
@@ -155,6 +157,7 @@ def test_derived_files_are_marked_derived_in_manifest(tmp_path: Path):
     assert role["corpus/extractions.json"] == "canonical"
     assert role["investigation.json"] == "authored"
     assert role["study/highlights.json"] == "authored"
+    assert role["governance/reader_structure_decisions.json"] == "authored"
     assert role["synthesis/packet-study.json"] == "derived"
     assert role["lineage/lineage.json"] == "derived"
     assert role["evaluation/report.json"] == "derived"
@@ -236,4 +239,8 @@ def test_empty_workspace_exports_a_valid_bundle(tmp_path: Path):
     out = tmp_path / "bundle"
     manifest = _export(db_path, out)
     assert manifest["counts"]["documents"] == 0
+    assert manifest["counts"]["reader_structure_decisions"] == 0
     assert json.loads((out / "investigation.json").read_text()) is None
+    assert json.loads(
+        (out / "governance" / "reader_structure_decisions.json").read_text()
+    ) == []

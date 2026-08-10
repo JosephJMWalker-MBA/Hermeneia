@@ -50,6 +50,8 @@ workspace/
 │   ├── questions.json     # unresolved questions (highlight- and field-note-sourced)
 │   ├── buckets.json       # theme + evidence buckets
 │   └── rankings.json      # per-highlight ranks
+├── governance/
+│   └── reader_structure_decisions.json # human stewardship of inferred Reader structure
 ├── synthesis/             # compiled synthesis packets (derived)
 ├── evaluation/            # scorer verdicts + reports (derived)
 ├── reports/               # rendered narratives, critic reports (machine output)
@@ -203,6 +205,7 @@ Git history becomes an **intellectual** history, not a binary snapshot.
 | `observations` (+ terms) | `corpus/observations.json` | canonical |
 | `reader_highlights` | `study/highlights.json` (+ `questions`/`buckets`/`rankings` projections) | authored |
 | `investigation_log` | `study/field_notes.json` | authored |
+| `reader_structure_decisions` | `governance/reader_structure_decisions.json` | authored |
 | `observation_reviews`, `inquiry_notes` | `study/reviews.json` | authored |
 | `proposed_interpretations`, `interpretations` | `reports/interpretations.json` | machine / authored-on-adopt |
 | `rendered_narratives`, `critic_reports` | `reports/*` | machine |

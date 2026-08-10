@@ -8,7 +8,8 @@ noise. No secrets, no localStorage, and no `workspace.db` ever enter the bundle.
 
 v1 coverage (the smallest complete representation):
   canonical  — corpus/documents, corpus/extractions, corpus/observations, uploads
-  authored   — investigation, study/highlights, field_notes, questions, buckets, rankings
+  authored   — investigation, study/highlights, field_notes, questions, buckets, rankings,
+                governance/reader_structure_decisions
   derived    — synthesis/, lineage/, evaluation/  (marked derived; regenerable)
 
 Deferred to a later exporter PR (additive, no contract change): rendered
@@ -216,6 +217,15 @@ def build_bundle_files(
         "LEFT JOIN source_documents sd ON sd.id = il.source_document_id "
         "ORDER BY il.created_at, il.id",
     )
+    structure_decisions = (
+        _rows(
+            conn,
+            "SELECT * FROM reader_structure_decisions "
+            "ORDER BY document_id, candidate_id, decided_at, created_at, id",
+        )
+        if _table_exists(conn, "reader_structure_decisions")
+        else []
+    )
     investigation = _investigation(conn)
     projections = _study_projections(highlights, field_notes)
     derived = _derived(
@@ -238,6 +248,10 @@ def build_bundle_files(
         "study/questions.json": (AUTHORED, _dumps(projections["questions"])),
         "study/buckets.json": (AUTHORED, _dumps(projections["buckets"])),
         "study/rankings.json": (AUTHORED, _dumps(projections["rankings"])),
+        "governance/reader_structure_decisions.json": (
+            AUTHORED,
+            _dumps(structure_decisions),
+        ),
         "synthesis/packet-study.json": (DERIVED, _dumps(derived["packet"])),
         "lineage/lineage.json": (DERIVED, _dumps(derived["lineage"])),
         "evaluation/report.json": (DERIVED, _dumps(derived["evaluation"])),
@@ -267,6 +281,7 @@ def build_bundle_files(
             "observations": len(observations),
             "highlights": len(highlights),
             "field_notes": len(field_notes),
+            "reader_structure_decisions": len(structure_decisions),
         },
     }
 
