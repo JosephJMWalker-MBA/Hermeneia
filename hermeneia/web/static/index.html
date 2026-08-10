@@ -2096,6 +2096,18 @@ body.has-workflow-rail { padding-bottom: 40px; }
   background: var(--surface2); cursor: pointer; transition: border-color .15s;
 }
 .ob-upload-zone:hover, .ob-upload-zone.drag-over { border-color: var(--accent); }
+.ob-upload-zone:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
+.ob-upload-zone.wayfinding-focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.ob-upload-wayfinding {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 10px; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: var(--r); background: var(--bg2);
+}
+.ob-upload-wayfinding-title { font-size: 13px; font-weight: 700; color: var(--fg); }
+.ob-upload-wayfinding-note { font-size: 12px; color: var(--dim2); margin-top: 2px; }
 .ob-upload-zone-icon  { font-size: 28px; margin-bottom: 8px; }
 .ob-upload-zone-label { font-size: 15px; font-weight: 650; color: var(--fg); margin-bottom: 4px; }
 .ob-upload-zone-sub   { font-size: 12px; color: var(--dim2); }
@@ -2567,6 +2579,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
   </div>
   <div class="nav-right">
     <button class="reader-home-btn" id="reader-home-btn" onclick="e10Go('reader')" title="Return to the book">Read</button>
+    <button class="nav-btn" id="add-document-btn" onclick="obOpenUploadArea()" style="font-size:13px" title="Upload a PDF into the current workspace">Add document</button>
     <button class="nav-btn" id="workspace-menu-btn" onclick="toggleWorkspaceMenu()" aria-expanded="false" aria-controls="workspace-drawer" style="font-size:13px" title="Pipeline tools that support the reading">Workspace ▾</button>
     <button class="nav-btn" onclick="e10Go('guide')" style="font-size:13px">Guide</button>
     <button class="nav-btn" onclick="e10Go('constitution')" style="font-size:13px">Constitution</button>
@@ -2585,6 +2598,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
 <div class="workspace-drawer" id="workspace-drawer" data-open="0" hidden role="menu" aria-label="Workspace pipeline tools">
   <div class="workspace-drawer-head">Workspace</div>
   <div class="workspace-drawer-note">Reader is your primary surface. These tools organize, review, render, audit, and trace the work that grows from reading.</div>
+  <button class="workspace-drawer-item" role="menuitem" onclick="_wsCloseMenu();obOpenUploadArea()"><span class="workspace-drawer-name">Add document</span><span class="workspace-drawer-desc">upload a PDF to this workspace</span></button>
   <button class="workspace-drawer-item" role="menuitem" onclick="_wsGo('corpus')"><span class="workspace-drawer-name">Corpus</span><span class="workspace-drawer-desc">evidence base</span></button>
   <button class="workspace-drawer-item" role="menuitem" onclick="_wsGo('lab')"><span class="workspace-drawer-name">Lab</span><span class="workspace-drawer-desc">generate candidate interpretations</span></button>
   <button class="workspace-drawer-item" role="menuitem" onclick="_wsGo('review')"><span class="workspace-drawer-name">Review</span><span class="workspace-drawer-desc">steward proposals</span></button>
@@ -3009,6 +3023,8 @@ let _activeCell = null, _covOpen = false;
 let _e10Selected = null, _e10Detail = null, _e10ActiveProposal = null;
 let _e10Providers = null;
 let _e10ProviderNotices = {};
+let _obUploadFocusPending = false;
+let _obCanUploadDocuments = true;
 
 // ── Runtime connectivity and local authored drafts ────
 const _RUNTIME_HEALTH_URL = '/api/health';
@@ -3837,6 +3853,7 @@ function mount(h) {
   const title = fn.replace(/\.pdf$/i,'').replace(/[_-]/g,' ')
                   .replace(/\b\w/g, c => c.toUpperCase()) || 'Hermeneia';
   _runtimeSetDraftWorkspaceScope(h.runtime?.workspace_id || h.workspace_id || h.db_path || fn || window.location?.origin);
+  _obCanUploadDocuments = !h._noDatabase;
 
   document.getElementById('root').innerHTML = `
 <header class="page-head">
@@ -4149,9 +4166,9 @@ async function e10LoadFirstRun() {
           : `${s.demo_available
               ? `<button class="btn-primary" style="padding:7px 18px;margin:6px 8px 6px 0" ${s.database_exists ? '' : 'disabled title="Create the workspace first"'}
                    onclick="_frDemo(this)">Load the demo corpus — The Great Gatsby</button>`
-              : `<span style="color:var(--dim2)">No demo corpus is bundled with this install.</span><br>`}
+             : `<span style="color:var(--dim2)">No demo corpus is bundled with this install.</span><br>`}
              <button class="btn-trace" style="padding:7px 18px;margin-top:6px" ${s.database_exists ? '' : 'disabled title="Create the workspace first"'}
-               onclick="e10Go('corpus')">Upload your own PDF →</button>
+               onclick="obOpenUploadArea()">Upload your own PDF →</button>
              <div style="font-size:11px;color:var(--dim2);margin-top:8px">Uploading runs the full extraction pipeline:
              the text becomes preserved, immutable observations you can read, search, and interpret.</div>`,
         s.document_count > 0)}
@@ -4181,6 +4198,7 @@ async function _frInit(btn) {
     const resp = await fetch('/api/setup/init', { method: 'POST' });
     const d = await resp.json();
     if (!resp.ok) throw new Error(d.error || 'init failed');
+    _obCanUploadDocuments = true;
     e10LoadFirstRun();
   } catch (e) {
     showAppError(e.message);
@@ -4498,6 +4516,33 @@ function e10LoadSetup() {
   _renderSetupTags();
 }
 
+function obOpenUploadArea() {
+  if (!_obCanUploadDocuments) {
+    e10Go('firstrun');
+    return;
+  }
+  _obUploadFocusPending = true;
+  e10Go('onboarding');
+}
+
+function _obMaybeFocusUploadArea() {
+  if (!_obUploadFocusPending) return false;
+  _obUploadFocusPending = false;
+  return _obFocusUploadArea();
+}
+
+function _obFocusUploadArea() {
+  const area = document.getElementById('ob-upload-area');
+  const zone = document.getElementById('ob-upload-zone');
+  if (!area || !zone) return false;
+  zone.classList.add('wayfinding-focus');
+  zone.setAttribute('tabindex', '0');
+  area.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  zone.focus({ preventScroll: true });
+  setTimeout(() => zone.classList.remove('wayfinding-focus'), 2600);
+  return true;
+}
+
 async function e10LoadOnboarding() {
   const host = document.getElementById('onboarding-panel');
   if (!host) return;
@@ -4551,12 +4596,13 @@ async function e10LoadOnboarding() {
   } else if (currentStage) {
     const ctaTarget  = currentStage.nav_target || 'corpus';
     const ctaLabel   = { corpus: 'Open Corpus', reader: 'Open Reader', lab: 'Open Lab', architect: 'Open Architect', reports: 'Read Report', critic: 'Open Critic', lineage: 'Inspect Lineage' };
+    const uploadStage = ctaTarget === 'corpus' && Number(currentStage.count || 0) === 0;
     ctaHtml = `<div class="onboarding-current-cta">
       <div>
         <div class="onboarding-current-cta-label">Current stage · ${x(currentStage.label)}</div>
         <div class="onboarding-current-cta-text">${x(currentStage.description)}</div>
       </div>
-      <button class="btn-primary" onclick="e10Go('${x(ctaTarget)}')">${ctaLabel[ctaTarget] || 'Go'}</button>
+      <button class="btn-primary" onclick="${uploadStage ? 'obOpenUploadArea()' : `e10Go('${x(ctaTarget)}')`}">${uploadStage ? 'Upload PDF' : (ctaLabel[ctaTarget] || 'Go')}</button>
     </div>`;
   }
 
@@ -4666,8 +4712,16 @@ async function e10LoadOnboarding() {
   // Upload zone (always shown; collapses after first compile)
   const uploadHtml = `
     <div id="ob-upload-area" style="margin-bottom:24px">
+      <div class="ob-upload-wayfinding" id="ob-upload-wayfinding">
+        <div>
+          <div class="ob-upload-wayfinding-title">Add document to this workspace</div>
+          <div class="ob-upload-wayfinding-note">Upload a PDF into the currently served Hermeneia workspace.</div>
+        </div>
+        <button class="btn-trace" onclick="e10LoadOnboarding()">Back to start</button>
+      </div>
       <input type="file" id="ob-file-input" accept=".pdf" style="display:none" onchange="obHandleFileSelect(this)">
       <div class="ob-upload-zone" id="ob-upload-zone"
+           tabindex="0"
            onclick="document.getElementById('ob-file-input').click()"
            ondragover="event.preventDefault();this.classList.add('drag-over')"
            ondragleave="this.classList.remove('drag-over')"
@@ -4818,6 +4872,7 @@ async function e10LoadOnboarding() {
     if (s.nav_target) navStatuses[s.nav_target] = s.status === 'complete' ? 'complete' : (s.status === 'current' ? 'active' : 'pending');
   });
   updateNavCycle(activeNav, navStatuses);
+  _obMaybeFocusUploadArea();
 }
 
 // ── Bookmarks (localStorage) ───────────────────────────
@@ -5007,7 +5062,7 @@ async function obUploadSupportingFile(file) {
 
   let result;
   try {
-    const resp = await fetch('/api/upload', { method: 'POST', body: form });
+    const resp = await runtimeApiFetch('/api/upload', { method: 'POST', body: form });
     result = await resp.json();
     if (!resp.ok) throw new Error(result.error || 'Upload failed');
   } catch (err) {
@@ -5050,6 +5105,7 @@ function obHandleFileDrop(event) {
 function obHandleFileSelect(input) {
   const file = input.files[0];
   if (file) obUploadFile(file);
+  else _obFocusUploadArea();
 }
 async function obUploadFile(file) {
   const statusEl = document.getElementById('ob-upload-status');
@@ -5076,7 +5132,7 @@ async function obUploadFile(file) {
 
   let result;
   try {
-    const resp = await fetch('/api/upload', { method: 'POST', body: form });
+    const resp = await runtimeApiFetch('/api/upload', { method: 'POST', body: form });
     result = await resp.json();
     if (!resp.ok) throw new Error(result.error || 'Upload failed');
   } catch (err) {
