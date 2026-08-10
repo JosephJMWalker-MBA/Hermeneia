@@ -1472,6 +1472,7 @@ body.has-workflow-rail { padding-bottom: 40px; }
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   padding: 1px 2px;
+  cursor: pointer;
 }
 .cr-inline-highlight.important {
   background: rgba(255, 202, 92, .22);
@@ -7738,8 +7739,10 @@ function _crRenderDocPicker(ws) {
   pageView.removeEventListener('mouseup', _crHandleSelection);
   pageView.removeEventListener('pointerup', _crHandleSelection);
   pageView.removeEventListener('keyup', _crHandleSelection);
+  pageView.removeEventListener('click', _crHandlePersistedHighlightClick);
   pageView.addEventListener('pointerup', _crHandleSelection);
   pageView.addEventListener('keyup', _crHandleSelection);
+  pageView.addEventListener('click', _crHandlePersistedHighlightClick);
   document.removeEventListener('selectionchange', _crHandleSelectionChange);
   document.addEventListener('selectionchange', _crHandleSelectionChange);
   _crSyncBottomWorkstationState();
@@ -9951,6 +9954,46 @@ function _crHandleSelectionChange() {
   _crScheduleReaderSelectionResolve();
 }
 
+function _crReaderHasActiveNativeSelection() {
+  const sel = window.getSelection?.();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;
+  try {
+    return _crSelectionInsideReader(sel.getRangeAt(0));
+  } catch {
+    return false;
+  }
+}
+
+async function _crOpenHighlightInspectorById(highlightId) {
+  const id = String(highlightId || '').trim();
+  if (!id) return false;
+  let h = (_crHighlights || []).find(h => String(h.id || '') === id);
+  if (!h && _crDocId) {
+    await _crLoadHighlightList();
+    h = (_crHighlights || []).find(h => String(h.id || '') === id);
+  }
+  if (!h) return false;
+
+  _crCaptureOpen = false;
+  _crHideToolbar(true);
+  try { window.CSS?.highlights?.delete('hermeneia-pending'); } catch {}
+  _dockOpenPanel('inspector');
+  return _crShowHighlightDetail(id);
+}
+
+function _crHandlePersistedHighlightClick(e) {
+  const pageView = document.getElementById('cr-page-view');
+  const mark = _crNodeElement(e?.target)?.closest?.('[data-highlight-id]');
+  if (!pageView || !mark || !pageView.contains(mark)) return;
+  if (_crReaderHasActiveNativeSelection()) return;
+  const highlightId = mark.getAttribute('data-highlight-id') || '';
+  if (!highlightId) return;
+
+  e?.preventDefault?.();
+  e?.stopPropagation?.();
+  _crOpenHighlightInspectorById(highlightId).catch(err => showAppError(err.message || String(err)));
+}
+
 function _crReaderSelectionControlTarget(target) {
   const el = _crNodeElement(target);
   return !!el?.closest?.('#cr-sel-toolbar, #a11y-selection-tip, #a11y-dock, #a11y-dock-collapsed-pill, #cr-companion-panel');
@@ -10231,12 +10274,13 @@ async function _crSaveHighlight(asCandidate) {
 }
 
 async function _crShowHighlightDetail(highlightId) {
-  const h = _crHighlights.find(h => h.id === highlightId);
-  if (!h) return;
+  const id = String(highlightId || '');
+  const h = (_crHighlights || []).find(h => String(h.id || '') === id);
+  if (!h) return false;
   cmpMarkOnboardingStep('observe', { keepPaused: true });
   const form = document.getElementById('cr-sel-form');
   const prompt = document.getElementById('cr-sel-prompt');
-  if (!form || !prompt) return;
+  if (!form || !prompt) return false;
   prompt.style.display = 'none';
   form.style.display = 'block';
 
@@ -10297,6 +10341,7 @@ async function _crShowHighlightDetail(highlightId) {
 
   _crRelevance = h.relevance || 'unclear';
   form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  return true;
 }
 
 async function _crUpdateHighlight(id) {
