@@ -102,6 +102,35 @@ def test_save_highlight_does_not_create_observation(tmp_path):
     assert hl_id, "A highlight id must be returned"
 
 
+def test_highlight_without_note_persists_no_synthetic_note_text(tmp_path):
+    """An empty Reader note must stay empty, not become interface guidance."""
+    db = _make_db(tmp_path)
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    _insert_doc(conn, "a" * 64, "gatsby.pdf", source_role="primary")
+    conn.commit(); conn.close()
+
+    client = create_app(db_path=db).test_client()
+    resp = client.post("/api/reader/highlights", json={
+        "source_document_id": "a" * 64,
+        "selected_text": "So we beat on, boats against the current.",
+        "page": 1,
+        "note_text": None,
+    })
+    assert resp.status_code == 201
+    hl_id = resp.get_json()["id"]
+
+    conn2 = sqlite3.connect(db)
+    conn2.row_factory = sqlite3.Row
+    row = conn2.execute(
+        "SELECT note_text FROM reader_highlights WHERE id = ?",
+        (hl_id,),
+    ).fetchone()
+    conn2.close()
+    assert row["note_text"] is None
+    assert (row["note_text"] or "").lower() != "candidate for observation."
+
+
 def test_highlight_preserves_source_document_id_and_role(tmp_path):
     """Saved highlight must record source_document_id and the document's source_role."""
     db = _make_db(tmp_path)
