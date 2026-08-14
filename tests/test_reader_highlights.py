@@ -155,6 +155,34 @@ def test_highlight_saves_note_and_question(tmp_path):
     assert row["relevance"] == "supports"
 
 
+def test_highlight_without_note_persists_no_synthetic_note_text(tmp_path):
+    """Blank new highlights must not store instructional note copy."""
+    db = _make_db(tmp_path)
+    conn = sqlite3.connect(db)
+    _insert_doc(conn, "a" * 64, "gatsby.pdf")
+    conn.commit(); conn.close()
+
+    client = create_app(db_path=db).test_client()
+    resp = client.post("/api/reader/highlights", json={
+        "source_document_id": "a" * 64,
+        "selected_text": "the green light",
+        "note_text": None,
+        "page": 2,
+    })
+    assert resp.status_code == 201
+    hl_id = resp.get_json()["id"]
+
+    conn2 = sqlite3.connect(db)
+    conn2.row_factory = sqlite3.Row
+    row = conn2.execute(
+        "SELECT note_text FROM reader_highlights WHERE id = ?",
+        (hl_id,),
+    ).fetchone()
+    conn2.close()
+
+    assert row["note_text"] is None
+
+
 def test_promote_creates_candidate_not_observation(tmp_path):
     """Promoting a highlight must set status=observation_candidate, not create an Observation."""
     db = _make_db(tmp_path)

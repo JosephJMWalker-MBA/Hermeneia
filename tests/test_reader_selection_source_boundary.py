@@ -131,7 +131,7 @@ const b0 = makeBlock(0, 'p1:block0', 'First projected source line.');
 const b1 = makeBlock(1, 'p1:block1', 'Second projected source line with “Unicode” — punctuation.');
 const b2 = makeBlock(2, 'p1:block2', 'Final source line: end.');
 const allBlocks = [b0.block, b1.block, b2.block];
-function input(value=''){ return { value, checked: false, style: {}, textContent: '', innerHTML: '' }; }
+function input(value=''){ return { value, checked: false, style: {}, textContent: '', innerHTML: '', focus(){} }; }
 const elements = {
   'cr-note-input': input(''),
   'cr-q-input': input(''),
@@ -315,6 +315,66 @@ def test_save_payload_uses_structural_selection_not_stale_ui_copy() -> None:
     assert "Capture this passage" not in result["selectedText"]
     assert "Open marginal tools" not in result["selectedText"]
     assert result["note"] is None
+
+
+def test_new_highlight_note_input_starts_empty_with_placeholder_guidance() -> None:
+    result = _run_node(
+        r"""
+_crReaderSelectionState = {
+  valid: true,
+  text: 'First projected source line.',
+  source_locators: ['p1:block0'],
+  blocks: [{ block_index: 0 }],
+  page: 1,
+};
+_crSelText = 'First projected source line.';
+_crHighlightSelected('note');
+const html = _crSelToolbar.innerHTML;
+const match = html.match(/<textarea id="cr-note-input"[^>]*placeholder="([^"]*)"[^>]*>([\s\S]*?)<\/textarea>/);
+process.stdout.write(JSON.stringify({
+  placeholder: match && match[1],
+  value: match && match[2],
+  containsSynthetic: html.includes('Candidate for observation.'),
+}));
+"""
+    )
+
+    assert result == {
+        "placeholder": "Your reading note…",
+        "value": "",
+        "containsSynthetic": False,
+    }
+
+
+def test_new_observation_candidate_note_input_still_starts_empty() -> None:
+    result = _run_node(
+        r"""
+_crReaderSelectionState = {
+  valid: true,
+  text: 'First projected source line.',
+  source_locators: ['p1:block0'],
+  blocks: [{ block_index: 0 }],
+  page: 1,
+};
+_crSelText = 'First projected source line.';
+_crHighlightSelected('candidate');
+const html = _crSelToolbar.innerHTML;
+const match = html.match(/<textarea id="cr-note-input"[^>]*placeholder="([^"]*)"[^>]*>([\s\S]*?)<\/textarea>/);
+process.stdout.write(JSON.stringify({
+  importantChecked: html.includes('id="cr-important-input" type="checkbox" checked'),
+  placeholder: match && match[1],
+  value: match && match[2],
+  containsSynthetic: html.includes('Candidate for observation.'),
+}));
+"""
+    )
+
+    assert result == {
+        "importantChecked": True,
+        "placeholder": "Your reading note…",
+        "value": "",
+        "containsSynthetic": False,
+    }
 
 
 def test_cancel_clears_transient_reader_selection_state() -> None:
