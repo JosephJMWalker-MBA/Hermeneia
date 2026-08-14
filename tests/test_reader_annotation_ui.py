@@ -40,8 +40,9 @@ def test_reader_ui_keeps_evidence_bucket_separate_from_theme_bucket():
     index_html = INDEX.read_text()
 
     assert "theme_bucket: themeBucket" in index_html
-    assert "evidence_bucket" not in index_html
-    assert "Evidence Bucket" not in index_html
+    assert "evidence_bucket: evidenceBucket" in index_html
+    assert 'id="cr-edit-evidence"' in index_html
+    assert "Optional working set membership, separate from theme." in index_html
 
 
 def test_rank_theme_glance_only_renders_when_present():
