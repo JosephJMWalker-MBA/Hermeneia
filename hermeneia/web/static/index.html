@@ -8859,7 +8859,9 @@ function _crRenderDocPicker(ws) {
   document.getElementById('cr-tool-drawer-btn')?.setAttribute('aria-expanded', 'false');
 
   // Selection listener
-  document.getElementById('cr-page-view').addEventListener('mouseup', _crHandleSelection);
+  const pageView = document.getElementById('cr-page-view');
+  pageView.addEventListener('mouseup', _crHandleSelection);
+  pageView.addEventListener('click', _crOpenPersistedHighlightFromEvent);
   document.removeEventListener('selectionchange', _crHandleSelectionChange);
   document.addEventListener('selectionchange', _crHandleSelectionChange);
   _crSyncBottomWorkstationState();
@@ -11046,6 +11048,7 @@ function _crClearReaderSelectionState() {
 }
 
 function _crHandleSelection(e) {
+  if (_crNodeElement(e?.target)?.closest?.('.cr-inline-highlight[data-highlight-id]')) return;
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
     if (!_crCaptureOpen) _crHideToolbar();
@@ -11203,6 +11206,22 @@ function _crHighlightSelected(focus) {
   if (isConcept) setTimeout(() => document.getElementById('cr-concept-input')?.focus(), 50);
 }
 
+function _crOpenPersistedHighlightFromEvent(e) {
+  const mark = _crNodeElement(e?.target)?.closest?.('.cr-inline-highlight[data-highlight-id]');
+  const highlightId = mark?.dataset?.highlightId || '';
+  if (!highlightId) return;
+  e.preventDefault?.();
+  e.stopPropagation?.();
+  try { window.getSelection?.()?.removeAllRanges?.(); } catch {}
+  _crCaptureOpen = false;
+  _crHideToolbar(true);
+  _crClearPending();
+  _crClearReaderSelectionState();
+  _crSelText = '';
+  _crSelectionRect = null;
+  _crShowHighlightDetail(highlightId);
+}
+
 function _crSetRelevance(val, btn) {
   _crRelevance = val;
   btn.closest('.cr-relevance-btns')?.querySelectorAll('.cr-rel-btn').forEach(b => b.classList.remove('active'));
@@ -11329,8 +11348,13 @@ async function _crSaveHighlight(asCandidate) {
 }
 
 async function _crShowHighlightDetail(highlightId) {
-  const h = _crHighlights.find(h => h.id === highlightId);
+  let h = _crHighlights.find(h => h.id === highlightId);
+  if (!h && _crDocId) {
+    await _crLoadHighlightList();
+    h = _crHighlights.find(h => h.id === highlightId);
+  }
   if (!h) return;
+  _dockOpenPanel('inspector');
   cmpMarkOnboardingStep('observe', { keepPaused: true });
   const form = document.getElementById('cr-sel-form');
   const prompt = document.getElementById('cr-sel-prompt');
@@ -11369,6 +11393,11 @@ async function _crShowHighlightDetail(highlightId) {
         <div class="cr-form-hint">What kind of meaning does this belong to?</div>
       </div>
       <div class="cr-form-row">
+        <div class="cr-form-label">Evidence bucket</div>
+        <input id="cr-edit-evidence" type="text" value="${x(h.evidence_bucket || '')}" placeholder="draft-1, chapter-2, open questions">
+        <div class="cr-form-hint">Optional working set membership, separate from theme.</div>
+      </div>
+      <div class="cr-form-row">
         <div class="cr-form-label">Note</div>
         <textarea id="cr-edit-note" rows="3" style="margin-top:4px">${x(h.note_text || '')}</textarea>
       </div>
@@ -11405,6 +11434,7 @@ async function _crUpdateHighlight(id) {
   const typedTags = _crParseTypedTags(document.getElementById('cr-edit-tags')?.value || '');
   const rank = _crReadRankValue('cr-edit-rank');
   const themeBucket = _crReadOptionalText('cr-edit-theme');
+  const evidenceBucket = _crReadOptionalText('cr-edit-evidence');
   const existing = _crHighlights.find(h => h.id === id);
   const conceptTags = _crHighlightTags(existing).filter(t => t.startsWith('concept:'));
   const tags = _crUniqueTags([
@@ -11426,6 +11456,7 @@ async function _crUpdateHighlight(id) {
         tags,
         rank,
         theme_bucket: themeBucket,
+        evidence_bucket: evidenceBucket,
       },
     });
     _authoredDraftClear(draftKey);
