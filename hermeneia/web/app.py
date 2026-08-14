@@ -11,6 +11,7 @@ Start with: python scripts/herm_server.py
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import tempfile
@@ -44,6 +45,17 @@ from ..compiler.projections.interpretive_divergence import (
     interpretive_divergence_projection,
 )
 from ..storage.sqlite import SQLiteStore
+from ..workspace import (
+    DEFAULT_LEGACY_DB,
+    WorkspaceAlreadyExistsError,
+    WorkspaceLifecycleError,
+    WorkspaceNameReservedError,
+    WorkspaceRecord,
+    create_workspace,
+    inspect_workspace,
+    list_workspaces,
+    read_workspace_identity,
+)
 from ..explorer.interpreter import (
     ExplorerError,
     _call_provider,
@@ -393,6 +405,145 @@ def create_app(
 
     def _store() -> SQLiteStore:
         return SQLiteStore(db_path)
+
+    def _canonical_path(path: Path) -> Path:
+        return path.expanduser().resolve()
+
+    def _same_runtime_db(candidate: Path) -> bool:
+        try:
+            return _canonical_path(candidate) == _canonical_path(db_path)
+        except OSError:
+            return False
+
+    def _browser_draft_fingerprint(value: str) -> str:
+        """Match the old browser FNV-1a base36 draft-scope fingerprint."""
+        h = 2166136261
+        for ch in value:
+            h ^= ord(ch)
+            h = (h * 16777619) & 0xFFFFFFFF
+        if h == 0:
+            return "0"
+        chars = "0123456789abcdefghijklmnopqrstuvwxyz"
+        out = ""
+        while h:
+            h, rem = divmod(h, 36)
+            out = chars[rem] + out
+        return out
+
+    def _opaque_runtime_token(value: str) -> str:
+        return hashlib.sha256(value.encode("utf-8")).hexdigest()[:32]
+
+    def _runtime_scope_for(
+        *,
+        kind: str,
+        workspace_id: str | None,
+        slug: str | None,
+        runtime_db: Path,
+    ) -> str:
+        if kind == "legacy":
+            return "legacy:gatsby"
+        if workspace_id:
+            prefix = "managed" if kind == "managed" else "custom"
+            return f"{prefix}:{workspace_id}"
+        if kind == "managed" and slug:
+            token = _opaque_runtime_token(f"managed:{_canonical_path(runtime_db)}")
+            return f"managed:{token}"
+        token = _opaque_runtime_token(f"custom:{_canonical_path(runtime_db)}")
+        return f"custom:{token}"
+
+    def _with_runtime_draft_scope(payload: dict, *, runtime_db: Path) -> dict:
+        return {
+            **payload,
+            "runtime_scope": _runtime_scope_for(
+                kind=str(payload.get("kind") or "custom"),
+                workspace_id=payload.get("id"),
+                slug=payload.get("slug"),
+                runtime_db=runtime_db,
+            ),
+            "draft_migration_scope": _browser_draft_fingerprint(str(db_path)),
+        }
+
+    def _runtime_workspace_identity() -> dict | None:
+        if not db_path.exists():
+            return None
+        conn = None
+        try:
+            conn = _conn()
+            return read_workspace_identity(conn)
+        except sqlite3.DatabaseError:
+            return None
+        finally:
+            if conn is not None:
+                conn.close()
+
+    def _workspace_payload(
+        record: WorkspaceRecord,
+        *,
+        is_active: bool | None = None,
+    ) -> dict:
+        payload = {
+            "id": record.workspace_id,
+            "name": record.name,
+            "slug": record.slug,
+            "kind": record.kind,
+            "managed": record.kind == "managed",
+        }
+        if is_active is not None:
+            payload["is_active"] = is_active
+        if record.created_at:
+            payload["created_at"] = record.created_at
+        if record.updated_at:
+            payload["updated_at"] = record.updated_at
+        return payload
+
+    def _legacy_runtime_workspace_payload() -> dict:
+        identity = _runtime_workspace_identity() or {}
+        return {
+            "id": identity.get("workspace_id"),
+            "name": identity.get("workspace_name") or "Gatsby",
+            "slug": "gatsby",
+            "kind": "legacy",
+            "managed": False,
+        }
+
+    def _custom_runtime_workspace_payload() -> dict:
+        identity = _runtime_workspace_identity() or {}
+        return {
+            "id": identity.get("workspace_id"),
+            "name": identity.get("workspace_name") or "Custom workspace",
+            "slug": None,
+            "kind": "custom",
+            "managed": False,
+        }
+
+    def _runtime_workspace_payload(
+        records: list[WorkspaceRecord] | None = None,
+    ) -> dict:
+        discovered = records if records is not None else list_workspaces(
+            include_document_count=False
+        )
+        for record in discovered:
+            if _same_runtime_db(record.db_path):
+                return _with_runtime_draft_scope(
+                    _workspace_payload(record),
+                    runtime_db=record.db_path,
+                )
+        if _same_runtime_db(DEFAULT_LEGACY_DB):
+            return _with_runtime_draft_scope(
+                _legacy_runtime_workspace_payload(),
+                runtime_db=db_path,
+            )
+        return _with_runtime_draft_scope(
+            _custom_runtime_workspace_payload(),
+            runtime_db=db_path,
+        )
+
+    def _workspace_catalog_payload() -> list[dict]:
+        records = list_workspaces(include_document_count=False)
+        return [
+            _workspace_payload(record, is_active=_same_runtime_db(record.db_path))
+            for record in records
+        ]
 
     def _scope_error_response(exc: _ScopeAccessError):
         payload = {"error": str(exc)}
@@ -1845,6 +1996,9 @@ def create_app(
             "database_exists": exists,
             "document_count": doc_count,
             "db_path": str(db_path),
+            "runtime": {
+                "workspace": _runtime_workspace_payload(),
+            },
             "demo_available": _DEMO_CORPUS.exists(),
             "first_run": (not exists) or doc_count == 0,
         }
@@ -1885,6 +2039,47 @@ def create_app(
             return jsonify({"error": f"demo compile failed: {exc}"}), 500
         return jsonify(_setup_state_payload())
 
+    @app.route("/api/runtime/workspace")
+    def api_runtime_workspace():
+        return jsonify({
+            "workspace": _runtime_workspace_payload(),
+            "capabilities": {"workspace_switch": False},
+        })
+
+    def _workspace_create_conflict_payload(slug: str) -> dict:
+        payload: dict = {"error": f"workspace already exists: {slug}"}
+        try:
+            record = inspect_workspace(slug)
+        except WorkspaceLifecycleError:
+            return payload
+        payload["workspace"] = _workspace_payload(
+            record,
+            is_active=_same_runtime_db(record.db_path),
+        )
+        return payload
+
+    @app.route("/api/workspaces", methods=["GET", "POST"])
+    def api_workspaces():
+        if request.method == "POST":
+            body = request.get_json(silent=True) or {}
+            raw_name = body.get("name") if isinstance(body, dict) else None
+            name = str(raw_name or "").strip()
+            try:
+                record = create_workspace(name)
+            except WorkspaceAlreadyExistsError as exc:
+                return jsonify(_workspace_create_conflict_payload(exc.slug)), 409
+            except WorkspaceNameReservedError as exc:
+                return jsonify({"error": str(exc)}), 400
+            except WorkspaceLifecycleError as exc:
+                return jsonify({"error": str(exc)}), 400
+            return jsonify({
+                "workspace": _workspace_payload(
+                    record,
+                    is_active=_same_runtime_db(record.db_path),
+                )
+            }), 201
+        return jsonify({"workspaces": _workspace_catalog_payload()})
+
     @app.route("/api/health")
     def api_health():
         if not db_path.exists():
@@ -1899,6 +2094,12 @@ def create_app(
         covered, total, fraction = coverage_metrics(conn)
 
         data = {
+            "db_path": str(db_path),
+            "runtime": {
+                "endpoint_reachable": True,
+                "database_available": True,
+                "workspace": _runtime_workspace_payload(),
+            },
             "compiler_ok": ok,
             "compiler_note": note,
             "document": {

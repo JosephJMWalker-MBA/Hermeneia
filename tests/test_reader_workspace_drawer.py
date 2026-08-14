@@ -51,6 +51,8 @@ def test_workspace_drawer_markup_exists():
     index = _index()
     assert 'id="workspace-drawer"' in index
     assert 'id="workspace-menu-btn"' in index
+    assert 'id="runtime-workspace-chip"' in index
+    assert 'id="runtime-workspace-name"' in index
     assert "toggleWorkspaceMenu()" in index
     assert 'aria-controls="workspace-drawer"' in index
     assert "Workspace" in index
@@ -65,6 +67,41 @@ def test_workspace_drawer_includes_expected_pipeline_entries():
         assert f"_wsGo('{stage}')" in index, stage
     for label in ("Corpus", "Lab", "Review", "Architect", "Reports", "Critic", "Lineage"):
         assert label in index, label
+
+
+def test_workspace_drawer_catalog_opens_only_through_supervised_runtime():
+    index = _index()
+    assert 'id="workspace-catalog"' in index
+    assert 'id="workspace-create-form"' in index
+    assert 'id="workspace-create-name"' in index
+    assert 'id="workspace-create-submit"' in index
+    assert "+ New workspace" in index
+    assert "Known Workspaces" in index
+    assert "/api/runtime/workspace" in index
+    assert "/api/workspaces" in index
+    assert "workspace-catalog-badge" in index
+    assert "workspace-catalog-open" in index
+    assert "_wsOpenWorkspace" in index
+    assert "_wsRuntimeCanSwitch" in index
+    assert "Workspace switching requires the supervised Hermeneia runtime." in index
+    assert "/api/workspaces/${encodeURIComponent(selector)}/open" in index
+    assert "Switch workspace" not in index
+    assert "_wsSwitch" not in index
+
+
+def test_workspace_create_flow_does_not_reframe_current_upload_or_navigation():
+    index = _index()
+    drawer = index[
+        index.index('<div class="workspace-drawer"') : index.index(
+            '<input type="file" id="ws-import-file"'
+        )
+    ]
+    create_fn = _extract_function(index, "async function _wsCreateWorkspace(")
+    assert "Open workspace" not in drawer
+    assert "Switch" not in drawer
+    assert "obOpenUploadArea" not in drawer
+    assert "obOpenUploadArea" not in create_fn
+    assert "e10Go(" not in create_fn
 
 
 def test_workspace_drawer_entries_reuse_existing_navigation():
@@ -148,6 +185,7 @@ def test_workspace_drawer_toggle_opens_and_closes():
         return null;
       }},
     }};
+    function _wsRefreshWorkspaceCatalog() {{}}
     {toggle}
     toggleWorkspaceMenu();
     const opened = _state.drawer.dataset.open === '1' && _state.drawer.hidden === false

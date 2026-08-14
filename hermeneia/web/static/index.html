@@ -79,6 +79,23 @@ body.reader-active .wrap { max-width: 1180px; padding: 0 20px; }
   flex-shrink: 0;
 }
 .nav-right { display: flex; align-items: center; gap: 8px; }
+.nav-workspace-chip {
+  display: flex; align-items: center; gap: 6px;
+  min-width: 0; max-width: 220px;
+  padding: 5px 10px; border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--bg2); color: var(--fg2);
+  font-size: 12px; white-space: nowrap;
+}
+.nav-workspace-chip span:last-child {
+  overflow: hidden; text-overflow: ellipsis;
+}
+.nav-workspace-chip .nav-workspace-prefix {
+  color: var(--dim2); flex-shrink: 0;
+}
+.nav-workspace-chip[data-kind="custom"] {
+  border-color: color-mix(in srgb, #e0a800 45%, var(--border));
+}
 
 .reader-home-btn {
   min-height: 38px;
@@ -263,6 +280,95 @@ body.reader-active .wrap { max-width: 1180px; padding: 0 20px; }
 .workspace-drawer-item:hover .workspace-drawer-name { color: var(--accent); }
 .workspace-drawer-name { font-size: 14px; color: var(--fg); font-weight: 600; }
 .workspace-drawer-desc { font-size: 12px; color: var(--dim2); }
+.workspace-catalog {
+  border-top: 1px solid var(--border);
+  margin-top: 8px; padding-top: 10px;
+}
+.workspace-catalog-head {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--dim2); margin-bottom: 6px;
+}
+.workspace-catalog-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 7px 2px; border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.workspace-catalog-row:first-of-type { border-top: none; }
+.workspace-catalog-name {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--fg2); font-size: 13px;
+}
+.workspace-catalog-actions {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.workspace-catalog-badge {
+  flex-shrink: 0; font-size: 10px; color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 999px; padding: 2px 7px; background: var(--accent2);
+}
+.workspace-catalog-open {
+  flex-shrink: 0; cursor: pointer; font-size: 11px;
+  border: 1px solid var(--border); border-radius: var(--r);
+  color: var(--fg); background: var(--surface2); padding: 4px 8px;
+}
+.workspace-catalog-open:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.workspace-catalog-open:disabled { opacity: .55; cursor: default; }
+.workspace-catalog-empty {
+  font-size: 12px; color: var(--dim2); line-height: 1.45; padding: 4px 0;
+}
+.workspace-catalog-status {
+  font-size: 12px; line-height: 1.45; color: var(--dim2);
+  padding-top: 7px;
+}
+.workspace-catalog-status[hidden] { display: none; }
+.workspace-catalog-status[data-kind="success"] { color: var(--green); }
+.workspace-catalog-status[data-kind="error"] { color: var(--red); }
+.workspace-create {
+  border-top: 1px solid var(--border);
+  margin-top: 10px; padding-top: 10px;
+}
+.workspace-create-toggle {
+  width: 100%; text-align: left; cursor: pointer;
+  background: none; border: 1px solid var(--border); color: var(--fg);
+  border-radius: var(--r); padding: 8px 10px; font-size: 13px;
+}
+.workspace-create-toggle:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
+}
+.workspace-create-form {
+  margin-top: 10px; display: flex; flex-direction: column; gap: 8px;
+}
+.workspace-create-form[hidden] { display: none; }
+.workspace-create-label {
+  font-size: 12px; color: var(--fg2); font-weight: 600;
+}
+.workspace-create-input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface2); color: var(--fg); padding: 8px 10px;
+  font-size: 13px;
+}
+.workspace-create-input::placeholder { color: var(--dim2); }
+.workspace-create-actions { display: flex; gap: 8px; }
+.workspace-create-btn {
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface2); color: var(--fg); padding: 7px 10px;
+  font-size: 12px; cursor: pointer;
+}
+.workspace-create-btn.primary {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  color: var(--accent);
+}
+.workspace-create-btn:disabled { opacity: .55; cursor: default; }
+.workspace-create-status {
+  font-size: 12px; line-height: 1.45; color: var(--dim2);
+}
+.workspace-create-status[hidden] { display: none; }
+.workspace-create-status[data-kind="success"] { color: var(--green); }
+.workspace-create-status[data-kind="error"] { color: var(--red); }
 
 /* Import Workspace modal — inspect before acting. */
 .ws-import-overlay {
@@ -811,6 +917,21 @@ body.x .expert-btn { color: var(--accent); border-color: var(--accent); }
   color: var(--red); padding: 12px 14px; font-size: 14px;
 }
 .app-error.open { display: block; }
+.runtime-connection-status {
+  position: sticky; top: 56px; z-index: 150;
+  width: min(1100px, calc(100% - 32px)); margin: 10px auto 0;
+  border: 1px solid var(--yellow, #f4c542); border-radius: var(--r);
+  background: color-mix(in srgb, var(--surface) 92%, var(--yellow, #f4c542) 8%);
+  color: var(--fg); padding: 8px 12px; box-shadow: var(--shadow);
+  font-size: 12px; line-height: 1.45;
+}
+.runtime-connection-status[hidden] { display: none; }
+.runtime-connection-title { font-weight: 700; color: var(--fg); }
+.runtime-connection-detail { color: var(--dim2); margin-top: 2px; }
+.runtime-connection-status.reconnected {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--surface) 92%, var(--green) 8%);
+}
 .e10-select {
   height: 40px; background: var(--surface); color: var(--fg);
   border: 1px solid var(--border2); border-radius: var(--r); padding: 0 12px;
@@ -2510,6 +2631,10 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
 
 <nav class="nav">
   <span class="nav-brand" onclick="e10Go('onboarding')" style="cursor:pointer">Hermeneia</span>
+  <div class="nav-workspace-chip" id="runtime-workspace-chip" title="Current workspace reported by the running backend" hidden>
+    <span class="nav-workspace-prefix">Workspace</span>
+    <span id="runtime-workspace-name"></span>
+  </div>
   <!-- Hidden nav-step buttons preserved for JS .active class toggling -->
   <button class="nav-step" id="navstep-corpus"    onclick="e10Go('corpus')">Corpus</button>
   <button class="nav-step" id="navstep-reader"    onclick="e10Go('reader')">Reader</button>
@@ -2541,6 +2666,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
 <!-- Persistent study compass: the governing question, visible on every screen.
      Gently prompts the steward to set one when none exists (issue: reader-first). -->
 <div id="thesis-bar" class="thesis-bar" hidden onclick="_thesisBarClick()"></div>
+<div id="runtime-connection-status" class="runtime-connection-status" hidden role="status" aria-live="polite"></div>
 
 <!-- Workspace drawer (issue #56 slice 4): an additive grouping of the older
      pipeline surfaces behind one clear entry point. Reader stays primary; the
@@ -2557,6 +2683,22 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
   <button class="workspace-drawer-item" role="menuitem" onclick="_wsGo('lineage')"><span class="workspace-drawer-name">Lineage</span><span class="workspace-drawer-desc">trace claims back to evidence</span></button>
   <button class="workspace-drawer-item workspace-drawer-export" role="menuitem" onclick="exportWorkspace()"><span class="workspace-drawer-name">⬇ Export workspace</span><span class="workspace-drawer-desc">download a portable .zip bundle of your work</span></button>
   <button class="workspace-drawer-item workspace-drawer-export" role="menuitem" onclick="importWorkspace()"><span class="workspace-drawer-name">⬆ Import workspace</span><span class="workspace-drawer-desc">preview and restore a .zip bundle into a fresh workspace</span></button>
+  <div class="workspace-catalog" id="workspace-catalog" aria-label="Known workspaces">
+    <div class="workspace-catalog-head">Known Workspaces</div>
+    <div class="workspace-catalog-empty">Loading workspaces...</div>
+  </div>
+  <div class="workspace-create" id="workspace-create">
+    <button class="workspace-create-toggle" id="workspace-create-toggle" type="button" onclick="_wsShowCreateForm()">+ New workspace</button>
+    <div class="workspace-create-form" id="workspace-create-form" hidden>
+      <label class="workspace-create-label" for="workspace-create-name">Workspace name</label>
+      <input class="workspace-create-input" id="workspace-create-name" type="text" autocomplete="off" placeholder="The Second Sale">
+      <div class="workspace-create-actions">
+        <button class="workspace-create-btn primary" id="workspace-create-submit" type="button" onclick="_wsCreateWorkspace()">Create workspace</button>
+        <button class="workspace-create-btn" type="button" onclick="_wsHideCreateForm()">Cancel</button>
+      </div>
+      <div class="workspace-create-status" id="workspace-create-status" role="status" aria-live="polite" hidden></div>
+    </div>
+  </div>
 </div>
 <input type="file" id="ws-import-file" accept=".zip,application/zip" hidden>
 <div class="ws-import-overlay" id="ws-import-overlay" hidden>
@@ -2970,6 +3112,628 @@ let _e10Selected = null, _e10Detail = null, _e10ActiveProposal = null;
 let _e10Providers = null;
 let _e10ProviderNotices = {};
 
+// ── Runtime connectivity and local authored drafts ────
+const _RUNTIME_HEALTH_URL = '/api/health';
+const _RUNTIME_RECONNECT_BASE_MS = 1500;
+const _RUNTIME_RECONNECT_MAX_MS = 12000;
+const _RUNTIME_RECONNECTED_VISIBLE_MS = 2600;
+const _AUTHORED_DRAFT_PREFIX_V1 = 'hermeneia_authored_draft_v1';
+const _AUTHORED_DRAFT_PREFIX = 'hermeneia:draft:v2';
+let _runtimeConnectionState = 'connected';
+let _runtimeReconnectTimer = null;
+let _runtimeReconnectDelayMs = _RUNTIME_RECONNECT_BASE_MS;
+let _runtimeReconnectQuietTimer = null;
+let _runtimeLastEndpointError = null;
+let _runtimeDraftWorkspaceScope = '';
+let _runtimeDraftMigrationScope = '';
+let _runtimeDraftScopeReady = false;
+const _authoredDraftKeyParts = new Map();
+
+class RuntimeEndpointError extends Error {
+  constructor(message = 'Connection to Hermeneia lost. Your unsaved text is preserved in this browser.', cause = null) {
+    super(message);
+    this.name = 'RuntimeEndpointError';
+    this.endpointUnreachable = true;
+    if (cause) this.cause = cause;
+  }
+}
+
+class RuntimeHttpError extends Error {
+  constructor(message, response, data = null) {
+    super(message || `HTTP ${response?.status || ''}`.trim());
+    this.name = 'RuntimeHttpError';
+    this.status = response?.status || 0;
+    this.data = data;
+  }
+}
+
+function _runtimeEndpointLostMessage() {
+  return 'Connection to Hermeneia lost. Your unsaved text is preserved in this browser.';
+}
+
+function _runtimeIsFetchNetworkError(error) {
+  if (!error) return false;
+  const message = String(error.message || '');
+  return error instanceof TypeError
+    || /Failed to fetch|NetworkError|Load failed|fetch failed|Failed to load/i.test(message);
+}
+
+function _runtimeIsEndpointError(error) {
+  return !!error?.endpointUnreachable || error instanceof RuntimeEndpointError;
+}
+
+function _runtimeRenderConnectionStatus() {
+  const host = document.getElementById('runtime-connection-status');
+  if (!host) return;
+  if (_runtimeConnectionState === 'connected') {
+    host.hidden = true;
+    host.className = 'runtime-connection-status';
+    host.innerHTML = '';
+    return;
+  }
+  const reconnected = _runtimeConnectionState === 'reconnected';
+  host.hidden = false;
+  host.className = `runtime-connection-status ${reconnected ? 'reconnected' : 'unreachable'}`;
+  const title = reconnected ? 'Reconnected to Hermeneia.' : 'Connection to Hermeneia lost.';
+  const detail = reconnected
+    ? 'Save again when you are ready. Unsaved text was not replayed automatically.'
+    : 'Your unsaved text is preserved in this browser. The local endpoint is unreachable; if you use a tunnel, the tunnel or Hermeneia process may need attention.';
+  host.innerHTML = `<div class="runtime-connection-title">${x(title)}</div><div class="runtime-connection-detail">${x(detail)}</div>`;
+}
+
+function _runtimeSetConnectionState(state) {
+  if (_runtimeConnectionState === state) {
+    _runtimeRenderConnectionStatus();
+    return;
+  }
+  _runtimeConnectionState = state;
+  _runtimeRenderConnectionStatus();
+}
+
+function _runtimeMarkReachable() {
+  const wasDisconnected = _runtimeConnectionState === 'unreachable' || _runtimeConnectionState === 'reconnecting';
+  _runtimeLastEndpointError = null;
+  _runtimeReconnectDelayMs = _RUNTIME_RECONNECT_BASE_MS;
+  if (_runtimeReconnectTimer) {
+    clearTimeout(_runtimeReconnectTimer);
+    _runtimeReconnectTimer = null;
+  }
+  if (wasDisconnected) {
+    _runtimeSetConnectionState('reconnected');
+    clearTimeout(_runtimeReconnectQuietTimer);
+    _runtimeReconnectQuietTimer = setTimeout(() => _runtimeSetConnectionState('connected'), _RUNTIME_RECONNECTED_VISIBLE_MS);
+    if (typeof _wsRefreshWorkspaceShell === 'function') _wsRefreshWorkspaceShell();
+    return;
+  }
+  _runtimeSetConnectionState('connected');
+}
+
+function _runtimeMarkUnreachable(error) {
+  _runtimeLastEndpointError = error || null;
+  clearTimeout(_runtimeReconnectQuietTimer);
+  _runtimeReconnectQuietTimer = null;
+  if (_runtimeConnectionState !== 'unreachable' && _runtimeConnectionState !== 'reconnecting') {
+    _runtimeSetConnectionState('unreachable');
+  } else {
+    _runtimeRenderConnectionStatus();
+  }
+  _runtimeScheduleReconnectCheck();
+}
+
+function _runtimeScheduleReconnectCheck() {
+  if (_runtimeReconnectTimer) return;
+  _runtimeReconnectTimer = setTimeout(async () => {
+    _runtimeReconnectTimer = null;
+    if (_runtimeConnectionState === 'unreachable') _runtimeSetConnectionState('reconnecting');
+    try {
+      await fetch(_RUNTIME_HEALTH_URL, { cache: 'no-store' });
+      _runtimeMarkReachable();
+    } catch (error) {
+      if (!_runtimeIsFetchNetworkError(error)) throw error;
+      _runtimeReconnectDelayMs = Math.min(_runtimeReconnectDelayMs * 1.6, _RUNTIME_RECONNECT_MAX_MS);
+      _runtimeSetConnectionState('unreachable');
+      _runtimeScheduleReconnectCheck();
+    }
+  }, _runtimeReconnectDelayMs);
+}
+
+async function runtimeApiFetch(url, options = {}) {
+  try {
+    const response = await fetch(url, options);
+    _runtimeMarkReachable();
+    return response;
+  } catch (error) {
+    if (_runtimeIsFetchNetworkError(error)) {
+      _runtimeMarkUnreachable(error);
+      throw new RuntimeEndpointError(_runtimeEndpointLostMessage(), error);
+    }
+    throw error;
+  }
+}
+
+function _runtimeDraftScopeIsSafe(scope) {
+  const value = String(scope || '').trim();
+  if (!value || value.includes('/') || value.includes('\\')) return false;
+  if (/hermeneia\.db|uploads|\/private|\/home|\/users/i.test(value)) return false;
+  return /^[a-z][a-z0-9_-]*:[A-Za-z0-9._:-]+$/.test(value);
+}
+
+function _runtimeDraftScopeFromWorkspace(workspace) {
+  if (!workspace || typeof workspace !== 'object') return '';
+  const direct = String(workspace.runtime_scope || '').trim();
+  if (_runtimeDraftScopeIsSafe(direct)) return direct;
+  const kind = String(workspace.kind || '').trim().toLowerCase();
+  const slug = String(workspace.slug || '').trim().toLowerCase();
+  const id = String(workspace.id || '').trim();
+  if (kind === 'legacy' && slug === 'gatsby') return 'legacy:gatsby';
+  if (id && !/[\\/]/.test(id)) {
+    const prefix = kind === 'managed' ? 'managed' : 'custom';
+    const scope = `${prefix}:${id}`;
+    if (_runtimeDraftScopeIsSafe(scope)) return scope;
+  }
+  return '';
+}
+
+function _runtimeDraftMigrationScopeFromWorkspace(workspace) {
+  const value = String(workspace?.draft_migration_scope || '').trim();
+  return /^[a-z0-9]+$/i.test(value) ? value : '';
+}
+
+function _runtimeApplyWorkspaceDraftScope(workspace, options = {}) {
+  const nextScope = _runtimeDraftScopeFromWorkspace(workspace);
+  if (!nextScope) return false;
+  const previousScope = _runtimeDraftWorkspaceScope;
+  const changed = _runtimeDraftScopeReady && previousScope && previousScope !== nextScope;
+  if (changed) _runtimeFlushActiveDraftsForScope(previousScope);
+  _runtimeDraftWorkspaceScope = nextScope;
+  _runtimeDraftMigrationScope = _runtimeDraftMigrationScopeFromWorkspace(workspace);
+  _runtimeDraftScopeReady = true;
+  try {
+    document.body.dataset.workspaceDraftScope = _authoredDraftFingerprint(nextScope);
+    document.body.dataset.workspaceDraftScopeVersion = '2';
+  } catch {}
+  if (changed && options.hydrate !== false) _runtimeHydrateActiveDraftsForScope(nextScope);
+  return true;
+}
+
+function _runtimeFlushActiveDraftsForScope(scope) {
+  if (!_runtimeDraftScopeReady || scope !== _runtimeDraftWorkspaceScope) return;
+  if (typeof _crStoreActiveReaderDraft === 'function') _crStoreActiveReaderDraft();
+  if (typeof _flnPersistDraft === 'function'
+      && (document.getElementById('fln-understanding') || document.getElementById('fln-questions'))) {
+    _flnPersistDraft(typeof _flnLane === 'undefined' ? 'corpus' : _flnLane);
+  }
+  if (typeof _cmpPersistDraft === 'function' && document.getElementById('cmp-input')) {
+    _cmpPersistDraft();
+  }
+}
+
+function _runtimeHydrateActiveDraftsForScope(scope = _runtimeDraftWorkspaceScope) {
+  if (!_runtimeDraftScopeReady || scope !== _runtimeDraftWorkspaceScope) return;
+  if (typeof _crHydrateActiveReaderDraft === 'function') _crHydrateActiveReaderDraft();
+  if (typeof _flnApplyDraft === 'function'
+      && (document.getElementById('fln-understanding') || document.getElementById('fln-questions'))) {
+    _flnApplyDraft(typeof _flnLane === 'undefined' ? 'corpus' : _flnLane);
+  }
+  if (typeof _cmpApplyDraft === 'function' && document.getElementById('cmp-input')) {
+    _cmpApplyDraft({ replace: true });
+  }
+}
+
+function _authoredDraftFingerprint(value) {
+  const s = String(value ?? '');
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
+}
+
+function _authoredDraftStorage(fn, fallback = null) {
+  try {
+    if (typeof localStorage === 'undefined') return fallback;
+    return fn(localStorage);
+  } catch {
+    return fallback;
+  }
+}
+
+function _authoredDraftKey(parts) {
+  if (!_runtimeDraftScopeReady || !_runtimeDraftWorkspaceScope) return '';
+  const normalizedParts = (parts || []).map(part => String(part ?? ''));
+  const key = [
+    _AUTHORED_DRAFT_PREFIX,
+    encodeURIComponent(_runtimeDraftWorkspaceScope),
+    ...normalizedParts.map(part => encodeURIComponent(part)),
+  ].join(':');
+  _authoredDraftKeyParts.set(key, normalizedParts);
+  return key;
+}
+
+function _authoredDraftV1Key(parts) {
+  if (!_runtimeDraftMigrationScope) return '';
+  return [
+    _AUTHORED_DRAFT_PREFIX_V1,
+    encodeURIComponent(_runtimeDraftMigrationScope),
+    ...(parts || []).map(part => encodeURIComponent(String(part ?? ''))),
+  ].join(':');
+}
+
+function _authoredDraftMigrateV1(key) {
+  if (!key || !_runtimeDraftMigrationScope) return;
+  const parts = _authoredDraftKeyParts.get(key);
+  if (!parts) return;
+  _authoredDraftStorage(store => {
+    if (store.getItem(key) !== null) return false;
+    const oldKey = _authoredDraftV1Key(parts);
+    if (!oldKey || oldKey === key) return false;
+    const oldRaw = store.getItem(oldKey);
+    if (oldRaw === null) return false;
+    store.setItem(key, oldRaw);
+    if (store.getItem(key) === oldRaw) store.removeItem(oldKey);
+    return true;
+  }, false);
+}
+
+function _authoredDraftHasValue(fields) {
+  return Object.values(fields || {}).some(value => {
+    if (typeof value === 'boolean') return value;
+    if (Array.isArray(value)) return value.length > 0;
+    return String(value ?? '').trim() !== '';
+  });
+}
+
+function _authoredDraftSave(key, payload) {
+  if (!key) return;
+  const fields = payload?.fields || {};
+  if (!_authoredDraftHasValue(fields)) {
+    _authoredDraftClear(key);
+    return;
+  }
+  _authoredDraftStorage(store => store.setItem(key, JSON.stringify({
+    ...payload,
+    schema: 2,
+    saved_at: new Date().toISOString(),
+  })));
+}
+
+function _authoredDraftLoad(key) {
+  if (!key) return null;
+  _authoredDraftMigrateV1(key);
+  return _authoredDraftStorage(store => {
+    const raw = store.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  }, null);
+}
+
+function _authoredDraftClear(key) {
+  if (!key) return;
+  _authoredDraftStorage(store => store.removeItem(key));
+}
+
+function _draftValue(id) {
+  return document.getElementById(id)?.value || '';
+}
+
+function _draftSetValue(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.value = value == null ? '' : String(value);
+}
+
+function _draftSetChecked(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.checked = !!value;
+}
+
+function _draftBindInputs(root, handler) {
+  if (!root?.querySelectorAll) return;
+  root.querySelectorAll('input, textarea, select').forEach(el => {
+    el.addEventListener('input', handler);
+    el.addEventListener('change', handler);
+  });
+}
+
+function _draftFormNotice(id, message) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = message;
+  el.style.color = 'var(--green)';
+}
+
+function _crNewHighlightDraftKey(selection = null) {
+  const text = selection?.text || _crSelText || '';
+  const locator = _crEncodeReaderSpanLocator(selection || _crReaderSelectionState) || '';
+  return _authoredDraftKey([
+    'reader-highlight-new',
+    _crDocId || 'no-document',
+    _crPage || 'no-page',
+    _authoredDraftFingerprint(`${locator}|${text}`),
+  ]);
+}
+
+function _crReadNewHighlightDraftFields() {
+  return {
+    concept: _draftValue('cr-concept-input'),
+    important: !!document.getElementById('cr-important-input')?.checked,
+    tags: _draftValue('cr-tags-input'),
+    rank: _draftValue('cr-rank-input'),
+    theme_bucket: _draftValue('cr-theme-input'),
+    note_text: _draftValue('cr-note-input'),
+    question_text: _draftValue('cr-q-input'),
+    relevance: _crRelevance || 'unclear',
+  };
+}
+
+function _crApplyRelevanceDraft(value) {
+  const rel = value || 'unclear';
+  _crRelevance = rel;
+  document.querySelectorAll?.('.cr-relevance-btns .cr-rel-btn').forEach(btn => {
+    const label = String(btn.textContent || '').trim();
+    btn.classList.toggle('active', label === rel);
+  });
+}
+
+function _crApplyNewHighlightDraft(fields = {}) {
+  _draftSetValue('cr-concept-input', fields.concept || '');
+  _draftSetChecked('cr-important-input', fields.important);
+  _draftSetValue('cr-tags-input', fields.tags || '');
+  _draftSetValue('cr-rank-input', fields.rank || '');
+  _draftSetValue('cr-theme-input', fields.theme_bucket || '');
+  _draftSetValue('cr-note-input', fields.note_text || '');
+  _draftSetValue('cr-q-input', fields.question_text || '');
+  _crApplyRelevanceDraft(fields.relevance || 'unclear');
+}
+
+function _crStoreNewHighlightDraft(key, selection = null) {
+  const fields = _crReadNewHighlightDraftFields();
+  if (fields.relevance === 'unclear') fields.relevance = '';
+  _authoredDraftSave(key, {
+    form_type: 'reader-highlight-new',
+    document_id: _crDocId || null,
+    page: _crPage || null,
+    record_id: _authoredDraftFingerprint(`${selection?.text || _crSelText || ''}|${_crPage || ''}`),
+    selected_text: selection?.text || _crSelText || '',
+    fields,
+  });
+}
+
+function _crBindNewHighlightDraft(selection = null) {
+  const toolbar = document.getElementById('cr-sel-toolbar');
+  if (!toolbar) return null;
+  const key = _crNewHighlightDraftKey(selection);
+  toolbar.dataset.draftKey = key;
+  toolbar.dataset.draftKind = 'reader-highlight-new';
+  const draft = _authoredDraftLoad(key);
+  if (draft?.fields) {
+    _crApplyNewHighlightDraft(draft.fields);
+    _draftFormNotice('cr-capture-msg', 'Recovered unsaved highlight text from this browser.');
+  }
+  _draftBindInputs(toolbar, () => _crStoreNewHighlightDraft(key, selection));
+  return key;
+}
+
+function _crHighlightEditDraftKey(highlight) {
+  const h = typeof highlight === 'object' ? highlight : { id: highlight };
+  return _authoredDraftKey([
+    'reader-highlight-edit',
+    h.source_document_id || _crDocId || 'no-document',
+    h.id || 'no-highlight',
+  ]);
+}
+
+function _crHighlightEditBase(h = {}) {
+  const tags = _crHighlightTags(h);
+  const typedTags = tags.filter(t => t.startsWith('tag:')).map(t => t.slice(4)).join(', ');
+  return {
+    note_text: h.note_text || '',
+    question_text: h.question_text || '',
+    relevance: h.relevance || 'unclear',
+    tags: typedTags,
+    important: tags.includes('important'),
+    rank: h.rank == null ? '' : String(h.rank),
+    theme_bucket: h.theme_bucket || '',
+  };
+}
+
+function _crReadHighlightEditDraftFields() {
+  return {
+    important: !!document.getElementById('cr-edit-important')?.checked,
+    tags: _draftValue('cr-edit-tags'),
+    rank: _draftValue('cr-edit-rank'),
+    theme_bucket: _draftValue('cr-edit-theme'),
+    note_text: _draftValue('cr-edit-note'),
+    question_text: _draftValue('cr-edit-q'),
+    relevance: _crRelevance || 'unclear',
+  };
+}
+
+function _crHighlightEditBaseMatches(h, draft) {
+  const base = draft?.base || {};
+  const current = _crHighlightEditBase(h);
+  return Object.keys(current).every(key => String(current[key] ?? '') === String(base[key] ?? ''));
+}
+
+function _crApplyHighlightEditDraft(h, draft) {
+  if (!draft?.fields) return false;
+  if (!_crHighlightEditBaseMatches(h, draft)) {
+    _draftFormNotice('cr-edit-msg', 'Unsaved browser draft preserved, but the saved highlight changed. Review before replacing it.');
+    return false;
+  }
+  const f = draft.fields;
+  _draftSetChecked('cr-edit-important', f.important);
+  _draftSetValue('cr-edit-tags', f.tags || '');
+  _draftSetValue('cr-edit-rank', f.rank || '');
+  _draftSetValue('cr-edit-theme', f.theme_bucket || '');
+  _draftSetValue('cr-edit-note', f.note_text || '');
+  _draftSetValue('cr-edit-q', f.question_text || '');
+  _crApplyRelevanceDraft(f.relevance || 'unclear');
+  _draftFormNotice('cr-edit-msg', 'Recovered unsaved highlight text from this browser.');
+  return true;
+}
+
+function _crApplyHighlightEditBaseDraft(h = {}) {
+  const f = _crHighlightEditBase(h);
+  _draftSetChecked('cr-edit-important', f.important);
+  _draftSetValue('cr-edit-tags', f.tags || '');
+  _draftSetValue('cr-edit-rank', f.rank || '');
+  _draftSetValue('cr-edit-theme', f.theme_bucket || '');
+  _draftSetValue('cr-edit-note', f.note_text || '');
+  _draftSetValue('cr-edit-q', f.question_text || '');
+  _crApplyRelevanceDraft(f.relevance || 'unclear');
+}
+
+function _crStoreHighlightEditDraft(key, h = null) {
+  const highlight = h || (_crHighlights || []).find(row => row.id === document.getElementById('cr-sel-form')?.dataset?.highlightId) || {};
+  const base = _crHighlightEditBase(highlight);
+  const fields = _crReadHighlightEditDraftFields();
+  const changed = Object.keys(base).some(k => String(fields[k] ?? '') !== String(base[k] ?? ''));
+  if (!changed) {
+    _authoredDraftClear(key);
+    return;
+  }
+  _authoredDraftSave(key, {
+    form_type: 'reader-highlight-edit',
+    document_id: highlight.source_document_id || _crDocId || null,
+    page: highlight.page || _crPage || null,
+    record_id: highlight.id || null,
+    base,
+    fields,
+  });
+}
+
+function _crBindHighlightEditDraft(h) {
+  const form = document.getElementById('cr-sel-form');
+  if (!form || !h) return null;
+  const key = _crHighlightEditDraftKey(h);
+  form.dataset.draftKey = key;
+  form.dataset.draftKind = 'reader-highlight-edit';
+  form.dataset.highlightId = h.id || '';
+  _crApplyHighlightEditDraft(h, _authoredDraftLoad(key));
+  _draftBindInputs(form, () => _crStoreHighlightEditDraft(key, h));
+  return key;
+}
+
+function _crStoreActiveReaderDraft() {
+  const toolbar = document.getElementById('cr-sel-toolbar');
+  if (toolbar?.dataset?.draftKind === 'reader-highlight-new') {
+    _crStoreNewHighlightDraft(toolbar.dataset.draftKey, _crGetReaderSelection({ refresh: false, fallback: true }));
+  }
+  const form = document.getElementById('cr-sel-form');
+  if (form?.dataset?.draftKind === 'reader-highlight-edit') {
+    const h = (_crHighlights || []).find(row => row.id === form.dataset.highlightId);
+    _crStoreHighlightEditDraft(form.dataset.draftKey, h);
+  }
+}
+
+function _crHydrateActiveReaderDraft() {
+  const toolbar = document.getElementById('cr-sel-toolbar');
+  if (toolbar?.dataset?.draftKind === 'reader-highlight-new') {
+    const selection = typeof _crGetReaderSelection === 'function'
+      ? _crGetReaderSelection({ refresh: false, fallback: true })
+      : null;
+    const key = _crNewHighlightDraftKey(selection);
+    toolbar.dataset.draftKey = key;
+    _crApplyNewHighlightDraft({});
+    const draft = _authoredDraftLoad(key);
+    if (draft?.fields) {
+      _crApplyNewHighlightDraft(draft.fields);
+      _draftFormNotice('cr-capture-msg', 'Recovered unsaved highlight text from this browser.');
+    }
+  }
+  const form = document.getElementById('cr-sel-form');
+  if (form?.dataset?.draftKind === 'reader-highlight-edit') {
+    const h = (_crHighlights || []).find(row => row.id === form.dataset.highlightId);
+    if (!h) return;
+    const key = _crHighlightEditDraftKey(h);
+    form.dataset.draftKey = key;
+    _crApplyHighlightEditBaseDraft(h);
+    _crApplyHighlightEditDraft(h, _authoredDraftLoad(key));
+  }
+}
+
+function _flnDraftKey(lane = _flnLane) {
+  return _authoredDraftKey([
+    'field-notes',
+    _crDocId || 'no-document',
+    _crPage || 'no-page',
+    lane || 'corpus',
+  ]);
+}
+
+function _flnReadDraftFields() {
+  return {
+    understanding: _draftValue('fln-understanding'),
+    pressing_questions: _draftValue('fln-questions'),
+  };
+}
+
+function _flnPersistDraft(lane = _flnLane) {
+  const fields = _flnReadDraftFields();
+  _authoredDraftSave(_flnDraftKey(lane), {
+    form_type: 'field-notes',
+    document_id: _crDocId || null,
+    page: _crPage || null,
+    record_id: lane || 'corpus',
+    fields,
+  });
+}
+
+function _flnApplyDraft(lane = _flnLane) {
+  const draft = _authoredDraftLoad(_flnDraftKey(lane));
+  if (!draft?.fields) {
+    _draftSetValue('fln-understanding', '');
+    _draftSetValue('fln-questions', '');
+    return;
+  }
+  _draftSetValue('fln-understanding', draft.fields.understanding || '');
+  _draftSetValue('fln-questions', draft.fields.pressing_questions || '');
+}
+
+function _flnBindDrafts() {
+  ['fln-understanding', 'fln-questions'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.draftBound === '1') return;
+    el.addEventListener('input', () => _flnPersistDraft());
+    el.dataset.draftBound = '1';
+  });
+}
+
+function _cmpDraftKey() {
+  return _authoredDraftKey([
+    'companion-message',
+    _crDocId || 'no-document',
+    _crPage || 'no-page',
+  ]);
+}
+
+function _cmpPersistDraft() {
+  const input = document.getElementById('cmp-input');
+  _authoredDraftSave(_cmpDraftKey(), {
+    form_type: 'companion-message',
+    document_id: _crDocId || null,
+    page: _crPage || null,
+    record_id: 'composer',
+    fields: { message: input?.value || '' },
+  });
+}
+
+function _cmpBindDraft() {
+  const input = document.getElementById('cmp-input');
+  if (!input) return;
+  _cmpApplyDraft();
+  if (input.dataset.draftBound === '1') return;
+  input.addEventListener('input', _cmpPersistDraft);
+  input.dataset.draftBound = '1';
+}
+
+function _cmpApplyDraft(options = {}) {
+  const input = document.getElementById('cmp-input');
+  if (!input) return;
+  const draft = _authoredDraftLoad(_cmpDraftKey());
+  if (options.replace || !input.value) input.value = draft?.fields?.message || '';
+}
+
 // ── Accessibility Dock v0.2 ────────────────────────────
 const _a11y = { read: false, focus: false, textLg: false, speaking: false, collapsed: false };
 let _a11yHintTimer = null;
@@ -3177,14 +3941,17 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) a11yS
 // ── Boot ───────────────────────────────────────────────
 (async () => {
   try {
-    mount(await get('/api/health'));
+    const health = await get('/api/health');
+    mount(health);
+    setTimeout(() => _wsRefreshWorkspaceShell(health.runtime?.workspace), 0);
   } catch(e) {
     // A missing database is not an error — it is a fresh environment.
     // Route to first-run onboarding instead of a dead screen.
     try {
       const s = await get('/api/setup/state');
       if (!s.database_exists) {
-        mount({ document: { filename: null }, _noDatabase: true });
+        mount({ document: { filename: null }, _noDatabase: true, runtime: s.runtime || null });
+        setTimeout(() => _wsRefreshWorkspaceShell(s.runtime?.workspace), 0);
         return;
       }
     } catch {}
@@ -3212,6 +3979,312 @@ function toggleExpert() {
 // Additive progressive disclosure: group the older pipeline surfaces behind
 // one clear entry point without changing routing. Every entry reuses the
 // existing e10Go() navigation; the existing nav buttons stay in place.
+let _wsCurrentWorkspace = null;
+let _wsCatalog = [];
+let _wsCatalogLoading = false;
+let _wsCreateInFlight = false;
+let _wsOpenInFlight = false;
+let _wsRuntimeCapabilities = {};
+let _wsCatalogStatusMessage = '';
+let _wsCatalogStatusKind = '';
+
+function _wsApplyRuntimePayload(data) {
+  if (!data || typeof data !== 'object') return;
+  if (Object.prototype.hasOwnProperty.call(data, 'capabilities')) {
+    const capabilities = data.capabilities;
+    _wsRuntimeCapabilities = capabilities && typeof capabilities === 'object' ? capabilities : {};
+  }
+  if (data.workspace) _wsApplyCurrentWorkspace(data.workspace);
+  else _wsRenderWorkspaceCatalog();
+}
+
+function _wsApplyCurrentWorkspace(workspace) {
+  if (!workspace) return;
+  _runtimeApplyWorkspaceDraftScope(workspace);
+  _wsCurrentWorkspace = workspace;
+  const chip = document.getElementById('runtime-workspace-chip');
+  const name = document.getElementById('runtime-workspace-name');
+  if (name) name.textContent = workspace.name || 'Workspace';
+  if (chip) {
+    chip.hidden = false;
+    chip.dataset.kind = workspace.kind || '';
+    chip.title = `Current workspace: ${workspace.name || 'Workspace'}`;
+  }
+  _wsRenderWorkspaceCatalog();
+}
+
+function _wsRuntimeCanSwitch() {
+  return _wsRuntimeCapabilities.workspace_switch === true;
+}
+
+function _wsWorkspaceSelector(workspace) {
+  const slug = String(workspace?.slug || '').trim();
+  if (slug) return slug;
+  const id = String(workspace?.id || '').trim();
+  if (id) return id;
+  return '';
+}
+
+function _wsWorkspaceMatches(left, right) {
+  if (!left || !right) return false;
+  const leftId = String(left.id || '').trim();
+  const rightId = String(right.id || '').trim();
+  if (leftId && rightId) return leftId === rightId;
+  const leftKind = String(left.kind || '').trim().toLowerCase();
+  const rightKind = String(right.kind || '').trim().toLowerCase();
+  const leftSlug = String(left.slug || '').trim().toLowerCase();
+  const rightSlug = String(right.slug || '').trim().toLowerCase();
+  return !!leftKind && leftKind === rightKind && !!leftSlug && leftSlug === rightSlug;
+}
+
+function _wsSetCatalogStatus(message = '', kind = '') {
+  _wsCatalogStatusMessage = message;
+  _wsCatalogStatusKind = kind;
+  const host = document.getElementById('workspace-catalog-status');
+  if (!host) return;
+  host.textContent = message;
+  host.dataset.kind = kind;
+  host.hidden = !message;
+}
+
+function _wsRenderWorkspaceCatalog() {
+  const host = document.getElementById('workspace-catalog');
+  if (!host) return;
+  const canSwitch = _wsRuntimeCanSwitch();
+  const rows = (_wsCatalog || []).map(workspace => {
+    const isActive = workspace.is_active || _wsWorkspaceMatches(_wsCurrentWorkspace, workspace);
+    const selector = _wsWorkspaceSelector(workspace);
+    const action = isActive
+      ? '<span class="workspace-catalog-badge">Current</span>'
+      : canSwitch && selector
+        ? `<button class="workspace-catalog-open" type="button" onclick="_wsOpenWorkspace('${x(selector)}')" ${_wsOpenInFlight ? 'disabled' : ''}>Open</button>`
+        : '';
+    return `
+    <div class="workspace-catalog-row" aria-current="${isActive ? 'true' : 'false'}">
+      <span class="workspace-catalog-name">${x(workspace.name || workspace.slug || 'Workspace')}</span>
+      <span class="workspace-catalog-actions">${action}</span>
+    </div>
+  `;
+  }).join('');
+  host.innerHTML = `
+    <div class="workspace-catalog-head">Known Workspaces</div>
+    ${rows || '<div class="workspace-catalog-empty">No managed workspaces found yet.</div>'}
+    <div class="workspace-catalog-status" id="workspace-catalog-status" role="status" aria-live="polite" data-kind="${x(_wsCatalogStatusKind)}" ${_wsCatalogStatusMessage ? '' : 'hidden'}>${x(_wsCatalogStatusMessage)}</div>
+  `;
+}
+
+async function _wsRefreshRuntimeWorkspace(seed = null) {
+  if (seed) _wsApplyCurrentWorkspace(seed);
+  const data = await get('/api/runtime/workspace');
+  _wsApplyRuntimePayload(data);
+}
+
+async function _wsRefreshWorkspaceCatalog() {
+  if (_wsCatalogLoading) return;
+  _wsCatalogLoading = true;
+  try {
+    const data = await get('/api/workspaces');
+    _wsCatalog = data.workspaces || [];
+    _wsRenderWorkspaceCatalog();
+  } finally {
+    _wsCatalogLoading = false;
+  }
+}
+
+function _wsCurrentDraftStorageKeys() {
+  if (!_runtimeDraftWorkspaceScope) return [];
+  const prefix = `${_AUTHORED_DRAFT_PREFIX}:${encodeURIComponent(_runtimeDraftWorkspaceScope)}:`;
+  return _authoredDraftStorage((storage) => {
+    let keys = [];
+    if (typeof storage.length === 'number' && typeof storage.key === 'function') {
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (typeof key === 'string') keys.push(key);
+      }
+    } else if (storage.data && typeof storage.data === 'object') {
+      keys = Object.keys(storage.data);
+    }
+    return keys.filter(key => key.startsWith(prefix));
+  }, []);
+}
+
+function _wsDraftPayloadHasAuthoredText(payload) {
+  const fields = payload && typeof payload === 'object' ? payload.fields : null;
+  if (!fields || typeof fields !== 'object') return false;
+  return Object.values(fields).some(value => {
+    if (typeof value === 'string') return value.trim() !== '';
+    if (Array.isArray(value)) return value.length > 0;
+    return value === true;
+  });
+}
+
+function _wsDraftLabelForPayload(payload, key) {
+  const form = String(payload?.form_type || key || '');
+  if (form.includes('reader-highlight')) return 'Highlight Inspector';
+  if (form.includes('field-notes')) return 'Field Notes';
+  if (form.includes('companion')) return 'Companion';
+  return 'authored text';
+}
+
+function _wsCurrentDraftLabels() {
+  const labels = new Set();
+  _authoredDraftStorage((storage) => {
+    for (const key of _wsCurrentDraftStorageKeys()) {
+      try {
+        const payload = JSON.parse(storage.getItem(key) || 'null');
+        if (_wsDraftPayloadHasAuthoredText(payload)) labels.add(_wsDraftLabelForPayload(payload, key));
+      } catch {}
+    }
+  });
+  return Array.from(labels);
+}
+
+function _wsConfirmOpenWithDrafts(labels, targetName) {
+  if (!labels.length) return true;
+  if (typeof window === 'undefined' || typeof window.confirm !== 'function') return true;
+  const currentName = _wsCurrentWorkspace?.name || 'the current workspace';
+  const target = targetName || 'the selected workspace';
+  return window.confirm(
+    `Unsaved ${labels.join(', ')} drafts will stay with ${currentName} and will not move to ${target}. Save or clear them before switching if needed, or continue to preserve them here and open ${target}.`
+  );
+}
+
+function _wsOpenErrorMessage(error) {
+  if (_runtimeIsEndpointError(error)) {
+    return 'Workspace state could not be confirmed. Reconnect to refresh backend truth before continuing.';
+  }
+  if (error?.status === 409) return error.message || 'Workspace switch already in progress.';
+  if (error?.status === 404) return error.message || 'Workspace was not found.';
+  return error?.message || 'Workspace could not be opened.';
+}
+
+async function _wsOpenWorkspace(selector) {
+  selector = String(selector || '').trim();
+  if (!selector || _wsOpenInFlight) return;
+  if (!_wsRuntimeCanSwitch()) {
+    _wsSetCatalogStatus('Workspace switching requires the supervised Hermeneia runtime.', 'error');
+    return;
+  }
+  const target = (_wsCatalog || []).find(workspace => _wsWorkspaceSelector(workspace) === selector) || null;
+  if (target && _wsWorkspaceMatches(_wsCurrentWorkspace, target)) return;
+  _runtimeFlushActiveDraftsForScope(_runtimeDraftWorkspaceScope);
+  const labels = _wsCurrentDraftLabels();
+  const targetName = target?.name || selector;
+  if (!_wsConfirmOpenWithDrafts(labels, targetName)) {
+    _wsSetCatalogStatus('Workspace open canceled. Current workspace unchanged.', '');
+    return;
+  }
+
+  _wsOpenInFlight = true;
+  _wsRenderWorkspaceCatalog();
+  _wsSetCatalogStatus(`Opening ${targetName}...`, 'pending');
+  try {
+    const response = await runtimeApiFetch(`/api/workspaces/${encodeURIComponent(selector)}/open`, {
+      method: 'POST',
+    });
+    const opened = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new RuntimeHttpError(opened.error || `HTTP ${response.status}`, response, opened);
+    }
+    const runtime = await get('/api/runtime/workspace');
+    const runtimeWorkspace = runtime.workspace || null;
+    const expectedWorkspace = opened.workspace || target;
+    if (expectedWorkspace && !_wsWorkspaceMatches(runtimeWorkspace, expectedWorkspace)) {
+      throw new Error('Workspace open was not confirmed by runtime identity.');
+    }
+    _wsApplyRuntimePayload(runtime);
+    await _wsRefreshWorkspaceCatalog().catch(() => {});
+    _wsSetCatalogStatus(`Opened ${runtimeWorkspace?.name || targetName}.`, 'success');
+  } catch (error) {
+    _wsSetCatalogStatus(_wsOpenErrorMessage(error), 'error');
+    await _wsRefreshRuntimeWorkspace().catch(() => {});
+    await _wsRefreshWorkspaceCatalog().catch(() => {});
+  } finally {
+    _wsOpenInFlight = false;
+    _wsRenderWorkspaceCatalog();
+  }
+}
+
+function _wsRefreshWorkspaceShell(seed = null) {
+  if (seed) _wsApplyCurrentWorkspace(seed);
+  _wsRefreshRuntimeWorkspace().catch(() => {});
+  _wsRefreshWorkspaceCatalog().catch(() => {});
+}
+
+function _wsSetCreateStatus(message = '', kind = '') {
+  const host = document.getElementById('workspace-create-status');
+  if (!host) return;
+  host.textContent = message;
+  host.dataset.kind = kind;
+  host.hidden = !message;
+}
+
+function _wsShowCreateForm() {
+  const form = document.getElementById('workspace-create-form');
+  const input = document.getElementById('workspace-create-name');
+  if (form) form.hidden = false;
+  _wsSetCreateStatus('');
+  if (input && typeof input.focus === 'function') input.focus();
+}
+
+function _wsHideCreateForm() {
+  const form = document.getElementById('workspace-create-form');
+  const input = document.getElementById('workspace-create-name');
+  if (form) form.hidden = true;
+  if (input) input.value = '';
+  _wsSetCreateStatus('');
+}
+
+function _wsCreateErrorMessage(error) {
+  if (_runtimeIsEndpointError(error)) {
+    return 'Workspace creation was not confirmed. The name remains here; reconnect will refresh known workspaces.';
+  }
+  if (error?.status === 409) {
+    const existing = error.data?.workspace?.name || error.data?.workspace?.slug || '';
+    return existing ? `Workspace already exists: ${existing}.` : 'Workspace already exists.';
+  }
+  return error?.message || 'Workspace could not be created.';
+}
+
+async function _wsCreateWorkspace() {
+  const input = document.getElementById('workspace-create-name');
+  const submit = document.getElementById('workspace-create-submit');
+  const name = String(input?.value || '').trim();
+  if (!name) {
+    _wsSetCreateStatus('Workspace name is required.', 'error');
+    return;
+  }
+  if (_wsCreateInFlight) return;
+  _wsCreateInFlight = true;
+  if (submit) submit.disabled = true;
+  _wsSetCreateStatus('Creating workspace...', 'pending');
+  try {
+    const response = await runtimeApiFetch('/api/workspaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new RuntimeHttpError(data.error || `HTTP ${response.status}`, response, data);
+    }
+    const workspace = data.workspace || {};
+    const createdName = workspace.name || name;
+    const currentName = _wsCurrentWorkspace?.name || 'current workspace';
+    if (input) input.value = '';
+    _wsSetCreateStatus(
+      `Workspace created: ${createdName}. Current workspace remains: ${currentName}.`,
+      'success'
+    );
+    await _wsRefreshWorkspaceCatalog().catch(() => {});
+  } catch (error) {
+    _wsSetCreateStatus(_wsCreateErrorMessage(error), 'error');
+  } finally {
+    _wsCreateInFlight = false;
+    if (submit) submit.disabled = false;
+  }
+}
+
 function _wsCloseMenu() {
   const d = document.getElementById('workspace-drawer');
   if (d) { d.dataset.open = '0'; d.hidden = true; }
@@ -3225,6 +4298,7 @@ function toggleWorkspaceMenu() {
   d.dataset.open = open ? '0' : '1';
   d.hidden = open;
   if (b) b.setAttribute('aria-expanded', String(!open));
+  if (open === false) _wsRefreshWorkspaceCatalog();
 }
 // Close the Workspace drawer on outside click or Escape — it is a tool drawer,
 // not a persistent navigation surface (issue: reader-first cleanup).
@@ -3355,6 +4429,8 @@ function mount(h) {
   const fn    = h.document?.filename || '';
   const title = fn.replace(/\.pdf$/i,'').replace(/[_-]/g,' ')
                   .replace(/\b\w/g, c => c.toUpperCase()) || 'Hermeneia';
+  _runtimeApplyWorkspaceDraftScope(h.runtime?.workspace, { hydrate: false });
+  _obCanUploadDocuments = !h._noDatabase;
 
   document.getElementById('root').innerHTML = `
 <header class="page-head">
@@ -3625,6 +4701,7 @@ async function e10LoadFirstRun() {
     host.innerHTML = '<div class="e10-empty" style="color:var(--red)">The server is not reachable.</div>';
     return;
   }
+  _runtimeApplyWorkspaceDraftScope(s.runtime?.workspace);
 
   const step = (n, title, body, done) => `
     <div style="display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--border)">
@@ -6988,10 +8065,12 @@ function _flnMark() {
   _flnActivity = 0;
 }
 
-function flnSetLane(lane) {
+function flnSetLane(lane, opts = {}) {
+  if (!opts.skipPersist) _flnPersistDraft();
   _flnLane = lane === 'instrument' ? 'instrument' : 'corpus';
   document.querySelectorAll('.fln-lane').forEach(b =>
     b.classList.toggle('fs-on', b.dataset.lane === _flnLane));
+  _flnApplyDraft();
 }
 
 async function _flnRender() {
@@ -7022,7 +8101,8 @@ async function _flnRender() {
     saveBtn.addEventListener('click', (e) => { e.preventDefault(); flnSave(); });
     saveBtn.dataset.bound = '1';
   }
-  flnSetLane(_flnLane);
+  _flnBindDrafts();
+  flnSetLane(_flnLane, { skipPersist: true });
   _flnLoadEntries();
 }
 
@@ -7076,21 +8156,22 @@ async function flnSave() {
   const pressing = qEl?.value.trim() || '';
   if (!understanding && !pressing) { uEl?.focus(); return; }
   const btn = document.getElementById('fln-save');
+  const draftKey = _flnDraftKey(_flnLane);
   btn?.setAttribute('disabled', 'disabled');
   try {
-    const resp = await fetch('/api/investigation-log', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    _flnPersistDraft(_flnLane);
+    await requestJSON('/api/investigation-log', {
+      method: 'POST',
+      body: {
         lane: _flnLane,
         understanding,
         pressing_questions: pressing,
         source_document_id: _crDocId || null,
         page: _crPage || null,
         governing_question: invLoad()?.thesis || '',
-      }),
+      },
     });
-    const d = await resp.json();
-    if (!resp.ok) throw new Error(d.error || 'save failed');
+    _authoredDraftClear(draftKey);
     if (uEl) uEl.value = '';
     if (qEl) qEl.value = '';
     _flnMark();
@@ -7477,6 +8558,7 @@ async function _cmpRender() {
   _cmpRenderOnboarding();
   _cmpRenderContextRows();
   _cmpRenderTranscript();
+  _cmpBindDraft();
 
   const sel = document.getElementById('cmp-provider');
   if (sel) {
@@ -7534,11 +8616,12 @@ function cmpUseResponse(index, target) {
   const field = document.getElementById(fieldId);
   const text = String(message.text || '').trim();
   if (!field || !text) return;
+  flnSetLane('corpus');
   // Bring it in as an attributed quotation, not as the reader's own words.
   const quoted = `Companion — ${_cmpAttribution(message)} said:\n"${text}"`;
   const existing = field.value;
   field.value = existing.trim() ? `${existing}\n\n${quoted}` : quoted;
-  flnSetLane('corpus');
+  if (typeof _flnPersistDraft === 'function') _flnPersistDraft();
   flnToggleTray(true);
   field.focus();
   field.setSelectionRange(field.value.length, field.value.length);
@@ -7550,13 +8633,14 @@ async function cmpAsk() {
   if (!message || _cmpBusy) return;
   _cmpTranscript.push({ role: 'user', text: message });
   _cmpBusy = true;
+  _cmpPersistDraft();
   input.value = '';
   document.getElementById('cmp-ask')?.setAttribute('disabled', 'disabled');
   _cmpRenderTranscript();
   try {
-    const resp = await fetch('/api/companion/ask', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const d = await requestJSON('/api/companion/ask', {
+      method: 'POST',
+      body: {
         provider: _cmpProvider || 'stub',
         message,
         document_id: _crDocId,
@@ -7564,12 +8648,15 @@ async function cmpAsk() {
         context_flags: _cmpFlags,
         selected_text: _cmpFlags.selected_passage ? (_crSelText || '') : '',
         governing_question_text: _cmpFlags.governing_question ? (invLoad()?.thesis || '') : '',
-      }),
+      },
     });
-    const d = await resp.json();
-    if (!resp.ok) throw new Error(d.error || 'Companion unavailable');
+    _authoredDraftClear(_cmpDraftKey());
     _cmpTranscript.push({ role: 'companion', text: d.reply, provider: d.provider, model: d.model, context_used: d.context_used });
   } catch (e) {
+    if (input && !input.value) {
+      input.value = message;
+      _cmpPersistDraft();
+    }
     _cmpTranscript.push({ role: 'companion', text: `⚠ ${e.message}`, provider: 'error', context_used: [] });
   }
   _cmpBusy = false;
@@ -9308,7 +10395,7 @@ function _crRenderPage() {
 
   // Record progress
   if (_crDocId) {
-    fetch(`/api/reader/progress`, {
+    runtimeApiFetch(`/api/reader/progress`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ document_id: _crDocId, page: _crPage }),
@@ -9755,6 +10842,7 @@ function _crHighlightSelected(focus) {
       <div id="cr-capture-msg" style="font-size:12px;margin-top:6px"></div>
     </div>`;
 
+  if (typeof _crBindNewHighlightDraft === 'function') _crBindNewHighlightDraft(selection);
   requestAnimationFrame(() => _crPlaceToolbar(tb, _crSelectionRect));
   if (focusNote) setTimeout(() => document.getElementById('cr-note-input')?.focus(), 50);
   if (focusQ)    setTimeout(() => document.getElementById('cr-q-input')?.focus(), 50);
@@ -9765,6 +10853,7 @@ function _crSetRelevance(val, btn) {
   _crRelevance = val;
   btn.closest('.cr-relevance-btns')?.querySelectorAll('.cr-rel-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  if (typeof _crStoreActiveReaderDraft === 'function') _crStoreActiveReaderDraft();
 }
 
 function _crCancelHighlight() {
@@ -9803,6 +10892,8 @@ function _crUniqueTags(tags) {
 }
 
 async function _crSaveHighlight(asCandidate) {
+  const selection = _crGetReaderSelection({ refresh: false, fallback: true });
+  const draftKey = _crNewHighlightDraftKey(selection);
   const note = document.getElementById('cr-note-input')?.value?.trim() || '';
   const question = document.getElementById('cr-q-input')?.value?.trim() || '';
   const important = !!document.getElementById('cr-important-input')?.checked;
@@ -9839,19 +10930,17 @@ async function _crSaveHighlight(asCandidate) {
   try {
     const msg = document.getElementById('cr-capture-msg');
     if (msg) { msg.textContent = 'Saving…'; msg.style.color = 'var(--dim2)'; }
-    const res = await fetch('/api/reader/highlights', {
+    _crStoreNewHighlightDraft(draftKey, selection);
+    const d = await requestJSON('/api/reader/highlights', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: payload,
     });
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.error || 'Save failed');
 
     if (asCandidate) {
-      const promote = await fetch(`/api/reader/highlights/${encodeURIComponent(d.id)}/promote`, { method: 'POST' });
-      if (!promote.ok) throw new Error((await promote.json()).error || 'Promotion failed');
+      await requestJSON(`/api/reader/highlights/${encodeURIComponent(d.id)}/promote`, { method: 'POST' });
     }
 
+    _authoredDraftClear(draftKey);
     await _crLoadHighlightList();
     _crRenderPage();
     _crRefreshTrail();
@@ -9947,6 +11036,7 @@ async function _crShowHighlightDetail(highlightId) {
     </div>`;
 
   _crRelevance = h.relevance || 'unclear';
+  if (typeof _crBindHighlightEditDraft === 'function') _crBindHighlightEditDraft(h);
   form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -9966,20 +11056,21 @@ async function _crUpdateHighlight(id) {
   ]);
   const msg = document.getElementById('cr-edit-msg');
   if (msg) { msg.textContent = 'Saving…'; msg.style.color = 'var(--dim2)'; }
+  const draftKey = _crHighlightEditDraftKey(existing || { id, source_document_id: _crDocId });
   try {
-    const res = await fetch(`/api/reader/highlights/${encodeURIComponent(id)}`, {
+    _crStoreHighlightEditDraft(draftKey, existing);
+    await requestJSON(`/api/reader/highlights/${encodeURIComponent(id)}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: {
         note_text: note,
         question_text: question,
         relevance: _crRelevance,
         tags,
         rank,
         theme_bucket: themeBucket,
-      }),
+      },
     });
-    if (!res.ok) throw new Error((await res.json()).error || 'Update failed');
+    _authoredDraftClear(draftKey);
     if (msg) { msg.textContent = '✓ Saved'; msg.style.color = 'var(--green)'; }
     await _crLoadHighlightList();
     _crRenderPage();
@@ -9993,7 +11084,7 @@ async function _crUpdateHighlight(id) {
 async function _crPromoteHighlight(id) {
   const msg = document.getElementById('cr-edit-msg');
   try {
-    await fetch(`/api/reader/highlights/${encodeURIComponent(id)}/promote`, { method: 'POST' });
+    await requestJSON(`/api/reader/highlights/${encodeURIComponent(id)}/promote`, { method: 'POST' });
     if (msg) { msg.textContent = '✓ Marked as observation candidate'; msg.style.color = 'var(--green)'; }
     await _crLoadHighlightList();
     _crRenderPage();
@@ -10007,7 +11098,7 @@ async function _crPromoteHighlight(id) {
 async function _crDismissHighlight(id) {
   if (!confirm('Dismiss this highlight? It will be hidden from the list.')) return;
   try {
-    await fetch(`/api/reader/highlights/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    await requestJSON(`/api/reader/highlights/${encodeURIComponent(id)}`, { method: 'DELETE' });
     _crCancelHighlight();
     await _crLoadHighlightList();
     _crRenderPage();
@@ -10807,17 +11898,13 @@ async function requestJSON(url, options = {}) {
     requestOptions.body = JSON.stringify(requestOptions.body || {});
   }
   try {
-    const response = await fetch(url, requestOptions);
+    const response = await runtimeApiFetch(url, requestOptions);
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    if (!response.ok) throw new RuntimeHttpError(data.error || `HTTP ${response.status}`, response, data);
     clearAppError();
     return data;
   } catch (error) {
-    showAppError(
-      error instanceof TypeError
-        ? 'Hermeneia server is unavailable. Restart the local server and reload this page.'
-        : error.message
-    );
+    showAppError(_runtimeIsEndpointError(error) ? _runtimeEndpointLostMessage() : error.message);
     throw error;
   }
 }

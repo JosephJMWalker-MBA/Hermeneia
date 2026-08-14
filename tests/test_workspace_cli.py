@@ -53,6 +53,14 @@ def test_workspace_create_errors_on_collision(tmp_path, monkeypatch):
         cmd_workspace_create("The Second Sale")
 
 
+@pytest.mark.parametrize("name", ["Gatsby", " legacy ", "CURRENT", "Default"])
+def test_workspace_create_errors_on_reserved_selector(tmp_path, monkeypatch, name):
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(SystemExit, match="workspace name is reserved"):
+        cmd_workspace_create(name)
+
+
 def test_cli_serve_resolution_rejects_global_and_command_db_together():
     with pytest.raises(
         WorkspaceLifecycleError,

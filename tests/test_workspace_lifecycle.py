@@ -14,7 +14,10 @@ import pytest
 
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.workspace import (
+    RESERVED_WORKSPACE_SELECTORS,
+    WorkspaceAlreadyExistsError,
     WorkspaceLifecycleError,
+    WorkspaceNameReservedError,
     create_workspace,
     inspect_workspace,
     list_workspaces,
@@ -93,8 +96,35 @@ def test_create_refuses_colliding_workspace_slug(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     create_workspace("The Second Sale")
 
-    with pytest.raises(WorkspaceLifecycleError, match="already exists"):
+    with pytest.raises(WorkspaceAlreadyExistsError, match="already exists"):
         create_workspace("The Second Sale")
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["Gatsby", " gAtSbY ", "legacy", "CURRENT", "Default", "../gatsby"],
+)
+def test_create_refuses_reserved_workspace_selectors(tmp_path, monkeypatch, name):
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(WorkspaceNameReservedError, match="workspace name is reserved"):
+        create_workspace(name)
+
+
+def test_traversal_like_workspace_names_cannot_escape_managed_root(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    outside = create_workspace("../../outside")
+    tmp_named = create_workspace("/tmp/foo")
+
+    assert outside.slug == "outside"
+    assert outside.root_path == Path("workspaces/outside")
+    assert outside.db_path == Path("workspaces/outside/hermeneia.db")
+    assert (tmp_path / "workspaces/outside/hermeneia.db").exists()
+    assert not (tmp_path / "outside").exists()
+    assert tmp_named.slug == "tmp-foo"
+    assert tmp_named.root_path == Path("workspaces/tmp-foo")
+    assert (tmp_path / "workspaces/tmp-foo/hermeneia.db").exists()
 
 
 def test_serve_resolution_preserves_db_default_and_rejects_ambiguity(tmp_path, monkeypatch):
@@ -116,3 +146,9 @@ def test_workspace_slug_is_stable_and_strict():
     assert slugify_workspace_name("The Second Sale") == "the-second-sale"
     with pytest.raises(WorkspaceLifecycleError):
         slugify_workspace_name("   ")
+
+
+def test_reserved_workspace_selectors_are_centralized_for_future_browser_create():
+    assert RESERVED_WORKSPACE_SELECTORS == frozenset(
+        {"gatsby", "legacy", "current", "default"}
+    )

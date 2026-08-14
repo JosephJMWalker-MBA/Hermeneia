@@ -194,4 +194,4 @@ def test_e10_ui_exposes_provider_configuration_surface():
     assert "Credential storage" in index_html
     assert "server memory" in index_html
     assert "key saved · adapter missing" in index_html
-    assert "Hermeneia server is unavailable" in index_html
+    assert "Connection to Hermeneia lost" in index_html
