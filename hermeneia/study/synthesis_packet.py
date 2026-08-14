@@ -4,6 +4,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from hermeneia.reader_span import (
+    reader_span_display_locator,
+    reader_span_raw_locator,
+)
+
 from .compiler import RANK_LABELS, classify_mark, compile_study
 
 
@@ -44,6 +49,15 @@ def _record_key(record: dict[str, Any]) -> tuple[str, str]:
         str(record.get("created_at") or ""),
         str(record.get("id") or ""),
     )
+
+
+def _source_locator_fields(source_locator: object) -> dict[str, str | None]:
+    display = reader_span_display_locator(source_locator)
+    raw_span = reader_span_raw_locator(source_locator)
+    fields = {"source_locator": display}
+    if raw_span:
+        fields["reader_span_locator"] = raw_span
+    return fields
 
 
 def _active_annotations(
@@ -93,7 +107,7 @@ def _ranked_highlights(
                 ),
                 "source_role": annotation.get("source_role") or "primary",
                 "page": annotation.get("page"),
-                "source_locator": annotation.get("source_locator"),
+                **_source_locator_fields(annotation.get("source_locator")),
                 "observation_id": annotation.get("observation_id"),
             },
             "created_at": annotation.get("created_at"),
@@ -205,7 +219,7 @@ def _unresolved_questions(
                     str(annotation.get("source_document_id") or "")
                 ),
                 "page": annotation.get("page"),
-                "source_locator": annotation.get("source_locator"),
+                **_source_locator_fields(annotation.get("source_locator")),
             },
             "created_at": annotation.get("created_at"),
         }
@@ -328,7 +342,7 @@ def _lineage(
             "document_id": document_id,
             "filename": document_names.get(str(document_id or "")),
             "page": annotation.get("page"),
-            "source_locator": _text(annotation.get("source_locator")),
+            **_source_locator_fields(annotation.get("source_locator")),
             "observation_id": annotation.get("observation_id"),
         }
         missing = [

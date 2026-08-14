@@ -46,6 +46,10 @@ def _renderer_harness() -> str:
         "_crFiniteNumber",
         "_crTextOffset",
         "_crHasAnyValue",
+        "_crHasComparableProvenance",
+        "_crSpanHasProvenance",
+        "_crBlockProvenanceWithinSpan",
+        "_crBlockMatchesSpan",
         "_crBlockMatchesSpanPoint",
         "_crSpanRangeForBlock",
         "_crPushNonOverlappingRange",
@@ -176,6 +180,120 @@ process.stdout.write(JSON.stringify({html}));
     assert result["html"].startswith("dashboard before ")
     assert ">dashboard selected</span> dashboard after" in result["html"]
     assert result["html"].count('data-highlight-id="hl-repeat"') == 1
+
+
+def test_reader_span_provenance_vetoes_stale_block_indexes() -> None:
+    script = _renderer_harness() + r"""
+const highlight = {
+  id: "hl-stale",
+  page: 12,
+  status: "saved_highlight",
+  selected_text: "old selected text",
+  source_locator: _crEncodeReaderSpanLocator({
+    valid: true,
+    page: 12,
+    start: {block_index: 1, source_locator: "page:12:block:old-1", source_locators: ["page:12:block:old-1"], extraction_ids: ["old-ext-1"], offset: 4},
+    end: {block_index: 3, source_locator: "page:12:block:old-3", source_locators: ["page:12:block:old-3"], extraction_ids: ["old-ext-3"], offset: 8},
+    blocks: [1, 2, 3].map(i => ({block_index: i, source_locator: `page:12:block:old-${i}`, source_locators: [`page:12:block:old-${i}`], extraction_ids: [`old-ext-${i}`]})),
+    source_locators: ["page:12:block:old-1", "page:12:block:old-2", "page:12:block:old-3"],
+    extraction_ids: ["old-ext-1", "old-ext-2", "old-ext-3"]
+  })
+};
+const html = _crRenderTextWithHighlights("new projection at the stale index", [highlight], [], {
+  block_index: 2,
+  page: 12,
+  source_locator: "page:12:block:new-2",
+  source_locators: ["page:12:block:new-2"],
+  extraction_ids: ["new-ext-2"]
+});
+process.stdout.write(JSON.stringify({html}));
+"""
+    result = _run_node(script)
+
+    assert result["html"] == "new projection at the stale index"
+    assert 'data-highlight-id="hl-stale"' not in result["html"]
+
+
+def test_reader_span_reordered_blocks_map_by_provenance_not_old_index() -> None:
+    script = _renderer_harness() + r"""
+const highlight = {
+  id: "hl-reordered",
+  page: 12,
+  status: "saved_highlight",
+  selected_text: "old selected text",
+  source_locator: _crEncodeReaderSpanLocator({
+    valid: true,
+    page: 12,
+    start: {block_index: 1, source_locator: "page:12:block:old-1", source_locators: ["page:12:block:old-1"], extraction_ids: ["old-ext-1"], offset: 6},
+    end: {block_index: 3, source_locator: "page:12:block:old-3", source_locators: ["page:12:block:old-3"], extraction_ids: ["old-ext-3"], offset: 9},
+    blocks: [1, 2, 3].map(i => ({block_index: i, source_locator: `page:12:block:old-${i}`, source_locators: [`page:12:block:old-${i}`], extraction_ids: [`old-ext-${i}`]})),
+    source_locators: ["page:12:block:old-1", "page:12:block:old-2", "page:12:block:old-3"],
+    extraction_ids: ["old-ext-1", "old-ext-2", "old-ext-3"]
+  })
+};
+const renderedStart = _crRenderTextWithHighlights("start selected text", [highlight], [], {
+  block_index: 8,
+  page: 12,
+  source_locator: "page:12:block:old-1",
+  source_locators: ["page:12:block:old-1"],
+  extraction_ids: ["old-ext-1"]
+});
+const renderedMiddle = _crRenderTextWithHighlights("middle selected text", [highlight], [], {
+  block_index: 9,
+  page: 12,
+  source_locator: "page:12:block:old-2",
+  source_locators: ["page:12:block:old-2"],
+  extraction_ids: ["old-ext-2"]
+});
+const renderedEnd = _crRenderTextWithHighlights("end text after", [highlight], [], {
+  block_index: 7,
+  page: 12,
+  source_locator: "page:12:block:old-3",
+  source_locators: ["page:12:block:old-3"],
+  extraction_ids: ["old-ext-3"]
+});
+process.stdout.write(JSON.stringify({renderedStart, renderedMiddle, renderedEnd}));
+"""
+    result = _run_node(script)
+
+    assert result["renderedStart"].startswith("start ")
+    assert ">selected text</span>" in result["renderedStart"]
+    assert ">middle selected text</span>" in result["renderedMiddle"]
+    assert ">end text </span>after" in result["renderedEnd"]
+
+
+def test_reader_span_fails_closed_for_projection_block_with_outside_provenance() -> None:
+    script = _renderer_harness() + r"""
+const highlight = {
+  id: "hl-mixed",
+  page: 12,
+  status: "saved_highlight",
+  selected_text: "selected",
+    source_locator: _crEncodeReaderSpanLocator({
+      valid: true,
+      page: 12,
+      start: {block_index: 1, source_locator: "page:12:block:old-1", source_locators: ["page:12:block:old-1"], extraction_ids: ["old-ext-1"], offset: 0},
+      end: {block_index: 2, source_locator: "page:12:block:old-2", source_locators: ["page:12:block:old-2"], extraction_ids: ["old-ext-2"], offset: 8},
+      blocks: [
+        {block_index: 1, source_locator: "page:12:block:old-1", source_locators: ["page:12:block:old-1"], extraction_ids: ["old-ext-1"]},
+        {block_index: 2, source_locator: "page:12:block:old-2", source_locators: ["page:12:block:old-2"], extraction_ids: ["old-ext-2"]}
+      ],
+      source_locators: ["page:12:block:old-1", "page:12:block:old-2"],
+      extraction_ids: ["old-ext-1", "old-ext-2"]
+    })
+};
+const html = _crRenderTextWithHighlights("selected plus outside material", [highlight], [], {
+  block_index: 2,
+  page: 12,
+  source_locators: ["page:12:block:old-2", "page:12:block:outside"],
+  extraction_ids: ["old-ext-2", "outside-ext"]
+});
+process.stdout.write(JSON.stringify({html}));
+"""
+    result = _run_node(script)
+
+    assert result["html"] == "selected plus outside material"
+    assert 'data-highlight-id="hl-mixed"' not in result["html"]
 
 
 def test_single_block_and_distinct_same_page_highlights_still_render() -> None:

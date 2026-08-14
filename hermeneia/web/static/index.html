@@ -10330,12 +10330,57 @@ function _crHasAnyValue(needles, haystack) {
   return _crStringList(needles).some(v => available.has(v));
 }
 
+function _crHasComparableProvenance(blockCtx, point) {
+  return _crStringList(blockCtx?.source_locators).length > 0 && _crStringList(point?.source_locators).length > 0 ||
+    _crStringList(blockCtx?.extraction_ids).length > 0 && _crStringList(point?.extraction_ids).length > 0;
+}
+
+function _crSpanHasProvenance(span) {
+  return _crStringList(span?.source_locators).length > 0 ||
+    _crStringList(span?.extraction_ids).length > 0 ||
+    _crStringList(span?.start?.source_locators).length > 0 ||
+    _crStringList(span?.start?.extraction_ids).length > 0 ||
+    _crStringList(span?.end?.source_locators).length > 0 ||
+    _crStringList(span?.end?.extraction_ids).length > 0;
+}
+
+function _crBlockProvenanceWithinSpan(span, blockCtx) {
+  const currentLocators = _crStringList(blockCtx?.source_locators);
+  const currentExtractionIds = _crStringList(blockCtx?.extraction_ids);
+  const savedLocators = new Set(_crStringList(span?.source_locators));
+  const savedExtractionIds = new Set(_crStringList(span?.extraction_ids));
+  if (currentLocators.length && savedLocators.size === 0) return false;
+  if (currentExtractionIds.length && savedExtractionIds.size === 0) return false;
+  if (currentLocators.some(locator => !savedLocators.has(locator))) return false;
+  if (currentExtractionIds.some(id => !savedExtractionIds.has(id))) return false;
+  return currentLocators.length > 0 || currentExtractionIds.length > 0;
+}
+
+function _crBlockMatchesSpan(span, blockCtx) {
+  if (_crSpanHasProvenance(span)) {
+    return _crBlockProvenanceWithinSpan(span, blockCtx) && (
+      _crHasAnyValue(span?.source_locators, blockCtx?.source_locators) ||
+      _crHasAnyValue(span?.extraction_ids, blockCtx?.extraction_ids)
+    );
+  }
+  const blockIndex = _crFiniteNumber(blockCtx?.block_index);
+  const startIndex = _crFiniteNumber(span?.start?.block_index);
+  const endIndex = _crFiniteNumber(span?.end?.block_index);
+  return blockIndex !== null && startIndex !== null && endIndex !== null &&
+    blockIndex >= Math.min(startIndex, endIndex) && blockIndex <= Math.max(startIndex, endIndex);
+}
+
 function _crBlockMatchesSpanPoint(blockCtx, point) {
+  if (_crHasComparableProvenance(blockCtx, point)) {
+    return _crHasAnyValue(point?.source_locators, blockCtx?.source_locators) ||
+      _crHasAnyValue(point?.extraction_ids, blockCtx?.extraction_ids);
+  }
+  if (_crStringList(point?.source_locators).length || _crStringList(point?.extraction_ids).length) {
+    return false;
+  }
   const blockIndex = _crFiniteNumber(blockCtx?.block_index);
   const pointIndex = _crFiniteNumber(point?.block_index);
-  if (blockIndex !== null && pointIndex !== null && blockIndex === pointIndex) return true;
-  return _crHasAnyValue(point?.source_locators, blockCtx?.source_locators) ||
-    _crHasAnyValue(point?.extraction_ids, blockCtx?.extraction_ids);
+  return blockIndex !== null && pointIndex !== null && blockIndex === pointIndex;
 }
 
 function _crSpanRangeForBlock(span, blockCtx, text) {
@@ -10344,17 +10389,7 @@ function _crSpanRangeForBlock(span, blockCtx, text) {
   const blockPage = _crFiniteNumber(blockCtx.page);
   if (spanPage !== null && blockPage !== null && spanPage !== blockPage) return null;
 
-  const blockIndex = _crFiniteNumber(blockCtx.block_index);
-  const startIndex = _crFiniteNumber(span.start?.block_index);
-  const endIndex = _crFiniteNumber(span.end?.block_index);
-  let inside = false;
-  if (blockIndex !== null && startIndex !== null && endIndex !== null) {
-    inside = blockIndex >= Math.min(startIndex, endIndex) && blockIndex <= Math.max(startIndex, endIndex);
-  } else {
-    inside = _crHasAnyValue(span.source_locators, blockCtx.source_locators) ||
-      _crHasAnyValue(span.extraction_ids, blockCtx.extraction_ids);
-  }
-  if (!inside) return null;
+  if (!_crBlockMatchesSpan(span, blockCtx)) return null;
 
   const isStart = _crBlockMatchesSpanPoint(blockCtx, span.start);
   const isEnd = _crBlockMatchesSpanPoint(blockCtx, span.end);

@@ -1,13 +1,17 @@
 """Deterministic study synthesis packet tests (Issue #47)."""
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.study import PACKET_VERSION, compile_synthesis_packet
 from hermeneia.web.app import create_app
+
+SPAN_PREFIX = "reader-span:v1:"
 
 
 def _annotation(**overrides: object) -> dict[str, object]:
@@ -31,6 +35,33 @@ def _annotation(**overrides: object) -> dict[str, object]:
     }
     annotation.update(overrides)
     return annotation
+
+
+def _span_locator() -> str:
+    payload = {
+        "page": 9,
+        "start": {
+            "block_index": 1,
+            "source_locator": "page:9:block:1",
+            "source_locators": ["page:9:block:1"],
+            "extraction_ids": ["ext-1"],
+            "offset": 4,
+        },
+        "end": {
+            "block_index": 3,
+            "source_locator": "page:9:block:3",
+            "source_locators": ["page:9:block:3"],
+            "extraction_ids": ["ext-3"],
+            "offset": 12,
+        },
+        "source_locators": [
+            "page:9:block:1",
+            "page:9:block:2",
+            "page:9:block:3",
+        ],
+        "extraction_ids": ["ext-1", "ext-2", "ext-3"],
+    }
+    return SPAN_PREFIX + quote(json.dumps(payload, separators=(",", ":")), safe="")
 
 
 def test_packet_shape_organizes_ranked_records_and_preserves_references() -> None:
@@ -224,6 +255,66 @@ def test_packet_is_deterministic_for_identical_records_and_timestamp() -> None:
     assert first == second
 
 
+def test_packet_projects_reader_span_locator_to_inspectable_source() -> None:
+    locator = _span_locator()
+    packet = compile_synthesis_packet(
+        [
+            _annotation(
+                id="mark-span",
+                rank=5,
+                question_text="How does the passage turn?",
+                source_locator=locator,
+                page=9,
+            )
+        ],
+        documents=[
+            {
+                "id": "doc-a",
+                "filename": "gatsby.pdf",
+                "file_hash": "hash-a",
+                "source_role": "primary",
+                "total_pages": 10,
+            }
+        ],
+        field_notes=[],
+        reading_progress=[],
+        compiled_at="2026-07-04T15:00:00+00:00",
+    )
+
+    source = packet["ranked_highlights"][0]["source"]
+    assert source["source_locator"] == "page:9:block:1..page:9:block:3"
+    assert source["reader_span_locator"] == locator
+    question_source = packet["unresolved_questions"][0]["source"]
+    assert question_source["source_locator"] == "page:9:block:1..page:9:block:3"
+    assert question_source["reader_span_locator"] == locator
+    lineage = packet["lineage"]["records"][0]
+    assert lineage["source"]["source_locator"] == "page:9:block:1..page:9:block:3"
+    assert lineage["source"]["reader_span_locator"] == locator
+    assert lineage["traceable"] is True
+
+
+def test_packet_leaves_legacy_source_locators_unchanged() -> None:
+    packet = compile_synthesis_packet(
+        [_annotation(id="mark-legacy", rank=5, source_locator="page:2:block:4")],
+        documents=[
+            {
+                "id": "doc-a",
+                "filename": "gatsby.pdf",
+                "file_hash": "hash-a",
+                "source_role": "primary",
+                "total_pages": 10,
+            }
+        ],
+        field_notes=[],
+        reading_progress=[],
+        compiled_at="2026-07-04T15:00:00+00:00",
+    )
+
+    source = packet["ranked_highlights"][0]["source"]
+    assert source["source_locator"] == "page:2:block:4"
+    assert "reader_span_locator" not in source
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -301,6 +392,50 @@ def test_study_compile_api_includes_packet_from_saved_records(tmp_path: Path) ->
     assert packet["provenance"]["provider_free"] is True
 
     verify = sqlite3.connect(db_path)
+    assert verify.execute("SELECT COUNT(*) FROM observations").fetchone()[0] == 0
+    assert verify.execute("SELECT COUNT(*) FROM source_extractions").fetchone()[0] == 0
+    verify.close()
+
+
+def test_study_compile_api_preserves_raw_reader_span_row(tmp_path: Path) -> None:
+    db_path = tmp_path / "synthesis_reader_span.db"
+    SQLiteStore(db_path).close()
+    doc_id = "d" * 64
+    locator = _span_locator()
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """INSERT INTO source_documents
+           (id, original_filename, file_hash, total_pages, registered_at,
+            compiler_version, source_role, excluded_from_analysis)
+           VALUES (?,?,?,?,?,?,?,?)""",
+        (doc_id, "second-sale.pdf", doc_id, 10, _now(), "test", "primary", 0),
+    )
+    conn.commit()
+    conn.close()
+
+    client = create_app(db_path=db_path).test_client()
+    assert client.post(
+        "/api/reader/highlights",
+        json={
+            "source_document_id": doc_id,
+            "selected_text": "span across blocks",
+            "source_locator": locator,
+            "page": 9,
+            "rank": 5,
+        },
+    ).status_code == 201
+
+    packet = client.get(f"/api/study/compile?document_id={doc_id}").get_json()[
+        "synthesis_packet"
+    ]
+    source = packet["ranked_highlights"][0]["source"]
+    assert source["source_locator"] == "page:9:block:1..page:9:block:3"
+    assert source["reader_span_locator"] == locator
+
+    verify = sqlite3.connect(db_path)
+    assert verify.execute(
+        "SELECT source_locator FROM reader_highlights"
+    ).fetchone()[0] == locator
     assert verify.execute("SELECT COUNT(*) FROM observations").fetchone()[0] == 0
     assert verify.execute("SELECT COUNT(*) FROM source_extractions").fetchone()[0] == 0
     verify.close()

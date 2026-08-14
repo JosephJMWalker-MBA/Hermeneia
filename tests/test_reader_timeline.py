@@ -7,13 +7,43 @@ exclusion of dismissed highlights and muted documents) and the panel UI wiring.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
+from urllib.parse import quote
 
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.web.app import create_app
 
 INDEX = Path(__file__).parent.parent / "hermeneia" / "web" / "static" / "index.html"
+SPAN_PREFIX = "reader-span:v1:"
+
+
+def _span_locator() -> str:
+    payload = {
+        "page": 2,
+        "start": {
+            "block_index": 1,
+            "source_locator": "page:2:block:1",
+            "source_locators": ["page:2:block:1"],
+            "extraction_ids": ["ext-1"],
+            "offset": 3,
+        },
+        "end": {
+            "block_index": 3,
+            "source_locator": "page:2:block:3",
+            "source_locators": ["page:2:block:3"],
+            "extraction_ids": ["ext-3"],
+            "offset": 9,
+        },
+        "source_locators": [
+            "page:2:block:1",
+            "page:2:block:2",
+            "page:2:block:3",
+        ],
+        "extraction_ids": ["ext-1", "ext-2", "ext-3"],
+    }
+    return SPAN_PREFIX + quote(json.dumps(payload, separators=(",", ":")), safe="")
 
 
 def _seed(tmp_path: Path) -> Path:
@@ -92,6 +122,29 @@ def test_timeline_carries_navigation_target(tmp_path: Path):
     assert hl["document_id"] == "a" * 64
     assert hl["document_name"] == "gatsby.pdf"
     assert hl["page"] == 2
+
+
+def test_timeline_projects_reader_span_locator_without_rewriting_row(tmp_path: Path):
+    db_path = _seed(tmp_path)
+    locator = _span_locator()
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "UPDATE reader_highlights SET source_locator = ? WHERE id = ?",
+        (locator, "hl-q"),
+    )
+    conn.commit()
+    conn.close()
+
+    entries = {e["id"]: e for e in _timeline(db_path)["entries"]}
+    hl = entries["hl-q"]
+    assert hl["source_locator"] == "page:2:block:1..page:2:block:3"
+    assert hl["reader_span_locator"] == locator
+
+    verify = sqlite3.connect(db_path)
+    assert verify.execute(
+        "SELECT source_locator FROM reader_highlights WHERE id = 'hl-q'"
+    ).fetchone()[0] == locator
+    verify.close()
 
 
 def test_timeline_excludes_muted_documents(tmp_path: Path):

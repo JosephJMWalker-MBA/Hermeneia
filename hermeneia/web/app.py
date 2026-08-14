@@ -45,6 +45,7 @@ from ..compiler.projections.interpretive_divergence import (
     interpretive_divergence_projection,
 )
 from ..storage.sqlite import SQLiteStore
+from ..reader_span import reader_span_display_locator, reader_span_raw_locator
 from ..workspace import (
     DEFAULT_LEGACY_DB,
     WorkspaceAlreadyExistsError,
@@ -110,6 +111,14 @@ def _json_list(value):
             return []
         return parsed if isinstance(parsed, list) else []
     return []
+
+
+def _reader_source_locator_fields(source_locator):
+    raw_span = reader_span_raw_locator(source_locator)
+    fields = {"source_locator": reader_span_display_locator(source_locator)}
+    if raw_span:
+        fields["reader_span_locator"] = raw_span
+    return fields
 
 
 def create_app(
@@ -6252,7 +6261,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "document_id": r["source_document_id"],
                 "document_name": r["original_filename"],
                 "page": r["page"],
-                "source_locator": r["source_locator"],
+                **_reader_source_locator_fields(r["source_locator"]),
                 "created_at": r["created_at"],
             })
         field_notes = conn.execute(
@@ -7057,6 +7066,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                 {"id": h["id"], "page": h["page"], "selected_text": (h["selected_text"] or "")[:160],
                  "note_text": h["note_text"], "question_text": h["question_text"],
                  "relevance": h["relevance"], "status": h["status"],
+                 **_reader_source_locator_fields(h["source_locator"]),
                  "source_role": h["source_role"] or "primary",
                  "is_primary_source": (h["source_role"] or "primary") == "primary",
                  "created_at": h["created_at"]}
@@ -7362,6 +7372,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                         "filename": h["original_filename"],
                         "page": h["page"],
                         "question_text": h["question_text"],
+                        **_reader_source_locator_fields(h["source_locator"]),
                         "source_role": h["source_role"] or "primary",
                         "is_primary_source": (
                             h["source_role"] or "primary"
@@ -7389,6 +7400,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                     "question_text": h["question_text"],
                     "relevance": h["relevance"],
                     "status": h["status"],
+                    **_reader_source_locator_fields(h["source_locator"]),
                     "source_role": h["source_role"] or "primary",
                     "is_primary_source": (
                         h["source_role"] or "primary"
