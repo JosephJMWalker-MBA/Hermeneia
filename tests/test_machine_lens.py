@@ -64,6 +64,10 @@ def _run_lens(text, highlights, machine_obs):
         + _extract_fn(html, "_crBlockMatchesSpanPoint")
         + _extract_fn(html, "_crSpanRangeForBlock")
         + _extract_fn(html, "_crPushNonOverlappingRange")
+        + _extract_fn(html, "_crHighlightSortKey")
+        + _extract_fn(html, "_crSortedHighlightsForSegment")
+        + _extract_fn(html, "_crHumanHighlightTitle")
+        + _extract_fn(html, "_crHumanSegmentsFromRanges")
         + _extract_fn(html, "_crRenderTextWithHighlights")
         + _extract_fn(html, "_crMachineHighlightClass")
         + "const [t,h,m]=JSON.parse(process.argv[1]);\n"

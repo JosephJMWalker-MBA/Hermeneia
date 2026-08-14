@@ -54,6 +54,10 @@ def _renderer_harness() -> str:
         "_crBlockMatchesSpanPoint",
         "_crSpanRangeForBlock",
         "_crPushNonOverlappingRange",
+        "_crHighlightSortKey",
+        "_crSortedHighlightsForSegment",
+        "_crHumanHighlightTitle",
+        "_crHumanSegmentsFromRanges",
         "_crRenderTextWithHighlights",
         "_crMachineHighlightClass",
     ]

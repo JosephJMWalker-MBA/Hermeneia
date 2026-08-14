@@ -53,9 +53,15 @@ def _run_node(script: str, payload: object | None = None) -> dict:
         "_crBlockMatchesSpanPoint",
         "_crSpanRangeForBlock",
         "_crPushNonOverlappingRange",
+        "_crHighlightSortKey",
+        "_crSortedHighlightsForSegment",
+        "_crHumanHighlightTitle",
+        "_crHumanSegmentsFromRanges",
         "_crRenderTextWithHighlights",
         "_crMachineHighlightClass",
         "_crNodeElement",
+        "_crHighlightIdsFromMark",
+        "_crShowHighlightChooser",
         "_crOpenPersistedHighlightFromEvent",
         "_crShowHighlightDetail",
         "_crUpdateHighlight",
@@ -195,7 +201,7 @@ const html = _crRenderTextWithHighlights('alpha beta gamma', _crHighlights, [], 
   source_locators: ['page:1:block:1'],
   extraction_ids: ['ext-1'],
 });
-const mark = { nodeType: Node.ELEMENT_NODE, dataset: { highlightId: 'hl-single' }, closest(sel){ return sel === '.cr-inline-highlight[data-highlight-id]' ? mark : null; } };
+const mark = { nodeType: Node.ELEMENT_NODE, dataset: { highlightId: 'hl-single' }, closest(sel){ return sel.includes('[data-highlight-id]') ? mark : null; } };
 let prevented = false;
 let stopped = false;
 _crOpenPersistedHighlightFromEvent({ target: mark, preventDefault(){ prevented = true; }, stopPropagation(){ stopped = true; } });
@@ -252,7 +258,7 @@ const htmls = blocks.map((text, idx) => _crRenderTextWithHighlights(text, _crHig
 }));
 const opened = [];
 for (let i = 0; i < 3; i += 1) {
-  const mark = { nodeType: Node.ELEMENT_NODE, dataset: { highlightId: 'hl-multi' }, closest(sel){ return sel === '.cr-inline-highlight[data-highlight-id]' ? mark : null; } };
+  const mark = { nodeType: Node.ELEMENT_NODE, dataset: { highlightId: 'hl-multi' }, closest(sel){ return sel.includes('[data-highlight-id]') ? mark : null; } };
   _crOpenPersistedHighlightFromEvent({ target: mark, preventDefault(){}, stopPropagation(){} });
   opened.push(openedPanel);
 }
@@ -332,6 +338,82 @@ def test_editing_reopened_highlight_saves_same_record_payload() -> None:
     ]
     assert result["renderPageCalls"] == 1
     assert result["refreshTrailCalls"] == 1
+
+
+def test_identical_overlapping_highlights_click_shows_durable_id_chooser() -> None:
+    result = _run_node(
+        r"""
+_crHighlights = [
+  {id: 'hl-b', page: 1, status: 'saved_highlight', selected_text: 'beta', note_text: 'Second', created_at: '2026-01-02T00:00:00Z'},
+  {id: 'hl-a', page: 1, status: 'saved_highlight', selected_text: 'beta', note_text: 'First', created_at: '2026-01-01T00:00:00Z'},
+];
+const html = _crRenderTextWithHighlights('alpha beta gamma', _crHighlights, [], {
+  block_index: 0,
+  page: 1,
+  source_locators: ['page:1:block:1'],
+  extraction_ids: ['ext-1'],
+});
+const mark = { nodeType: Node.ELEMENT_NODE, dataset: { highlightIds: 'hl-a,hl-b' }, closest(sel){ return sel.includes('[data-highlight-ids]') ? mark : null; } };
+_crOpenPersistedHighlightFromEvent({ target: mark, preventDefault(){}, stopPropagation(){} });
+process.stdout.write(JSON.stringify({html, openedPanel, form: elements['cr-sel-form'].innerHTML}));
+"""
+    )
+
+    assert 'data-highlight-ids="hl-a,hl-b"' in result["html"]
+    assert 'data-highlight-id=' not in result["html"]
+    assert result["openedPanel"] == "inspector"
+    assert "Overlapping highlights" in result["form"]
+    assert result["form"].index("hl-a") < result["form"].index("hl-b")
+    assert "First" in result["form"]
+    assert "Second" in result["form"]
+
+
+def test_partial_overlap_segments_expose_only_actual_membership() -> None:
+    result = _run_node(
+        r"""
+_crHighlights = [
+  {id: 'hl-left', page: 1, status: 'saved_highlight', selected_text: 'beta gamma', created_at: '2026-01-01T00:00:00Z'},
+  {id: 'hl-right', page: 1, status: 'saved_highlight', selected_text: 'gamma delta', created_at: '2026-01-02T00:00:00Z'},
+];
+const html = _crRenderTextWithHighlights('alpha beta gamma delta epsilon', _crHighlights, [], {
+  block_index: 0,
+  page: 1,
+  source_locators: ['page:1:block:1'],
+  extraction_ids: ['ext-1'],
+});
+process.stdout.write(JSON.stringify({html}));
+"""
+    )
+
+    html = result["html"]
+    assert 'data-highlight-id="hl-left"' in html
+    assert '>beta </span>' in html
+    assert 'data-highlight-ids="hl-left,hl-right"' in html
+    assert '>gamma</span>' in html
+    assert 'data-highlight-id="hl-right"' in html
+    assert '> delta</span>' in html
+
+
+def test_chooser_entry_opens_exact_selected_record_metadata() -> None:
+    result = _run_node(
+        r"""
+(async () => {
+  _crHighlights = [
+    {id: 'hl-a', page: 1, status: 'saved_highlight', selected_text: 'beta', note_text: 'A note', relevance: 'supports', tags: [], created_at: '2026-01-01T00:00:00Z'},
+    {id: 'hl-b', page: 1, status: 'saved_highlight', selected_text: 'beta', note_text: 'B note', relevance: 'complicates', tags: [], created_at: '2026-01-02T00:00:00Z'},
+  ];
+  await _crShowHighlightChooser(['hl-b', 'hl-a']);
+  const chooser = elements['cr-sel-form'].innerHTML;
+  await _crShowHighlightDetail('hl-b');
+  process.stdout.write(JSON.stringify({chooser, detail: elements['cr-sel-form'].innerHTML}));
+})();
+"""
+    )
+
+    assert result["chooser"].index("hl-a") < result["chooser"].index("hl-b")
+    assert "B note" in result["detail"]
+    assert "_crUpdateHighlight('hl-b')" in result["detail"]
+    assert "A note" not in result["detail"]
 
 
 def test_patch_updates_original_highlight_without_duplicate_or_canonical_mutation(tmp_path: Path) -> None:

@@ -10417,6 +10417,45 @@ function _crPushNonOverlappingRange(ranges, start, end, entry) {
   return true;
 }
 
+function _crHighlightSortKey(h) {
+  return `${String(h?.created_at || '')}\u0000${String(h?.id || '')}`;
+}
+
+function _crSortedHighlightsForSegment(highlights) {
+  return [...(highlights || [])].sort((a, b) => _crHighlightSortKey(a).localeCompare(_crHighlightSortKey(b)));
+}
+
+function _crHumanHighlightTitle(highlights) {
+  if (!highlights?.length) return '';
+  if (highlights.length === 1) {
+    const h = highlights[0];
+    const titleParts = [`p.${h.page || '?'}`];
+    if (h.relevance) titleParts.push(h.relevance);
+    if (_crHighlightTags(h).includes('important')) titleParts.push('important');
+    if (h.status === 'observation_candidate') titleParts.push('observation candidate');
+    return titleParts.join(' · ');
+  }
+  return `${highlights.length} overlapping highlights`;
+}
+
+function _crHumanSegmentsFromRanges(ranges) {
+  const points = Array.from(new Set((ranges || []).flatMap(r => [r.start, r.end])))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+  const segments = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const start = points[i];
+    const end = points[i + 1];
+    if (end <= start) continue;
+    const highlights = _crSortedHighlightsForSegment(
+      ranges.filter(r => start >= r.start && end <= r.end).map(r => r.highlight)
+    );
+    if (!highlights.length) continue;
+    segments.push({ kind: 'user', start, end, highlights });
+  }
+  return segments;
+}
+
 // Renders a block's text non-destructively from source: user highlights are
 // wrapped from saved Reader span locators, falling back to exact-substring
 // matches for legacy rows, and — when the Machine Lens is on — machine
@@ -10428,15 +10467,17 @@ function _crRenderTextWithHighlights(text, highlights, machineObs, blockCtx = {}
     h && h.status !== 'dismissed' && typeof h.selected_text === 'string' && h.selected_text.trim().length
   );
 
-  const ranges = [];
-  // User highlights first — they win any overlap with machine attention.
+  const humanRanges = [];
+  // User highlights first — collect every durable mark before segmenting so
+  // overlapping records remain reachable by ID instead of one visual range
+  // hiding another.
   active.forEach(h => {
     const isReaderSpan = _crIsReaderSpanLocator(h.source_locator);
     const span = _crDecodeReaderSpanLocator(h.source_locator);
     const spanRange = _crSpanRangeForBlock(span, blockCtx, text);
     if (isReaderSpan) {
       if (spanRange) {
-        _crPushNonOverlappingRange(ranges, spanRange.start, spanRange.end, { kind: 'user', highlight: h });
+        humanRanges.push({ start: spanRange.start, end: spanRange.end, highlight: h });
       }
       return;
     }
@@ -10444,10 +10485,12 @@ function _crRenderTextWithHighlights(text, highlights, machineObs, blockCtx = {}
     let start = text.indexOf(selected);
     while (start >= 0) {
       const end = start + selected.length;
-      if (_crPushNonOverlappingRange(ranges, start, end, { kind: 'user', highlight: h })) break;
+      humanRanges.push({ start, end, highlight: h });
+      break;
       start = text.indexOf(selected, start + 1);
     }
   });
+  const ranges = _crHumanSegmentsFromRanges(humanRanges);
   // Machine observations — only where they do not overlap a user mark.
   // Exact substring is the safe strategy; an observation whose raw_text is not
   // found verbatim in this block (normalization, cross-block spans) is simply
@@ -10474,12 +10517,14 @@ function _crRenderTextWithHighlights(text, highlights, machineObs, blockCtx = {}
       const stateLabel = { approved: 'approved', unsure: 'deferred' }[r.obs.review_status] || 'unreviewed';
       html += `<span class="${_crMachineHighlightClass(r.obs)}" data-machine-obs="${x(r.obs.id || '')}" title="Machine observation · ${stateLabel} · p.${r.obs.page || '?'}">${body}</span>`;
     } else {
-      const h = r.highlight;
-      const titleParts = [`p.${h.page || '?'}`];
-      if (h.relevance) titleParts.push(h.relevance);
-      if (_crHighlightTags(h).includes('important')) titleParts.push('important');
-      if (h.status === 'observation_candidate') titleParts.push('observation candidate');
-      html += `<span class="${_crInlineHighlightClass(h)}" data-highlight-id="${x(h.id || '')}" title="${x(titleParts.join(' · '))}">${body}</span>`;
+      const highlights = r.highlights || (r.highlight ? [r.highlight] : []);
+      const ids = highlights.map(h => String(h?.id || '')).filter(Boolean);
+      const primary = highlights[0] || {};
+      const multi = ids.length > 1;
+      const idAttrs = multi
+        ? `data-highlight-ids="${x(ids.join(','))}"`
+        : `data-highlight-id="${x(ids[0] || '')}"`;
+      html += `<span class="${_crInlineHighlightClass(primary)}" ${idAttrs} title="${x(_crHumanHighlightTitle(highlights))}">${body}</span>`;
     }
     cursor = r.end;
   });
@@ -11048,7 +11093,7 @@ function _crClearReaderSelectionState() {
 }
 
 function _crHandleSelection(e) {
-  if (_crNodeElement(e?.target)?.closest?.('.cr-inline-highlight[data-highlight-id]')) return;
+  if (_crNodeElement(e?.target)?.closest?.('.cr-inline-highlight[data-highlight-id], .cr-inline-highlight[data-highlight-ids]')) return;
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
     if (!_crCaptureOpen) _crHideToolbar();
@@ -11207,9 +11252,9 @@ function _crHighlightSelected(focus) {
 }
 
 function _crOpenPersistedHighlightFromEvent(e) {
-  const mark = _crNodeElement(e?.target)?.closest?.('.cr-inline-highlight[data-highlight-id]');
-  const highlightId = mark?.dataset?.highlightId || '';
-  if (!highlightId) return;
+  const mark = _crNodeElement(e?.target)?.closest?.('.cr-inline-highlight[data-highlight-id], .cr-inline-highlight[data-highlight-ids]');
+  const highlightIds = _crHighlightIdsFromMark(mark);
+  if (!highlightIds.length) return;
   e.preventDefault?.();
   e.stopPropagation?.();
   try { window.getSelection?.()?.removeAllRanges?.(); } catch {}
@@ -11219,7 +11264,49 @@ function _crOpenPersistedHighlightFromEvent(e) {
   _crClearReaderSelectionState();
   _crSelText = '';
   _crSelectionRect = null;
-  _crShowHighlightDetail(highlightId);
+  if (highlightIds.length === 1) _crShowHighlightDetail(highlightIds[0]);
+  else _crShowHighlightChooser(highlightIds);
+}
+
+function _crHighlightIdsFromMark(mark) {
+  if (!mark?.dataset) return [];
+  const multi = String(mark.dataset.highlightIds || '').split(',').map(id => id.trim()).filter(Boolean);
+  if (multi.length) return Array.from(new Set(multi));
+  const single = String(mark.dataset.highlightId || '').trim();
+  return single ? [single] : [];
+}
+
+async function _crShowHighlightChooser(highlightIds) {
+  const ids = Array.from(new Set((highlightIds || []).filter(Boolean)));
+  if (!ids.length) return;
+  if (_crDocId && ids.some(id => !_crHighlights.find(h => h.id === id))) {
+    await _crLoadHighlightList();
+  }
+  const candidates = _crSortedHighlightsForSegment(ids.map(id => _crHighlights.find(h => h.id === id)).filter(Boolean));
+  if (candidates.length === 1) { _crShowHighlightDetail(candidates[0].id); return; }
+  if (!candidates.length) return;
+  _dockOpenPanel('inspector');
+  cmpMarkOnboardingStep('observe', { keepPaused: true });
+  const form = document.getElementById('cr-sel-form');
+  const prompt = document.getElementById('cr-sel-prompt');
+  if (!form || !prompt) return;
+  prompt.style.display = 'none';
+  form.style.display = 'block';
+  form.innerHTML = `
+    <div style="font-size:10px;color:var(--dim2);font-family:var(--mono);margin-bottom:8px">Overlapping highlights</div>
+    <div style="font-size:12px;color:var(--dim2);line-height:1.6;margin-bottom:10px">This passage is represented by more than one durable highlight record. Choose the record to edit.</div>
+    <div class="cr-highlight-list">
+      ${candidates.map(h => `
+        <button class="cr-highlight-item" type="button" onclick="_crShowHighlightDetail('${x(h.id)}')" style="width:100%;text-align:left">
+          <div style="font-size:10px;color:var(--dim2);font-family:var(--mono);margin-bottom:4px">${x(h.id)}</div>
+          <div class="cr-highlight-quote">"${x((h.selected_text || '').slice(0, 120))}${h.selected_text?.length > 120 ? '…' : ''}"</div>
+          ${h.note_text ? `<div style="font-size:11px;color:var(--dim2);margin-top:3px;line-height:1.4">${x(h.note_text.slice(0, 80))}${h.note_text.length > 80 ? '…' : ''}</div>` : ''}
+          ${_crAnnotationMetaHtml(h)}
+        </button>
+      `).join('')}
+    </div>
+    <button style="margin-top:8px;width:100%;padding:6px;background:none;border:1px solid var(--border2);border-radius:var(--r);color:var(--dim2);cursor:pointer;font:inherit;font-size:12px" onclick="_crCancelHighlight()">← Back</button>`;
+  form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function _crSetRelevance(val, btn) {
