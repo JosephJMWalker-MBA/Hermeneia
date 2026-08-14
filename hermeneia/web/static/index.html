@@ -297,14 +297,34 @@ body.reader-active .wrap { max-width: 1180px; padding: 0 20px; }
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   color: var(--fg2); font-size: 13px;
 }
+.workspace-catalog-actions {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
 .workspace-catalog-badge {
   flex-shrink: 0; font-size: 10px; color: var(--accent);
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: 999px; padding: 2px 7px; background: var(--accent2);
 }
+.workspace-catalog-open {
+  flex-shrink: 0; cursor: pointer; font-size: 11px;
+  border: 1px solid var(--border); border-radius: var(--r);
+  color: var(--fg); background: var(--surface2); padding: 4px 8px;
+}
+.workspace-catalog-open:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.workspace-catalog-open:disabled { opacity: .55; cursor: default; }
 .workspace-catalog-empty {
   font-size: 12px; color: var(--dim2); line-height: 1.45; padding: 4px 0;
 }
+.workspace-catalog-status {
+  font-size: 12px; line-height: 1.45; color: var(--dim2);
+  padding-top: 7px;
+}
+.workspace-catalog-status[hidden] { display: none; }
+.workspace-catalog-status[data-kind="success"] { color: var(--green); }
+.workspace-catalog-status[data-kind="error"] { color: var(--red); }
 .workspace-create {
   border-top: 1px solid var(--border);
   margin-top: 10px; padding-top: 10px;
@@ -3963,6 +3983,20 @@ let _wsCurrentWorkspace = null;
 let _wsCatalog = [];
 let _wsCatalogLoading = false;
 let _wsCreateInFlight = false;
+let _wsOpenInFlight = false;
+let _wsRuntimeCapabilities = {};
+let _wsCatalogStatusMessage = '';
+let _wsCatalogStatusKind = '';
+
+function _wsApplyRuntimePayload(data) {
+  if (!data || typeof data !== 'object') return;
+  if (Object.prototype.hasOwnProperty.call(data, 'capabilities')) {
+    const capabilities = data.capabilities;
+    _wsRuntimeCapabilities = capabilities && typeof capabilities === 'object' ? capabilities : {};
+  }
+  if (data.workspace) _wsApplyCurrentWorkspace(data.workspace);
+  else _wsRenderWorkspaceCatalog();
+}
 
 function _wsApplyCurrentWorkspace(workspace) {
   if (!workspace) return;
@@ -3979,25 +4013,70 @@ function _wsApplyCurrentWorkspace(workspace) {
   _wsRenderWorkspaceCatalog();
 }
 
+function _wsRuntimeCanSwitch() {
+  return _wsRuntimeCapabilities.workspace_switch === true;
+}
+
+function _wsWorkspaceSelector(workspace) {
+  const slug = String(workspace?.slug || '').trim();
+  if (slug) return slug;
+  const id = String(workspace?.id || '').trim();
+  if (id) return id;
+  return '';
+}
+
+function _wsWorkspaceMatches(left, right) {
+  if (!left || !right) return false;
+  const leftId = String(left.id || '').trim();
+  const rightId = String(right.id || '').trim();
+  if (leftId && rightId) return leftId === rightId;
+  const leftKind = String(left.kind || '').trim().toLowerCase();
+  const rightKind = String(right.kind || '').trim().toLowerCase();
+  const leftSlug = String(left.slug || '').trim().toLowerCase();
+  const rightSlug = String(right.slug || '').trim().toLowerCase();
+  return !!leftKind && leftKind === rightKind && !!leftSlug && leftSlug === rightSlug;
+}
+
+function _wsSetCatalogStatus(message = '', kind = '') {
+  _wsCatalogStatusMessage = message;
+  _wsCatalogStatusKind = kind;
+  const host = document.getElementById('workspace-catalog-status');
+  if (!host) return;
+  host.textContent = message;
+  host.dataset.kind = kind;
+  host.hidden = !message;
+}
+
 function _wsRenderWorkspaceCatalog() {
   const host = document.getElementById('workspace-catalog');
   if (!host) return;
-  const rows = (_wsCatalog || []).map(workspace => `
-    <div class="workspace-catalog-row" aria-current="${workspace.is_active ? 'true' : 'false'}">
+  const canSwitch = _wsRuntimeCanSwitch();
+  const rows = (_wsCatalog || []).map(workspace => {
+    const isActive = workspace.is_active || _wsWorkspaceMatches(_wsCurrentWorkspace, workspace);
+    const selector = _wsWorkspaceSelector(workspace);
+    const action = isActive
+      ? '<span class="workspace-catalog-badge">Current</span>'
+      : canSwitch && selector
+        ? `<button class="workspace-catalog-open" type="button" onclick="_wsOpenWorkspace('${x(selector)}')" ${_wsOpenInFlight ? 'disabled' : ''}>Open</button>`
+        : '';
+    return `
+    <div class="workspace-catalog-row" aria-current="${isActive ? 'true' : 'false'}">
       <span class="workspace-catalog-name">${x(workspace.name || workspace.slug || 'Workspace')}</span>
-      ${workspace.is_active ? '<span class="workspace-catalog-badge">Current</span>' : ''}
+      <span class="workspace-catalog-actions">${action}</span>
     </div>
-  `).join('');
+  `;
+  }).join('');
   host.innerHTML = `
     <div class="workspace-catalog-head">Known Workspaces</div>
     ${rows || '<div class="workspace-catalog-empty">No managed workspaces found yet.</div>'}
+    <div class="workspace-catalog-status" id="workspace-catalog-status" role="status" aria-live="polite" data-kind="${x(_wsCatalogStatusKind)}" ${_wsCatalogStatusMessage ? '' : 'hidden'}>${x(_wsCatalogStatusMessage)}</div>
   `;
 }
 
 async function _wsRefreshRuntimeWorkspace(seed = null) {
   if (seed) _wsApplyCurrentWorkspace(seed);
   const data = await get('/api/runtime/workspace');
-  _wsApplyCurrentWorkspace(data.workspace);
+  _wsApplyRuntimePayload(data);
 }
 
 async function _wsRefreshWorkspaceCatalog() {
@@ -4009,6 +4088,120 @@ async function _wsRefreshWorkspaceCatalog() {
     _wsRenderWorkspaceCatalog();
   } finally {
     _wsCatalogLoading = false;
+  }
+}
+
+function _wsCurrentDraftStorageKeys() {
+  if (!_runtimeDraftWorkspaceScope) return [];
+  const prefix = `${_AUTHORED_DRAFT_PREFIX}:${encodeURIComponent(_runtimeDraftWorkspaceScope)}:`;
+  return _authoredDraftStorage((storage) => {
+    let keys = [];
+    if (typeof storage.length === 'number' && typeof storage.key === 'function') {
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (typeof key === 'string') keys.push(key);
+      }
+    } else if (storage.data && typeof storage.data === 'object') {
+      keys = Object.keys(storage.data);
+    }
+    return keys.filter(key => key.startsWith(prefix));
+  }, []);
+}
+
+function _wsDraftPayloadHasAuthoredText(payload) {
+  const fields = payload && typeof payload === 'object' ? payload.fields : null;
+  if (!fields || typeof fields !== 'object') return false;
+  return Object.values(fields).some(value => {
+    if (typeof value === 'string') return value.trim() !== '';
+    if (Array.isArray(value)) return value.length > 0;
+    return value === true;
+  });
+}
+
+function _wsDraftLabelForPayload(payload, key) {
+  const form = String(payload?.form_type || key || '');
+  if (form.includes('reader-highlight')) return 'Highlight Inspector';
+  if (form.includes('field-notes')) return 'Field Notes';
+  if (form.includes('companion')) return 'Companion';
+  return 'authored text';
+}
+
+function _wsCurrentDraftLabels() {
+  const labels = new Set();
+  _authoredDraftStorage((storage) => {
+    for (const key of _wsCurrentDraftStorageKeys()) {
+      try {
+        const payload = JSON.parse(storage.getItem(key) || 'null');
+        if (_wsDraftPayloadHasAuthoredText(payload)) labels.add(_wsDraftLabelForPayload(payload, key));
+      } catch {}
+    }
+  });
+  return Array.from(labels);
+}
+
+function _wsConfirmOpenWithDrafts(labels, targetName) {
+  if (!labels.length) return true;
+  if (typeof window === 'undefined' || typeof window.confirm !== 'function') return true;
+  const currentName = _wsCurrentWorkspace?.name || 'the current workspace';
+  const target = targetName || 'the selected workspace';
+  return window.confirm(
+    `Unsaved ${labels.join(', ')} drafts will stay with ${currentName} and will not move to ${target}. Save or clear them before switching if needed, or continue to preserve them here and open ${target}.`
+  );
+}
+
+function _wsOpenErrorMessage(error) {
+  if (_runtimeIsEndpointError(error)) {
+    return 'Workspace open was not confirmed. Current workspace remains active; reconnect will refresh backend truth.';
+  }
+  if (error?.status === 409) return error.message || 'Workspace switch already in progress.';
+  if (error?.status === 404) return error.message || 'Workspace was not found.';
+  return error?.message || 'Workspace could not be opened.';
+}
+
+async function _wsOpenWorkspace(selector) {
+  selector = String(selector || '').trim();
+  if (!selector || _wsOpenInFlight) return;
+  if (!_wsRuntimeCanSwitch()) {
+    _wsSetCatalogStatus('Workspace switching requires the supervised Hermeneia runtime.', 'error');
+    return;
+  }
+  const target = (_wsCatalog || []).find(workspace => _wsWorkspaceSelector(workspace) === selector) || null;
+  if (target && _wsWorkspaceMatches(_wsCurrentWorkspace, target)) return;
+  _runtimeFlushActiveDraftsForScope(_runtimeDraftWorkspaceScope);
+  const labels = _wsCurrentDraftLabels();
+  const targetName = target?.name || selector;
+  if (!_wsConfirmOpenWithDrafts(labels, targetName)) {
+    _wsSetCatalogStatus('Workspace open canceled. Current workspace unchanged.', '');
+    return;
+  }
+
+  _wsOpenInFlight = true;
+  _wsRenderWorkspaceCatalog();
+  _wsSetCatalogStatus(`Opening ${targetName}...`, 'pending');
+  try {
+    const response = await runtimeApiFetch(`/api/workspaces/${encodeURIComponent(selector)}/open`, {
+      method: 'POST',
+    });
+    const opened = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new RuntimeHttpError(opened.error || `HTTP ${response.status}`, response, opened);
+    }
+    const runtime = await get('/api/runtime/workspace');
+    const runtimeWorkspace = runtime.workspace || null;
+    const expectedWorkspace = opened.workspace || target;
+    if (expectedWorkspace && !_wsWorkspaceMatches(runtimeWorkspace, expectedWorkspace)) {
+      throw new Error('Workspace open was not confirmed by runtime identity.');
+    }
+    _wsApplyRuntimePayload(runtime);
+    await _wsRefreshWorkspaceCatalog().catch(() => {});
+    _wsSetCatalogStatus(`Opened ${runtimeWorkspace?.name || targetName}.`, 'success');
+  } catch (error) {
+    _wsSetCatalogStatus(_wsOpenErrorMessage(error), 'error');
+    await _wsRefreshRuntimeWorkspace().catch(() => {});
+    await _wsRefreshWorkspaceCatalog().catch(() => {});
+  } finally {
+    _wsOpenInFlight = false;
+    _wsRenderWorkspaceCatalog();
   }
 }
 
