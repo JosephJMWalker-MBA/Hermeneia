@@ -10303,9 +10303,13 @@ function _crInlineHighlightClass(h) {
   return parts.join(' ');
 }
 
+function _crIsReaderSpanLocator(sourceLocator) {
+  return String(sourceLocator || '').startsWith(_CR_READER_SPAN_LOCATOR_PREFIX);
+}
+
 function _crDecodeReaderSpanLocator(sourceLocator) {
   const raw = String(sourceLocator || '');
-  if (!raw.startsWith(_CR_READER_SPAN_LOCATOR_PREFIX)) return null;
+  if (!_crIsReaderSpanLocator(raw)) return null;
   try {
     const span = JSON.parse(decodeURIComponent(raw.slice(_CR_READER_SPAN_LOCATOR_PREFIX.length)));
     return span && typeof span === 'object' ? span : null;
@@ -10363,11 +10367,7 @@ function _crBlockMatchesSpan(span, blockCtx) {
       _crHasAnyValue(span?.extraction_ids, blockCtx?.extraction_ids)
     );
   }
-  const blockIndex = _crFiniteNumber(blockCtx?.block_index);
-  const startIndex = _crFiniteNumber(span?.start?.block_index);
-  const endIndex = _crFiniteNumber(span?.end?.block_index);
-  return blockIndex !== null && startIndex !== null && endIndex !== null &&
-    blockIndex >= Math.min(startIndex, endIndex) && blockIndex <= Math.max(startIndex, endIndex);
+  return false;
 }
 
 function _crBlockMatchesSpanPoint(blockCtx, point) {
@@ -10429,9 +10429,10 @@ function _crRenderTextWithHighlights(text, highlights, machineObs, blockCtx = {}
   const ranges = [];
   // User highlights first — they win any overlap with machine attention.
   active.forEach(h => {
+    const isReaderSpan = _crIsReaderSpanLocator(h.source_locator);
     const span = _crDecodeReaderSpanLocator(h.source_locator);
     const spanRange = _crSpanRangeForBlock(span, blockCtx, text);
-    if (span) {
+    if (isReaderSpan) {
       if (spanRange) {
         _crPushNonOverlappingRange(ranges, spanRange.start, spanRange.end, { kind: 'user', highlight: h });
       }

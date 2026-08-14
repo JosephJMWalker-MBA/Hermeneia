@@ -41,6 +41,7 @@ def _renderer_harness() -> str:
         "_crReaderBlockContext",
         "_crReaderSpanPoint",
         "_crEncodeReaderSpanLocator",
+        "_crIsReaderSpanLocator",
         "_crDecodeReaderSpanLocator",
         "_crInlineHighlightClass",
         "_crFiniteNumber",
@@ -294,6 +295,59 @@ process.stdout.write(JSON.stringify({html}));
 
     assert result["html"] == "selected plus outside material"
     assert 'data-highlight-id="hl-mixed"' not in result["html"]
+
+
+def test_malformed_reader_span_locator_does_not_substring_highlight() -> None:
+    script = _renderer_harness() + r"""
+const html = _crRenderTextWithHighlights("alpha beta gamma", [
+  {
+    id: "hl-bad-v1",
+    page: 1,
+    status: "saved_highlight",
+    selected_text: "beta",
+    source_locator: "reader-span:v1:%7Bnot-json"
+  }
+], [], {
+  block_index: 0,
+  page: 1,
+  source_locators: ["page:1:block:1"],
+  extraction_ids: ["ext-1"]
+});
+process.stdout.write(JSON.stringify({html}));
+"""
+    result = _run_node(script)
+
+    assert result["html"] == "alpha beta gamma"
+    assert 'data-highlight-id="hl-bad-v1"' not in result["html"]
+
+
+def test_reader_span_without_usable_provenance_cannot_paint_by_block_index() -> None:
+    script = _renderer_harness() + r"""
+const locator = "reader-span:v1:" + encodeURIComponent(JSON.stringify({
+  page: 1,
+  start: {block_index: 0, offset: 6},
+  end: {block_index: 0, offset: 10}
+}));
+const html = _crRenderTextWithHighlights("alpha beta gamma", [
+  {
+    id: "hl-index-only",
+    page: 1,
+    status: "saved_highlight",
+    selected_text: "beta",
+    source_locator: locator
+  }
+], [], {
+  block_index: 0,
+  page: 1,
+  source_locators: ["page:1:block:1"],
+  extraction_ids: ["ext-1"]
+});
+process.stdout.write(JSON.stringify({html}));
+"""
+    result = _run_node(script)
+
+    assert result["html"] == "alpha beta gamma"
+    assert 'data-highlight-id="hl-index-only"' not in result["html"]
 
 
 def test_single_block_and_distinct_same_page_highlights_still_render() -> None:

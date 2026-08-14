@@ -52,6 +52,7 @@ def _run_lens(text, highlights, machine_obs):
         + _extract_fn(html, "_crStringList")
         + _extract_fn(html, "_crUniqueStringList")
         + _extract_fn(html, "_crInlineHighlightClass")
+        + _extract_fn(html, "_crIsReaderSpanLocator")
         + _extract_fn(html, "_crDecodeReaderSpanLocator")
         + _extract_fn(html, "_crFiniteNumber")
         + _extract_fn(html, "_crTextOffset")
