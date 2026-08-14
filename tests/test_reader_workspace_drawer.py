@@ -69,7 +69,7 @@ def test_workspace_drawer_includes_expected_pipeline_entries():
         assert label in index, label
 
 
-def test_workspace_drawer_includes_read_only_catalog_without_switching():
+def test_workspace_drawer_catalog_opens_only_through_supervised_runtime():
     index = _index()
     assert 'id="workspace-catalog"' in index
     assert 'id="workspace-create-form"' in index
@@ -80,9 +80,13 @@ def test_workspace_drawer_includes_read_only_catalog_without_switching():
     assert "/api/runtime/workspace" in index
     assert "/api/workspaces" in index
     assert "workspace-catalog-badge" in index
+    assert "workspace-catalog-open" in index
+    assert "_wsOpenWorkspace" in index
+    assert "_wsRuntimeCanSwitch" in index
+    assert "Workspace switching requires the supervised Hermeneia runtime." in index
+    assert "/api/workspaces/${encodeURIComponent(selector)}/open" in index
     assert "Switch workspace" not in index
     assert "_wsSwitch" not in index
-    assert "_wsOpenWorkspace" not in index
 
 
 def test_workspace_create_flow_does_not_reframe_current_upload_or_navigation():

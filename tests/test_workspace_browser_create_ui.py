@@ -37,9 +37,22 @@ def _extract_function(source: str, signature: str) -> str:
 def _workspace_create_js() -> str:
     source = _index()
     signatures = [
+        "function _wsApplyRuntimePayload(",
         "function _wsApplyCurrentWorkspace(",
+        "function _wsRuntimeCanSwitch(",
+        "function _wsWorkspaceSelector(",
+        "function _wsWorkspaceMatches(",
+        "function _wsSetCatalogStatus(",
         "function _wsRenderWorkspaceCatalog(",
         "async function _wsRefreshWorkspaceCatalog(",
+        "function _wsCurrentDraftStorageKeys(",
+        "function _wsDraftPayloadHasAuthoredText(",
+        "function _wsDraftLabelForPayload(",
+        "function _wsCurrentDraftLabels(",
+        "function _wsConfirmOpenWithDrafts(",
+        "function _wsOpenErrorMessage(",
+        "async function _wsOpenWorkspace(",
+        "async function _wsRefreshRuntimeWorkspace(",
         "function _wsSetCreateStatus(",
         "function _wsShowCreateForm(",
         "function _wsHideCreateForm(",
@@ -66,17 +79,31 @@ def _node_base() -> str:
         getAttribute(k) {{ return this.attrs[k]; }},
       }};
     }}
+    const localStorage={{
+      data:{{}},
+      get length(){{ return Object.keys(this.data).length; }},
+      key(i){{ return Object.keys(this.data)[i] || null; }},
+      getItem(k){{ return Object.prototype.hasOwnProperty.call(this.data,k)?this.data[k]:null; }},
+      setItem(k,v){{ this.data[k]=String(v); }},
+      removeItem(k){{ delete this.data[k]; }},
+    }};
     const elements = {{
       'workspace-create-form': makeElement(true),
       'workspace-create-name': makeElement(false),
       'workspace-create-status': makeElement(true),
       'workspace-create-submit': makeElement(false),
       'workspace-catalog': makeElement(false),
+      'workspace-catalog-status': makeElement(true),
       'runtime-workspace-chip': makeElement(true),
       'runtime-workspace-name': makeElement(false),
     }};
     const document = {{
+      body: {{ dataset: {{}} }},
       getElementById(id) {{ return elements[id] || null; }},
+    }};
+    const window = {{
+      confirms: [],
+      confirm(message) {{ this.confirms.push(message); return true; }},
     }};
     function x(value) {{
       return String(value ?? '').replace(/[&<>"']/g, (ch) => ({{
@@ -103,17 +130,33 @@ def _node_base() -> str:
     function _runtimeIsEndpointError(error) {{
       return !!error?.endpointUnreachable || error instanceof RuntimeEndpointError;
     }}
+    const _AUTHORED_DRAFT_PREFIX = 'hermeneia:draft:v2';
     let draftScope = 'managed:ws-a';
+    let _runtimeDraftWorkspaceScope = 'managed:ws-a';
     let draftScopeApplyCalls = 0;
+    let flushCalls = [];
     function _runtimeApplyWorkspaceDraftScope(workspace) {{
       draftScopeApplyCalls += 1;
-      if (workspace?.runtime_scope) draftScope = workspace.runtime_scope;
+      if (workspace?.runtime_scope) {{
+        draftScope = workspace.runtime_scope;
+        _runtimeDraftWorkspaceScope = workspace.runtime_scope;
+      }}
       return true;
+    }}
+    function _runtimeFlushActiveDraftsForScope(scope) {{
+      flushCalls.push(scope);
+    }}
+    function _authoredDraftStorage(fn, fallback = null) {{
+      try {{ return fn(localStorage); }} catch {{ return fallback; }}
     }}
     let _wsCurrentWorkspace = null;
     let _wsCatalog = [];
     let _wsCatalogLoading = false;
     let _wsCreateInFlight = false;
+    let _wsOpenInFlight = false;
+    let _wsRuntimeCapabilities = {{}};
+    let _wsCatalogStatusMessage = '';
+    let _wsCatalogStatusKind = '';
     let runtimeApiFetch;
     let get;
     {_workspace_create_js()}
@@ -290,3 +333,210 @@ def test_workspace_create_duplicate_error_is_clear_and_retains_name():
     assert out["gets"] == 0
     assert out["retained"] == "Research Notes"
     assert out["status"] == "Workspace already exists: Research Notes."
+
+
+def test_workspace_catalog_open_action_requires_supervised_runtime_capability():
+    out = _run_node(
+        """
+        const current = {
+          id: 'ws-a',
+          name: 'The Second Sale',
+          slug: 'the-second-sale',
+          kind: 'managed',
+          runtime_scope: 'managed:ws-a',
+        };
+        _wsCatalog = [
+          { id:'ws-a', name:'The Second Sale', slug:'the-second-sale', kind:'managed', is_active:true },
+          { id:'ws-b', name:'Research Notes', slug:'research-notes', kind:'managed', is_active:false },
+        ];
+        _wsApplyRuntimePayload({ workspace: current, capabilities: { workspace_switch: false } });
+        const directHtml = elements['workspace-catalog'].innerHTML;
+        _wsApplyRuntimePayload({ workspace: current, capabilities: { workspace_switch: true } });
+        const supervisedHtml = elements['workspace-catalog'].innerHTML;
+        console.log(JSON.stringify({
+          directHasOpen: directHtml.includes('workspace-catalog-open'),
+          supervisedHasOpen: supervisedHtml.includes('workspace-catalog-open'),
+          supervisedHasCurrent: supervisedHtml.includes('Current'),
+        }));
+        """
+    )
+
+    assert out == {
+        "directHasOpen": False,
+        "supervisedHasOpen": True,
+        "supervisedHasCurrent": True,
+    }
+
+
+def test_workspace_open_success_waits_for_runtime_truth_before_applying_identity():
+    out = _run_node(
+        """
+        (async () => {
+          const current = {
+            id: 'ws-a',
+            name: 'The Second Sale',
+            slug: 'the-second-sale',
+            kind: 'managed',
+            runtime_scope: 'managed:ws-a',
+          };
+          const target = {
+            id: 'ws-b',
+            name: 'Research Notes',
+            slug: 'research-notes',
+            kind: 'managed',
+            runtime_scope: 'managed:ws-b',
+          };
+          const posts = [];
+          const gets = [];
+          _wsCatalog = [
+            { id:'ws-a', name:'The Second Sale', slug:'the-second-sale', kind:'managed', is_active:true },
+            { id:'ws-b', name:'Research Notes', slug:'research-notes', kind:'managed', is_active:false },
+          ];
+          _wsApplyRuntimePayload({ workspace: current, capabilities: { workspace_switch: true } });
+          runtimeApiFetch = async (url, options) => {
+            posts.push({ url, method: options.method });
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({ changed: true, workspace: target }),
+            };
+          };
+          get = async (url) => {
+            gets.push(url);
+            if (url === '/api/runtime/workspace') {
+              return { workspace: target, capabilities: { workspace_switch: true } };
+            }
+            return {
+              workspaces: [
+                { id:'ws-a', name:'The Second Sale', slug:'the-second-sale', kind:'managed', is_active:false },
+                { id:'ws-b', name:'Research Notes', slug:'research-notes', kind:'managed', is_active:true },
+              ],
+            };
+          };
+          await _wsOpenWorkspace('research-notes');
+          console.log(JSON.stringify({
+            post: posts[0],
+            gets,
+            currentSlug: _wsCurrentWorkspace.slug,
+            chip: elements['runtime-workspace-name'].textContent,
+            draftScope,
+            status: _wsCatalogStatusMessage,
+          }));
+        })();
+        """
+    )
+
+    assert out["post"] == {
+        "url": "/api/workspaces/research-notes/open",
+        "method": "POST",
+    }
+    assert out["gets"] == ["/api/runtime/workspace", "/api/workspaces"]
+    assert out["currentSlug"] == "research-notes"
+    assert out["chip"] == "Research Notes"
+    assert out["draftScope"] == "managed:ws-b"
+    assert out["status"] == "Opened Research Notes."
+
+
+def test_workspace_open_failed_candidate_keeps_old_workspace_active():
+    out = _run_node(
+        """
+        (async () => {
+          const current = {
+            id: 'ws-a',
+            name: 'The Second Sale',
+            slug: 'the-second-sale',
+            kind: 'managed',
+            runtime_scope: 'managed:ws-a',
+          };
+          _wsCatalog = [
+            { id:'ws-a', name:'The Second Sale', slug:'the-second-sale', kind:'managed', is_active:true },
+            { id:'ws-b', name:'Research Notes', slug:'research-notes', kind:'managed', is_active:false },
+          ];
+          _wsApplyRuntimePayload({ workspace: current, capabilities: { workspace_switch: true } });
+          runtimeApiFetch = async () => ({
+            ok: false,
+            status: 502,
+            json: async () => ({ error: 'candidate failed to start' }),
+          });
+          get = async (url) => {
+            if (url === '/api/runtime/workspace') {
+              return { workspace: current, capabilities: { workspace_switch: true } };
+            }
+            return {
+              workspaces: [
+                { id:'ws-a', name:'The Second Sale', slug:'the-second-sale', kind:'managed', is_active:true },
+                { id:'ws-b', name:'Research Notes', slug:'research-notes', kind:'managed', is_active:false },
+              ],
+            };
+          };
+          await _wsOpenWorkspace('research-notes');
+          console.log(JSON.stringify({
+            currentSlug: _wsCurrentWorkspace.slug,
+            chip: elements['runtime-workspace-name'].textContent,
+            draftScope,
+            status: _wsCatalogStatusMessage,
+          }));
+        })();
+        """
+    )
+
+    assert out["currentSlug"] == "the-second-sale"
+    assert out["chip"] == "The Second Sale"
+    assert out["draftScope"] == "managed:ws-a"
+    assert "candidate failed to start" in out["status"]
+
+
+def test_workspace_open_refuses_to_claim_switch_until_runtime_identity_matches():
+    out = _run_node(
+        """
+        (async () => {
+          const current = {
+            id: 'ws-a',
+            name: 'The Second Sale',
+            slug: 'the-second-sale',
+            kind: 'managed',
+            runtime_scope: 'managed:ws-a',
+          };
+          const target = {
+            id: 'ws-b',
+            name: 'Research Notes',
+            slug: 'research-notes',
+            kind: 'managed',
+            runtime_scope: 'managed:ws-b',
+          };
+          _wsCatalog = [
+            { id:'ws-a', name:'The Second Sale', slug:'the-second-sale', kind:'managed', is_active:true },
+            { id:'ws-b', name:'Research Notes', slug:'research-notes', kind:'managed', is_active:false },
+          ];
+          _wsApplyRuntimePayload({ workspace: current, capabilities: { workspace_switch: true } });
+          runtimeApiFetch = async () => ({
+            ok: true,
+            status: 200,
+            json: async () => ({ changed: true, workspace: target }),
+          });
+          get = async (url) => {
+            if (url === '/api/runtime/workspace') {
+              return { workspace: current, capabilities: { workspace_switch: true } };
+            }
+            return {
+              workspaces: [
+                { id:'ws-a', name:'The Second Sale', slug:'the-second-sale', kind:'managed', is_active:true },
+                { id:'ws-b', name:'Research Notes', slug:'research-notes', kind:'managed', is_active:false },
+              ],
+            };
+          };
+          await _wsOpenWorkspace('research-notes');
+          console.log(JSON.stringify({
+            currentSlug: _wsCurrentWorkspace.slug,
+            chip: elements['runtime-workspace-name'].textContent,
+            draftScope,
+            status: _wsCatalogStatusMessage,
+          }));
+        })();
+        """
+    )
+
+    assert out["currentSlug"] == "the-second-sale"
+    assert out["chip"] == "The Second Sale"
+    assert out["draftScope"] == "managed:ws-a"
+    assert out["status"] == "Workspace open was not confirmed by runtime identity."

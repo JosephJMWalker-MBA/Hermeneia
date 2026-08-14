@@ -47,6 +47,15 @@ def _draft_region() -> str:
     )
 
 
+def _workspace_drawer_region() -> str:
+    html = _index()
+    return _extract_region(
+        html,
+        "// ── Workspace drawer",
+        "function _wsCloseMenu(",
+    )
+
+
 def _node_base() -> str:
     html = _index()
     return (
@@ -311,3 +320,104 @@ process.stdout.write(JSON.stringify(afterAck));
     assert result["aPresent"] is True
     assert result["bPresent"] is False
     assert len(result["keys"]) == 1
+
+
+def test_workspace_open_flushes_old_drafts_and_hydrates_target_drafts() -> None:
+    result = _run_node(
+        r"""
+let get;
+elements['workspace-catalog']=makeInput('');
+elements['workspace-catalog-status']=makeInput('');
+elements['runtime-workspace-chip']=makeInput('');
+elements['runtime-workspace-name']=makeInput('');
+window.confirms=[];
+window.confirm=function(message){ this.confirms.push(message); return true; };
+"""
+        + _workspace_drawer_region()
+        + r"""
+        (async () => {
+const current = {
+  id:'ws-a',
+  name:'The Second Sale',
+  slug:'the-second-sale',
+  kind:'managed',
+  runtime_scope:'managed:ws-a',
+  draft_migration_scope:'olda',
+};
+const target = {
+  id:'ws-b',
+  name:'Research Notes',
+  slug:'research-notes',
+  kind:'managed',
+  runtime_scope:'managed:ws-b',
+  draft_migration_scope:'oldb',
+};
+_wsCatalog = [
+  {id:'ws-a',name:'The Second Sale',slug:'the-second-sale',kind:'managed',is_active:true},
+  {id:'ws-b',name:'Research Notes',slug:'research-notes',kind:'managed',is_active:false},
+];
+
+_runtimeApplyWorkspaceDraftScope(target);
+elements['fln-understanding'].value='target field note';
+elements['fln-questions'].value='';
+_flnPersistDraft('corpus');
+elements['cmp-input'].value='target companion draft';
+_cmpPersistDraft();
+const targetFieldKey = _flnDraftKey('corpus');
+const targetCompanionKey = _cmpDraftKey();
+
+_runtimeApplyWorkspaceDraftScope(current);
+elements['fln-understanding'].value='current field note before switch';
+elements['fln-questions'].value='';
+elements['cmp-input'].value='current companion before switch';
+_wsApplyRuntimePayload({workspace:current,capabilities:{workspace_switch:true}});
+const currentFieldKey = _flnDraftKey('corpus');
+const currentCompanionKey = _cmpDraftKey();
+
+runtimeApiFetch = async (url, options) => ({
+  ok:true,
+  status:200,
+  json:async () => ({changed:true,workspace:target}),
+});
+get = async (url) => {
+  if (url === '/api/runtime/workspace') {
+    return {workspace:target,capabilities:{workspace_switch:true}};
+  }
+  return {workspaces:[
+    {id:'ws-a',name:'The Second Sale',slug:'the-second-sale',kind:'managed',is_active:false},
+    {id:'ws-b',name:'Research Notes',slug:'research-notes',kind:'managed',is_active:true},
+  ]};
+};
+
+await _wsOpenWorkspace('research-notes');
+const currentField = JSON.parse(localStorage.getItem(currentFieldKey));
+const currentCompanion = JSON.parse(localStorage.getItem(currentCompanionKey));
+const targetField = JSON.parse(localStorage.getItem(targetFieldKey));
+const targetCompanion = JSON.parse(localStorage.getItem(targetCompanionKey));
+process.stdout.write(JSON.stringify({
+  currentSlug:_wsCurrentWorkspace.slug,
+  visibleField:elements['fln-understanding'].value,
+  visibleCompanion:elements['cmp-input'].value,
+  currentField:currentField.fields.understanding,
+  currentCompanion:currentCompanion.fields.message,
+  targetField:targetField.fields.understanding,
+  targetCompanion:targetCompanion.fields.message,
+  confirmCount:window.confirms.length,
+  confirmMessage:window.confirms[0],
+  status:_wsCatalogStatusMessage,
+}));
+        })();
+"""
+    )
+
+    assert result["currentSlug"] == "research-notes"
+    assert result["visibleField"] == "target field note"
+    assert result["visibleCompanion"] == "target companion draft"
+    assert result["currentField"] == "current field note before switch"
+    assert result["currentCompanion"] == "current companion before switch"
+    assert result["targetField"] == "target field note"
+    assert result["targetCompanion"] == "target companion draft"
+    assert result["confirmCount"] == 1
+    assert "Field Notes" in result["confirmMessage"]
+    assert "Companion" in result["confirmMessage"]
+    assert result["status"] == "Opened Research Notes."
