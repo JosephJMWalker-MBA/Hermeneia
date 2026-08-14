@@ -7976,6 +7976,7 @@ let _crSelRange = null;   // cloned Range of the pending selection
 let _crConcept = '';      // concept name when capturing via the Concept action
 let _crCaptureOpen = false;
 let _crSelectionRect = null;
+let _crReaderSelectionState = null;
 
 // The passage being captured stays visibly marked while the inspector
 // form is open — the selection is never lost mid-thought. Uses the CSS
@@ -10661,6 +10662,7 @@ function _crCaptureBlock(blockIndex) {
   _crHideToolbar(true);
   _crClearPending();
   _crSelText = text;
+  _crReaderSelectionState = _crCreateBlockReaderSelection(block, textEl, text);
   _crSelRange = null;
   _crSelectionRect = textEl.getBoundingClientRect();
   _crShowToolbar(_crSelectionRect);
@@ -10688,6 +10690,141 @@ function _crCleanSelectionText(text) {
   return (text || '').trim();
 }
 
+function _crReaderBlockInfo(el) {
+  const block = _crNodeElement(el)?.closest?.('.cr-text-block');
+  if (!block) return null;
+  const index = Number(block.dataset?.crBlock);
+  const ex = Number.isFinite(index) ? (_crCurrentExtractions || [])[index] : null;
+  return {
+    block_index: Number.isFinite(index) ? index : null,
+    source_locator: block.dataset?.crLocator || ex?.source_locator || '',
+    extraction_id: ex?.id || ex?.source_extraction_id || '',
+    page: _crPage || null,
+    source_document_id: _crDocId || '',
+    element: block,
+  };
+}
+
+function _crSelectionBlockInfos(startInfo, endInfo) {
+  if (!startInfo || !endInfo) return [];
+  const start = Number(startInfo.block_index);
+  const end = Number(endInfo.block_index);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return [startInfo, endInfo].filter(Boolean);
+  const low = Math.min(start, end);
+  const high = Math.max(start, end);
+  const infos = [];
+  for (let i = low; i <= high; i++) {
+    const block = document.querySelector(`[data-cr-block="${i}"]`);
+    const info = _crReaderBlockInfo(block);
+    if (info) infos.push(info);
+  }
+  return infos;
+}
+
+function _crSourceTextFromSelectionFragment(range) {
+  let fragment = null;
+  try { fragment = range?.cloneContents?.() || null; } catch {}
+  const nodes = Array.from(fragment?.querySelectorAll?.('.cr-page-text') || []);
+  if (!nodes.length) return '';
+  return _crCleanSelectionText(nodes.map(node => node.textContent || '').join('\n\n'));
+}
+
+function _crReaderSourceSelectionText(sel, range) {
+  const sourceText = _crSourceTextFromSelectionFragment(range);
+  if (sourceText) return sourceText;
+  const startText = _crNodeElement(range?.startContainer)?.closest?.('.cr-page-text');
+  const endText = _crNodeElement(range?.endContainer)?.closest?.('.cr-page-text');
+  if (startText && startText === endText) return _crCleanSelectionText(sel?.toString?.() || range?.toString?.() || '');
+  return '';
+}
+
+function _crUsableRect(rect) {
+  return rect && Number.isFinite(rect.left) && Number.isFinite(rect.top) &&
+    Number.isFinite(rect.bottom) && Number.isFinite(rect.right);
+}
+
+function _crRangeRect(range, fallbackEl) {
+  try {
+    const rect = range?.getBoundingClientRect?.();
+    if (_crUsableRect(rect) && (rect.width || rect.height || rect.bottom !== rect.top)) return rect;
+    const rects = Array.from(range?.getClientRects?.() || []);
+    const first = rects.find(_crUsableRect);
+    if (first) return first;
+  } catch {}
+  return fallbackEl?.getBoundingClientRect?.() || null;
+}
+
+function _crCreateReaderSelectionFromRange(sel, range) {
+  if (!range || !_crSelectionInsideReader(range)) return null;
+  const text = _crReaderSourceSelectionText(sel, range);
+  if (!text) return null;
+  const startInfo = _crReaderBlockInfo(range.startContainer);
+  const endInfo = _crReaderBlockInfo(range.endContainer);
+  const blocks = _crSelectionBlockInfos(startInfo, endInfo);
+  return {
+    valid: true,
+    text,
+    range: range.cloneRange?.() || null,
+    rect: _crRangeRect(range, startInfo?.element || endInfo?.element),
+    page: _crPage || null,
+    source_document_id: _crDocId || '',
+    start: startInfo,
+    end: endInfo,
+    blocks,
+    source_locators: blocks.map(b => b.source_locator).filter(Boolean),
+    extraction_ids: blocks.map(b => b.extraction_id).filter(Boolean),
+  };
+}
+
+function _crCreateBlockReaderSelection(block, textEl, text) {
+  const info = _crReaderBlockInfo(block);
+  return {
+    valid: true,
+    text,
+    range: null,
+    rect: textEl?.getBoundingClientRect?.() || block?.getBoundingClientRect?.() || null,
+    page: _crPage || null,
+    source_document_id: _crDocId || '',
+    start: info,
+    end: info,
+    blocks: info ? [info] : [],
+    source_locators: info?.source_locator ? [info.source_locator] : [],
+    extraction_ids: info?.extraction_id ? [info.extraction_id] : [],
+  };
+}
+
+function _crGetReaderSelection(opts = {}) {
+  const refresh = opts.refresh !== false;
+  if (refresh) {
+    const sel = window.getSelection?.();
+    if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+      const selection = _crCreateReaderSelectionFromRange(sel, sel.getRangeAt(0));
+      if (selection?.valid && selection.text) {
+        _crReaderSelectionState = selection;
+        _crSelText = selection.text;
+        _crSelRange = selection.range;
+        _crSelectionRect = selection.rect;
+        return selection;
+      }
+    }
+  }
+  return opts.fallback === false ? null : _crReaderSelectionState;
+}
+
+function _crEncodeReaderSpanLocator(selection = null) {
+  const source = selection || _crReaderSelectionState;
+  const locators = Array.from(new Set((source?.source_locators || []).filter(Boolean)));
+  if (locators.length) return locators.join('..');
+  const blocks = (source?.blocks || []).map(b => b?.block_index).filter(n => Number.isFinite(Number(n)));
+  if (blocks.length) return `page:${source?.page || _crPage || ''}:block:${blocks[0]}${blocks.length > 1 ? `..${blocks[blocks.length - 1]}` : ''}`;
+  return '';
+}
+
+function _crClearReaderSelectionState() {
+  _crReaderSelectionState = null;
+  _crSelRange = null;
+}
+
 function _crHandleSelection(e) {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
@@ -10695,18 +10832,15 @@ function _crHandleSelection(e) {
     return;
   }
   const range = sel.getRangeAt(0);
-  if (!_crSelectionInsideReader(range)) {
+  const selection = _crCreateReaderSelectionFromRange(sel, range);
+  if (!selection || selection.text.length < 3) {
     if (!_crCaptureOpen) _crHideToolbar();
     return;
   }
-  const text = _crCleanSelectionText(sel.toString());
-  if (!text || text.length < 3) {
-    if (!_crCaptureOpen) _crHideToolbar();
-    return;
-  }
-  _crSelText = text;
-  _crSelRange = range.cloneRange();
-  _crSelectionRect = range.getBoundingClientRect();
+  _crReaderSelectionState = selection;
+  _crSelText = selection.text;
+  _crSelRange = selection.range;
+  _crSelectionRect = selection.rect;
   _crShowToolbar(_crSelectionRect, e?.clientX, e?.clientY);
 }
 
@@ -10760,8 +10894,8 @@ function _crHideToolbar(force = false) {
 }
 
 function _crHighlightSelected(focus) {
-  const sel = window.getSelection();
-  const text = _crSelText || _crCleanSelectionText(sel?.toString());
+  const selection = _crGetReaderSelection({ refresh: !_crSelText, fallback: true });
+  const text = selection?.text || _crSelText;
   if (!text) return;
   _dockOpenPanel('inspector');
   _crSelText = text;
@@ -10860,6 +10994,7 @@ function _crCancelHighlight() {
   _crCaptureOpen = false;
   _crHideToolbar(true);
   _crClearPending();
+  _crClearReaderSelectionState();
   _crSelText = '';
   _crConcept = '';
   _crRelevance = 'unclear';
@@ -10894,6 +11029,7 @@ function _crUniqueTags(tags) {
 async function _crSaveHighlight(asCandidate) {
   const selection = _crGetReaderSelection({ refresh: false, fallback: true });
   const draftKey = _crNewHighlightDraftKey(selection);
+  const selectedText = selection?.text || _crSelText;
   const note = document.getElementById('cr-note-input')?.value?.trim() || '';
   const question = document.getElementById('cr-q-input')?.value?.trim() || '';
   const important = !!document.getElementById('cr-important-input')?.checked;
@@ -10903,9 +11039,9 @@ async function _crSaveHighlight(asCandidate) {
 
   // Get surrounding context from page text
   const fullText = _crPageReadingText();
-  const idx = fullText.indexOf(_crSelText);
+  const idx = fullText.indexOf(selectedText);
   const contextBefore = idx > 0 ? fullText.slice(Math.max(0, idx - 100), idx).trim() : '';
-  const contextAfter  = idx > -1 ? fullText.slice(idx + _crSelText.length, idx + _crSelText.length + 100).trim() : '';
+  const contextAfter  = idx > -1 ? fullText.slice(idx + selectedText.length, idx + selectedText.length + 100).trim() : '';
 
   const conceptName = document.getElementById('cr-concept-input')?.value?.trim() || '';
   const tags = _crUniqueTags([
@@ -10916,7 +11052,7 @@ async function _crSaveHighlight(asCandidate) {
   const payload = {
     source_document_id: _crDocId,
     page: _crPage,
-    selected_text: _crSelText,
+    selected_text: selectedText,
     context_before: contextBefore,
     context_after: contextAfter,
     note_text: note || null,
@@ -10947,6 +11083,7 @@ async function _crSaveHighlight(asCandidate) {
     _crCaptureOpen = false;
     _crHideToolbar(true);
     _crClearPending();
+    _crClearReaderSelectionState();
     _crSelText = '';
     _crConcept = '';
     _crSelectionRect = null;
