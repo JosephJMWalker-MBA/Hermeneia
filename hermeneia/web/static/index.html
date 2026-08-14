@@ -11144,7 +11144,7 @@ function _crResolveAndShowReaderSelection(e, opts = {}) {
   }
   const range = sel.getRangeAt(0);
   const selection = _crCreateReaderSelectionFromRange(sel, range);
-  if (!selection || selection.text.length < 3) {
+  if (!selection || !selection.text) {
     if (!_crCaptureOpen) _crHideToolbar();
     return null;
   }

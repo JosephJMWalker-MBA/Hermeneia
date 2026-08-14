@@ -346,6 +346,87 @@ process.stdout.write(JSON.stringify({
     assert result == {"text": "First", "toolbar": True, "payload": None}
 
 
+def test_one_character_reader_source_selection_shows_toolbar() -> None:
+    result = _run_node(
+        r"""
+const range = {
+  startContainer: b0.textEl,
+  endContainer: b0.textEl,
+  commonAncestorContainer: b0.textEl,
+  startOffset: 0,
+  endOffset: 1,
+  cloneRange(){ return this; },
+  cloneContents(){ return { querySelectorAll(){ return []; } }; },
+  toString(){ return 'F'; },
+  getBoundingClientRect(){ return { left: 11, top: 21, right: 14, bottom: 41, width: 3, height: 20 }; },
+};
+activeSelection = { rangeCount: 1, isCollapsed: false, getRangeAt(){ return range; }, toString(){ return 'F'; } };
+_crHandleSelection({ target: b0.textEl });
+process.stdout.write(JSON.stringify({
+  text: _crReaderSelectionState && _crReaderSelectionState.text,
+  toolbar: !!_crSelToolbar,
+  payload: savedPayload,
+}));
+"""
+    )
+
+    assert result == {"text": "F", "toolbar": True, "payload": None}
+
+
+def test_two_character_reader_source_selection_shows_toolbar() -> None:
+    result = _run_node(
+        r"""
+const range = {
+  startContainer: b0.textEl,
+  endContainer: b0.textEl,
+  commonAncestorContainer: b0.textEl,
+  startOffset: 0,
+  endOffset: 2,
+  cloneRange(){ return this; },
+  cloneContents(){ return { querySelectorAll(){ return []; } }; },
+  toString(){ return 'Fi'; },
+  getBoundingClientRect(){ return { left: 11, top: 21, right: 16, bottom: 41, width: 5, height: 20 }; },
+};
+activeSelection = { rangeCount: 1, isCollapsed: false, getRangeAt(){ return range; }, toString(){ return 'Fi'; } };
+_crHandleSelection({ target: b0.textEl });
+process.stdout.write(JSON.stringify({
+  text: _crReaderSelectionState && _crReaderSelectionState.text,
+  toolbar: !!_crSelToolbar,
+  payload: savedPayload,
+}));
+"""
+    )
+
+    assert result == {"text": "Fi", "toolbar": True, "payload": None}
+
+
+def test_whitespace_only_reader_source_selection_stays_rejected() -> None:
+    result = _run_node(
+        r"""
+const range = {
+  startContainer: b0.textEl,
+  endContainer: b0.textEl,
+  commonAncestorContainer: b0.textEl,
+  startOffset: 0,
+  endOffset: 2,
+  cloneRange(){ return this; },
+  cloneContents(){ return { querySelectorAll(){ return []; } }; },
+  toString(){ return '  '; },
+  getBoundingClientRect(){ return { left: 11, top: 21, right: 16, bottom: 41, width: 5, height: 20 }; },
+};
+activeSelection = { rangeCount: 1, isCollapsed: false, getRangeAt(){ return range; }, toString(){ return '  '; } };
+_crHandleSelection({ target: b0.textEl });
+process.stdout.write(JSON.stringify({
+  selectionState: _crReaderSelectionState,
+  toolbar: !!_crSelToolbar,
+  payload: savedPayload,
+}));
+"""
+    )
+
+    assert result == {"selectionState": None, "toolbar": False, "payload": None}
+
+
 def test_double_click_word_selection_resolves_through_same_transient_state() -> None:
     result = _run_node(
         r"""
