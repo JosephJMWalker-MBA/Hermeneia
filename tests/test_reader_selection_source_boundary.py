@@ -72,6 +72,31 @@ function _crBindNewHighlightDraft(){}
 function invLoad(){ return {}; }
 function requestAnimationFrame(fn){ fn(); }
 function setTimeout(fn){ fn(); }
+const _CR_READER_SPAN_LOCATOR_PREFIX = 'reader-span:v1:';
+function _crStringList(value){ return Array.isArray(value) ? value.filter(v => typeof v === 'string' && v.trim()).map(v => v.trim()) : []; }
+function _crUniqueStringList(values){ return Array.from(new Set((values || []).filter(v => typeof v === 'string' && v.trim()).map(v => v.trim()))); }
+function _crProjectionExtractionIds(ex){ return _crUniqueStringList([ex?.id || '', ex?.source_extraction_id || '']); }
+function _crProjectionSourceLocators(ex, fallbackLocator = ''){ return _crUniqueStringList([ex?.source_locator || '', fallbackLocator]); }
+function _crReaderBlockContext(ex, blockIndex, page = _crPage){
+  return {
+    block_index: Number.isFinite(Number(blockIndex)) ? Number(blockIndex) : null,
+    page: page || null,
+    source_locator: ex?.source_locator || '',
+    source_locators: _crProjectionSourceLocators(ex),
+    extraction_ids: _crProjectionExtractionIds(ex),
+  };
+}
+function _crReaderSpanPoint(info){
+  const blockIndex = Number(info?.block_index);
+  const offset = Number(info?.offset);
+  return {
+    block_index: Number.isFinite(blockIndex) ? blockIndex : null,
+    source_locator: info?.source_locator || '',
+    source_locators: _crUniqueStringList([...(info?.source_locators || []), info?.source_locator || '']),
+    extraction_ids: _crUniqueStringList([...(info?.extraction_ids || []), info?.extraction_id || '']),
+    offset: Number.isFinite(offset) ? offset : null,
+  };
+}
 
 function makeBlock(index, locator, text){
   const block = {
@@ -194,7 +219,9 @@ process.stdout.write(JSON.stringify({
     assert "Open marginal tools" in result["raw"]
     assert "Capture this passage" not in result["text"]
     assert "Open marginal tools" not in result["text"]
-    assert result["locator"] == "p1:block0..p1:block1"
+    assert result["locator"].startswith("reader-span:v1:")
+    assert "p1%3Ablock0" in result["locator"]
+    assert "p1%3Ablock1" in result["locator"]
 
 
 def test_single_block_selection_preserves_text_with_existing_trim_semantics() -> None:

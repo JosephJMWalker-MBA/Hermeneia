@@ -5931,7 +5931,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 
         # Fetch highlights for this doc
         highlights = conn.execute(
-            "SELECT id, page, selected_text, note_text, question_text, relevance, status, created_at "
+            "SELECT id, page, source_locator, selected_text, note_text, question_text, relevance, status, created_at "
             "FROM reader_highlights WHERE source_document_id = ? AND status != 'dismissed' "
             "ORDER BY page, created_at",
             (doc_id,)
