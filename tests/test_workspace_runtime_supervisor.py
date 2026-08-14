@@ -179,6 +179,30 @@ def test_supervisor_open_starts_candidate_hands_off_and_retires_old(tmp_path, mo
     _wait_until(lambda: old_child.process.terminated)
 
 
+def test_supervisor_start_clears_initial_candidate_bookkeeping(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    first = create_workspace("The Second Sale")
+    supervisor = _FakeSupervisor(initial_record=first)
+
+    supervisor.start()
+
+    assert supervisor.active.target.workspace == first
+    assert supervisor._candidate is None
+    supervisor.shutdown()
+
+
+def test_supervisor_default_drain_window_tracks_request_timeout(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    first = create_workspace("The Second Sale")
+    supervisor = WorkspaceRuntimeSupervisor(
+        initial_target=RuntimeTarget(first.db_path, first),
+        request_timeout=17,
+    )
+
+    assert supervisor._request_timeout == 17
+    assert supervisor._drain_timeout == 17
+
+
 def test_supervisor_drains_in_flight_old_child_before_retiring(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     first = create_workspace("The Second Sale")

@@ -4152,7 +4152,7 @@ function _wsConfirmOpenWithDrafts(labels, targetName) {
 
 function _wsOpenErrorMessage(error) {
   if (_runtimeIsEndpointError(error)) {
-    return 'Workspace open was not confirmed. Current workspace remains active; reconnect will refresh backend truth.';
+    return 'Workspace state could not be confirmed. Reconnect to refresh backend truth before continuing.';
   }
   if (error?.status === 409) return error.message || 'Workspace switch already in progress.';
   if (error?.status === 404) return error.message || 'Workspace was not found.';
