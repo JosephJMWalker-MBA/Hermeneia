@@ -48,7 +48,22 @@ def _run_lens(text, highlights, machine_obs):
         "function x(s){return String(s==null?'':s)"
         ".replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}\n"
         "function _crHighlightTags(h){return (h&&h.tags)||[];}\n"
+        "const _CR_READER_SPAN_LOCATOR_PREFIX='reader-span:v1:';\n"
+        + _extract_fn(html, "_crStringList")
+        + _extract_fn(html, "_crUniqueStringList")
         + _extract_fn(html, "_crInlineHighlightClass")
+        + _extract_fn(html, "_crIsReaderSpanLocator")
+        + _extract_fn(html, "_crDecodeReaderSpanLocator")
+        + _extract_fn(html, "_crFiniteNumber")
+        + _extract_fn(html, "_crTextOffset")
+        + _extract_fn(html, "_crHasAnyValue")
+        + _extract_fn(html, "_crHasComparableProvenance")
+        + _extract_fn(html, "_crSpanHasProvenance")
+        + _extract_fn(html, "_crBlockProvenanceWithinSpan")
+        + _extract_fn(html, "_crBlockMatchesSpan")
+        + _extract_fn(html, "_crBlockMatchesSpanPoint")
+        + _extract_fn(html, "_crSpanRangeForBlock")
+        + _extract_fn(html, "_crPushNonOverlappingRange")
         + _extract_fn(html, "_crRenderTextWithHighlights")
         + _extract_fn(html, "_crMachineHighlightClass")
         + "const [t,h,m]=JSON.parse(process.argv[1]);\n"
