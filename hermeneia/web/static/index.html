@@ -10820,6 +10820,11 @@ function _crEncodeReaderSpanLocator(selection = null) {
   return '';
 }
 
+function _crClearReaderSelectionState() {
+  _crReaderSelectionState = null;
+  _crSelRange = null;
+}
+
 function _crHandleSelection(e) {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
@@ -10989,6 +10994,7 @@ function _crCancelHighlight() {
   _crCaptureOpen = false;
   _crHideToolbar(true);
   _crClearPending();
+  _crClearReaderSelectionState();
   _crSelText = '';
   _crConcept = '';
   _crRelevance = 'unclear';
@@ -11077,6 +11083,7 @@ async function _crSaveHighlight(asCandidate) {
     _crCaptureOpen = false;
     _crHideToolbar(true);
     _crClearPending();
+    _crClearReaderSelectionState();
     _crSelText = '';
     _crConcept = '';
     _crSelectionRect = null;

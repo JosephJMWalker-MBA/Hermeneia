@@ -41,6 +41,7 @@ let _crCaptureOpen = false;
 let _crRelevance = 'unclear';
 let _crConcept = '';
 let savedPayload = null;
+let failNextRequest = false;
 function x(value){ return String(value ?? ''); }
 function _dockOpenPanel(){}
 function _crHideToolbar(){}
@@ -57,6 +58,10 @@ function _flnActivityTick(){}
 function _crShowHighlightDetail(){}
 function cmpMarkOnboardingStep(){}
 async function requestJSON(url, opts){
+  if (failNextRequest) {
+    failNextRequest = false;
+    throw new Error('network unavailable');
+  }
   savedPayload = opts && opts.body;
   return { id: 'hl-1' };
 }
@@ -283,3 +288,93 @@ def test_save_payload_uses_structural_selection_not_stale_ui_copy() -> None:
     assert "Capture this passage" not in result["selectedText"]
     assert "Open marginal tools" not in result["selectedText"]
     assert result["note"] is None
+
+
+def test_cancel_clears_transient_reader_selection_state() -> None:
+    result = _run_node(
+        r"""
+_crReaderSelectionState = {
+  valid: true,
+  text: 'First projected source line.',
+  source_locators: ['p1:block0'],
+  blocks: [{ block_index: 0 }],
+  page: 1,
+};
+_crSelRange = { detached: true };
+_crSelText = 'First projected source line.';
+_crCancelHighlight();
+process.stdout.write(JSON.stringify({
+  fallback: _crGetReaderSelection({ refresh: false, fallback: true }),
+  range: _crSelRange,
+  selectedText: _crSelText,
+}));
+"""
+    )
+
+    assert result == {"fallback": None, "range": None, "selectedText": ""}
+
+
+def test_successful_save_ack_clears_transient_reader_selection_state() -> None:
+    result = _run_node(
+        r"""
+(async () => {
+  _crReaderSelectionState = {
+    valid: true,
+    text: 'First projected source line.',
+    source_locators: ['p1:block0'],
+    blocks: [{ block_index: 0 }],
+    page: 1,
+  };
+  _crSelRange = { detached: true };
+  _crSelText = 'First projected source line.';
+  await _crSaveHighlight(false);
+  process.stdout.write(JSON.stringify({
+    fallback: _crGetReaderSelection({ refresh: false, fallback: true }),
+    range: _crSelRange,
+    selectedText: _crSelText,
+    savedText: savedPayload.selected_text,
+  }));
+})();
+"""
+    )
+
+    assert result == {
+        "fallback": None,
+        "range": None,
+        "selectedText": "",
+        "savedText": "First projected source line.",
+    }
+
+
+def test_failed_save_preserves_transient_reader_selection_state_for_retry() -> None:
+    result = _run_node(
+        r"""
+(async () => {
+  _crReaderSelectionState = {
+    valid: true,
+    text: 'First projected source line.',
+    source_locators: ['p1:block0'],
+    blocks: [{ block_index: 0 }],
+    page: 1,
+  };
+  _crSelRange = { detached: true };
+  _crSelText = 'First projected source line.';
+  failNextRequest = true;
+  await _crSaveHighlight(false);
+  const fallback = _crGetReaderSelection({ refresh: false, fallback: true });
+  process.stdout.write(JSON.stringify({
+    fallbackText: fallback && fallback.text,
+    rangeStillPresent: _crSelRange && _crSelRange.detached === true,
+    selectedText: _crSelText,
+    errorMessage: elements['cr-capture-msg'].textContent,
+  }));
+})();
+"""
+    )
+
+    assert result == {
+        "fallbackText": "First projected source line.",
+        "rangeStillPresent": True,
+        "selectedText": "First projected source line.",
+        "errorMessage": "network unavailable",
+    }
