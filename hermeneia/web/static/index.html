@@ -10168,11 +10168,7 @@ function _attnOpen(docId, page) {
 async function _crOpenDoc(docId) {
   _crDocId = docId;
   _crPage  = 1;
-  _crSelText = '';
-  _crCaptureOpen = false;
-  _crHideToolbar(true);
-  _crClearPending();
-  _crSelectionRect = null;
+  _crResetReaderTransientSelectionForContext();
 
   // Highlight active picker button
   document.querySelectorAll('.cr-doc-btn').forEach(b => b.classList.remove('active'));
@@ -10592,6 +10588,7 @@ function _crToggleLens() {
 function _crRenderPage() {
   const view = document.getElementById('cr-page-view');
   const pageData = _crPages.find(p => p.page === _crPage) || _crPages[_crPage - 1];
+  _crResetReaderTransientSelectionForContext();
 
   if (!pageData) {
     view.innerHTML = `<div class="e10-empty">No extracted text for page ${_crPage}.</div>`;
@@ -11121,6 +11118,15 @@ function _crClearReaderSelectionState() {
   _crReaderSelectionState = null;
   _crSelRange = null;
   if (typeof _a11yClearReaderSelectionCache === 'function') _a11yClearReaderSelectionCache();
+}
+
+function _crResetReaderTransientSelectionForContext() {
+  _crCaptureOpen = false;
+  _crHideToolbar(true);
+  _crClearPending();
+  _crClearReaderSelectionState();
+  _crSelText = '';
+  _crSelectionRect = null;
 }
 
 function _crHandleSelection(e) {

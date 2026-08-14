@@ -252,6 +252,94 @@ def test_reading_tools_do_not_resurrect_cleared_reader_selection():
     }
 
 
+def test_reader_page_context_reset_invalidates_cached_reading_tools_passage():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available for Reader accessibility UI test")
+
+    html = INDEX.read_text()
+    harness = (
+        "let currentReaderSelection={text:'Page one Reader passage'};\n"
+        "function _crGetReaderSelection(opts){return currentReaderSelection;}\n"
+        "const window={getSelection(){return {rangeCount:0,isCollapsed:true,toString(){return '';}};}};\n"
+        "const _a11y={read:false};\n"
+        "let _a11yHintShown=true;\n"
+        "let _a11yLastReaderSelection='';\n"
+        "let _crReaderSelectionState={valid:true,text:'Page one Reader passage'};\n"
+        "let _crSelRange={detached:true};\n"
+        "let _crSelText='Page one Reader passage';\n"
+        "let _crSelectionRect={left:1,top:2,bottom:3,right:4};\n"
+        "let _crCaptureOpen=false;\n"
+        "let spoken='';\n"
+        "let status='';\n"
+        "let pendingCleared=false;\n"
+        "let toolbarHidden=false;\n"
+        "function a11ySpeak(text){spoken=text;}\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _a11ySync(){}\n"
+        "function _crHideToolbar(force){toolbarHidden=!!force;}\n"
+        "function _crClearPending(){pendingCleared=true;}\n"
+        "function setTimeout(){}\n"
+        + _extract_fn(html, "_a11yRememberReaderSelection")
+        + _extract_fn(html, "_a11yClearReaderSelectionCache")
+        + _extract_fn(html, "_a11yGetSelectedText")
+        + _extract_fn(html, "_a11yCacheReaderSelection")
+        + _extract_fn(html, "_a11yGetDockReadText")
+        + _extract_fn(html, "a11yClickRead")
+        + _extract_fn(html, "_crClearReaderSelectionState")
+        + _extract_fn(html, "_crResetReaderTransientSelectionForContext")
+        + "_a11yCacheReaderSelection();\n"
+        "currentReaderSelection=null;\n"
+        "_crResetReaderTransientSelectionForContext();\n"
+        "a11yClickRead();\n"
+        "process.stdout.write(JSON.stringify({spoken,status,cached:_a11yLastReaderSelection,readerState:_crReaderSelectionState,range:_crSelRange,selText:_crSelText,rect:_crSelectionRect,pendingCleared,toolbarHidden}));\n"
+    )
+    result = subprocess.run(
+        [node, "-e", harness],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
+    behavior = json.loads(result.stdout)
+    assert behavior == {
+        "spoken": "",
+        "status": "Select text first.",
+        "cached": "",
+        "readerState": None,
+        "range": None,
+        "selText": "",
+        "rect": None,
+        "pendingCleared": True,
+        "toolbarHidden": True,
+    }
+
+
+def test_reader_context_reset_before_document_load_failure_invalidates_old_passage():
+    html = INDEX.read_text()
+
+    open_start = html.index("async function _crOpenDoc(docId)")
+    reset_at = html.index("_crResetReaderTransientSelectionForContext();", open_start)
+    loading_at = html.index("view.innerHTML = '<div class=\"e10-empty\">Loading pages", open_start)
+    fetch_at = html.index("await get(`/api/reader/documents/", open_start)
+    catch_at = html.index("} catch(e) {", open_start)
+
+    assert reset_at < loading_at < fetch_at < catch_at
+
+
+def test_reader_page_render_invalidates_selection_before_replacing_dom():
+    html = INDEX.read_text()
+
+    render_start = html.index("function _crRenderPage()")
+    reset_at = html.index("_crResetReaderTransientSelectionForContext();", render_start)
+    no_page_dom_at = html.index("view.innerHTML = `<div class=\"e10-empty\">No extracted text", render_start)
+    normal_dom_at = html.index("view.innerHTML = `", no_page_dom_at + 1)
+
+    assert reset_at < no_page_dom_at
+    assert reset_at < normal_dom_at
+
+
 def test_floating_read_popup_uses_same_cached_reader_selection_after_collapse():
     node = shutil.which("node")
     if not node:
@@ -292,6 +380,64 @@ def test_floating_read_popup_uses_same_cached_reader_selection_after_collapse():
         "spoken": "Popup cached Reader source",
         "cached": "Popup cached Reader source",
         "read": True,
+    }
+
+
+def test_new_reader_selection_after_context_reset_establishes_new_reading_tools_cache():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available for Reader accessibility UI test")
+
+    html = INDEX.read_text()
+    harness = (
+        "let currentReaderSelection={text:'Old Reader passage'};\n"
+        "function _crGetReaderSelection(opts){return currentReaderSelection;}\n"
+        "const window={getSelection(){return {rangeCount:0,isCollapsed:true,toString(){return '';}};}};\n"
+        "const _a11y={read:false};\n"
+        "let _a11yHintShown=true;\n"
+        "let _a11yLastReaderSelection='';\n"
+        "let _crReaderSelectionState={valid:true,text:'Old Reader passage'};\n"
+        "let _crSelRange={detached:true};\n"
+        "let _crSelText='Old Reader passage';\n"
+        "let _crSelectionRect={left:1,top:2,bottom:3,right:4};\n"
+        "let _crCaptureOpen=false;\n"
+        "let spoken='';\n"
+        "let status='';\n"
+        "function a11ySpeak(text){spoken=text;}\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _a11ySync(){}\n"
+        "function _crHideToolbar(){}\n"
+        "function _crClearPending(){}\n"
+        "function setTimeout(){}\n"
+        + _extract_fn(html, "_a11yRememberReaderSelection")
+        + _extract_fn(html, "_a11yClearReaderSelectionCache")
+        + _extract_fn(html, "_a11yGetSelectedText")
+        + _extract_fn(html, "_a11yCacheReaderSelection")
+        + _extract_fn(html, "_a11yGetDockReadText")
+        + _extract_fn(html, "a11yClickRead")
+        + _extract_fn(html, "_crClearReaderSelectionState")
+        + _extract_fn(html, "_crResetReaderTransientSelectionForContext")
+        + "_a11yCacheReaderSelection();\n"
+        "_crResetReaderTransientSelectionForContext();\n"
+        "currentReaderSelection={text:'Page two Reader passage'};\n"
+        "_a11yCacheReaderSelection();\n"
+        "currentReaderSelection=null;\n"
+        "a11yClickRead();\n"
+        "process.stdout.write(JSON.stringify({spoken,status,cached:_a11yLastReaderSelection}));\n"
+    )
+    result = subprocess.run(
+        [node, "-e", harness],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
+    behavior = json.loads(result.stdout)
+    assert behavior == {
+        "spoken": "Page two Reader passage",
+        "status": "",
+        "cached": "Page two Reader passage",
     }
 
 
