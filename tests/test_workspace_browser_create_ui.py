@@ -486,6 +486,21 @@ def test_workspace_open_failed_candidate_keeps_old_workspace_active():
     assert "candidate failed to start" in out["status"]
 
 
+def test_workspace_open_endpoint_loss_does_not_claim_old_workspace_remains_active():
+    out = _run_node(
+        """
+        const message = _wsOpenErrorMessage(new RuntimeEndpointError('lost'));
+        console.log(JSON.stringify({ message }));
+        """
+    )
+
+    assert out["message"] == (
+        "Workspace state could not be confirmed. "
+        "Reconnect to refresh backend truth before continuing."
+    )
+    assert "Current workspace remains active" not in out["message"]
+
+
 def test_workspace_open_refuses_to_claim_switch_until_runtime_identity_matches():
     out = _run_node(
         """

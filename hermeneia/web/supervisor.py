@@ -115,14 +115,14 @@ class WorkspaceRuntimeSupervisor:
         *,
         initial_target: RuntimeTarget,
         startup_timeout: float = 10.0,
-        drain_timeout: float = 5.0,
         request_timeout: float = 60.0,
+        drain_timeout: float | None = None,
         child_grace_seconds: float = 2.0,
     ) -> None:
         self._initial_target = initial_target
         self._startup_timeout = startup_timeout
-        self._drain_timeout = drain_timeout
         self._request_timeout = request_timeout
+        self._drain_timeout = request_timeout if drain_timeout is None else drain_timeout
         self._child_grace_seconds = child_grace_seconds
         self._state_lock = threading.RLock()
         self._switch_lock = threading.Lock()
@@ -144,6 +144,8 @@ class WorkspaceRuntimeSupervisor:
         child = self._launch_verified_child(self._initial_target)
         with self._state_lock:
             self._active = child
+            if self._candidate is child:
+                self._candidate = None
 
     def shutdown(self) -> None:
         with self._state_lock:
