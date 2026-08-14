@@ -92,9 +92,40 @@ def test_reading_tools_preserve_reader_selection_for_dock_fallback():
 def test_passage_read_action_still_uses_reader_passage_text():
     html = INDEX.read_text()
 
-    assert 'onclick="ttsSpeak(_crSelText)" title="Read aloud"' in html
+    assert 'onclick="_crReadResolvedSelection()" title="Read aloud"' in html
+    assert "function _crReadResolvedSelection()" in html
     # a11yReadSelection reads the current selection; it now also auto-enables
     # read mode so the popup's Read button works without pre-toggling (item 7).
     assert "function a11yReadSelection() {" in html
     assert "_a11yGetSelectedText()" in html
     assert "if (!_a11y.read) { _a11y.read = true; _a11ySync(); }" in html
+
+
+def test_reading_tools_can_use_central_reader_selection_state():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available for Reader accessibility UI test")
+
+    html = INDEX.read_text()
+    harness = (
+        "let centralCalls=0;\n"
+        "function _crGetReaderSelection(opts){centralCalls+=1;return {text:'Exact Reader source text'};}\n"
+        "const window={getSelection(){return {rangeCount:1,isCollapsed:false,toString(){return 'Raw UI chrome text';}};}};\n"
+        + _extract_fn(html, "_a11yGetSelectedText")
+        + _extract_fn(html, "_a11yGetDockReadText")
+        + "process.stdout.write(JSON.stringify({selected:_a11yGetSelectedText(),dock:_a11yGetDockReadText(),centralCalls}));\n"
+    )
+    result = subprocess.run(
+        [node, "-e", harness],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
+    behavior = json.loads(result.stdout)
+    assert behavior == {
+        "selected": "Exact Reader source text",
+        "dock": "Exact Reader source text",
+        "centralCalls": 2,
+    }
