@@ -296,6 +296,84 @@ async function fetch(url, options={}){
     assert result["ackSave"]["renderedPage"] == "Reader page content remains visible."
 
 
+def test_new_highlight_draft_recovery_preserves_authored_note_text() -> None:
+    html = INDEX.read_text()
+    script = (
+        _js_dom_prelude()
+        + r"""
+function makeInput(value=''){return {value,checked:false,style:{},dataset:{},textContent:'',listeners:{},addEventListener(type,fn){this.listeners[type]=fn;},classList:makeClassList(),focus(){}};}
+const elements={
+  'cr-note-input':makeInput(''),
+  'cr-q-input':makeInput(''),
+  'cr-important-input':makeInput(''),
+  'cr-tags-input':makeInput(''),
+  'cr-rank-input':makeInput(''),
+  'cr-theme-input':makeInput(''),
+  'cr-concept-input':makeInput(''),
+  'cr-capture-msg':makeInput(''),
+};
+const toolbar={
+  dataset:{},
+  querySelectorAll(){return [
+    elements['cr-note-input'],
+    elements['cr-q-input'],
+    elements['cr-important-input'],
+    elements['cr-tags-input'],
+    elements['cr-rank-input'],
+    elements['cr-theme-input'],
+    elements['cr-concept-input'],
+  ];},
+};
+const baseGetElementById=document.getElementById.bind(document);
+document.getElementById=function(id){
+  if(id==='cr-sel-toolbar')return toolbar;
+  return elements[id]||baseGetElementById(id);
+};
+let _crDocId='doc-1';
+let _crPage=4;
+let _crSelText='Selected passage';
+let _crRelevance='unclear';
+let _crReaderSelectionState={text:'Selected passage'};
+function _crEncodeReaderSpanLocator(){return 'p4:block1';}
+function _crApplyRelevanceDraft(value){_crRelevance=value||'unclear';}
+"""
+        + _extract_runtime_region(html)
+        + "_runtimeApplyWorkspaceDraftScope({runtime_scope:'managed:ws-a',draft_migration_scope:'oldscopea'});\n"
+        + r"""
+const selection={text:'Selected passage'};
+const key=_crNewHighlightDraftKey(selection);
+_authoredDraftSave(key,{
+  form_type:'reader-highlight-new',
+  document_id:'doc-1',
+  page:4,
+  selected_text:'Selected passage',
+  fields:{
+    note_text:'human-authored recovered note',
+    question_text:'',
+    tags:'',
+    rank:'',
+    theme_bucket:'',
+    relevance:'',
+  },
+});
+_crBindNewHighlightDraft(selection);
+process.stdout.write(JSON.stringify({
+  note:elements['cr-note-input'].value,
+  message:elements['cr-capture-msg'].textContent,
+  draftKind:toolbar.dataset.draftKind,
+}));
+"""
+    )
+
+    result = _run_node(script)
+
+    assert result == {
+        "note": "human-authored recovered note",
+        "message": "Recovered unsaved highlight text from this browser.",
+        "draftKind": "reader-highlight-new",
+    }
+
+
 def test_existing_highlight_edit_recovers_only_matching_browser_draft() -> None:
     html = INDEX.read_text()
     script = (
