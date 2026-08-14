@@ -3740,31 +3740,30 @@ let _a11yHintTimer = null;
 let _a11yHintShown = false;
 let _a11yLastReaderSelection = '';
 
+function _a11yRememberReaderSelection(selection) {
+  const text = (selection?.text || '').replace(/\s+/g, ' ').trim();
+  if (text) _a11yLastReaderSelection = text;
+  return text;
+}
+
+function _a11yClearReaderSelectionCache() {
+  _a11yLastReaderSelection = '';
+}
+
 function _a11yGetSelectedText() {
   if (typeof _crGetReaderSelection === 'function') {
     const selection = _crGetReaderSelection({ refresh: true, fallback: false });
-    if (selection?.text) return selection.text.replace(/\s+/g, ' ').trim();
+    if (selection?.text) return _a11yRememberReaderSelection(selection);
   }
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return '';
-  return sel.toString().replace(/\s+/g, ' ').trim();
+  return '';
 }
 
 function _a11yCacheReaderSelection() {
   if (typeof _crGetReaderSelection === 'function') {
     const selection = _crGetReaderSelection({ refresh: true, fallback: false });
-    if (selection?.text) {
-      _a11yLastReaderSelection = selection.text.replace(/\s+/g, ' ').trim();
-      return;
-    }
+    if (selection?.text) _a11yRememberReaderSelection(selection);
+    return;
   }
-  const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-  const range = sel.getRangeAt(0);
-  const pageView = document.getElementById('cr-page-view');
-  if (!pageView || !pageView.contains(range.commonAncestorContainer)) return;
-  const text = _a11yGetSelectedText();
-  if (text) _a11yLastReaderSelection = text;
 }
 
 function _a11yGetDockReadText() {
@@ -3883,7 +3882,7 @@ function a11yReadSelection() {
   // Clicking Read from the selection popup should just work — auto-enable what
   // is needed rather than requiring the global Read toggle first.
   if (!_a11y.read) { _a11y.read = true; _a11ySync(); }
-  const text = _a11yGetSelectedText();
+  const text = _a11yGetDockReadText();
   a11ySpeak(text);
 }
 
@@ -10169,11 +10168,7 @@ function _attnOpen(docId, page) {
 async function _crOpenDoc(docId) {
   _crDocId = docId;
   _crPage  = 1;
-  _crSelText = '';
-  _crCaptureOpen = false;
-  _crHideToolbar(true);
-  _crClearPending();
-  _crSelectionRect = null;
+  _crResetReaderTransientSelectionForContext();
 
   // Highlight active picker button
   document.querySelectorAll('.cr-doc-btn').forEach(b => b.classList.remove('active'));
@@ -10593,6 +10588,7 @@ function _crToggleLens() {
 function _crRenderPage() {
   const view = document.getElementById('cr-page-view');
   const pageData = _crPages.find(p => p.page === _crPage) || _crPages[_crPage - 1];
+  _crResetReaderTransientSelectionForContext();
 
   if (!pageData) {
     view.innerHTML = `<div class="e10-empty">No extracted text for page ${_crPage}.</div>`;
@@ -11089,6 +11085,7 @@ function _crGetReaderSelection(opts = {}) {
         _crSelText = selection.text;
         _crSelRange = selection.range;
         _crSelectionRect = selection.rect;
+        if (typeof _a11yRememberReaderSelection === 'function') _a11yRememberReaderSelection(selection);
         return selection;
       }
     }
@@ -11120,6 +11117,16 @@ function _crEncodeReaderSpanLocator(selection = null) {
 function _crClearReaderSelectionState() {
   _crReaderSelectionState = null;
   _crSelRange = null;
+  if (typeof _a11yClearReaderSelectionCache === 'function') _a11yClearReaderSelectionCache();
+}
+
+function _crResetReaderTransientSelectionForContext() {
+  _crCaptureOpen = false;
+  _crHideToolbar(true);
+  _crClearPending();
+  _crClearReaderSelectionState();
+  _crSelText = '';
+  _crSelectionRect = null;
 }
 
 function _crHandleSelection(e) {
@@ -11152,6 +11159,7 @@ function _crResolveAndShowReaderSelection(e, opts = {}) {
   _crSelText = selection.text;
   _crSelRange = selection.range;
   _crSelectionRect = selection.rect;
+  if (typeof _a11yRememberReaderSelection === 'function') _a11yRememberReaderSelection(selection);
   if (opts.showToolbar !== false) _crShowToolbar(_crSelectionRect, e?.clientX, e?.clientY);
   return selection;
 }

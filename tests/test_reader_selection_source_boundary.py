@@ -44,8 +44,10 @@ let _crConcept = '';
 let savedPayload = null;
 let failNextRequest = false;
 let spokenText = '';
+let a11yCacheCleared = false;
 function x(value){ return String(value ?? ''); }
 function ttsSpeak(text){ spokenText = text; }
+function _a11yClearReaderSelectionCache(){ a11yCacheCleared = true; }
 function _dockOpenPanel(){}
 function _crHideToolbar(){}
 function _crMarkPending(){}
@@ -613,6 +615,68 @@ process.stdout.write(JSON.stringify({ spokenText }));
     )
 
     assert result == {"spokenText": "Exact structural Reader text"}
+
+
+def test_clearing_reader_selection_invalidates_reading_tools_cache() -> None:
+    result = _run_node(
+        r"""
+_crReaderSelectionState = {
+  valid: true,
+  text: 'Reader text that should not linger',
+  source_locators: ['p1:block0'],
+  blocks: [{ block_index: 0 }],
+  page: 1,
+};
+_crSelRange = { detached: true };
+_crClearReaderSelectionState();
+process.stdout.write(JSON.stringify({
+  fallback: _crGetReaderSelection({ refresh: false, fallback: true }),
+  range: _crSelRange,
+  cacheCleared: a11yCacheCleared,
+}));
+"""
+    )
+
+    assert result == {"fallback": None, "range": None, "cacheCleared": True}
+
+
+def test_reader_context_reset_clears_stale_toolbar_passage_text() -> None:
+    result = _run_node(
+        r"""
+_crReaderSelectionState = {
+  valid: true,
+  text: 'Old page Reader text',
+  source_locators: ['p1:block0'],
+  blocks: [{ block_index: 0 }],
+  page: 1,
+};
+_crSelRange = { detached: true };
+_crSelText = 'Old page Reader text';
+_crSelectionRect = { left: 10, top: 20, right: 40, bottom: 60 };
+_crSelToolbar = { removed: false, remove(){ this.removed = true; } };
+_crResetReaderTransientSelectionForContext();
+_crReadResolvedSelection();
+process.stdout.write(JSON.stringify({
+  fallback: _crGetReaderSelection({ refresh: false, fallback: true }),
+  range: _crSelRange,
+  selectedText: _crSelText,
+  rect: _crSelectionRect,
+  toolbar: _crSelToolbar,
+  spokenText,
+  cacheCleared: a11yCacheCleared,
+}));
+"""
+    )
+
+    assert result == {
+        "fallback": None,
+        "range": None,
+        "selectedText": "",
+        "rect": None,
+        "toolbar": None,
+        "spokenText": "",
+        "cacheCleared": True,
+    }
 
 
 def test_new_highlight_note_input_starts_empty_with_placeholder_guidance() -> None:
