@@ -7529,6 +7529,14 @@ function e10ProviderCard(provider, cal, perf) {
     const selectedModel = provider.selected_model || provider.default_model || '';
     const selectedInstalled = installedModels.includes(selectedModel);
     const selectorDisabled = !provider.ollama_server_running || installedModels.length === 0;
+    const modelSourceLabel = provider.selected_model_source === 'user_config'
+        ? 'user setting'
+        : 'registry default';
+    const hostSourceLabel = provider.ollama_host_source === 'environment'
+      ? 'environment'
+      : provider.ollama_host_source === 'user_config'
+        ? 'user setting'
+        : 'default';
     const installedHtml = installedModels.length
       ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px">${installedModels.map(m => `<span style="font-family:var(--mono);font-size:10px;border:1px solid var(--border);border-radius:999px;padding:1px 6px;color:${m === selectedModel ? 'var(--green)' : 'var(--dim2)'}">${x(m)}</span>`).join('')}</div>`
       : '<div style="font-size:11px;color:var(--dim2);margin-top:4px">No installed models discovered.</div>';
@@ -7545,9 +7553,13 @@ function e10ProviderCard(provider, cal, perf) {
     else steps.push({ ok: true, label: `Selected model installed (${x(selectedModel)})`, action: null });
     ollamaSteps = `<div style="margin:8px 0 4px;font-size:11px;color:var(--dim2)">
       <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 8px;margin-bottom:8px">
-        <span>Host</span><span style="font-family:var(--mono);color:var(--fg2)">${x(provider.ollama_host || 'http://localhost:11434')}</span>
+        <span>Host</span><span style="font-family:var(--mono);color:var(--fg2)">${x(provider.ollama_host || 'http://localhost:11434')} <span style="font-family:var(--sans);color:var(--dim2)">(${x(hostSourceLabel)})</span></span>
         <span>Runtime</span><span style="color:${provider.ollama_server_running ? 'var(--green)' : 'var(--yellow)'}">${provider.ollama_server_running ? 'online' : 'offline'}</span>
         <span>Selected</span><span style="font-family:var(--mono);color:${provider.selected_model_installed ? 'var(--green)' : 'var(--yellow)'}">${x(selectedModel || '—')}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin:8px 0">
+        <input id="ollama-host-${x(provider.participant)}" type="text" value="${x(provider.ollama_host || 'http://localhost:11434')}" placeholder="http://localhost:11434" style="font-size:11px;padding:4px 7px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);min-width:220px;max-width:100%">
+        <button class="btn-trace" style="font-size:10px;padding:3px 8px" onclick="e10SaveOllamaHost('${x(provider.participant)}')">Save host</button>
       </div>
       <label style="display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);margin-bottom:3px">Installed models</label>
       ${installedHtml}
@@ -7555,7 +7567,7 @@ function e10ProviderCard(provider, cal, perf) {
         <select ${selectorDisabled ? 'disabled' : ''} data-current-model="${x(selectedModel)}" onchange="e10SelectOllamaModel(${pk},this.value,this)" style="font-size:11px;padding:4px 7px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);max-width:100%">
           ${modelOptions || `<option value="">No installed models</option>`}
         </select>
-        ${provider.selected_model_source === 'session' ? '<span style="font-size:10px;color:var(--dim2)">session selection</span>' : '<span style="font-size:10px;color:var(--dim2)">registry default</span>'}
+        <span style="font-size:10px;color:var(--dim2)">${x(modelSourceLabel)}</span>
       </div>
       ${steps.map(s => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
         <span style="color:${s.ok ? 'var(--green)' : 'var(--yellow)'}">${s.ok ? '✓' : '○'}</span>
@@ -12004,6 +12016,19 @@ async function e10SelectOllamaModel(participant, model, selectEl) {
   } finally {
     if (selectEl) selectEl.disabled = false;
   }
+}
+
+async function e10SaveOllamaHost(participant) {
+  const input = document.getElementById(`ollama-host-${participant}`);
+  const host = input?.value.trim() || '';
+  if (!host) {
+    showAppError('Enter an Ollama host before saving.');
+    input?.focus();
+    return;
+  }
+  const result = await put('/api/e10/ollama/host', { host });
+  _e10ProviderNotices[participant] = result.message;
+  await e10LoadProviders();
 }
 
 async function e10TestProvider(participant) {
