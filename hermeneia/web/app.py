@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 import tempfile
 import threading
@@ -144,6 +145,7 @@ def create_app(
 
     active_provider_registry = provider_registry or DEFAULT_PROVIDER_REGISTRY
     runtime_provider_keys: dict[str, str] = {}
+    runtime_selected_models: dict[str, str] = {}
     runtime_provider_keys_lock = threading.RLock()
 
     # ── Calibration store ──────────────────────────────────────────────────────
@@ -190,20 +192,56 @@ def create_app(
         "Observation: \"He stretched out his arms toward the dark water in a trembling way.\""
     )
 
-    def _get_participant_calibration(participant_key: str) -> dict:
-        """Return the calibration record for a participant, initialised if absent."""
+    def _empty_calibration_record(
+        participant_key: str,
+        *,
+        provider_id: str | None = None,
+        model_id: str | None = None,
+    ) -> dict:
+        record = {
+            "participant": participant_key,
+            "role_status": {
+                role: {"status": "untested", "last_updated": None, "steward_note": None}
+                for role in _CALIBRATION_ROLES
+            },
+            "calibration_tests": [],
+        }
+        if provider_id:
+            record["provider_id"] = provider_id
+        if model_id:
+            record["model_id"] = model_id
+        return record
+
+    def _calibration_key(
+        participant_key: str,
+        provider_id: str | None = None,
+        model_id: str | None = None,
+    ) -> str:
+        if provider_id and provider_id.startswith("ollama-") and model_id:
+            return f"{participant_key}::{provider_id}::{model_id}"
+        return participant_key
+
+    def _get_calibration_record(
+        participant_key: str,
+        *,
+        provider_id: str | None = None,
+        model_id: str | None = None,
+    ) -> dict:
+        """Return calibration for the exact participant/provider/model identity."""
         with _calibration_lock:
             store = runtime_calibration
-            if participant_key not in store.get("records", {}):
-                store.setdefault("records", {})[participant_key] = {
-                    "participant": participant_key,
-                    "role_status": {
-                        role: {"status": "untested", "last_updated": None, "steward_note": None}
-                        for role in _CALIBRATION_ROLES
-                    },
-                    "calibration_tests": [],
-                }
-            return store["records"][participant_key]
+            key = _calibration_key(participant_key, provider_id, model_id)
+            if key not in store.get("records", {}):
+                store.setdefault("records", {})[key] = _empty_calibration_record(
+                    participant_key,
+                    provider_id=provider_id,
+                    model_id=model_id,
+                )
+            return store["records"][key]
+
+    def _get_participant_calibration(participant_key: str) -> dict:
+        """Return the legacy participant calibration record."""
+        return _get_calibration_record(participant_key)
 
     def _record_calibration_result(
         participant_key: str,
@@ -213,14 +251,22 @@ def create_app(
         latency_ms: int | None,
         failure_reason: str | None,
         recommendation: str,
+        provider_id: str | None = None,
+        model_id: str | None = None,
     ) -> None:
         with _calibration_lock:
-            rec = _get_participant_calibration(participant_key)
+            rec = _get_calibration_record(
+                participant_key,
+                provider_id=provider_id,
+                model_id=model_id,
+            )
             now = datetime.now(timezone.utc).isoformat()
             test_id = f"t-{now[:10].replace('-','')}-{len(rec['calibration_tests'])+1:03d}"
             rec["calibration_tests"].append({
                 "test_id": test_id,
                 "timestamp": now,
+                "provider_id": provider_id,
+                "model_id": model_id,
                 "role": role,
                 "test_name": test_name,
                 "status": status,
@@ -398,6 +444,54 @@ def create_app(
             ],
         },
     }
+
+    def _empty_performance_record(*, suppressed: bool = False) -> dict:
+        rec = {
+            "calls": 0,
+            "success": 0,
+            "parse_ok": 0,
+            "avg_latency_ms": None,
+            "errors": [],
+            "accepted": 0,
+            "rejected": 0,
+        }
+        if suppressed:
+            rec["suppressed"] = True
+            rec["message"] = (
+                "Participant-level performance is hidden for multi-model Ollama "
+                "providers. Exact model analytics belong to the Model Observatory."
+            )
+        return rec
+
+    def _model_specific_role_suitability(
+        participant_key: str,
+        provider_id: str,
+        selected_model: str,
+        default_model: str,
+    ) -> dict[str, str]:
+        if provider_id.startswith("ollama-") and selected_model != default_model:
+            return {role: "untested" for role in _CALIBRATION_ROLES}
+        return _ROLE_SUITABILITY.get(participant_key, {})
+
+    def _model_specific_provider_setup(
+        participant_key: str,
+        provider_id: str,
+        selected_model: str,
+        default_model: str,
+    ) -> dict:
+        setup = dict(_PROVIDER_SETUP.get(participant_key, {}))
+        if provider_id.startswith("ollama-") and selected_model != default_model:
+            setup["about"] = (
+                "Local model running via Ollama. No static Hermeneia suitability "
+                "judgment is recorded for this exact selected model; use calibration "
+                "to establish role readiness."
+            )
+            setup["setup_steps"] = [
+                "Install Ollama from ollama.com",
+                "Choose an installed local model explicitly",
+                "Run: ollama serve",
+            ]
+        return setup
 
     def _conn() -> sqlite3.Connection:
         uri = db_path.resolve().as_uri() + "?mode=ro"
@@ -697,34 +791,112 @@ def create_app(
             return None
         return key, item[0], item[2]
 
-    def _ollama_readiness(model: str) -> dict:
-        """Check Ollama server reachability and model availability without raising."""
+    def _ollama_host() -> str:
+        return os.environ.get("OLLAMA_HOST") or "http://localhost:11434"
+
+    def _ollama_model_names(model_rows: object) -> list[str]:
+        names: list[str] = []
+        for item in model_rows or []:
+            if isinstance(item, dict):
+                name = item.get("model") or item.get("name") or ""
+            else:
+                name = getattr(item, "model", "") or getattr(item, "name", "")
+            name = str(name).strip()
+            if name and name not in names:
+                names.append(name)
+        return sorted(names)
+
+    def _ollama_catalog() -> dict:
+        """Return configured Ollama host status and installed models."""
+        host = _ollama_host()
         try:
             import ollama as _ollama  # noqa: F401
         except ImportError:
-            return {"server_running": False, "model_pulled": False,
-                    "setup_action": "Run: pip install ollama"}
+            return {
+                "host": host,
+                "online": False,
+                "installed_models": [],
+                "setup_action": "Run: pip install ollama",
+                "error": "ollama Python package is not installed",
+            }
         try:
-            client = _ollama.Client()
+            client = (
+                _ollama.Client(host=os.environ.get("OLLAMA_HOST"))
+                if os.environ.get("OLLAMA_HOST")
+                else _ollama.Client()
+            )
             result = client.list()
             model_rows = getattr(result, "models", None)
             if model_rows is None and isinstance(result, dict):
                 model_rows = result.get("models", [])
-            names = {
-                str(item.get("model", "") if isinstance(item, dict) else getattr(item, "model", ""))
-                for item in (model_rows or [])
-            }
-            if model in names:
-                return {"server_running": True, "model_pulled": True, "setup_action": None}
             return {
-                "server_running": True, "model_pulled": False,
-                "setup_action": f"Run: ollama pull {model}",
+                "host": host,
+                "online": True,
+                "installed_models": _ollama_model_names(model_rows),
+                "setup_action": None,
+                "error": None,
             }
-        except Exception:
+        except Exception as exc:
             return {
-                "server_running": False, "model_pulled": False,
+                "host": host,
+                "online": False,
+                "installed_models": [],
                 "setup_action": "Run: ollama serve",
+                "error": str(exc),
             }
+
+    def _ollama_readiness(model: str, catalog: dict | None = None) -> dict:
+        """Check Ollama server reachability and model availability without raising."""
+        catalog = catalog or _ollama_catalog()
+        installed = set(catalog.get("installed_models") or [])
+        server_running = bool(catalog.get("online"))
+        model_pulled = server_running and model in installed
+        return {
+            "host": catalog.get("host") or _ollama_host(),
+            "server_running": server_running,
+            "model_pulled": model_pulled,
+            "installed_models": sorted(installed),
+            "setup_action": (
+                None if model_pulled
+                else catalog.get("setup_action") if not server_running
+                else f"Run: ollama pull {model}"
+            ),
+            "error": catalog.get("error"),
+        }
+
+    def _provider_default_model(provider_id: str, fallback: str | None = None) -> str | None:
+        try:
+            definition = active_provider_registry.definition(provider_id)
+            return definition.default_model or fallback
+        except KeyError:
+            return fallback
+
+    def _selected_model_for_provider(
+        provider_id: str,
+        fallback: str | None = None,
+    ) -> tuple[str | None, str]:
+        default_model = _provider_default_model(provider_id, fallback)
+        if not provider_id.startswith("ollama-"):
+            return default_model, "default"
+        with runtime_provider_keys_lock:
+            selected = str(runtime_selected_models.get(provider_id) or "").strip()
+        if selected:
+            return selected, "session"
+        return default_model, "default"
+
+    def _set_selected_model_for_provider(provider_id: str, model: str) -> None:
+        with runtime_provider_keys_lock:
+            runtime_selected_models[provider_id] = model
+
+    def _provider_kwargs(provider_id: str, *, api_key: str | None = None) -> dict:
+        kwargs: dict[str, object] = {}
+        if provider_id.startswith("ollama-"):
+            selected_model, _ = _selected_model_for_provider(provider_id)
+            if selected_model:
+                kwargs["model"] = selected_model
+        if api_key:
+            kwargs["api_key"] = api_key
+        return kwargs
 
     def _e10_provider_statuses() -> list[dict]:
         ecology = active_provider_registry.ecology()
@@ -732,6 +904,7 @@ def create_app(
             provider["id"]: provider
             for provider in ecology.get("providers", [])
         }
+        ollama_catalog: dict | None = None
         rows = []
         for key, (label, provider_id, draft_model) in _E10_PARTICIPANTS.items():
             provider = providers.get(provider_id)
@@ -758,11 +931,14 @@ def create_app(
             requires_credential = bool(provider.get("required_environment"))
             is_ollama = provider_id.startswith("ollama-")
             default_model = provider.get("default_model") or draft_model
+            selected_model, selected_model_source = _selected_model_for_provider(provider_id, default_model)
 
             # Ollama: check actual server + model readiness, not just package install
             ollama_ready = None
             if is_ollama and adapter_available:
-                ollama_ready = _ollama_readiness(default_model)
+                if ollama_catalog is None:
+                    ollama_catalog = _ollama_catalog()
+                ollama_ready = _ollama_readiness(selected_model or "", ollama_catalog)
                 ollama_fully_ready = ollama_ready["server_running"] and ollama_ready["model_pulled"]
             else:
                 ollama_fully_ready = True  # non-Ollama providers are governed by credential
@@ -772,7 +948,11 @@ def create_app(
                 if not ollama_ready["server_running"]:
                     message = f"Ollama package is installed, but the server is not running. {setup_action or 'Run: ollama serve'}"
                 else:
-                    message = f"Ollama server is running, but the model is not pulled. {setup_action or f'Run: ollama pull {default_model}'}"
+                    message = (
+                        f"Ollama server is running, but the selected model "
+                        f"'{selected_model}' is not installed. Choose an installed model "
+                        "or pull the model outside this PR's governed-install scope."
+                    )
                 effective_status = "not_connected"
             elif available and not requires_credential:
                 message = "Ollama server is running and model is ready." if is_ollama else (
@@ -809,15 +989,32 @@ def create_app(
                     else None
                 ),
                 "default_model": default_model,
+                "selected_model": selected_model,
+                "selected_model_source": selected_model_source,
                 "execution_mode": "deterministic_local_draft",
                 "message": message,
-                "role_suitability": _ROLE_SUITABILITY.get(key, {}),
-                "setup": _PROVIDER_SETUP.get(key, {}),
+                "role_suitability": _model_specific_role_suitability(
+                    key,
+                    provider_id,
+                    selected_model,
+                    default_model,
+                ),
+                "setup": _model_specific_provider_setup(
+                    key,
+                    provider_id,
+                    selected_model,
+                    default_model,
+                ),
             }
             if is_ollama:
+                installed_models = ollama_ready["installed_models"] if ollama_ready else []
                 row["ollama_server_running"] = bool(ollama_ready and ollama_ready["server_running"])
                 row["ollama_model_pulled"] = bool(ollama_ready and ollama_ready["model_pulled"])
+                row["selected_model_installed"] = bool(ollama_ready and ollama_ready["model_pulled"])
+                row["ollama_host"] = (ollama_ready or {}).get("host") or _ollama_host()
+                row["installed_models"] = installed_models
                 row["ollama_setup_action"] = ollama_ready["setup_action"] if ollama_ready else None
+                row["ollama_error"] = ollama_ready.get("error") if ollama_ready else None
             rows.append(row)
         return rows
 
@@ -3285,6 +3482,57 @@ def create_app(
             ),
         })
 
+    @app.route("/api/e10/providers/<participant>/model", methods=["PUT"])
+    def api_e10_provider_model(participant: str):
+        participant_info = _e10_participant(participant)
+        if participant_info is None:
+            return jsonify({"error": f"unsupported participant: {participant}"}), 400
+        key, label, _ = participant_info
+        provider_id = _E10_PARTICIPANTS[key][1]
+        if not provider_id.startswith("ollama-"):
+            return jsonify({
+                "error": "model selection is currently implemented only for Ollama local providers"
+            }), 400
+        try:
+            active_provider_registry.definition(provider_id)
+        except KeyError:
+            return jsonify({
+                "error": f"{label} has no registered provider adapter"
+            }), 409
+
+        payload = request.get_json(silent=True) or {}
+        model = str(payload.get("model") or "").strip()
+        if not model:
+            return jsonify({"error": "model is required"}), 400
+
+        catalog = _ollama_catalog()
+        installed_models = set(catalog.get("installed_models") or [])
+        if not catalog.get("online"):
+            return jsonify({
+                "error": (
+                    "Ollama is not reachable, so Hermeneia cannot verify installed models. "
+                    "Start Ollama and choose from the discovered installed models."
+                ),
+                "ollama_host": catalog.get("host") or _ollama_host(),
+                "installed_models": sorted(installed_models),
+            }), 409
+        if model not in installed_models:
+            return jsonify({
+                "error": f"model '{model}' is not installed on the configured Ollama host",
+                "ollama_host": catalog.get("host") or _ollama_host(),
+                "installed_models": sorted(installed_models),
+            }), 400
+
+        _set_selected_model_for_provider(provider_id, model)
+        status = next(
+            row for row in _e10_provider_statuses()
+            if row["participant"] == key
+        )
+        return jsonify({
+            **status,
+            "message": f"Selected Ollama model for {label}: {model}",
+        })
+
     @app.route("/api/e10/providers/<participant>/test", methods=["POST"])
     def api_e10_provider_test(participant: str):
         selected = [
@@ -3321,9 +3569,7 @@ def create_app(
             })
         validation_error = None
         try:
-            provider_kwargs: dict[str, object] = {
-                "model": provider["default_model"],
-            }
+            provider_kwargs = _provider_kwargs(provider_id)
             if runtime_key:
                 provider_kwargs["api_key"] = runtime_key
             adapter = active_provider_registry.create(provider_id, **provider_kwargs)
@@ -3338,6 +3584,7 @@ def create_app(
             "adapter_available": provider["adapter_available"],
             "credential_source": provider["credential_source"],
             "default_model": provider["default_model"],
+            "selected_model": provider.get("selected_model"),
             "live_connection_test": True,
             "configuration_valid": validation_error is None,
             "message": (
@@ -3351,17 +3598,25 @@ def create_app(
     def api_e10_calibration():
         """Return full calibration records for all participants."""
         with _calibration_lock:
-            records = runtime_calibration.get("records", {})
             perf = _performance_summary()
             result = {}
             for key in _E10_PARTICIPANTS:
-                rec = _get_participant_calibration(key)
+                provider_id = _E10_PARTICIPANTS[key][1]
+                selected_model, _ = _selected_model_for_provider(provider_id, _E10_PARTICIPANTS[key][2])
+                rec = _get_calibration_record(
+                    key,
+                    provider_id=provider_id,
+                    model_id=selected_model,
+                )
+                performance = (
+                    _empty_performance_record(suppressed=True)
+                    if provider_id.startswith("ollama-")
+                    else perf.get(key, _empty_performance_record())
+                )
                 result[key] = {
                     **rec,
-                    "performance": perf.get(key, {
-                        "calls": 0, "success": 0, "parse_ok": 0,
-                        "avg_latency_ms": None, "errors": [], "accepted": 0, "rejected": 0,
-                    }),
+                    "calibration_identity": _calibration_key(key, provider_id, selected_model),
+                    "performance": performance,
                 }
         return jsonify({"calibration": result, "roles": _CALIBRATION_ROLES})
 
@@ -3390,7 +3645,7 @@ def create_app(
         # For Ollama providers, check server + model readiness
         is_ollama = provider_id.startswith("ollama-")
         if is_ollama:
-            model = provider_status.get("default_model", "")
+            model = provider_status.get("selected_model") or provider_status.get("default_model", "")
             readiness = _ollama_readiness(model)
             if not (readiness["server_running"] and readiness["model_pulled"]):
                 action = readiness.get("setup_action", "Check Ollama setup")
@@ -3419,8 +3674,9 @@ def create_app(
         start = _time.monotonic()
         raw_output = None
         error_msg = None
+        selected_model = provider_status.get("selected_model") or provider_status.get("default_model")
         try:
-            kwargs: dict = {"model": provider_status["default_model"]}
+            kwargs = _provider_kwargs(provider_id)
             if runtime_key:
                 kwargs["api_key"] = runtime_key
             adapter = active_provider_registry.create(provider_id, **kwargs)
@@ -3432,7 +3688,9 @@ def create_app(
         if error_msg:
             _record_calibration_result(
                 key, role, test_name, "fail", latency_ms,
-                error_msg, f"Provider call failed: {error_msg}"
+                error_msg, f"Provider call failed: {error_msg}",
+                provider_id=provider_id,
+                model_id=selected_model,
             )
             _log_performance_event({
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -3442,6 +3700,8 @@ def create_app(
             })
             return jsonify({
                 "participant": key, "role": role, "test_name": test_name,
+                "provider_id": provider_id,
+                "model_id": selected_model,
                 "status": "fail",
                 "failure_reason": error_msg,
                 "latency_ms": latency_ms,
@@ -3478,7 +3738,17 @@ def create_app(
             f"Passed {test_name} calibration. Approved for {role}." if parse_ok else
             f"Failed {test_name}: {failure_reason}. Rejected for {role} until calibration passes."
         )
-        _record_calibration_result(key, role, test_name, status, latency_ms, failure_reason, recommendation)
+        _record_calibration_result(
+            key,
+            role,
+            test_name,
+            status,
+            latency_ms,
+            failure_reason,
+            recommendation,
+            provider_id=provider_id,
+            model_id=selected_model,
+        )
         _log_performance_event({
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "participant": key, "role": role,
@@ -3486,9 +3756,15 @@ def create_app(
             "latency_ms": latency_ms, "error": failure_reason,
         })
 
-        rec = _get_participant_calibration(key)
+        rec = _get_calibration_record(
+            key,
+            provider_id=provider_id,
+            model_id=selected_model,
+        )
         return jsonify({
             "participant": key, "role": role, "test_name": test_name,
+            "provider_id": provider_id,
+            "model_id": selected_model,
             "status": status,
             "failure_reason": failure_reason,
             "latency_ms": latency_ms,
@@ -3516,14 +3792,22 @@ def create_app(
             }), 400
 
         key, label, _ = participant_info
+        provider_id = _E10_PARTICIPANTS[key][1]
+        selected_model, _ = _selected_model_for_provider(provider_id, _E10_PARTICIPANTS[key][2])
         now = datetime.now(timezone.utc).isoformat()
         with _calibration_lock:
-            rec = _get_participant_calibration(key)
+            rec = _get_calibration_record(
+                key,
+                provider_id=provider_id,
+                model_id=selected_model,
+            )
             rec["role_status"][role] = {"status": status, "last_updated": now, "steward_note": note}
             _save_calibration_store(runtime_calibration)
 
         return jsonify({
             "participant": key, "role": role,
+            "provider_id": provider_id,
+            "model_id": selected_model,
             "status": status, "steward_note": note, "updated_at": now,
             "message": f"{label}: {role} role status set to '{status}' by Steward.",
         })
@@ -3690,8 +3974,12 @@ def create_app(
             generated_at = datetime.now(timezone.utc).isoformat()
             for key, label, model in participants:
                 _provider_id = _E10_PARTICIPANTS[key][1]
+                selected_model, _ = _selected_model_for_provider(_provider_id, model)
                 try:
-                    _adapter = active_provider_registry.create(_provider_id)
+                    _adapter = active_provider_registry.create(
+                        _provider_id,
+                        **_provider_kwargs(_provider_id),
+                    )
                 except Exception:
                     _adapter = active_provider_registry.create("null")
                 import time as _time
@@ -3737,7 +4025,7 @@ def create_app(
                     perspective=label,
                     text=interp_text,
                     evidential_status="speculative",
-                    generating_model=model,
+                    generating_model=selected_model or model,
                     prompt_reference=prompt_used,
                     prompt_reference_type="full_text",
                     conn=store,
@@ -3849,8 +4137,12 @@ def create_app(
         }
 
         # Bucketing pass — ephemeral, never stored
+        bucket_provider_id = _E10_PARTICIPANTS[participants[0][0]][1]
         try:
-            _bucketing_provider = active_provider_registry.create(participants[0][0])
+            _bucketing_provider = active_provider_registry.create(
+                bucket_provider_id,
+                **_provider_kwargs(bucket_provider_id),
+            )
         except Exception:
             _bucketing_provider = active_provider_registry.create("null")
         try:
@@ -3895,8 +4187,12 @@ def create_app(
                         continue
 
                     _provider_id = _E10_PARTICIPANTS[key][1]
+                    selected_model, _ = _selected_model_for_provider(_provider_id, model)
                     try:
-                        _adapter = active_provider_registry.create(_provider_id)
+                        _adapter = active_provider_registry.create(
+                            _provider_id,
+                            **_provider_kwargs(_provider_id),
+                        )
                     except Exception:
                         _adapter = active_provider_registry.create("null")
 
@@ -3915,7 +4211,7 @@ def create_app(
                         perspective=label,
                         text=interp_text,
                         evidential_status="speculative",
-                        generating_model=model,
+                        generating_model=selected_model or model,
                         prompt_reference=prompt_used,
                         prompt_reference_type="full_text",
                         conn=store,
@@ -4524,7 +4820,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 
             with runtime_provider_keys_lock:
                 runtime_key = runtime_provider_keys.get(provider)
-            provider_kwargs: dict = {}
+            provider_kwargs = _provider_kwargs(provider)
             if runtime_key:
                 provider_kwargs["api_key"] = runtime_key
             prov = get_provider(provider, **provider_kwargs)
@@ -5263,7 +5559,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         try:
             with runtime_provider_keys_lock:
                 runtime_key = runtime_provider_keys.get(provider)
-            kwargs: dict = {}
+            kwargs = _provider_kwargs(provider)
             if model:
                 kwargs["model"] = model
             if api_key or runtime_key:
@@ -5340,7 +5636,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         try:
             with runtime_provider_keys_lock:
                 runtime_key = runtime_provider_keys.get(provider)
-            provider_kwargs: dict = {}
+            provider_kwargs = _provider_kwargs(provider)
             if runtime_key:
                 provider_kwargs["api_key"] = runtime_key
             if plan_id:
@@ -5411,7 +5707,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         try:
             with runtime_provider_keys_lock:
                 runtime_key = runtime_provider_keys.get(provider)
-            provider_kwargs: dict = {}
+            provider_kwargs = _provider_kwargs(provider)
             if runtime_key:
                 provider_kwargs["api_key"] = runtime_key
             result = render_for_plan(
@@ -5548,7 +5844,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         try:
             with runtime_provider_keys_lock:
                 runtime_key = runtime_provider_keys.get(provider)
-            provider_kwargs: dict = {}
+            provider_kwargs = _provider_kwargs(provider)
             if runtime_key:
                 provider_kwargs["api_key"] = runtime_key
             if model:
@@ -6426,9 +6722,13 @@ Return ONLY valid JSON, no markdown, no explanation:
                 return jsonify({"error": f"unsupported provider: {raw_provider}"}), 400
             participant_key, participant_label, model_id = participant
             provider_id = _E10_PARTICIPANTS[participant_key][1]
+            model_id, _ = _selected_model_for_provider(provider_id, model_id)
 
         try:
-            adapter = active_provider_registry.create(provider_id)
+            adapter = active_provider_registry.create(
+                provider_id,
+                **_provider_kwargs(provider_id),
+            )
         except Exception as exc:
             return jsonify({"error": f"provider unavailable: {exc}"}), 502
 

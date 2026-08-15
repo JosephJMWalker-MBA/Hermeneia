@@ -7449,10 +7449,12 @@ async function e10LoadProviders() {
             <div style="font-size:12px;font-weight:600;color:var(--fg);margin-bottom:4px">${x(p.label)} <span style="font-size:10px;color:var(--dim2);font-weight:400">(${x(p.provider_id)})</span></div>
             <div style="font-family:var(--mono);font-size:11px;color:var(--dim2);line-height:1.8">
               adapter: ${p.adapter_available ? '✓ installed' : '✗ missing'}<br>
-              model: ${x(p.default_model || '—')}<br>
+              model: ${x(p.selected_model || p.default_model || '—')}<br>
               credential: ${p.requires_credential ? (p.configured ? `✓ ${x(p.credential_scope || '')}` : '✗ none') : 'not required'}
+              ${p.ollama_host ? `<br>ollama host: ${x(p.ollama_host)}` : ''}
               ${p.ollama_server_running !== undefined ? `<br>ollama server: ${p.ollama_server_running ? '✓ running' : '✗ not running'}` : ''}
               ${p.ollama_model_pulled !== undefined ? `<br>model pulled: ${p.ollama_model_pulled ? '✓ ready' : '✗ not pulled'}` : ''}
+              ${Array.isArray(p.installed_models) ? `<br>installed models: ${p.installed_models.length ? x(p.installed_models.join(', ')) : 'none discovered'}` : ''}
               ${p.ollama_setup_action ? `<br><span style="color:var(--yellow)">Next step: ${x(p.ollama_setup_action)}</span>` : ''}
             </div>
             ${_e10CalibrationTestLog(p.participant)}
@@ -7523,12 +7525,38 @@ function e10ProviderCard(provider, cal, perf) {
   // Ollama readiness steps
   let ollamaSteps = '';
   if (isOllama && provider.adapter_available) {
+    const installedModels = Array.isArray(provider.installed_models) ? provider.installed_models : [];
+    const selectedModel = provider.selected_model || provider.default_model || '';
+    const selectedInstalled = installedModels.includes(selectedModel);
+    const selectorDisabled = !provider.ollama_server_running || installedModels.length === 0;
+    const installedHtml = installedModels.length
+      ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px">${installedModels.map(m => `<span style="font-family:var(--mono);font-size:10px;border:1px solid var(--border);border-radius:999px;padding:1px 6px;color:${m === selectedModel ? 'var(--green)' : 'var(--dim2)'}">${x(m)}</span>`).join('')}</div>`
+      : '<div style="font-size:11px;color:var(--dim2);margin-top:4px">No installed models discovered.</div>';
+    const missingSelectedOption = selectedModel && !selectedInstalled
+      ? `<option value="" selected disabled>${x(selectedModel)} (not installed)</option>`
+      : '';
+    const modelOptions = missingSelectedOption + installedModels.map(m =>
+      `<option value="${x(m)}" ${m === selectedModel ? 'selected' : ''}>${x(m)}</option>`
+    ).join('');
     const steps = [];
     if (!provider.ollama_server_running) steps.push({ ok: false, label: 'Ollama server running', action: 'ollama serve' });
     else steps.push({ ok: true, label: 'Ollama server running', action: null });
-    if (!provider.ollama_model_pulled) steps.push({ ok: false, label: `Model pulled (${x(provider.default_model)})`, action: `ollama pull ${x(provider.default_model)}` });
-    else steps.push({ ok: true, label: `Model pulled (${x(provider.default_model)})`, action: null });
+    if (!provider.ollama_model_pulled) steps.push({ ok: false, label: `Selected model installed (${x(selectedModel)})`, action: `ollama pull ${x(selectedModel)}` });
+    else steps.push({ ok: true, label: `Selected model installed (${x(selectedModel)})`, action: null });
     ollamaSteps = `<div style="margin:8px 0 4px;font-size:11px;color:var(--dim2)">
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 8px;margin-bottom:8px">
+        <span>Host</span><span style="font-family:var(--mono);color:var(--fg2)">${x(provider.ollama_host || 'http://localhost:11434')}</span>
+        <span>Runtime</span><span style="color:${provider.ollama_server_running ? 'var(--green)' : 'var(--yellow)'}">${provider.ollama_server_running ? 'online' : 'offline'}</span>
+        <span>Selected</span><span style="font-family:var(--mono);color:${provider.selected_model_installed ? 'var(--green)' : 'var(--yellow)'}">${x(selectedModel || '—')}</span>
+      </div>
+      <label style="display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);margin-bottom:3px">Installed models</label>
+      ${installedHtml}
+      <div style="display:flex;align-items:center;gap:6px;margin:8px 0">
+        <select ${selectorDisabled ? 'disabled' : ''} data-current-model="${x(selectedModel)}" onchange="e10SelectOllamaModel(${pk},this.value,this)" style="font-size:11px;padding:4px 7px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);max-width:100%">
+          ${modelOptions || `<option value="">No installed models</option>`}
+        </select>
+        ${provider.selected_model_source === 'session' ? '<span style="font-size:10px;color:var(--dim2)">session selection</span>' : '<span style="font-size:10px;color:var(--dim2)">registry default</span>'}
+      </div>
       ${steps.map(s => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
         <span style="color:${s.ok ? 'var(--green)' : 'var(--yellow)'}">${s.ok ? '✓' : '○'}</span>
         <span style="color:${s.ok ? 'var(--fg2)' : 'var(--dim2)'}">${s.label}</span>
@@ -7576,7 +7604,7 @@ function e10ProviderCard(provider, cal, perf) {
 
   // Performance summary strip
   let perfHtml = '';
-  if (perf && perf.calls > 0) {
+  if (perf && !perf.suppressed && perf.calls > 0) {
     const sr = perf.success_rate != null ? Math.round(perf.success_rate * 100) + '%' : '—';
     const lat = perf.avg_latency_ms != null ? Math.round(perf.avg_latency_ms) + 'ms' : '—';
     const po = perf.parse_ok_rate != null ? Math.round(perf.parse_ok_rate * 100) + '%' : '—';
@@ -11961,6 +11989,21 @@ async function e10RemoveKey(participant) {
   const result = await del(`/api/e10/providers/${encodeURIComponent(participant)}/key`);
   _e10ProviderNotices[participant] = result.message;
   await e10LoadProviders();
+}
+
+async function e10SelectOllamaModel(participant, model, selectEl) {
+  if (!model) return;
+  if (selectEl) selectEl.disabled = true;
+  try {
+    const result = await put(`/api/e10/providers/${encodeURIComponent(participant)}/model`, { model });
+    _e10ProviderNotices[participant] = result.message;
+    await e10LoadProviders();
+  } catch(e) {
+    await e10LoadProviders();
+    showAppError(e.message);
+  } finally {
+    if (selectEl) selectEl.disabled = false;
+  }
 }
 
 async function e10TestProvider(participant) {
