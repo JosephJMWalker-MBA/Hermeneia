@@ -292,7 +292,7 @@ def test_e10_ollama_missing_selected_model_does_not_silently_switch(
 
     assert local["installed_models"] == ["qwen3:4b"]
     assert local["selected_model"] == "missing:1b"
-    assert local["selected_model_source"] == "session"
+    assert local["selected_model_source"] == "user_config"
     assert local["selected_model_installed"] is False
     assert "qwen3:4b" not in local["message"], "Hermeneia must not imply an automatic switch"
 
@@ -315,7 +315,7 @@ def test_e10_ollama_model_selection_persists_in_user_settings_not_calibration(
     assert response.status_code == 200
     body = response.get_json()
     assert body["selected_model"] == "llama3.2:1b"
-    assert body["selected_model_source"] == "session"
+    assert body["selected_model_source"] == "user_config"
     assert not (tmp_path / "calibration.json").exists()
     settings = json.loads(settings_path.read_text())
     assert settings["schema"] == "hermeneia.connections_settings.v1"
@@ -491,6 +491,103 @@ def test_e10_ollama_host_uses_environment_user_default_precedence(
     )
     assert env_status["ollama_host"] == "http://env.local:11434"
     assert env_status["ollama_host_source"] == "environment"
+
+
+def test_e10_ollama_failed_settings_write_does_not_change_live_model_or_host(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    _install_fake_ollama(monkeypatch, ["llama3.2:1b", "qwen3:4b"])
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    def fail_save(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("hermeneia.web.app.save_connections_settings", fail_save)
+
+    model_response = client.put("/api/e10/providers/local/model", json={"model": "llama3.2:1b"})
+    host_response = client.put("/api/e10/ollama/host", json={"host": "http://jetson.local:11434"})
+    local = next(
+        provider for provider in client.get("/api/e10/providers").get_json()["providers"]
+        if provider["participant"] == "local"
+    )
+
+    assert model_response.status_code == 500
+    assert host_response.status_code == 500
+    assert local["selected_model"] == "qwen3:4b"
+    assert local["selected_model_source"] == "default"
+    assert local["ollama_host"] == "http://localhost:11434"
+    assert local["ollama_host_source"] == "default"
+    assert not settings_path.exists()
+
+
+def test_e10_ollama_host_rejects_secret_bearing_or_non_origin_urls(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    bad_hosts = [
+        "http://username:password@server:11434",
+        "http://server:11434?token=secret",
+        "http://server:11434/#secret",
+        "http://server:11434/api",
+        "http:///missing-host",
+        "ftp://server:11434",
+    ]
+    for host in bad_hosts:
+        response = client.put("/api/e10/ollama/host", json={"host": host})
+        assert response.status_code == 400, host
+
+    assert not settings_path.exists()
+
+
+def test_e10_ollama_unsupported_future_settings_are_not_overwritten(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    settings_path.parent.mkdir(parents=True)
+    future_settings = {
+        "schema": "hermeneia.connections_settings.v1",
+        "version": 2,
+        "future_field": {"preserve": True},
+    }
+    settings_path.write_text(json.dumps(future_settings, indent=2))
+    original_text = settings_path.read_text()
+    _install_fake_ollama(monkeypatch, ["llama3.2:1b", "qwen3:4b"])
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    model_response = client.put("/api/e10/providers/local/model", json={"model": "llama3.2:1b"})
+    host_response = client.put("/api/e10/ollama/host", json={"host": "http://jetson.local:11434"})
+    local = next(
+        provider for provider in client.get("/api/e10/providers").get_json()["providers"]
+        if provider["participant"] == "local"
+    )
+
+    assert model_response.status_code == 409
+    assert host_response.status_code == 409
+    assert "Unsupported Hermeneia Connections settings version" in model_response.get_json()["error"]
+    assert settings_path.read_text() == original_text
+    assert local["selected_model"] == "qwen3:4b"
+    assert local["selected_model_source"] == "default"
+    assert local["ollama_host"] == "http://localhost:11434"
+    assert local["ollama_host_source"] == "default"
 
 
 def test_e10_ollama_refuses_uninstalled_or_unverified_model_selection(

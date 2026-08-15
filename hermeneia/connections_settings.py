@@ -15,11 +15,20 @@ import tempfile
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 
 CONNECTIONS_SETTINGS_SCHEMA = "hermeneia.connections_settings.v1"
 CONNECTIONS_SETTINGS_VERSION = 1
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
+
+
+class UnsupportedConnectionsSettingsError(RuntimeError):
+    """Raised when a valid Hermeneia settings file is newer than this binary."""
+
+
+class InvalidConnectionsSettingError(ValueError):
+    """Raised when a proposed non-secret setting violates its boundary."""
 
 
 def connections_settings_path() -> Path:
@@ -51,19 +60,61 @@ def empty_connections_settings() -> dict[str, Any]:
     }
 
 
-def _coerce_settings(raw: object) -> dict[str, Any]:
+def _is_hermeneia_connections_schema(value: object) -> bool:
+    return isinstance(value, str) and value.startswith("hermeneia.connections_settings.")
+
+
+def validate_ollama_host(host: str) -> str:
+    value = str(host or "").strip()
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"}:
+        raise InvalidConnectionsSettingError("host must begin with http:// or https://")
+    if not parsed.hostname:
+        raise InvalidConnectionsSettingError("host must include a hostname")
+    if parsed.username or parsed.password:
+        raise InvalidConnectionsSettingError("host must not include username or password")
+    if parsed.query or parsed.fragment:
+        raise InvalidConnectionsSettingError("host must not include query strings or fragments")
+    if parsed.path not in {"", "/"}:
+        raise InvalidConnectionsSettingError("host must be an Ollama origin, not a URL path")
+    if parsed.params:
+        raise InvalidConnectionsSettingError("host must not include URL parameters")
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise InvalidConnectionsSettingError("host port is invalid") from exc
+    netloc = parsed.hostname
+    if port is not None:
+        netloc = f"{netloc}:{port}"
+    return f"{parsed.scheme}://{netloc}"
+
+
+def _coerce_settings(raw: object, *, allow_unsupported: bool = False) -> dict[str, Any]:
     if not isinstance(raw, dict):
         return empty_connections_settings()
-    if raw.get("schema") != CONNECTIONS_SETTINGS_SCHEMA:
+    schema = raw.get("schema")
+    version = raw.get("version")
+    if schema != CONNECTIONS_SETTINGS_SCHEMA:
+        if _is_hermeneia_connections_schema(schema) and not allow_unsupported:
+            raise UnsupportedConnectionsSettingsError(
+                f"Unsupported Hermeneia Connections settings schema: {schema}"
+            )
         return empty_connections_settings()
-    if raw.get("version") != CONNECTIONS_SETTINGS_VERSION:
+    if version != CONNECTIONS_SETTINGS_VERSION:
+        if not allow_unsupported:
+            raise UnsupportedConnectionsSettingsError(
+                f"Unsupported Hermeneia Connections settings version: {version}"
+            )
         return empty_connections_settings()
     settings = empty_connections_settings()
     ollama = raw.get("ollama")
     if isinstance(ollama, dict):
         host = str(ollama.get("host") or "").strip()
         if host:
-            settings["ollama"]["host"] = host
+            try:
+                settings["ollama"]["host"] = validate_ollama_host(host)
+            except InvalidConnectionsSettingError:
+                pass
     providers = raw.get("providers")
     if isinstance(providers, dict):
         for provider_id, provider_settings in providers.items():
@@ -158,5 +209,5 @@ def ollama_host_from_settings(settings: dict[str, Any]) -> str | None:
 
 def set_ollama_host(settings: dict[str, Any], host: str) -> dict[str, Any]:
     next_settings = _coerce_settings(deepcopy(settings))
-    next_settings["ollama"]["host"] = host
+    next_settings["ollama"]["host"] = validate_ollama_host(host)
     return next_settings

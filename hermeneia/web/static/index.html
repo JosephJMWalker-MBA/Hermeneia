@@ -7529,9 +7529,7 @@ function e10ProviderCard(provider, cal, perf) {
     const selectedModel = provider.selected_model || provider.default_model || '';
     const selectedInstalled = installedModels.includes(selectedModel);
     const selectorDisabled = !provider.ollama_server_running || installedModels.length === 0;
-    const modelSourceLabel = provider.selected_model_source === 'session'
-      ? 'session selection'
-      : provider.selected_model_source === 'user_config'
+    const modelSourceLabel = provider.selected_model_source === 'user_config'
         ? 'user setting'
         : 'registry default';
     const hostSourceLabel = provider.ollama_host_source === 'environment'
