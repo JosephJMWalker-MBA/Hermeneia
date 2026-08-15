@@ -145,6 +145,7 @@ def create_app(
 
     active_provider_registry = provider_registry or DEFAULT_PROVIDER_REGISTRY
     runtime_provider_keys: dict[str, str] = {}
+    runtime_selected_models: dict[str, str] = {}
     runtime_provider_keys_lock = threading.RLock()
 
     # ── Calibration store ──────────────────────────────────────────────────────
@@ -191,20 +192,56 @@ def create_app(
         "Observation: \"He stretched out his arms toward the dark water in a trembling way.\""
     )
 
-    def _get_participant_calibration(participant_key: str) -> dict:
-        """Return the calibration record for a participant, initialised if absent."""
+    def _empty_calibration_record(
+        participant_key: str,
+        *,
+        provider_id: str | None = None,
+        model_id: str | None = None,
+    ) -> dict:
+        record = {
+            "participant": participant_key,
+            "role_status": {
+                role: {"status": "untested", "last_updated": None, "steward_note": None}
+                for role in _CALIBRATION_ROLES
+            },
+            "calibration_tests": [],
+        }
+        if provider_id:
+            record["provider_id"] = provider_id
+        if model_id:
+            record["model_id"] = model_id
+        return record
+
+    def _calibration_key(
+        participant_key: str,
+        provider_id: str | None = None,
+        model_id: str | None = None,
+    ) -> str:
+        if provider_id and provider_id.startswith("ollama-") and model_id:
+            return f"{participant_key}::{provider_id}::{model_id}"
+        return participant_key
+
+    def _get_calibration_record(
+        participant_key: str,
+        *,
+        provider_id: str | None = None,
+        model_id: str | None = None,
+    ) -> dict:
+        """Return calibration for the exact participant/provider/model identity."""
         with _calibration_lock:
             store = runtime_calibration
-            if participant_key not in store.get("records", {}):
-                store.setdefault("records", {})[participant_key] = {
-                    "participant": participant_key,
-                    "role_status": {
-                        role: {"status": "untested", "last_updated": None, "steward_note": None}
-                        for role in _CALIBRATION_ROLES
-                    },
-                    "calibration_tests": [],
-                }
-            return store["records"][participant_key]
+            key = _calibration_key(participant_key, provider_id, model_id)
+            if key not in store.get("records", {}):
+                store.setdefault("records", {})[key] = _empty_calibration_record(
+                    participant_key,
+                    provider_id=provider_id,
+                    model_id=model_id,
+                )
+            return store["records"][key]
+
+    def _get_participant_calibration(participant_key: str) -> dict:
+        """Return the legacy participant calibration record."""
+        return _get_calibration_record(participant_key)
 
     def _record_calibration_result(
         participant_key: str,
@@ -214,14 +251,22 @@ def create_app(
         latency_ms: int | None,
         failure_reason: str | None,
         recommendation: str,
+        provider_id: str | None = None,
+        model_id: str | None = None,
     ) -> None:
         with _calibration_lock:
-            rec = _get_participant_calibration(participant_key)
+            rec = _get_calibration_record(
+                participant_key,
+                provider_id=provider_id,
+                model_id=model_id,
+            )
             now = datetime.now(timezone.utc).isoformat()
             test_id = f"t-{now[:10].replace('-','')}-{len(rec['calibration_tests'])+1:03d}"
             rec["calibration_tests"].append({
                 "test_id": test_id,
                 "timestamp": now,
+                "provider_id": provider_id,
+                "model_id": model_id,
                 "role": role,
                 "test_name": test_name,
                 "status": status,
@@ -785,21 +830,15 @@ def create_app(
         default_model = _provider_default_model(provider_id, fallback)
         if not provider_id.startswith("ollama-"):
             return default_model, "default"
-        with _calibration_lock:
-            configured = runtime_calibration.setdefault("provider_configuration", {})
-            provider_config = configured.get(provider_id, {})
-            selected = str(provider_config.get("selected_model") or "").strip()
+        with runtime_provider_keys_lock:
+            selected = str(runtime_selected_models.get(provider_id) or "").strip()
         if selected:
-            return selected, "user"
+            return selected, "session"
         return default_model, "default"
 
     def _set_selected_model_for_provider(provider_id: str, model: str) -> None:
-        with _calibration_lock:
-            configured = runtime_calibration.setdefault("provider_configuration", {})
-            provider_config = configured.setdefault(provider_id, {})
-            provider_config["selected_model"] = model
-            provider_config["updated_at"] = datetime.now(timezone.utc).isoformat()
-            _save_calibration_store(runtime_calibration)
+        with runtime_provider_keys_lock:
+            runtime_selected_models[provider_id] = model
 
     def _provider_kwargs(provider_id: str, *, api_key: str | None = None) -> dict:
         kwargs: dict[str, object] = {}
@@ -3501,13 +3540,19 @@ def create_app(
     def api_e10_calibration():
         """Return full calibration records for all participants."""
         with _calibration_lock:
-            records = runtime_calibration.get("records", {})
             perf = _performance_summary()
             result = {}
             for key in _E10_PARTICIPANTS:
-                rec = _get_participant_calibration(key)
+                provider_id = _E10_PARTICIPANTS[key][1]
+                selected_model, _ = _selected_model_for_provider(provider_id, _E10_PARTICIPANTS[key][2])
+                rec = _get_calibration_record(
+                    key,
+                    provider_id=provider_id,
+                    model_id=selected_model,
+                )
                 result[key] = {
                     **rec,
+                    "calibration_identity": _calibration_key(key, provider_id, selected_model),
                     "performance": perf.get(key, {
                         "calls": 0, "success": 0, "parse_ok": 0,
                         "avg_latency_ms": None, "errors": [], "accepted": 0, "rejected": 0,
@@ -3569,6 +3614,7 @@ def create_app(
         start = _time.monotonic()
         raw_output = None
         error_msg = None
+        selected_model = provider_status.get("selected_model") or provider_status.get("default_model")
         try:
             kwargs = _provider_kwargs(provider_id)
             if runtime_key:
@@ -3582,7 +3628,9 @@ def create_app(
         if error_msg:
             _record_calibration_result(
                 key, role, test_name, "fail", latency_ms,
-                error_msg, f"Provider call failed: {error_msg}"
+                error_msg, f"Provider call failed: {error_msg}",
+                provider_id=provider_id,
+                model_id=selected_model,
             )
             _log_performance_event({
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -3592,6 +3640,8 @@ def create_app(
             })
             return jsonify({
                 "participant": key, "role": role, "test_name": test_name,
+                "provider_id": provider_id,
+                "model_id": selected_model,
                 "status": "fail",
                 "failure_reason": error_msg,
                 "latency_ms": latency_ms,
@@ -3628,7 +3678,17 @@ def create_app(
             f"Passed {test_name} calibration. Approved for {role}." if parse_ok else
             f"Failed {test_name}: {failure_reason}. Rejected for {role} until calibration passes."
         )
-        _record_calibration_result(key, role, test_name, status, latency_ms, failure_reason, recommendation)
+        _record_calibration_result(
+            key,
+            role,
+            test_name,
+            status,
+            latency_ms,
+            failure_reason,
+            recommendation,
+            provider_id=provider_id,
+            model_id=selected_model,
+        )
         _log_performance_event({
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "participant": key, "role": role,
@@ -3636,9 +3696,15 @@ def create_app(
             "latency_ms": latency_ms, "error": failure_reason,
         })
 
-        rec = _get_participant_calibration(key)
+        rec = _get_calibration_record(
+            key,
+            provider_id=provider_id,
+            model_id=selected_model,
+        )
         return jsonify({
             "participant": key, "role": role, "test_name": test_name,
+            "provider_id": provider_id,
+            "model_id": selected_model,
             "status": status,
             "failure_reason": failure_reason,
             "latency_ms": latency_ms,
@@ -3666,14 +3732,22 @@ def create_app(
             }), 400
 
         key, label, _ = participant_info
+        provider_id = _E10_PARTICIPANTS[key][1]
+        selected_model, _ = _selected_model_for_provider(provider_id, _E10_PARTICIPANTS[key][2])
         now = datetime.now(timezone.utc).isoformat()
         with _calibration_lock:
-            rec = _get_participant_calibration(key)
+            rec = _get_calibration_record(
+                key,
+                provider_id=provider_id,
+                model_id=selected_model,
+            )
             rec["role_status"][role] = {"status": status, "last_updated": now, "steward_note": note}
             _save_calibration_store(runtime_calibration)
 
         return jsonify({
             "participant": key, "role": role,
+            "provider_id": provider_id,
+            "model_id": selected_model,
             "status": status, "steward_note": note, "updated_at": now,
             "message": f"{label}: {role} role status set to '{status}' by Steward.",
         })

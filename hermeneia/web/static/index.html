@@ -7527,11 +7527,15 @@ function e10ProviderCard(provider, cal, perf) {
   if (isOllama && provider.adapter_available) {
     const installedModels = Array.isArray(provider.installed_models) ? provider.installed_models : [];
     const selectedModel = provider.selected_model || provider.default_model || '';
+    const selectedInstalled = installedModels.includes(selectedModel);
     const selectorDisabled = !provider.ollama_server_running || installedModels.length === 0;
     const installedHtml = installedModels.length
       ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px">${installedModels.map(m => `<span style="font-family:var(--mono);font-size:10px;border:1px solid var(--border);border-radius:999px;padding:1px 6px;color:${m === selectedModel ? 'var(--green)' : 'var(--dim2)'}">${x(m)}</span>`).join('')}</div>`
       : '<div style="font-size:11px;color:var(--dim2);margin-top:4px">No installed models discovered.</div>';
-    const modelOptions = installedModels.map(m =>
+    const missingSelectedOption = selectedModel && !selectedInstalled
+      ? `<option value="" selected disabled>${x(selectedModel)} (not installed)</option>`
+      : '';
+    const modelOptions = missingSelectedOption + installedModels.map(m =>
       `<option value="${x(m)}" ${m === selectedModel ? 'selected' : ''}>${x(m)}</option>`
     ).join('');
     const steps = [];
@@ -7548,10 +7552,10 @@ function e10ProviderCard(provider, cal, perf) {
       <label style="display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);margin-bottom:3px">Installed models</label>
       ${installedHtml}
       <div style="display:flex;align-items:center;gap:6px;margin:8px 0">
-        <select ${selectorDisabled ? 'disabled' : ''} onchange="e10SelectOllamaModel(${pk},this.value,this)" style="font-size:11px;padding:4px 7px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);max-width:100%">
+        <select ${selectorDisabled ? 'disabled' : ''} data-current-model="${x(selectedModel)}" onchange="e10SelectOllamaModel(${pk},this.value,this)" style="font-size:11px;padding:4px 7px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);max-width:100%">
           ${modelOptions || `<option value="">No installed models</option>`}
         </select>
-        ${provider.selected_model_source === 'user' ? '<span style="font-size:10px;color:var(--dim2)">saved default</span>' : '<span style="font-size:10px;color:var(--dim2)">registry default</span>'}
+        ${provider.selected_model_source === 'session' ? '<span style="font-size:10px;color:var(--dim2)">session selection</span>' : '<span style="font-size:10px;color:var(--dim2)">registry default</span>'}
       </div>
       ${steps.map(s => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
         <span style="color:${s.ok ? 'var(--green)' : 'var(--yellow)'}">${s.ok ? '✓' : '○'}</span>
@@ -11989,14 +11993,13 @@ async function e10RemoveKey(participant) {
 
 async function e10SelectOllamaModel(participant, model, selectEl) {
   if (!model) return;
-  const original = selectEl?.value;
   if (selectEl) selectEl.disabled = true;
   try {
     const result = await put(`/api/e10/providers/${encodeURIComponent(participant)}/model`, { model });
     _e10ProviderNotices[participant] = result.message;
     await e10LoadProviders();
   } catch(e) {
-    if (selectEl && original) selectEl.value = original;
+    await e10LoadProviders();
     showAppError(e.message);
   } finally {
     if (selectEl) selectEl.disabled = false;
