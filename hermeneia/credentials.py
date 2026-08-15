@@ -14,6 +14,23 @@ from typing import Protocol
 
 SERVICE_NAME = "Hermeneia Connections"
 
+_SYSTEM_BACKEND_MARKERS = (
+    "keyring.backends.macos",
+    "keyring.backends.secretservice",
+    "keyring.backends.kwallet",
+    "keyring.backends.windows",
+)
+_INSECURE_BACKEND_MARKERS = (
+    "keyring.backends.fail",
+    "keyring.backends.null",
+    "keyrings.alt",
+    "plaintext",
+    "plain",
+    "file",
+    "cryptfile",
+    "encryptedfile",
+)
+
 
 class CredentialStoreError(RuntimeError):
     """Base error for credential-store operations."""
@@ -87,14 +104,15 @@ class KeyringCredentialStore:
             ) from exc
         backend_module = backend.__class__.__module__.lower()
         backend_name = backend.__class__.__name__
+        backend_identity = f"{backend_module}.{backend_name.lower()}"
         priority = getattr(backend, "priority", 0)
-        if "keyring.backends.fail" in backend_module:
+        if any(marker in backend_identity for marker in _INSECURE_BACKEND_MARKERS):
             raise CredentialStoreUnavailable(
-                "No system credential backend is available for this runtime."
+                "Refusing to use a non-system or insecure credential backend."
             )
-        if "keyring.backends.null" in backend_module or "plaintext" in backend_module:
+        if not any(marker in backend_module for marker in _SYSTEM_BACKEND_MARKERS):
             raise CredentialStoreUnavailable(
-                "Refusing to use an insecure plaintext credential backend."
+                "No recognized system credential backend is available for this runtime."
             )
         try:
             if float(priority) <= 0:
@@ -133,11 +151,11 @@ class KeyringCredentialStore:
         return self.get_password(provider_id) is not None
 
     def delete_password(self, provider_id: str) -> None:
+        if self.get_password(provider_id) is None:
+            return
         try:
             self._keyring.delete_password(SERVICE_NAME, provider_id)
         except Exception as exc:
-            if exc.__class__.__name__ == "PasswordDeleteError":
-                return
             raise CredentialStoreError("System credential store delete failed.") from exc
 
 

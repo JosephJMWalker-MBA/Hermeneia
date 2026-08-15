@@ -1292,8 +1292,11 @@ def test_e10_system_store_presence_does_not_trust_stale_configured_metadata(
 
 
 def test_e10_keyring_backend_errors_are_sanitized(monkeypatch):
-    class _FakeBackend:
-        priority = 1
+    _FakeBackend = type(
+        "Keyring",
+        (),
+        {"priority": 1, "__module__": "keyring.backends.SecretService"},
+    )
 
     fake_keyring = types.SimpleNamespace()
     fake_keyring.get_keyring = lambda: _FakeBackend()
@@ -1318,6 +1321,67 @@ def test_e10_keyring_backend_errors_are_sanitized(monkeypatch):
             action()
         assert "raw dbus" not in str(exc.value)
         assert "secret backend failure" not in str(exc.value)
+
+
+def test_e10_keyring_rejects_positive_priority_non_system_backends(monkeypatch):
+    for backend in (
+        type(
+            "PlaintextKeyring",
+            (),
+            {"priority": 1, "__module__": "custom.secureish"},
+        )(),
+        type(
+            "FileKeyring",
+            (),
+            {"priority": 1, "__module__": "keyring.backends.SecretService"},
+        )(),
+        type(
+            "EncryptedKeyring",
+            (),
+            {"priority": 1, "__module__": "keyrings.alt.file"},
+        )(),
+        type(
+            "Keyring",
+            (),
+            {"priority": 1, "__module__": "thirdparty.backend"},
+        )(),
+    ):
+        fake_keyring = types.SimpleNamespace()
+        fake_keyring.get_keyring = lambda backend=backend: backend
+        monkeypatch.setattr("hermeneia.credentials.importlib.util.find_spec", lambda name: object())
+        monkeypatch.setitem(sys.modules, "keyring", fake_keyring)
+
+        store = default_credential_store()
+
+        assert store.available() is False
+
+
+def test_e10_keyring_delete_error_is_not_success_when_secret_is_present(monkeypatch):
+    _FakeBackend = type(
+        "Keyring",
+        (),
+        {"priority": 1, "__module__": "keyring.backends.SecretService"},
+    )
+
+    class PasswordDeleteError(Exception):
+        pass
+
+    fake_keyring = types.SimpleNamespace()
+    fake_keyring.get_keyring = lambda: _FakeBackend()
+    fake_keyring.get_password = lambda service, account: "still-present-secret"
+    fake_keyring.set_password = lambda service, account, secret: None
+    fake_keyring.delete_password = lambda service, account: (_ for _ in ()).throw(
+        PasswordDeleteError("backend delete failed")
+    )
+    monkeypatch.setattr("hermeneia.credentials.importlib.util.find_spec", lambda name: object())
+    monkeypatch.setitem(sys.modules, "keyring", fake_keyring)
+    store = KeyringCredentialStore()
+
+    with pytest.raises(CredentialStoreError) as exc:
+        store.delete_password("openai")
+
+    assert "backend delete failed" not in str(exc.value)
+    assert "System credential store delete failed." == str(exc.value)
 
 
 def test_e10_default_credential_store_sanitizes_backend_initialization_error(monkeypatch):
