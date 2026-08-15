@@ -55,10 +55,19 @@ from ..connections_settings import (
     empty_connections_settings,
     load_connections_settings,
     ollama_host_from_settings,
+    provider_credential_source,
     save_connections_settings,
     selected_ollama_model,
+    set_provider_credential_source,
     set_ollama_host,
     set_selected_ollama_model,
+)
+from ..credentials import (
+    CredentialStore,
+    CredentialStoreError,
+    CredentialStoreUnavailable,
+    SERVICE_NAME as CREDENTIAL_SERVICE_NAME,
+    default_credential_store,
 )
 from ..workspace import (
     DEFAULT_LEGACY_DB,
@@ -139,6 +148,7 @@ def create_app(
     db_path: str | Path = "build/hermeneia.db",
     *,
     provider_registry: ProviderRegistry | None = None,
+    credential_store: CredentialStore | None = None,
 ) -> Flask:
     db_path = Path(db_path)
     app = Flask(__name__, static_folder=str(STATIC_DIR))
@@ -157,7 +167,9 @@ def create_app(
     from ..narrative.artist_providers import DEFAULT_PROVIDER_REGISTRY
 
     active_provider_registry = provider_registry or DEFAULT_PROVIDER_REGISTRY
+    active_credential_store = credential_store or default_credential_store()
     runtime_provider_keys: dict[str, str] = {}
+    runtime_credential_sources: dict[str, str] = {}
     runtime_provider_keys_lock = threading.RLock()
     _connections_settings_lock = threading.RLock()
     _connections_settings_load_error: str | None = None
@@ -934,6 +946,97 @@ def create_app(
             runtime_connections_settings.clear()
             runtime_connections_settings.update(next_settings)
 
+    def _set_persisted_credential_source(provider_id: str, source: dict[str, object]) -> None:
+        with _connections_settings_lock:
+            if _connections_settings_load_error:
+                raise UnsupportedConnectionsSettingsError(_connections_settings_load_error)
+            next_settings = set_provider_credential_source(
+                runtime_connections_settings,
+                provider_id,
+                source,
+            )
+            save_connections_settings(next_settings)
+            runtime_connections_settings.clear()
+            runtime_connections_settings.update(next_settings)
+
+    def _credential_source_for_provider(provider: dict) -> dict[str, object]:
+        provider_id = str(provider["id"])
+        env_name = provider.get("required_environment")
+        if not env_name:
+            return {"kind": "not_required", "configured": True}
+        with runtime_provider_keys_lock:
+            runtime_source = runtime_credential_sources.get(provider_id)
+            session_present = bool(runtime_provider_keys.get(provider_id))
+        if runtime_source == "session":
+            return {"kind": "session", "configured": session_present}
+        with _connections_settings_lock:
+            persisted = provider_credential_source(runtime_connections_settings, provider_id)
+        if persisted:
+            kind = persisted.get("kind")
+            if kind == "session":
+                return {"kind": "session", "configured": session_present}
+            if kind == "system_store":
+                status = active_credential_store.status()
+                return {
+                    "kind": "system_store",
+                    "configured": bool(persisted.get("configured")),
+                    "system_store_available": bool(status.get("available")),
+                    "system_store_backend": status.get("backend"),
+                    "message": status.get("message"),
+                    "service": persisted.get("service"),
+                    "account": persisted.get("account"),
+                }
+            if kind == "environment":
+                env_var = str(persisted.get("environment_variable") or env_name)
+                return {
+                    "kind": "environment",
+                    "environment_variable": env_var,
+                    "configured": bool(os.environ.get(env_var)),
+                }
+        return {
+            "kind": "environment",
+            "environment_variable": env_name,
+            "configured": bool(os.environ.get(str(env_name))),
+        }
+
+    def _credential_secret_for_provider(provider_id: str) -> str | None:
+        try:
+            provider = active_provider_registry.definition(provider_id).metadata()
+        except KeyError:
+            return None
+        source = _credential_source_for_provider(provider)
+        kind = source.get("kind")
+        if kind == "not_required":
+            return None
+        if kind == "session":
+            with runtime_provider_keys_lock:
+                secret = runtime_provider_keys.get(provider_id)
+            if not secret:
+                raise CredentialStoreUnavailable("Session credential is not configured.")
+            return secret
+        if kind == "environment":
+            env_name = str(source.get("environment_variable") or "")
+            secret = os.environ.get(env_name) if env_name else None
+            if not secret:
+                raise CredentialStoreUnavailable("Selected environment credential is not configured.")
+            return secret
+        if kind == "system_store":
+            if not source.get("system_store_available"):
+                raise CredentialStoreUnavailable(str(source.get("message") or "System credential store is unavailable."))
+            secret = active_credential_store.get_password(provider_id)
+            if not secret:
+                raise CredentialStoreUnavailable("System credential is not configured.")
+            return secret
+        return None
+
+    def _credential_configured(provider: dict) -> bool:
+        if not provider.get("required_environment"):
+            return True
+        source = _credential_source_for_provider(provider)
+        if source.get("kind") == "system_store" and not source.get("system_store_available"):
+            return False
+        return bool(source.get("configured"))
+
     def _provider_kwargs(provider_id: str, *, api_key: str | None = None) -> dict:
         kwargs: dict[str, object] = {}
         if provider_id.startswith("ollama-"):
@@ -941,8 +1044,9 @@ def create_app(
             if selected_model:
                 kwargs["model"] = selected_model
             kwargs["host"] = _ollama_host()
-        if api_key:
-            kwargs["api_key"] = api_key
+        resolved_key = api_key if api_key is not None else _credential_secret_for_provider(provider_id)
+        if resolved_key:
+            kwargs["api_key"] = resolved_key
         return kwargs
 
     def _e10_provider_statuses() -> list[dict]:
@@ -970,9 +1074,8 @@ def create_app(
                 })
                 continue
 
-            with runtime_provider_keys_lock:
-                runtime_key_present = bool(runtime_provider_keys.get(provider_id))
-            configured = bool(provider.get("configured")) or runtime_key_present
+            credential_source_state = _credential_source_for_provider(provider)
+            configured = _credential_configured(provider)
             adapter_available = bool(provider.get("adapter_available"))
             available = configured and adapter_available and provider.get("provider_type") == "artist"
             requires_credential = bool(provider.get("required_environment"))
@@ -1015,6 +1118,9 @@ def create_app(
                     "Install the provider SDK before testing the configuration."
                 )
                 effective_status = "not_connected"
+            elif credential_source_state.get("kind") == "system_store" and not credential_source_state.get("system_store_available"):
+                message = str(credential_source_state.get("message") or "System credential store is unavailable.")
+                effective_status = "not_connected"
             else:
                 message = "No credential is configured."
                 effective_status = "not_connected"
@@ -1028,11 +1134,15 @@ def create_app(
                 "adapter_available": adapter_available,
                 "status": effective_status,
                 "credential_source": provider.get("required_environment"),
-                "credential_scope": (
-                    "server_session"
-                    if runtime_key_present
-                    else "environment"
-                    if provider.get("configured") and requires_credential
+                "credential_scope": credential_source_state.get("kind"),
+                "credential_source_kind": credential_source_state.get("kind"),
+                "credential_source_configured": credential_source_state.get("configured"),
+                "credential_environment_variable": credential_source_state.get("environment_variable"),
+                "system_credential_store_available": credential_source_state.get("system_store_available"),
+                "system_credential_store_backend": credential_source_state.get("system_store_backend"),
+                "system_credential_configured": (
+                    credential_source_state.get("configured")
+                    if credential_source_state.get("kind") == "system_store"
                     else None
                 ),
                 "default_model": default_model,
@@ -3439,10 +3549,12 @@ def create_app(
 
     @app.route("/api/e10/providers")
     def api_e10_providers():
+        system_store_status = active_credential_store.status()
         return jsonify({
-            "credential_storage": "server_session_or_environment",
+            "credential_storage": "session_environment_or_system_store",
             "stores_api_keys": True,
-            "persistent_api_keys": False,
+            "persistent_api_keys": bool(system_store_status.get("available")),
+            "system_credential_store": system_store_status,
             "live_connection_test": True,
             "providers": _e10_provider_statuses(),
         })
@@ -3504,26 +3616,119 @@ def create_app(
                 "error": f"{label} has no registered provider adapter"
             }), 409
 
+        payload = request.get_json(silent=True) or {}
+        provider_meta = active_provider_registry.definition(provider_id).metadata()
+        source_state = _credential_source_for_provider(provider_meta)
+
         if request.method == "DELETE":
+            source_kind = str(payload.get("credential_source") or source_state.get("kind") or "").strip()
+            if source_kind == "system_store":
+                old_secret = None
+                try:
+                    old_secret = active_credential_store.get_password(provider_id)
+                    active_credential_store.delete_password(provider_id)
+                    _set_persisted_credential_source(provider_id, {
+                        "kind": "system_store",
+                        "configured": False,
+                        "service": CREDENTIAL_SERVICE_NAME,
+                        "account": provider_id,
+                    })
+                except (UnsupportedConnectionsSettingsError, OSError) as exc:
+                    if old_secret:
+                        try:
+                            active_credential_store.set_password(provider_id, old_secret)
+                        except CredentialStoreError:
+                            pass
+                    return jsonify({"error": f"Could not update credential source after removing system credential: {exc}"}), 500
+                except CredentialStoreError as exc:
+                    return jsonify({"error": f"Could not remove system credential: {exc}"}), 500
+                return jsonify({
+                    "participant": key,
+                    "configured": False,
+                    "credential_scope": "system_store",
+                    "credential_source_kind": "system_store",
+                    "message": f"System credential removed for {label}.",
+                })
             with runtime_provider_keys_lock:
                 runtime_provider_keys.pop(provider_id, None)
+                runtime_credential_sources.pop(provider_id, None)
             return jsonify({
                 "participant": key,
                 "configured": False,
-                "credential_scope": None,
+                "credential_scope": "session",
+                "credential_source_kind": "session",
                 "message": f"Session key removed for {label}.",
             })
 
-        payload = request.get_json(silent=True) or {}
         api_key = str(payload.get("api_key", "")).strip()
+        source_kind = str(payload.get("credential_source") or "session").strip()
+        if source_kind == "environment":
+            env_name = provider_meta.get("required_environment")
+            if not env_name:
+                return jsonify({"error": f"{label} has no environment credential source"}), 400
+            try:
+                _set_persisted_credential_source(provider_id, {
+                    "kind": "environment",
+                    "environment_variable": env_name,
+                })
+            except (UnsupportedConnectionsSettingsError, OSError, InvalidConnectionsSettingError) as exc:
+                return jsonify({"error": f"Could not save credential source: {exc}"}), 500
+            with runtime_provider_keys_lock:
+                runtime_provider_keys.pop(provider_id, None)
+                runtime_credential_sources.pop(provider_id, None)
+            return jsonify({
+                "participant": key,
+                "configured": bool(os.environ.get(str(env_name))),
+                "credential_scope": "environment",
+                "credential_source_kind": "environment",
+                "message": f"Environment credential source selected for {label}.",
+            })
+        if source_kind not in {"session", "system_store"}:
+            return jsonify({"error": "credential_source must be session, environment, or system_store"}), 400
         if len(api_key) < 8:
             return jsonify({"error": "api_key must contain at least 8 characters"}), 400
+        if source_kind == "system_store":
+            try:
+                active_credential_store.set_password(provider_id, api_key)
+                _set_persisted_credential_source(provider_id, {
+                    "kind": "system_store",
+                    "configured": True,
+                    "service": CREDENTIAL_SERVICE_NAME,
+                    "account": provider_id,
+                })
+            except CredentialStoreError as exc:
+                return jsonify({"error": f"System credential store unavailable: {exc}"}), 503
+            except (UnsupportedConnectionsSettingsError, OSError, InvalidConnectionsSettingError) as exc:
+                try:
+                    active_credential_store.delete_password(provider_id)
+                except CredentialStoreError:
+                    pass
+                return jsonify({"error": f"Could not save credential source: {exc}"}), 500
+            with runtime_provider_keys_lock:
+                runtime_provider_keys.pop(provider_id, None)
+                runtime_credential_sources.pop(provider_id, None)
+            return jsonify({
+                "participant": key,
+                "configured": True,
+                "credential_scope": "system_store",
+                "credential_source_kind": "system_store",
+                "message": f"System credential saved for {label}.",
+            })
+        with runtime_provider_keys_lock:
+            runtime_credential_sources[provider_id] = "session"
+        try:
+            _set_persisted_credential_source(provider_id, {"kind": "session"})
+        except (UnsupportedConnectionsSettingsError, OSError, InvalidConnectionsSettingError) as exc:
+            with runtime_provider_keys_lock:
+                runtime_credential_sources.pop(provider_id, None)
+            return jsonify({"error": f"Could not save credential source: {exc}"}), 500
         with runtime_provider_keys_lock:
             runtime_provider_keys[provider_id] = api_key
         return jsonify({
             "participant": key,
             "configured": True,
-            "credential_scope": "server_session",
+            "credential_scope": "session",
+            "credential_source_kind": "session",
             "message": (
                 f"Session key saved for {label}. "
                 "It will be forgotten when the Hermeneia server stops."
@@ -3627,8 +3832,6 @@ def create_app(
             return jsonify({"error": f"unsupported participant: {participant}"}), 400
         provider = selected[0]
         provider_id = provider["provider_id"]
-        with runtime_provider_keys_lock:
-            runtime_key = runtime_provider_keys.get(provider_id)
         if not provider["configured"]:
             return jsonify({
                 **provider,
@@ -3653,8 +3856,6 @@ def create_app(
         validation_error = None
         try:
             provider_kwargs = _provider_kwargs(provider_id)
-            if runtime_key:
-                provider_kwargs["api_key"] = runtime_key
             adapter = active_provider_registry.create(provider_id, **provider_kwargs)
             adapter.test_connection()
         except Exception as exc:
@@ -3750,9 +3951,6 @@ def create_app(
             prompt = "Respond with exactly the word: READY"
             test_name = "connectivity"
 
-        with runtime_provider_keys_lock:
-            runtime_key = runtime_provider_keys.get(provider_id)
-
         import time as _time
         start = _time.monotonic()
         raw_output = None
@@ -3760,8 +3958,6 @@ def create_app(
         selected_model = provider_status.get("selected_model") or provider_status.get("default_model")
         try:
             kwargs = _provider_kwargs(provider_id)
-            if runtime_key:
-                kwargs["api_key"] = runtime_key
             adapter = active_provider_registry.create(provider_id, **kwargs)
             raw_output = adapter.render(prompt)
         except Exception as exc:
@@ -4901,11 +5097,7 @@ Return ONLY valid JSON, no markdown, no explanation:
   ]
 }}"""
 
-            with runtime_provider_keys_lock:
-                runtime_key = runtime_provider_keys.get(provider)
             provider_kwargs = _provider_kwargs(provider)
-            if runtime_key:
-                provider_kwargs["api_key"] = runtime_key
             prov = get_provider(provider, **provider_kwargs)
             raw = prov.render(prompt)
 
@@ -5627,7 +5819,6 @@ Return ONLY valid JSON, no markdown, no explanation:
         provider = str(payload.get("provider", "null")).strip()
         model    = payload.get("model") or None
         save     = bool(payload.get("save", False))
-        api_key  = payload.get("api_key") or None
 
         if not text:
             return jsonify({"error": "text is required"}), 400
@@ -5640,13 +5831,9 @@ Return ONLY valid JSON, no markdown, no explanation:
         import traceback as _tb
 
         try:
-            with runtime_provider_keys_lock:
-                runtime_key = runtime_provider_keys.get(provider)
             kwargs = _provider_kwargs(provider)
             if model:
                 kwargs["model"] = model
-            if api_key or runtime_key:
-                kwargs["api_key"] = api_key or runtime_key
             prov = get_provider(provider, **kwargs)
             proposed = extract_blueprint_from_text(text, prov)
         except BlueprintExtractionError as exc:
@@ -5717,11 +5904,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         import traceback as _tb
         conn = _conn_rw()
         try:
-            with runtime_provider_keys_lock:
-                runtime_key = runtime_provider_keys.get(provider)
             provider_kwargs = _provider_kwargs(provider)
-            if runtime_key:
-                provider_kwargs["api_key"] = runtime_key
             if plan_id:
                 result = render_for_plan(
                     plan_id,
@@ -5788,11 +5971,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         # Read-only connection: structurally guarantees the preview writes nothing.
         conn = _conn()
         try:
-            with runtime_provider_keys_lock:
-                runtime_key = runtime_provider_keys.get(provider)
             provider_kwargs = _provider_kwargs(provider)
-            if runtime_key:
-                provider_kwargs["api_key"] = runtime_key
             result = render_for_plan(
                 plan_id,
                 conn,
@@ -5925,11 +6104,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 
         conn = _conn_rw()
         try:
-            with runtime_provider_keys_lock:
-                runtime_key = runtime_provider_keys.get(provider)
             provider_kwargs = _provider_kwargs(provider)
-            if runtime_key:
-                provider_kwargs["api_key"] = runtime_key
             if model:
                 provider_kwargs["model"] = model
 

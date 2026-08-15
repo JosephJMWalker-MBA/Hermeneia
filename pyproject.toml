@@ -24,6 +24,7 @@ anthropic = ["anthropic"]
 openai = ["openai"]
 gemini = ["google-genai"]
 ollama = ["ollama"]
+credentials = ["keyring"]
 providers = [
     "anthropic",
     "openai",

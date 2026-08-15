@@ -17,6 +17,7 @@ from hermeneia.narrative.provider_registry import (
 )
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.web.app import create_app
+from hermeneia.credentials import CredentialStoreError
 
 from test_constitutional_p0 import _seed_full_chain
 
@@ -62,6 +63,57 @@ class _CapturingProvider:
             "sdk_version": "test",
             "request_schema_version": "1",
         }
+
+
+class _FakeCredentialStore:
+    def __init__(self) -> None:
+        self.passwords: dict[str, str] = {}
+        self.fail_set = False
+        self.fail_delete = False
+
+    def available(self) -> bool:
+        return True
+
+    def status(self) -> dict[str, object]:
+        return {
+            "available": True,
+            "backend": "tests.fake",
+            "message": "fake secure credential store available",
+        }
+
+    def set_password(self, provider_id: str, secret: str) -> None:
+        if self.fail_set:
+            raise CredentialStoreError("write failed")
+        self.passwords[provider_id] = secret
+
+    def get_password(self, provider_id: str) -> str | None:
+        return self.passwords.get(provider_id)
+
+    def delete_password(self, provider_id: str) -> None:
+        if self.fail_delete:
+            raise CredentialStoreError("delete failed")
+        self.passwords.pop(provider_id, None)
+
+
+class _UnavailableCredentialStore:
+    def available(self) -> bool:
+        return False
+
+    def status(self) -> dict[str, object]:
+        return {
+            "available": False,
+            "backend": None,
+            "message": "fake secure credential store unavailable",
+        }
+
+    def set_password(self, provider_id: str, secret: str) -> None:
+        raise CredentialStoreError("unavailable")
+
+    def get_password(self, provider_id: str) -> str | None:
+        raise CredentialStoreError("unavailable")
+
+    def delete_password(self, provider_id: str) -> None:
+        raise CredentialStoreError("unavailable")
 
 
 def _install_fake_ollama(
@@ -114,6 +166,26 @@ def _ollama_registry() -> ProviderRegistry:
                     capabilities=("text",),
                     local_or_remote="local",
                     default_model="qwen3:4b",
+                ),
+                _CapturingProvider,
+            ),
+        ),
+    )
+
+
+def _cloud_registry() -> ProviderRegistry:
+    return ProviderRegistry(
+        (
+            ProviderRegistration(
+                ProviderDefinition(
+                    id="openai",
+                    display_name="OpenAI",
+                    provider_type="artist",
+                    enabled=True,
+                    capabilities=("text",),
+                    local_or_remote="remote",
+                    required_environment="OPENAI_API_KEY",
+                    default_model="gpt-4o",
                 ),
                 _CapturingProvider,
             ),
@@ -216,9 +288,10 @@ def test_e10_provider_status_is_visible_without_secret_storage(tmp_path, monkeyp
 
     assert response.status_code == 200
     body = response.get_json()
-    assert body["credential_storage"] == "server_session_or_environment"
+    assert body["credential_storage"] == "session_environment_or_system_store"
     assert body["stores_api_keys"] is True
-    assert body["persistent_api_keys"] is False
+    assert isinstance(body["persistent_api_keys"], bool)
+    assert "system_credential_store" in body
     providers = {provider["participant"]: provider for provider in body["providers"]}
     assert providers["gpt"]["credential_source"] == "OPENAI_API_KEY"
     assert providers["gpt"]["configured"] is True
@@ -226,9 +299,9 @@ def test_e10_provider_status_is_visible_without_secret_storage(tmp_path, monkeyp
     assert providers["meta"]["provider_id"] == "ollama-meta"
     assert providers["local"]["provider_id"] == "ollama-local"
     assert providers["meta"]["requires_credential"] is False
-    assert providers["meta"]["credential_scope"] is None
+    assert providers["meta"]["credential_scope"] == "not_required"
     assert providers["local"]["requires_credential"] is False
-    assert providers["local"]["credential_scope"] is None
+    assert providers["local"]["credential_scope"] == "not_required"
 
     serialized = json.dumps(body)
     assert "do-not-return" not in serialized
@@ -837,8 +910,14 @@ def test_e10_ollama_selected_model_reaches_explorer_and_companion_execution(
     assert _CapturingProvider.calls[-1]["model"] == "llama3.2:1b"
 
 
-def test_e10_session_key_can_be_saved_and_removed_without_being_returned(tmp_path):
-    client = create_app(db_path=tmp_path / "missing.db").test_client()
+def test_e10_session_key_can_be_saved_and_removed_without_being_returned(tmp_path, monkeypatch):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    _CapturingProvider.calls = []
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_registry(),
+    ).test_client()
     secret = "session-secret-openai-key"
 
     saved = client.put(
@@ -846,23 +925,215 @@ def test_e10_session_key_can_be_saved_and_removed_without_being_returned(tmp_pat
         json={"api_key": secret},
     )
     assert saved.status_code == 200
-    assert saved.get_json()["credential_scope"] == "server_session"
+    assert saved.get_json()["credential_scope"] == "session"
 
     status = client.get("/api/e10/providers").get_json()
     gpt = next(provider for provider in status["providers"] if provider["participant"] == "gpt")
     assert gpt["configured"] is True
-    assert gpt["credential_scope"] == "server_session"
+    assert gpt["credential_scope"] == "session"
     assert secret not in json.dumps(status)
+    assert secret not in settings_path.read_text()
+
+    tested = client.post("/api/e10/providers/gpt/test", json={})
+    assert tested.status_code == 200
+    assert _CapturingProvider.calls[-1]["kwargs"]["api_key"] == secret
+
+    restarted = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_registry(),
+    ).test_client()
+    restarted_gpt = next(
+        provider for provider in restarted.get("/api/e10/providers").get_json()["providers"]
+        if provider["participant"] == "gpt"
+    )
+    assert restarted_gpt["credential_scope"] == "session"
+    assert restarted_gpt["configured"] is False
 
     removed = client.delete("/api/e10/providers/gpt/key")
     assert removed.status_code == 200
     assert removed.get_json()["configured"] is False
 
 
+def test_e10_environment_credential_source_resolves_only_selected_environment(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    _CapturingProvider.calls = []
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_registry(),
+    ).test_client()
+
+    selected = client.put("/api/e10/providers/gpt/key", json={"credential_source": "environment"})
+    tested = client.post("/api/e10/providers/gpt/test", json={})
+
+    assert selected.status_code == 200
+    assert selected.get_json()["credential_scope"] == "environment"
+    assert tested.status_code == 200
+    assert _CapturingProvider.calls[-1]["kwargs"]["api_key"] == "environment-openai-key"
+    text = settings_path.read_text()
+    assert "environment-openai-key" not in text
+    assert "OPENAI_API_KEY" in text
+
+
+def test_e10_system_store_save_load_delete_and_workspace_independence(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    store = _FakeCredentialStore()
+    _CapturingProvider.calls = []
+    first = create_app(
+        db_path=tmp_path / "workspace-a" / "a.db",
+        provider_registry=_cloud_registry(),
+        credential_store=store,
+    ).test_client()
+
+    saved = first.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "system_store", "api_key": "system-openai-secret"},
+    )
+
+    assert saved.status_code == 200
+    assert saved.get_json()["credential_scope"] == "system_store"
+    settings_text = settings_path.read_text()
+    assert "system-openai-secret" not in settings_text
+    assert json.loads(settings_text)["providers"]["openai"]["credential_source"]["configured"] is True
+
+    second = create_app(
+        db_path=tmp_path / "workspace-b" / "b.db",
+        provider_registry=_cloud_registry(),
+        credential_store=store,
+    ).test_client()
+    tested = second.post("/api/e10/providers/gpt/test", json={})
+    second_gpt = next(
+        provider for provider in second.get("/api/e10/providers").get_json()["providers"]
+        if provider["participant"] == "gpt"
+    )
+    second_status = second.get("/api/e10/providers").get_json()
+
+    assert tested.status_code == 200
+    assert second_gpt["credential_scope"] == "system_store"
+    assert second_gpt["system_credential_configured"] is True
+    assert _CapturingProvider.calls[-1]["kwargs"]["api_key"] == "system-openai-secret"
+    assert "system-openai-secret" not in json.dumps(second_status)
+    assert not (tmp_path / "workspace-a" / "calibration.json").exists()
+    assert not (tmp_path / "workspace-b" / "calibration.json").exists()
+
+    removed = second.delete("/api/e10/providers/gpt/key", json={"credential_source": "system_store"})
+    assert removed.status_code == 200
+    assert "openai" not in store.passwords
+    assert json.loads(settings_path.read_text())["providers"]["openai"]["credential_source"]["configured"] is False
+
+
+def test_e10_system_store_unavailable_and_failed_writes_do_not_change_source(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    unavailable = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_registry(),
+        credential_store=_UnavailableCredentialStore(),
+    ).test_client()
+
+    unavailable_response = unavailable.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "system_store", "api_key": "system-openai-secret"},
+    )
+    status = unavailable.get("/api/e10/providers").get_json()
+    gpt = next(provider for provider in status["providers"] if provider["participant"] == "gpt")
+    assert unavailable_response.status_code == 503
+    assert gpt["credential_scope"] == "environment"
+    assert not settings_path.exists()
+
+    failing_store = _FakeCredentialStore()
+    failing_store.fail_set = True
+    failing = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_registry(),
+        credential_store=failing_store,
+    ).test_client()
+    failed = failing.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "system_store", "api_key": "system-openai-secret"},
+    )
+    assert failed.status_code == 503
+    assert "openai" not in failing_store.passwords
+    assert not settings_path.exists()
+
+
+def test_e10_system_store_failed_delete_preserves_secret_and_metadata(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    store = _FakeCredentialStore()
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_registry(),
+        credential_store=store,
+    ).test_client()
+    assert client.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "system_store", "api_key": "system-openai-secret"},
+    ).status_code == 200
+    before = settings_path.read_text()
+    store.fail_delete = True
+
+    removed = client.delete("/api/e10/providers/gpt/key", json={"credential_source": "system_store"})
+
+    assert removed.status_code == 500
+    assert store.passwords["openai"] == "system-openai-secret"
+    assert settings_path.read_text() == before
+
+
+def test_e10_selected_credential_source_precedence_is_exact(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    store = _FakeCredentialStore()
+    _CapturingProvider.calls = []
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_registry(),
+        credential_store=store,
+    ).test_client()
+
+    assert client.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "system_store", "api_key": "system-openai-secret"},
+    ).status_code == 200
+    assert client.post("/api/e10/providers/gpt/test", json={}).status_code == 200
+    assert _CapturingProvider.calls[-1]["kwargs"]["api_key"] == "system-openai-secret"
+
+    assert client.put("/api/e10/providers/gpt/key", json={"credential_source": "environment"}).status_code == 200
+    assert client.post("/api/e10/providers/gpt/test", json={}).status_code == 200
+    assert _CapturingProvider.calls[-1]["kwargs"]["api_key"] == "environment-openai-key"
+
+    assert client.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "session", "api_key": "session-openai-key"},
+    ).status_code == 200
+    assert client.post("/api/e10/providers/gpt/test", json={}).status_code == 200
+    assert _CapturingProvider.calls[-1]["kwargs"]["api_key"] == "session-openai-key"
+    assert "session-openai-key" not in settings_path.read_text()
+
+
 def test_e10_saved_key_reports_missing_adapter_without_implying_rejection(
     tmp_path,
     monkeypatch,
 ):
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(tmp_path / "connections.json"))
     client = create_app(db_path=tmp_path / "missing.db").test_client()
     monkeypatch.setattr(
         "hermeneia.narrative.provider_registry.ProviderDefinition.adapter_available",
@@ -902,10 +1173,15 @@ def test_e10_ui_exposes_provider_configuration_surface():
     assert "Test Connection" in index_html
     assert "Add Key" in index_html
     assert "Manage Key" in index_html
-    assert "Save Key" in index_html
-    assert "Remove Key" in index_html
+    assert "Use Session Only" in index_html
+    assert "Use Environment" in index_html
+    assert "Save to System Store" in index_html
+    assert "Remove Credential" in index_html
     assert "Credential storage" in index_html
     assert "server memory" in index_html
+    assert "credential_source: 'environment'" in index_html
+    assert "credentialSource = 'session'" in index_html
+    assert "system_credential_store_available" in index_html
     assert "key saved · adapter missing" in index_html
     assert "Connection to Hermeneia lost" in index_html
     assert "ollama_host" in index_html

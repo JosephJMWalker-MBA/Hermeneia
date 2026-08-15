@@ -22,6 +22,7 @@ from urllib.parse import urlparse
 CONNECTIONS_SETTINGS_SCHEMA = "hermeneia.connections_settings.v1"
 CONNECTIONS_SETTINGS_VERSION = 1
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
+VALID_CREDENTIAL_SOURCE_KINDS = {"session", "environment", "system_store", "not_required"}
 
 
 class UnsupportedConnectionsSettingsError(RuntimeError):
@@ -167,11 +168,20 @@ def _coerce_settings(raw: object, *, allow_unsupported: bool = False) -> dict[st
                 environment_variable = str(
                     credential_source.get("environment_variable") or ""
                 ).strip()
-                clean_source: dict[str, str] = {}
-                if kind:
+                service = str(credential_source.get("service") or "").strip()
+                account = str(credential_source.get("account") or "").strip()
+                configured = bool(credential_source.get("configured"))
+                clean_source: dict[str, object] = {}
+                if kind in VALID_CREDENTIAL_SOURCE_KINDS:
                     clean_source["kind"] = kind
-                if environment_variable:
+                if kind == "environment" and environment_variable:
                     clean_source["environment_variable"] = environment_variable
+                if kind == "system_store":
+                    clean_source["configured"] = configured
+                    if service:
+                        clean_source["service"] = service
+                    if account:
+                        clean_source["account"] = account
                 if clean_source:
                     clean_provider["credential_source"] = clean_source
             if clean_provider:
@@ -240,6 +250,50 @@ def set_selected_ollama_model(
     provider_settings = next_settings["providers"].setdefault(provider_id, {})
     provider_settings["selected_model"] = model
     provider_settings["credential_source"] = {"kind": "not_required"}
+    return next_settings
+
+
+def provider_credential_source(
+    settings: dict[str, Any],
+    provider_id: str,
+) -> dict[str, object] | None:
+    providers = settings.get("providers")
+    if not isinstance(providers, dict):
+        return None
+    provider_settings = providers.get(provider_id)
+    if not isinstance(provider_settings, dict):
+        return None
+    source = provider_settings.get("credential_source")
+    if not isinstance(source, dict):
+        return None
+    return dict(source)
+
+
+def set_provider_credential_source(
+    settings: dict[str, Any],
+    provider_id: str,
+    source: dict[str, object],
+) -> dict[str, Any]:
+    next_settings = _coerce_settings(deepcopy(settings))
+    kind = str(source.get("kind") or "").strip()
+    if kind not in VALID_CREDENTIAL_SOURCE_KINDS:
+        raise InvalidConnectionsSettingError("unsupported credential source kind")
+    provider_settings = next_settings["providers"].setdefault(provider_id, {})
+    clean_source: dict[str, object] = {"kind": kind}
+    if kind == "environment":
+        env_name = str(source.get("environment_variable") or "").strip()
+        if not env_name:
+            raise InvalidConnectionsSettingError("environment credential source requires an environment variable")
+        clean_source["environment_variable"] = env_name
+    elif kind == "system_store":
+        clean_source["configured"] = bool(source.get("configured"))
+        service = str(source.get("service") or "").strip()
+        account = str(source.get("account") or "").strip()
+        if service:
+            clean_source["service"] = service
+        if account:
+            clean_source["account"] = account
+    provider_settings["credential_source"] = clean_source
     return next_settings
 
 

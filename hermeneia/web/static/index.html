@@ -11961,27 +11961,38 @@ function e10ManageKey(participant) {
   if (!provider || !host) return;
   const envName = provider.credential_source;
   const supported = !!envName;
+  const sourceKind = provider.credential_source_kind || provider.credential_scope || 'environment';
+  const systemAvailable = !!provider.system_credential_store_available;
+  const systemConfigured = !!provider.system_credential_configured;
+  const sourceLabel = sourceKind === 'system_store'
+    ? 'System credential store'
+    : sourceKind === 'session'
+      ? 'Session only'
+      : 'Environment';
   host.innerHTML = `<div class="provider-key-panel">
     <div class="provider-key-title">${provider.configured ? 'Manage Key' : 'Add Key'} — ${x(provider.label)}</div>
     <div class="provider-note">
       ${supported
-        ? 'Keys entered here are held only in server memory. They are not stored in the browser, localStorage, sessionStorage, or the .herm database, and are forgotten when the server stops.'
+        ? 'Credential values are never returned by the API or written to workspaces. Session keys stay in server memory; environment keys stay in the environment; system credentials use the OS credential store when available.'
         : 'No key target is registered for this participant yet. A provider adapter must be added before keys can be managed.'}
     </div>
     ${supported ? `<div class="provider-kv">
       <div class="provider-k">Env Var</div><div class="provider-v">${x(envName)}</div>
-      <div class="provider-k">Present</div><div class="provider-v">${provider.configured ? 'yes' : 'no'}</div>
-      <div class="provider-k">Persistence</div><div class="provider-v">current server session only</div>
+      <div class="provider-k">Selected source</div><div class="provider-v">${x(sourceLabel)}</div>
+      <div class="provider-k">Environment</div><div class="provider-v">${provider.credential_source_kind === 'environment' && provider.configured ? `${x(envName)} detected` : `${x(envName)} ${provider.credential_source_kind === 'environment' ? 'not detected' : 'available'}`}</div>
+      <div class="provider-k">System store</div><div class="provider-v">${systemAvailable ? (systemConfigured ? 'configured' : 'available') : 'unavailable'}</div>
     </div>
     <input class="provider-key-input" id="key-input-${x(participant)}" type="password" autocomplete="off" placeholder="Enter API key">
     <div class="e10-actions">
-      <button class="btn-trace" onclick="e10SaveKey('${x(participant)}')">Save Key</button>
-      ${provider.credential_scope === 'server_session' ? `<button class="btn-trace" onclick="e10RemoveKey('${x(participant)}')">Remove Key</button>` : ''}
+      <button class="btn-trace" onclick="e10SaveKey('${x(participant)}','session')">Use Session Only</button>
+      <button class="btn-trace" onclick="e10UseEnvironmentKey('${x(participant)}')">Use Environment</button>
+      <button class="btn-trace" ${systemAvailable ? '' : 'disabled'} onclick="e10SaveKey('${x(participant)}','system_store')">Save to System Store</button>
+      ${sourceKind === 'session' || sourceKind === 'system_store' ? `<button class="btn-trace" onclick="e10RemoveKey('${x(participant)}','${x(sourceKind)}')">Remove Credential</button>` : ''}
     </div>` : ''}
   </div>`;
 }
 
-async function e10SaveKey(participant) {
+async function e10SaveKey(participant, credentialSource = 'session') {
   const input = document.getElementById(`key-input-${participant}`);
   const apiKey = input?.value.trim() || '';
   if (!apiKey) {
@@ -11991,14 +12002,23 @@ async function e10SaveKey(participant) {
   }
   const result = await put(`/api/e10/providers/${encodeURIComponent(participant)}/key`, {
     api_key: apiKey,
+    credential_source: credentialSource,
   });
   input.value = '';
   _e10ProviderNotices[participant] = result.message;
   await e10LoadProviders();
 }
 
-async function e10RemoveKey(participant) {
-  const result = await del(`/api/e10/providers/${encodeURIComponent(participant)}/key`);
+async function e10UseEnvironmentKey(participant) {
+  const result = await put(`/api/e10/providers/${encodeURIComponent(participant)}/key`, {
+    credential_source: 'environment',
+  });
+  _e10ProviderNotices[participant] = result.message;
+  await e10LoadProviders();
+}
+
+async function e10RemoveKey(participant, credentialSource = '') {
+  const result = await del(`/api/e10/providers/${encodeURIComponent(participant)}/key`, credentialSource ? { credential_source: credentialSource } : {});
   _e10ProviderNotices[participant] = result.message;
   await e10LoadProviders();
 }
@@ -12498,8 +12518,8 @@ function post(url, body) {
 function put(url, body) {
   return requestJSON(url, { method: 'PUT', body });
 }
-function del(url) {
-  return requestJSON(url, { method: 'DELETE' });
+function del(url, body) {
+  return requestJSON(url, body === undefined ? { method: 'DELETE' } : { method: 'DELETE', body });
 }
 async function requestJSON(url, options = {}) {
   const requestOptions = { ...options };
