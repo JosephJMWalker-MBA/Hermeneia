@@ -981,14 +981,14 @@ def create_app(
                 "Could not retrieve model catalog. Check provider credentials and connectivity.",
             ).to_dict()
 
-    def _catalog_model_ids(catalog: dict[str, object]) -> set[str]:
-        ids: set[str] = set()
+    def _catalog_model_availability(catalog: dict[str, object]) -> dict[str, str]:
+        availability: dict[str, str] = {}
         for model in catalog.get("models") or []:
             if isinstance(model, dict):
                 model_id = str(model.get("model_id") or model.get("id") or "").strip()
                 if model_id:
-                    ids.add(model_id)
-        return ids
+                    availability[model_id] = str(model.get("availability") or "unknown")
+        return availability
 
     def _provider_default_model(provider_id: str, fallback: str | None = None) -> str | None:
         try:
@@ -1215,12 +1215,23 @@ def create_app(
             else:
                 model_catalog = _provider_model_catalog(provider_id, provider)
                 ollama_fully_ready = True  # non-Ollama providers are governed by credential
-            catalog_ids = _catalog_model_ids(model_catalog)
+            catalog_availability = _catalog_model_availability(model_catalog)
+            known_model_ids = set(catalog_availability)
+            available_model_ids = {
+                model_id
+                for model_id, availability in catalog_availability.items()
+                if availability == "available"
+            }
             catalog_status = str(model_catalog.get("status") or "unavailable")
+            selected_model_availability = (
+                catalog_availability.get(str(selected_model))
+                if selected_model
+                else None
+            )
             selected_model_available = (
                 bool(selected_model)
                 and catalog_status == "available"
-                and selected_model in catalog_ids
+                and selected_model_availability == "available"
             )
 
             if is_ollama and adapter_available and not ollama_fully_ready:
@@ -1240,11 +1251,24 @@ def create_app(
                 and configured
                 and catalog_status == "available"
                 and selected_model
-                and not selected_model_available
+                and selected_model not in known_model_ids
             ):
                 message = (
                     f"Selected model '{selected_model}' is not present in the current "
                     "provider catalog. Choose an available model explicitly."
+                )
+                effective_status = "not_connected"
+            elif (
+                provider.get("local_or_remote") == "remote"
+                and adapter_available
+                and configured
+                and catalog_status == "available"
+                and selected_model
+                and selected_model_availability == "known_unverified"
+            ):
+                message = (
+                    f"Selected model '{selected_model}' is known from provider discovery; "
+                    "Hermeneia adapter compatibility has not been established."
                 )
                 effective_status = "not_connected"
             elif available and not requires_credential:
@@ -1288,11 +1312,15 @@ def create_app(
                 "selected_model": selected_model,
                 "selected_model_source": selected_model_source,
                 "selected_model_available": selected_model_available,
+                "selected_model_availability": selected_model_availability or (
+                    "absent" if selected_model and catalog_status == "available" else "unknown"
+                ),
                 "model_catalog": model_catalog,
                 "model_catalog_source": model_catalog.get("catalog_source"),
                 "model_catalog_status": model_catalog.get("status"),
                 "model_catalog_error": model_catalog.get("error"),
-                "available_models": sorted(catalog_ids),
+                "known_models": sorted(known_model_ids),
+                "available_models": sorted(available_model_ids),
                 "execution_mode": "deterministic_local_draft",
                 "message": message,
                 "role_suitability": _model_specific_role_suitability(
@@ -3926,7 +3954,13 @@ def create_app(
             return jsonify({"error": "model is required"}), 400
 
         catalog = _provider_model_catalog(provider_id, definition.metadata())
-        catalog_ids = _catalog_model_ids(catalog)
+        catalog_availability = _catalog_model_availability(catalog)
+        known_model_ids = set(catalog_availability)
+        available_model_ids = {
+            model_id
+            for model_id, availability in catalog_availability.items()
+            if availability == "available"
+        }
         if catalog.get("status") != "available":
             verify_error = (
                 "Ollama is not reachable, so Hermeneia cannot verify installed models. "
@@ -3942,9 +3976,10 @@ def create_app(
                 "catalog_source": catalog.get("catalog_source"),
                 "catalog_status": catalog.get("status"),
                 "catalog_error": catalog.get("error"),
-                "available_models": sorted(catalog_ids),
+                "known_models": sorted(known_model_ids),
+                "available_models": sorted(available_model_ids),
             }), 409
-        if model not in catalog_ids:
+        if model not in known_model_ids:
             missing_message = (
                 f"model '{model}' is not installed on the configured Ollama host"
                 if provider_id.startswith("ollama-")
@@ -3954,7 +3989,8 @@ def create_app(
                 "error": missing_message,
                 "catalog_source": catalog.get("catalog_source"),
                 "catalog_status": catalog.get("status"),
-                "available_models": sorted(catalog_ids),
+                "known_models": sorted(known_model_ids),
+                "available_models": sorted(available_model_ids),
             }), 400
 
         try:

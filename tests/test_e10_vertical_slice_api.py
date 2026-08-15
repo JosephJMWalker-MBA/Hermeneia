@@ -74,6 +74,7 @@ class _CapturingProvider:
 
 class _CatalogProvider(_CapturingProvider):
     catalogs: dict[str, list[str]] = {}
+    catalog_availability: dict[str, dict[str, str]] = {}
     catalog_errors: dict[str, Exception] = {}
     catalog_calls: list[dict] = []
     reject_constructor_models: set[str] = set()
@@ -115,6 +116,10 @@ class _CatalogProvider(_CapturingProvider):
                     provider_id=self.provider_id,
                     display_label=model,
                     family="claude" if model.startswith("claude-") else "gpt" if model.startswith("gpt-") else None,
+                    availability=self.__class__.catalog_availability.get(
+                        self.provider_id,
+                        {},
+                    ).get(model, "available"),
                     catalog_source="provider_api",
                     capabilities=("text",),
                 )
@@ -298,6 +303,7 @@ def _reset_catalog_provider() -> None:
         "openai": ["gpt-4o", "gpt-4.1"],
         "anthropic": ["claude-sonnet-4-6", "claude-opus-4-1"],
     }
+    _CatalogProvider.catalog_availability = {}
     _CatalogProvider.catalog_errors = {}
     _CatalogProvider.catalog_calls = []
     _CatalogProvider.reject_constructor_models = set()
@@ -1304,6 +1310,58 @@ def test_e10_cloud_model_explicit_switch_a_b_a_and_provider_isolation(
     assert "anthropic" not in settings["providers"] or "selected_model" not in settings["providers"]["anthropic"]
 
 
+def test_e10_cloud_catalog_preserves_known_unverified_availability(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    _reset_catalog_provider()
+    _CatalogProvider.catalogs["openai"] = ["gpt-verified", "gpt-unverified"]
+    _CatalogProvider.catalog_availability = {
+        "openai": {
+            "gpt-verified": "available",
+            "gpt-unverified": "known_unverified",
+        }
+    }
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+
+    first = client.put("/api/e10/providers/gpt/model", json={"model": "gpt-unverified"})
+    unverified = next(
+        row for row in client.get("/api/e10/providers").get_json()["providers"]
+        if row["participant"] == "gpt"
+    )
+
+    assert first.status_code == 200
+    assert unverified["known_models"] == ["gpt-unverified", "gpt-verified"]
+    assert unverified["available_models"] == ["gpt-verified"]
+    assert unverified["selected_model"] == "gpt-unverified"
+    assert unverified["selected_model_availability"] == "known_unverified"
+    assert unverified["selected_model_available"] is False
+    assert "known from provider discovery" in unverified["message"]
+    assert "not present" not in unverified["message"]
+    option = next(
+        model for model in unverified["model_catalog"]["models"]
+        if model["model_id"] == "gpt-unverified"
+    )
+    assert option["availability"] == "known_unverified"
+
+    second = client.put("/api/e10/providers/gpt/model", json={"model": "gpt-verified"})
+    verified = next(
+        row for row in client.get("/api/e10/providers").get_json()["providers"]
+        if row["participant"] == "gpt"
+    )
+
+    assert second.status_code == 200
+    assert verified["selected_model"] == "gpt-verified"
+    assert verified["selected_model_availability"] == "available"
+    assert verified["selected_model_available"] is True
+
+
 def test_e10_cloud_calibration_isolated_by_selected_model(
     tmp_path,
     monkeypatch,
@@ -1957,5 +2015,6 @@ def test_e10_ui_exposes_provider_configuration_surface():
     assert "/api/e10/providers/${encodeURIComponent(participant)}/model" in index_html
     assert '(unavailable)</option>' in index_html
     assert 'selected disabled>${x(selectedModel)} (unavailable)' in index_html
+    assert "compatibility unverified" in index_html
     assert "await e10LoadProviders();" in index_html
     assert "perf && !perf.suppressed && perf.calls > 0" in index_html
