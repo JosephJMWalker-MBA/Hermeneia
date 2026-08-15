@@ -17,6 +17,62 @@ ProviderFactory = Callable[..., Any]
 
 
 @dataclass(frozen=True)
+class ModelCatalogEntry:
+    """Non-canonical model metadata exposed by a provider connection."""
+
+    model_id: str
+    provider_id: str
+    display_label: str | None = None
+    family: str | None = None
+    snapshot: str | None = None
+    availability: str = "known_unverified"
+    catalog_source: str = "provider_api"
+    capabilities: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "id": self.model_id,
+            "model_id": self.model_id,
+            "display_label": self.display_label,
+            "family": self.family,
+            "snapshot": self.snapshot,
+            "availability": self.availability,
+            "provider": self.provider_id,
+            "catalog_source": self.catalog_source,
+            "capabilities": list(self.capabilities),
+        }
+
+
+@dataclass(frozen=True)
+class ModelCatalog:
+    """Normalized, non-canonical model catalog for one provider connection."""
+
+    provider_id: str
+    catalog_source: str
+    status: str
+    models: tuple[ModelCatalogEntry, ...] = ()
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "provider": self.provider_id,
+            "catalog_source": self.catalog_source,
+            "status": self.status,
+            "error": self.error,
+            "models": [entry.to_dict() for entry in self.models],
+        }
+
+
+def unavailable_model_catalog(provider_id: str, error: str) -> ModelCatalog:
+    return ModelCatalog(
+        provider_id=provider_id,
+        catalog_source="unavailable",
+        status="unavailable",
+        error=error,
+    )
+
+
+@dataclass(frozen=True)
 class ProviderDefinition:
     """Immutable descriptive metadata for one Artist adapter."""
 

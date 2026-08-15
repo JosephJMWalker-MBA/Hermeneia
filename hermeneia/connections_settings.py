@@ -230,7 +230,7 @@ def save_connections_settings(settings: dict[str, Any], path: Path | None = None
         raise
 
 
-def selected_ollama_model(settings: dict[str, Any], provider_id: str) -> str | None:
+def selected_provider_model(settings: dict[str, Any], provider_id: str) -> str | None:
     providers = settings.get("providers")
     if not isinstance(providers, dict):
         return None
@@ -241,7 +241,7 @@ def selected_ollama_model(settings: dict[str, Any], provider_id: str) -> str | N
     return selected or None
 
 
-def set_selected_ollama_model(
+def set_selected_provider_model(
     settings: dict[str, Any],
     provider_id: str,
     model: str,
@@ -249,7 +249,20 @@ def set_selected_ollama_model(
     next_settings = _coerce_settings(deepcopy(settings))
     provider_settings = next_settings["providers"].setdefault(provider_id, {})
     provider_settings["selected_model"] = model
-    provider_settings["credential_source"] = {"kind": "not_required"}
+    return next_settings
+
+
+def selected_ollama_model(settings: dict[str, Any], provider_id: str) -> str | None:
+    return selected_provider_model(settings, provider_id)
+
+
+def set_selected_ollama_model(
+    settings: dict[str, Any],
+    provider_id: str,
+    model: str,
+) -> dict[str, Any]:
+    next_settings = set_selected_provider_model(settings, provider_id, model)
+    next_settings["providers"][provider_id]["credential_source"] = {"kind": "not_required"}
     return next_settings
 
 
