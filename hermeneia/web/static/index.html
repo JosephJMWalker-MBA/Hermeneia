@@ -7604,7 +7604,7 @@ function e10ProviderCard(provider, cal, perf) {
 
   // Performance summary strip
   let perfHtml = '';
-  if (perf && perf.calls > 0) {
+  if (perf && !perf.suppressed && perf.calls > 0) {
     const sr = perf.success_rate != null ? Math.round(perf.success_rate * 100) + '%' : '—';
     const lat = perf.avg_latency_ms != null ? Math.round(perf.avg_latency_ms) + 'ms' : '—';
     const po = perf.parse_ok_rate != null ? Math.round(perf.parse_ok_rate * 100) + '%' : '—';

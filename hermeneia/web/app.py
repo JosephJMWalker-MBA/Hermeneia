@@ -445,6 +445,54 @@ def create_app(
         },
     }
 
+    def _empty_performance_record(*, suppressed: bool = False) -> dict:
+        rec = {
+            "calls": 0,
+            "success": 0,
+            "parse_ok": 0,
+            "avg_latency_ms": None,
+            "errors": [],
+            "accepted": 0,
+            "rejected": 0,
+        }
+        if suppressed:
+            rec["suppressed"] = True
+            rec["message"] = (
+                "Participant-level performance is hidden for multi-model Ollama "
+                "providers. Exact model analytics belong to the Model Observatory."
+            )
+        return rec
+
+    def _model_specific_role_suitability(
+        participant_key: str,
+        provider_id: str,
+        selected_model: str,
+        default_model: str,
+    ) -> dict[str, str]:
+        if provider_id.startswith("ollama-") and selected_model != default_model:
+            return {role: "untested" for role in _CALIBRATION_ROLES}
+        return _ROLE_SUITABILITY.get(participant_key, {})
+
+    def _model_specific_provider_setup(
+        participant_key: str,
+        provider_id: str,
+        selected_model: str,
+        default_model: str,
+    ) -> dict:
+        setup = dict(_PROVIDER_SETUP.get(participant_key, {}))
+        if provider_id.startswith("ollama-") and selected_model != default_model:
+            setup["about"] = (
+                "Local model running via Ollama. No static Hermeneia suitability "
+                "judgment is recorded for this exact selected model; use calibration "
+                "to establish role readiness."
+            )
+            setup["setup_steps"] = [
+                "Install Ollama from ollama.com",
+                "Choose an installed local model explicitly",
+                "Run: ollama serve",
+            ]
+        return setup
+
     def _conn() -> sqlite3.Connection:
         uri = db_path.resolve().as_uri() + "?mode=ro"
         conn = sqlite3.connect(uri, uri=True)
@@ -945,8 +993,18 @@ def create_app(
                 "selected_model_source": selected_model_source,
                 "execution_mode": "deterministic_local_draft",
                 "message": message,
-                "role_suitability": _ROLE_SUITABILITY.get(key, {}),
-                "setup": _PROVIDER_SETUP.get(key, {}),
+                "role_suitability": _model_specific_role_suitability(
+                    key,
+                    provider_id,
+                    selected_model,
+                    default_model,
+                ),
+                "setup": _model_specific_provider_setup(
+                    key,
+                    provider_id,
+                    selected_model,
+                    default_model,
+                ),
             }
             if is_ollama:
                 installed_models = ollama_ready["installed_models"] if ollama_ready else []
@@ -3550,13 +3608,15 @@ def create_app(
                     provider_id=provider_id,
                     model_id=selected_model,
                 )
+                performance = (
+                    _empty_performance_record(suppressed=True)
+                    if provider_id.startswith("ollama-")
+                    else perf.get(key, _empty_performance_record())
+                )
                 result[key] = {
                     **rec,
                     "calibration_identity": _calibration_key(key, provider_id, selected_model),
-                    "performance": perf.get(key, {
-                        "calls": 0, "success": 0, "parse_ok": 0,
-                        "avg_latency_ms": None, "errors": [], "accepted": 0, "rejected": 0,
-                    }),
+                    "performance": performance,
                 }
         return jsonify({"calibration": result, "roles": _CALIBRATION_ROLES})
 

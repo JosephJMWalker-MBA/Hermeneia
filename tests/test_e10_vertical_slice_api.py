@@ -398,6 +398,63 @@ def test_e10_ollama_calibration_does_not_transfer_between_selected_models(
     assert len(restored["calibration_tests"]) == 1
 
 
+def test_e10_ollama_alternate_model_does_not_inherit_default_static_suitability(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["llama3.2:1b", "qwen3:4b"])
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    providers = {
+        provider["participant"]: provider
+        for provider in client.get("/api/e10/providers").get_json()["providers"]
+    }
+    assert providers["local"]["selected_model"] == "qwen3:4b"
+    assert providers["local"]["role_suitability"]["Explorer"] == "rejected"
+    assert "qwen3:4b" in json.dumps(providers["local"]["setup"])
+
+    selected = client.put("/api/e10/providers/local/model", json={"model": "llama3.2:1b"})
+    assert selected.status_code == 200
+    providers = {
+        provider["participant"]: provider
+        for provider in client.get("/api/e10/providers").get_json()["providers"]
+    }
+    local = providers["local"]
+
+    assert local["selected_model"] == "llama3.2:1b"
+    assert local["role_suitability"]["Explorer"] == "untested"
+    assert set(local["role_suitability"].values()) == {"untested"}
+    setup_text = json.dumps(local["setup"])
+    assert "qwen3:4b" not in setup_text
+    assert "Explorer role rejected" not in setup_text
+    assert "No static Hermeneia suitability judgment" in local["setup"]["about"]
+
+
+def test_e10_ollama_participant_performance_is_not_shown_as_selected_model_metrics(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["llama3.2:1b", "qwen3:4b"])
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    assert client.put("/api/e10/providers/local/model", json={"model": "llama3.2:1b"}).status_code == 200
+    calibrated = client.post("/api/e10/providers/local/calibrate/Explorer", json={})
+    assert calibrated.status_code in {200, 201}
+    assert client.put("/api/e10/providers/local/model", json={"model": "qwen3:4b"}).status_code == 200
+
+    performance = client.get("/api/e10/calibration").get_json()["calibration"]["local"]["performance"]
+
+    assert performance["suppressed"] is True
+    assert performance["calls"] == 0
+    assert "multi-model Ollama" in performance["message"]
+
+
 def test_e10_ollama_selected_model_reaches_explorer_and_companion_execution(
     tmp_path,
     monkeypatch,
@@ -519,3 +576,4 @@ def test_e10_ui_exposes_provider_configuration_surface():
     assert '(not installed)</option>' in index_html
     assert 'selected disabled>${x(selectedModel)} (not installed)' in index_html
     assert "await e10LoadProviders();" in index_html
+    assert "perf && !perf.suppressed && perf.calls > 0" in index_html
