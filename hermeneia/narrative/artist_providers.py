@@ -390,16 +390,14 @@ class AnthropicArtistProvider:
             if not model_id.startswith("claude-"):
                 continue
             display_name = str(getattr(item, "display_name", "") or "").strip() or None
-            created_at = getattr(item, "created_at", None)
             models.append(
                 ModelCatalogEntry(
                     model_id=model_id,
                     provider_id="anthropic",
                     display_label=display_name,
                     family="claude" if model_id.startswith("claude-") else None,
-                    snapshot=str(created_at) if created_at else None,
+                    availability="known_unverified",
                     catalog_source="provider_api",
-                    capabilities=("text",),
                 )
             )
         return ModelCatalog(
@@ -493,8 +491,8 @@ class OpenAIArtistProvider:
                         else "o" if model_id.startswith("o")
                         else None
                     ),
+                    availability="known_unverified",
                     catalog_source="provider_api",
-                    capabilities=("text",),
                 )
             )
         return ModelCatalog(
@@ -592,8 +590,13 @@ class GeminiArtistProvider:
                     provider_id="gemini",
                     display_label=display_name or model_id,
                     family="gemini" if model_id.startswith("gemini-") else None,
+                    availability=(
+                        "available"
+                        if "generateContent" in supported_actions
+                        else "known_unverified"
+                    ),
                     catalog_source="provider_api",
-                    capabilities=supported_actions or ("text",),
+                    capabilities=supported_actions,
                 )
             )
         return ModelCatalog(

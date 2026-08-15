@@ -958,7 +958,7 @@ def create_app(
         try:
             adapter = active_provider_registry.create(
                 provider_id,
-                **_provider_kwargs(provider_id),
+                **_provider_connection_kwargs(provider_id),
             )
             catalog_fn = getattr(adapter, "model_catalog", None)
             if not callable(catalog_fn):
@@ -1154,10 +1154,14 @@ def create_app(
         return bool(source.get("configured"))
 
     def _provider_kwargs(provider_id: str, *, api_key: str | None = None) -> dict:
-        kwargs: dict[str, object] = {}
+        kwargs = _provider_connection_kwargs(provider_id, api_key=api_key)
         selected_model, _ = _selected_model_for_provider(provider_id)
         if selected_model:
             kwargs["model"] = selected_model
+        return kwargs
+
+    def _provider_connection_kwargs(provider_id: str, *, api_key: str | None = None) -> dict:
+        kwargs: dict[str, object] = {}
         if provider_id.startswith("ollama-"):
             kwargs["host"] = _ollama_host()
         resolved_key = api_key if api_key is not None else _credential_secret_for_provider(provider_id)
@@ -5994,7 +5998,6 @@ Return ONLY valid JSON, no markdown, no explanation:
         payload = request.get_json(silent=True) or {}
         text     = str(payload.get("text", "")).strip()
         provider = str(payload.get("provider", "null")).strip()
-        model    = payload.get("model") or None
         save     = bool(payload.get("save", False))
 
         if not text:
@@ -6009,8 +6012,6 @@ Return ONLY valid JSON, no markdown, no explanation:
 
         try:
             kwargs = _provider_kwargs(provider)
-            if model:
-                kwargs["model"] = model
             prov = get_provider(provider, **kwargs)
             proposed = extract_blueprint_from_text(text, prov)
         except BlueprintExtractionError as exc:
@@ -6270,7 +6271,6 @@ Return ONLY valid JSON, no markdown, no explanation:
         payload = request.get_json(silent=True) or {}
         plan_id  = str(payload.get("plan_id", "")).strip()
         provider = str(payload.get("provider", "openai")).strip()
-        model    = payload.get("model") or None
 
         if not plan_id:
             return jsonify({"error": "plan_id is required"}), 400
@@ -6282,8 +6282,6 @@ Return ONLY valid JSON, no markdown, no explanation:
         conn = _conn_rw()
         try:
             provider_kwargs = _provider_kwargs(provider)
-            if model:
-                provider_kwargs["model"] = model
 
             profiles = list_profiles(conn)
             if not profiles:

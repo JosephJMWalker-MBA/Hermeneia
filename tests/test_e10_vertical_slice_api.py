@@ -19,6 +19,7 @@ from hermeneia.narrative.provider_registry import (
 )
 from hermeneia.narrative.artist_providers import (
     AnthropicArtistProvider,
+    GeminiArtistProvider,
     OpenAIArtistProvider,
 )
 from hermeneia.storage.sqlite import SQLiteStore
@@ -75,8 +76,11 @@ class _CatalogProvider(_CapturingProvider):
     catalogs: dict[str, list[str]] = {}
     catalog_errors: dict[str, Exception] = {}
     catalog_calls: list[dict] = []
+    reject_constructor_models: set[str] = set()
 
     def __init__(self, provider_id: str = "openai", model: str | None = None, **kwargs) -> None:
+        if model in self.__class__.reject_constructor_models:
+            raise ValueError(f"model rejected during construction: {model}")
         self.provider_id = provider_id
         super().__init__(model=model, **kwargs)
 
@@ -296,6 +300,7 @@ def _reset_catalog_provider() -> None:
     }
     _CatalogProvider.catalog_errors = {}
     _CatalogProvider.catalog_calls = []
+    _CatalogProvider.reject_constructor_models = set()
     _CatalogProvider.calls = []
 
 
@@ -1098,6 +1103,8 @@ def test_e10_openai_adapter_normalizes_provider_api_model_catalog(monkeypatch):
     assert catalog.catalog_source == "provider_api"
     assert [entry.model_id for entry in catalog.models] == ["gpt-4o", "o3-mini"]
     assert {entry.catalog_source for entry in catalog.models} == {"provider_api"}
+    assert {entry.availability for entry in catalog.models} == {"known_unverified"}
+    assert {entry.capabilities for entry in catalog.models} == {()}
 
 
 def test_e10_anthropic_adapter_normalizes_provider_api_model_catalog(monkeypatch):
@@ -1120,7 +1127,45 @@ def test_e10_anthropic_adapter_normalizes_provider_api_model_catalog(monkeypatch
     assert catalog.catalog_source == "provider_api"
     assert [entry.model_id for entry in catalog.models] == ["claude-sonnet-4-6"]
     assert catalog.models[0].display_label == "Claude Sonnet 4.6"
-    assert catalog.models[0].snapshot == "2026-01-01"
+    assert catalog.models[0].snapshot is None
+    assert catalog.models[0].availability == "known_unverified"
+    assert catalog.models[0].capabilities == ()
+
+
+def test_e10_gemini_adapter_preserves_unknown_capability_metadata(monkeypatch):
+    class _FakeModels:
+        def list(self):
+            return [
+                types.SimpleNamespace(
+                    name="models/gemini-2.0-flash",
+                    display_name="Gemini 2 Flash",
+                    supported_actions=["generateContent"],
+                ),
+                types.SimpleNamespace(
+                    name="models/gemini-unknown",
+                    display_name="Gemini Unknown",
+                    supported_actions=[],
+                ),
+            ]
+
+        def generate_content(self, model, contents):
+            return types.SimpleNamespace(text="ok")
+
+    class _FakeClient:
+        def __init__(self, api_key):
+            self.models = _FakeModels()
+
+    fake_google = types.SimpleNamespace(genai=types.SimpleNamespace(Client=_FakeClient))
+    monkeypatch.setitem(sys.modules, "google", fake_google)
+    monkeypatch.setitem(sys.modules, "google.genai", fake_google.genai)
+
+    catalog = GeminiArtistProvider(api_key="secret-gemini-key").model_catalog()
+
+    entries = {entry.model_id: entry for entry in catalog.models}
+    assert entries["gemini-2.0-flash"].availability == "available"
+    assert entries["gemini-2.0-flash"].capabilities == ("generateContent",)
+    assert entries["gemini-unknown"].availability == "known_unverified"
+    assert entries["gemini-unknown"].capabilities == ()
 
 
 def test_e10_cloud_model_selection_persists_across_restart_and_workspaces(
@@ -1196,6 +1241,40 @@ def test_e10_cloud_model_missing_from_catalog_does_not_silently_fallback(
     assert _CatalogProvider.calls[-1]["model"] == "gpt-4.1"
 
 
+def test_e10_cloud_catalog_discovery_ignores_stale_selected_constructor_model(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    settings_path.parent.mkdir(parents=True)
+    settings_path.write_text(json.dumps({
+        "schema": "hermeneia.connections_settings.v1",
+        "version": 1,
+        "providers": {"openai": {"selected_model": "retired-model"}},
+    }))
+    _reset_catalog_provider()
+    _CatalogProvider.catalogs["openai"] = ["gpt-4o", "gpt-4.1"]
+    _CatalogProvider.reject_constructor_models = {"retired-model"}
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+
+    payload = client.get("/api/e10/providers").get_json()
+    gpt = next(row for row in payload["providers"] if row["participant"] == "gpt")
+
+    assert gpt["selected_model"] == "retired-model"
+    assert gpt["selected_model_available"] is False
+    assert gpt["available_models"] == ["gpt-4.1", "gpt-4o"]
+    assert gpt["model_catalog_status"] == "available"
+    assert any(
+        call["provider_id"] == "openai" and call["model"] is None
+        for call in _CatalogProvider.catalog_calls
+    )
+
+
 def test_e10_cloud_model_explicit_switch_a_b_a_and_provider_isolation(
     tmp_path,
     monkeypatch,
@@ -1255,6 +1334,42 @@ def test_e10_cloud_calibration_isolated_by_selected_model(
     restored = client.get("/api/e10/calibration").get_json()["calibration"]["gpt"]
     assert restored["calibration_identity"] == "gpt::openai::gpt-4o"
     assert len(restored["calibration_tests"]) == 1
+
+
+def test_e10_blueprint_extraction_ignores_legacy_request_model_override(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    _reset_catalog_provider()
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+    assert client.put("/api/e10/providers/gpt/model", json={"model": "gpt-4.1"}).status_code == 200
+    calls: list[dict] = []
+
+    def _fake_get_provider(name, **kwargs):
+        calls.append({"name": name, "kwargs": kwargs})
+        return object()
+
+    monkeypatch.setattr(
+        "hermeneia.narrative.artist_providers.get_provider",
+        _fake_get_provider,
+    )
+
+    response = client.post("/api/pipeline/extract-blueprint", json={
+        "text": "A detailed analysis of the topic at hand.",
+        "provider": "openai",
+        "model": "legacy-payload-model",
+    })
+
+    assert response.status_code == 200
+    assert calls[-1]["kwargs"]["model"] == "gpt-4.1"
+    assert calls[-1]["kwargs"]["api_key"] == "environment-openai-key"
+    assert calls[-1]["kwargs"]["model"] != "legacy-payload-model"
 
 
 def test_e10_session_key_can_be_saved_and_removed_without_being_returned(tmp_path, monkeypatch):
