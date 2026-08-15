@@ -544,6 +544,10 @@ def test_e10_ollama_host_rejects_secret_bearing_or_non_origin_urls(
         "http://server:11434/#secret",
         "http://server:11434/api",
         "http:///missing-host",
+        "http://bad host:11434",
+        "http://-bad-host:11434",
+        "http://bad_host:11434",
+        "http://server:99999",
         "ftp://server:11434",
     ]
     for host in bad_hosts:
@@ -551,6 +555,26 @@ def test_e10_ollama_host_rejects_secret_bearing_or_non_origin_urls(
         assert response.status_code == 400, host
 
     assert not settings_path.exists()
+
+
+def test_e10_ollama_host_accepts_and_normalizes_ipv6_origin(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    response = client.put("/api/e10/ollama/host", json={"host": "http://[0:0:0:0:0:0:0:1]:11434/"})
+
+    assert response.status_code == 200
+    assert response.get_json()["configured_ollama_host"] == "http://[::1]:11434"
+    settings = json.loads(settings_path.read_text())
+    assert settings["ollama"]["host"] == "http://[::1]:11434"
 
 
 def test_e10_ollama_unsupported_future_settings_are_not_overwritten(
@@ -583,6 +607,52 @@ def test_e10_ollama_unsupported_future_settings_are_not_overwritten(
     assert model_response.status_code == 409
     assert host_response.status_code == 409
     assert "Unsupported Hermeneia Connections settings version" in model_response.get_json()["error"]
+    assert settings_path.read_text() == original_text
+    assert local["selected_model"] == "qwen3:4b"
+    assert local["selected_model_source"] == "default"
+    assert local["ollama_host"] == "http://localhost:11434"
+    assert local["ollama_host_source"] == "default"
+
+
+def test_e10_ollama_unreadable_existing_settings_blocks_writes(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    settings_path.parent.mkdir(parents=True)
+    settings_path.write_text(json.dumps({
+        "schema": "hermeneia.connections_settings.v1",
+        "version": 1,
+        "providers": {"ollama-local": {"selected_model": "qwen3:4b"}},
+    }))
+    original_text = settings_path.read_text()
+
+    def fail_read_text(self, *args, **kwargs):
+        if self == settings_path:
+            raise PermissionError("permission denied: /private/path/connections.json")
+        return original_read_text(self, *args, **kwargs)
+
+    original_read_text = Path.read_text
+    monkeypatch.setattr(Path, "read_text", fail_read_text)
+    _install_fake_ollama(monkeypatch, ["llama3.2:1b", "qwen3:4b"])
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    model_response = client.put("/api/e10/providers/local/model", json={"model": "llama3.2:1b"})
+    host_response = client.put("/api/e10/ollama/host", json={"host": "http://jetson.local:11434"})
+    local = next(
+        provider for provider in client.get("/api/e10/providers").get_json()["providers"]
+        if provider["participant"] == "local"
+    )
+
+    assert model_response.status_code == 409
+    assert host_response.status_code == 409
+    assert "could not be read" in model_response.get_json()["error"]
+    assert "/private/path" not in model_response.get_json()["error"]
+    monkeypatch.setattr(Path, "read_text", original_read_text)
     assert settings_path.read_text() == original_text
     assert local["selected_model"] == "qwen3:4b"
     assert local["selected_model_source"] == "default"

@@ -50,6 +50,7 @@ from ..reader_span import reader_span_display_locator, reader_span_raw_locator
 from ..connections_settings import (
     DEFAULT_OLLAMA_HOST,
     InvalidConnectionsSettingError,
+    UnreadableConnectionsSettingsError,
     UnsupportedConnectionsSettingsError,
     empty_connections_settings,
     load_connections_settings,
@@ -162,7 +163,7 @@ def create_app(
     _connections_settings_load_error: str | None = None
     try:
         runtime_connections_settings: dict = load_connections_settings()
-    except UnsupportedConnectionsSettingsError as exc:
+    except (UnsupportedConnectionsSettingsError, UnreadableConnectionsSettingsError) as exc:
         runtime_connections_settings = empty_connections_settings()
         _connections_settings_load_error = str(exc)
 
@@ -3601,10 +3602,12 @@ def create_app(
             return jsonify({"error": f"Could not save Connections settings: {exc}"}), 500
         source = _ollama_host_source()
         effective_host = _ollama_host()
+        with _connections_settings_lock:
+            configured_host = ollama_host_from_settings(runtime_connections_settings)
         return jsonify({
             "ollama_host": effective_host,
             "ollama_host_source": source,
-            "configured_ollama_host": host,
+            "configured_ollama_host": configured_host,
             "message": (
                 "Ollama host saved in user Connections settings. "
                 "The OLLAMA_HOST environment variable remains authoritative for this server session."

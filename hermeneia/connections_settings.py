@@ -13,6 +13,7 @@ import os
 import sys
 import tempfile
 from copy import deepcopy
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -25,6 +26,10 @@ DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 
 class UnsupportedConnectionsSettingsError(RuntimeError):
     """Raised when a valid Hermeneia settings file is newer than this binary."""
+
+
+class UnreadableConnectionsSettingsError(RuntimeError):
+    """Raised when an existing settings file cannot be safely read."""
 
 
 class InvalidConnectionsSettingError(ValueError):
@@ -64,6 +69,36 @@ def _is_hermeneia_connections_schema(value: object) -> bool:
     return isinstance(value, str) and value.startswith("hermeneia.connections_settings.")
 
 
+def _is_valid_dns_hostname(hostname: str) -> bool:
+    if not hostname or len(hostname) > 253:
+        return False
+    if hostname.endswith("."):
+        hostname = hostname[:-1]
+    if not hostname:
+        return False
+    labels = hostname.split(".")
+    for label in labels:
+        if not label or len(label) > 63:
+            return False
+        if label.startswith("-") or label.endswith("-"):
+            return False
+        if not all(ch.isalnum() or ch == "-" for ch in label):
+            return False
+    return True
+
+
+def _normalized_host(hostname: str) -> str:
+    try:
+        parsed_ip = ip_address(hostname)
+    except ValueError:
+        if not _is_valid_dns_hostname(hostname):
+            raise InvalidConnectionsSettingError("host must include a valid hostname or IP address")
+        return hostname.lower().rstrip(".")
+    if parsed_ip.version == 6:
+        return f"[{parsed_ip.compressed}]"
+    return parsed_ip.compressed
+
+
 def validate_ollama_host(host: str) -> str:
     value = str(host or "").strip()
     parsed = urlparse(value)
@@ -71,6 +106,8 @@ def validate_ollama_host(host: str) -> str:
         raise InvalidConnectionsSettingError("host must begin with http:// or https://")
     if not parsed.hostname:
         raise InvalidConnectionsSettingError("host must include a hostname")
+    if any(ch.isspace() for ch in parsed.hostname):
+        raise InvalidConnectionsSettingError("host must not contain whitespace")
     if parsed.username or parsed.password:
         raise InvalidConnectionsSettingError("host must not include username or password")
     if parsed.query or parsed.fragment:
@@ -83,7 +120,7 @@ def validate_ollama_host(host: str) -> str:
         port = parsed.port
     except ValueError as exc:
         raise InvalidConnectionsSettingError("host port is invalid") from exc
-    netloc = parsed.hostname
+    netloc = _normalized_host(parsed.hostname)
     if port is not None:
         netloc = f"{netloc}:{port}"
     return f"{parsed.scheme}://{netloc}"
@@ -146,8 +183,15 @@ def load_connections_settings(path: Path | None = None) -> dict[str, Any]:
     settings_path = path or connections_settings_path()
     try:
         raw = json.loads(settings_path.read_text())
-    except (OSError, json.JSONDecodeError):
+    except FileNotFoundError:
         return empty_connections_settings()
+    except json.JSONDecodeError:
+        return empty_connections_settings()
+    except OSError as exc:
+        raise UnreadableConnectionsSettingsError(
+            "Connections settings file exists but could not be read. "
+            "Fix file permissions or move the unreadable file before changing Connections settings."
+        ) from exc
     return _coerce_settings(raw)
 
 
