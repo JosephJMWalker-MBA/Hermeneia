@@ -7521,17 +7521,42 @@ function e10ProviderCard(provider, cal, perf) {
   const isOllama = provider.provider_id && provider.provider_id.startsWith('ollama-');
   const roleOrder = ['Explorer','Architect','Artist','Critic','Witness'];
   const pk = JSON.stringify(provider.participant);
+  const selectedModel = provider.selected_model || provider.default_model || '';
+  const modelCatalog = provider.model_catalog || {};
+  const catalogModels = Array.isArray(modelCatalog.models) ? modelCatalog.models : [];
+  const availableModelIds = catalogModels.map(m => m.model_id || m.id).filter(Boolean);
+  const catalogAvailable = modelCatalog.status === 'available';
+  const modelSourceLabel = provider.selected_model_source === 'user_config'
+      ? 'user setting'
+      : 'registry default';
+  const missingSelectedOption = selectedModel && !availableModelIds.includes(selectedModel)
+    ? `<option value="" selected disabled>${x(selectedModel)} (unavailable)</option>`
+    : '';
+  const modelOptions = missingSelectedOption + catalogModels.map(m => {
+    const id = m.model_id || m.id;
+    const label = m.display_label && m.display_label !== id ? `${id} — ${m.display_label}` : id;
+    return `<option value="${x(id)}" ${id === selectedModel ? 'selected' : ''}>${x(label)}</option>`;
+  }).join('');
+  const modelSelectorDisabled = !catalogAvailable || availableModelIds.length === 0;
+  const modelSection = provider.default_model ? `<div style="margin:8px 0 4px;font-size:11px;color:var(--dim2)">
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 8px;margin-bottom:8px">
+      <span>Selected model</span><span style="font-family:var(--mono);color:${provider.selected_model_available ? 'var(--green)' : 'var(--yellow)'}">${x(selectedModel || '—')} <span style="font-family:var(--sans);color:var(--dim2)">(${x(modelSourceLabel)})</span></span>
+      <span>Catalog source</span><span>${x(modelCatalog.catalog_source || provider.model_catalog_source || 'unavailable')}</span>
+      <span>Catalog status</span><span style="color:${catalogAvailable ? 'var(--green)' : 'var(--yellow)'}">${x(modelCatalog.status || provider.model_catalog_status || 'unavailable')}</span>
+    </div>
+    ${modelCatalog.error ? `<div style="font-size:11px;color:var(--yellow);margin-bottom:6px">${x(modelCatalog.error)}</div>` : ''}
+    <div style="display:flex;align-items:center;gap:6px;margin:8px 0">
+      <select ${modelSelectorDisabled ? 'disabled' : ''} data-current-model="${x(selectedModel)}" onchange="e10SelectProviderModel(${pk},this.value,this)" style="font-size:11px;padding:4px 7px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);max-width:100%">
+        ${modelOptions || `<option value="">No models discovered</option>`}
+      </select>
+      <span style="font-size:10px;color:var(--dim2)">${availableModelIds.length ? `${availableModelIds.length} known` : 'none verified'}</span>
+    </div>
+  </div>` : '';
 
   // Ollama readiness steps
   let ollamaSteps = '';
   if (isOllama && provider.adapter_available) {
     const installedModels = Array.isArray(provider.installed_models) ? provider.installed_models : [];
-    const selectedModel = provider.selected_model || provider.default_model || '';
-    const selectedInstalled = installedModels.includes(selectedModel);
-    const selectorDisabled = !provider.ollama_server_running || installedModels.length === 0;
-    const modelSourceLabel = provider.selected_model_source === 'user_config'
-        ? 'user setting'
-        : 'registry default';
     const hostSourceLabel = provider.ollama_host_source === 'environment'
       ? 'environment'
       : provider.ollama_host_source === 'user_config'
@@ -7540,12 +7565,6 @@ function e10ProviderCard(provider, cal, perf) {
     const installedHtml = installedModels.length
       ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px">${installedModels.map(m => `<span style="font-family:var(--mono);font-size:10px;border:1px solid var(--border);border-radius:999px;padding:1px 6px;color:${m === selectedModel ? 'var(--green)' : 'var(--dim2)'}">${x(m)}</span>`).join('')}</div>`
       : '<div style="font-size:11px;color:var(--dim2);margin-top:4px">No installed models discovered.</div>';
-    const missingSelectedOption = selectedModel && !selectedInstalled
-      ? `<option value="" selected disabled>${x(selectedModel)} (not installed)</option>`
-      : '';
-    const modelOptions = missingSelectedOption + installedModels.map(m =>
-      `<option value="${x(m)}" ${m === selectedModel ? 'selected' : ''}>${x(m)}</option>`
-    ).join('');
     const steps = [];
     if (!provider.ollama_server_running) steps.push({ ok: false, label: 'Ollama server running', action: 'ollama serve' });
     else steps.push({ ok: true, label: 'Ollama server running', action: null });
@@ -7563,12 +7582,6 @@ function e10ProviderCard(provider, cal, perf) {
       </div>
       <label style="display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);margin-bottom:3px">Installed models</label>
       ${installedHtml}
-      <div style="display:flex;align-items:center;gap:6px;margin:8px 0">
-        <select ${selectorDisabled ? 'disabled' : ''} data-current-model="${x(selectedModel)}" onchange="e10SelectOllamaModel(${pk},this.value,this)" style="font-size:11px;padding:4px 7px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);max-width:100%">
-          ${modelOptions || `<option value="">No installed models</option>`}
-        </select>
-        <span style="font-size:10px;color:var(--dim2)">${x(modelSourceLabel)}</span>
-      </div>
       ${steps.map(s => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
         <span style="color:${s.ok ? 'var(--green)' : 'var(--yellow)'}">${s.ok ? '✓' : '○'}</span>
         <span style="color:${s.ok ? 'var(--fg2)' : 'var(--dim2)'}">${s.label}</span>
@@ -7648,6 +7661,7 @@ function e10ProviderCard(provider, cal, perf) {
     </div>
     ${setup.about ? `<div style="font-size:12px;color:var(--dim2);margin-bottom:8px;line-height:1.5">${x(setup.about)}</div>` : ''}
     ${credentialSection}
+    ${modelSection}
     ${ollamaSteps}
     ${perfHtml}
     ${calSummary}
@@ -12023,7 +12037,7 @@ async function e10RemoveKey(participant, credentialSource = '') {
   await e10LoadProviders();
 }
 
-async function e10SelectOllamaModel(participant, model, selectEl) {
+async function e10SelectProviderModel(participant, model, selectEl) {
   if (!model) return;
   if (selectEl) selectEl.disabled = true;
   try {
@@ -12036,6 +12050,10 @@ async function e10SelectOllamaModel(participant, model, selectEl) {
   } finally {
     if (selectEl) selectEl.disabled = false;
   }
+}
+
+async function e10SelectOllamaModel(participant, model, selectEl) {
+  return e10SelectProviderModel(participant, model, selectEl);
 }
 
 async function e10SaveOllamaHost(participant) {

@@ -11,9 +11,15 @@ from pathlib import Path
 import pytest
 
 from hermeneia.narrative.provider_registry import (
+    ModelCatalog,
+    ModelCatalogEntry,
     ProviderDefinition,
     ProviderRegistration,
     ProviderRegistry,
+)
+from hermeneia.narrative.artist_providers import (
+    AnthropicArtistProvider,
+    OpenAIArtistProvider,
 )
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.web.app import create_app
@@ -63,6 +69,54 @@ class _CapturingProvider:
             "sdk_version": "test",
             "request_schema_version": "1",
         }
+
+
+class _CatalogProvider(_CapturingProvider):
+    catalogs: dict[str, list[str]] = {}
+    catalog_errors: dict[str, Exception] = {}
+    catalog_calls: list[dict] = []
+
+    def __init__(self, provider_id: str = "openai", model: str | None = None, **kwargs) -> None:
+        self.provider_id = provider_id
+        super().__init__(model=model, **kwargs)
+
+    @property
+    def provider_name(self) -> str:
+        return f"{self.provider_id}/{self.model}"
+
+    def execution_config(self) -> dict:
+        return {
+            "provider": self.provider_id,
+            "model_id": self.model,
+            "sdk_version": "test",
+            "request_schema_version": "1",
+        }
+
+    def model_catalog(self) -> ModelCatalog:
+        self.__class__.catalog_calls.append({
+            "provider_id": self.provider_id,
+            "model": self.model,
+            "kwargs": self.kwargs,
+        })
+        error = self.__class__.catalog_errors.get(self.provider_id)
+        if error:
+            raise error
+        return ModelCatalog(
+            provider_id=self.provider_id,
+            catalog_source="provider_api",
+            status="available",
+            models=tuple(
+                ModelCatalogEntry(
+                    model_id=model,
+                    provider_id=self.provider_id,
+                    display_label=model,
+                    family="claude" if model.startswith("claude-") else "gpt" if model.startswith("gpt-") else None,
+                    catalog_source="provider_api",
+                    capabilities=("text",),
+                )
+                for model in self.__class__.catalogs.get(self.provider_id, [])
+            ),
+        )
 
 
 class _FakeCredentialStore:
@@ -200,6 +254,49 @@ def _cloud_registry() -> ProviderRegistry:
             ),
         ),
     )
+
+
+def _cloud_catalog_registry() -> ProviderRegistry:
+    return ProviderRegistry(
+        (
+            ProviderRegistration(
+                ProviderDefinition(
+                    id="openai",
+                    display_name="OpenAI",
+                    provider_type="artist",
+                    enabled=True,
+                    capabilities=("text",),
+                    local_or_remote="remote",
+                    required_environment="OPENAI_API_KEY",
+                    default_model="gpt-4o",
+                ),
+                lambda **kwargs: _CatalogProvider(provider_id="openai", **kwargs),
+            ),
+            ProviderRegistration(
+                ProviderDefinition(
+                    id="anthropic",
+                    display_name="Anthropic",
+                    provider_type="artist",
+                    enabled=True,
+                    capabilities=("text",),
+                    local_or_remote="remote",
+                    required_environment="ANTHROPIC_API_KEY",
+                    default_model="claude-sonnet-4-6",
+                ),
+                lambda **kwargs: _CatalogProvider(provider_id="anthropic", **kwargs),
+            ),
+        ),
+    )
+
+
+def _reset_catalog_provider() -> None:
+    _CatalogProvider.catalogs = {
+        "openai": ["gpt-4o", "gpt-4.1"],
+        "anthropic": ["claude-sonnet-4-6", "claude-opus-4-1"],
+    }
+    _CatalogProvider.catalog_errors = {}
+    _CatalogProvider.catalog_calls = []
+    _CatalogProvider.calls = []
 
 
 def _table_counts(db_path: Path) -> dict[str, int]:
@@ -919,6 +1016,247 @@ def test_e10_ollama_selected_model_reaches_explorer_and_companion_execution(
     assert _CapturingProvider.calls[-1]["model"] == "llama3.2:1b"
 
 
+def test_e10_cloud_catalog_discovery_uses_credentials_and_reports_provenance(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "catalog-openai-secret")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "catalog-anthropic-secret")
+    _reset_catalog_provider()
+    client = create_app(
+        db_path=tmp_path / "workspace-a" / "a.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+
+    payload = client.get("/api/e10/providers").get_json()
+    providers = {row["participant"]: row for row in payload["providers"]}
+    gpt = providers["gpt"]
+    claude = providers["claude"]
+
+    assert gpt["model_catalog_source"] == "provider_api"
+    assert gpt["model_catalog_status"] == "available"
+    assert gpt["available_models"] == ["gpt-4.1", "gpt-4o"]
+    assert gpt["selected_model"] == "gpt-4o"
+    assert gpt["selected_model_available"] is True
+    assert claude["available_models"] == ["claude-opus-4-1", "claude-sonnet-4-6"]
+    assert any(
+        call["provider_id"] == "openai"
+        and call["kwargs"]["api_key"] == "catalog-openai-secret"
+        for call in _CatalogProvider.catalog_calls
+    )
+    assert "catalog-openai-secret" not in json.dumps(payload)
+    assert "catalog-anthropic-secret" not in json.dumps(payload)
+    assert not settings_path.exists()
+
+
+def test_e10_cloud_catalog_failure_preserves_selection_without_secret_disclosure(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "catalog-openai-secret")
+    _reset_catalog_provider()
+    _CatalogProvider.catalog_errors = {
+        "openai": RuntimeError("provider returned catalog-openai-secret in metadata"),
+    }
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+
+    payload = client.get("/api/e10/providers").get_json()
+    gpt = next(row for row in payload["providers"] if row["participant"] == "gpt")
+
+    assert gpt["configured"] is True
+    assert gpt["selected_model"] == "gpt-4o"
+    assert gpt["model_catalog_status"] == "unavailable"
+    assert gpt["model_catalog_source"] == "unavailable"
+    assert "Check provider credentials and connectivity" in gpt["model_catalog_error"]
+    assert "catalog-openai-secret" not in json.dumps(payload)
+
+
+def test_e10_openai_adapter_normalizes_provider_api_model_catalog(monkeypatch):
+    class _FakeModels:
+        def list(self):
+            return types.SimpleNamespace(data=[
+                types.SimpleNamespace(id="gpt-4o"),
+                types.SimpleNamespace(id="o3-mini"),
+                types.SimpleNamespace(id="text-embedding-3-large"),
+            ])
+
+    class _FakeOpenAI:
+        def __init__(self, api_key):
+            self.models = _FakeModels()
+
+    monkeypatch.setitem(sys.modules, "openai", types.SimpleNamespace(OpenAI=_FakeOpenAI))
+
+    catalog = OpenAIArtistProvider(api_key="secret-openai-key").model_catalog()
+
+    assert catalog.catalog_source == "provider_api"
+    assert [entry.model_id for entry in catalog.models] == ["gpt-4o", "o3-mini"]
+    assert {entry.catalog_source for entry in catalog.models} == {"provider_api"}
+
+
+def test_e10_anthropic_adapter_normalizes_provider_api_model_catalog(monkeypatch):
+    class _FakeModels:
+        def list(self, limit=100):
+            assert limit == 100
+            return [
+                types.SimpleNamespace(id="claude-sonnet-4-6", display_name="Claude Sonnet 4.6", created_at="2026-01-01"),
+                types.SimpleNamespace(id="embedding-model", display_name="Embedding", created_at=None),
+            ]
+
+    class _FakeAnthropic:
+        def __init__(self, api_key):
+            self.models = _FakeModels()
+
+    monkeypatch.setitem(sys.modules, "anthropic", types.SimpleNamespace(Anthropic=_FakeAnthropic))
+
+    catalog = AnthropicArtistProvider(api_key="secret-anthropic-key").model_catalog()
+
+    assert catalog.catalog_source == "provider_api"
+    assert [entry.model_id for entry in catalog.models] == ["claude-sonnet-4-6"]
+    assert catalog.models[0].display_label == "Claude Sonnet 4.6"
+    assert catalog.models[0].snapshot == "2026-01-01"
+
+
+def test_e10_cloud_model_selection_persists_across_restart_and_workspaces(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "environment-anthropic-key")
+    _reset_catalog_provider()
+    first = create_app(
+        db_path=tmp_path / "workspace-a" / "a.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+
+    selected = first.put("/api/e10/providers/gpt/model", json={"model": "gpt-4.1"})
+    tested = first.post("/api/e10/providers/gpt/test", json={})
+
+    assert selected.status_code == 200
+    assert selected.get_json()["selected_model"] == "gpt-4.1"
+    assert selected.get_json()["selected_model_source"] == "user_config"
+    assert tested.status_code == 200
+    assert _CatalogProvider.calls[-1]["model"] == "gpt-4.1"
+    settings = json.loads(settings_path.read_text())
+    assert settings["providers"]["openai"]["selected_model"] == "gpt-4.1"
+    assert "environment-openai-key" not in settings_path.read_text()
+
+    second = create_app(
+        db_path=tmp_path / "workspace-b" / "b.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+    providers = {row["participant"]: row for row in second.get("/api/e10/providers").get_json()["providers"]}
+
+    assert providers["gpt"]["selected_model"] == "gpt-4.1"
+    assert providers["gpt"]["selected_model_source"] == "user_config"
+    assert providers["claude"]["selected_model"] == "claude-sonnet-4-6"
+    assert providers["claude"]["selected_model_source"] == "default"
+    assert not (tmp_path / "workspace-a" / "calibration.json").exists()
+    assert not (tmp_path / "workspace-b" / "calibration.json").exists()
+
+
+def test_e10_cloud_model_missing_from_catalog_does_not_silently_fallback(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    _reset_catalog_provider()
+    first = create_app(
+        db_path=tmp_path / "missing-a.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+    assert first.put("/api/e10/providers/gpt/model", json={"model": "gpt-4.1"}).status_code == 200
+    _CatalogProvider.catalogs["openai"] = ["gpt-4o"]
+    _CatalogProvider.calls = []
+    second = create_app(
+        db_path=tmp_path / "missing-b.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+
+    status = second.get("/api/e10/providers").get_json()["providers"]
+    gpt = next(row for row in status if row["participant"] == "gpt")
+    tested = second.post("/api/e10/providers/gpt/test", json={})
+
+    assert gpt["selected_model"] == "gpt-4.1"
+    assert gpt["selected_model_source"] == "user_config"
+    assert gpt["selected_model_available"] is False
+    assert gpt["available_models"] == ["gpt-4o"]
+    assert gpt["status"] == "not_connected"
+    assert tested.status_code == 200
+    assert _CatalogProvider.calls[-1]["model"] == "gpt-4.1"
+
+
+def test_e10_cloud_model_explicit_switch_a_b_a_and_provider_isolation(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "environment-anthropic-key")
+    _reset_catalog_provider()
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+
+    assert client.put("/api/e10/providers/gpt/model", json={"model": "gpt-4.1"}).status_code == 200
+    assert client.put("/api/e10/providers/gpt/model", json={"model": "gpt-4o"}).status_code == 200
+    assert client.put("/api/e10/providers/gpt/model", json={"model": "gpt-4.1"}).status_code == 200
+
+    providers = {row["participant"]: row for row in client.get("/api/e10/providers").get_json()["providers"]}
+    settings = json.loads(settings_path.read_text())
+
+    assert providers["gpt"]["selected_model"] == "gpt-4.1"
+    assert providers["gpt"]["role_suitability"]["Explorer"] == "untested"
+    assert "No static Hermeneia suitability" in providers["gpt"]["setup"]["about"]
+    assert providers["claude"]["selected_model"] == "claude-sonnet-4-6"
+    assert settings["providers"]["openai"]["selected_model"] == "gpt-4.1"
+    assert "anthropic" not in settings["providers"] or "selected_model" not in settings["providers"]["anthropic"]
+
+
+def test_e10_cloud_calibration_isolated_by_selected_model(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    _reset_catalog_provider()
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+
+    assert client.put("/api/e10/providers/gpt/model", json={"model": "gpt-4o"}).status_code == 200
+    first = client.post("/api/e10/providers/gpt/calibrate/Explorer", json={})
+    first_cal = client.get("/api/e10/calibration").get_json()["calibration"]["gpt"]
+    assert first.status_code == 201
+    assert first.get_json()["model_id"] == "gpt-4o"
+    assert first_cal["calibration_identity"] == "gpt::openai::gpt-4o"
+    assert len(first_cal["calibration_tests"]) == 1
+
+    assert client.put("/api/e10/providers/gpt/model", json={"model": "gpt-4.1"}).status_code == 200
+    second_cal = client.get("/api/e10/calibration").get_json()["calibration"]["gpt"]
+    assert second_cal["calibration_identity"] == "gpt::openai::gpt-4.1"
+    assert second_cal["calibration_tests"] == []
+
+    assert client.put("/api/e10/providers/gpt/model", json={"model": "gpt-4o"}).status_code == 200
+    restored = client.get("/api/e10/calibration").get_json()["calibration"]["gpt"]
+    assert restored["calibration_identity"] == "gpt::openai::gpt-4o"
+    assert len(restored["calibration_tests"]) == 1
+
+
 def test_e10_session_key_can_be_saved_and_removed_without_being_returned(tmp_path, monkeypatch):
     settings_path = tmp_path / "user-config" / "connections.json"
     monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
@@ -1494,13 +1832,15 @@ def test_e10_ui_exposes_provider_configuration_surface():
     assert "ollama_host" in index_html
     assert "installed_models" in index_html
     assert "selected_model" in index_html
+    assert "model_catalog" in index_html
+    assert "e10SelectProviderModel" in index_html
     assert "e10SelectOllamaModel" in index_html
     assert "e10SaveOllamaHost" in index_html
     assert "/api/e10/ollama/host" in index_html
     assert "ollama_host_source" in index_html
     assert "user setting" in index_html
     assert "/api/e10/providers/${encodeURIComponent(participant)}/model" in index_html
-    assert '(not installed)</option>' in index_html
-    assert 'selected disabled>${x(selectedModel)} (not installed)' in index_html
+    assert '(unavailable)</option>' in index_html
+    assert 'selected disabled>${x(selectedModel)} (unavailable)' in index_html
     assert "await e10LoadProviders();" in index_html
     assert "perf && !perf.suppressed && perf.calls > 0" in index_html

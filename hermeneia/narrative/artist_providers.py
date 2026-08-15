@@ -29,6 +29,8 @@ from types import MappingProxyType
 from typing import Any, Protocol, runtime_checkable
 
 from .provider_registry import (
+    ModelCatalog,
+    ModelCatalogEntry,
     ProviderDefinition,
     ProviderRegistration,
     ProviderRegistry,
@@ -378,6 +380,35 @@ class AnthropicArtistProvider:
     def test_connection(self) -> None:
         self._client.models.list(limit=1)
 
+    def model_catalog(self) -> ModelCatalog:
+        rows = self._client.models.list(limit=100)
+        models: list[ModelCatalogEntry] = []
+        for item in rows:
+            model_id = str(getattr(item, "id", "") or "").strip()
+            if not model_id:
+                continue
+            if not model_id.startswith("claude-"):
+                continue
+            display_name = str(getattr(item, "display_name", "") or "").strip() or None
+            created_at = getattr(item, "created_at", None)
+            models.append(
+                ModelCatalogEntry(
+                    model_id=model_id,
+                    provider_id="anthropic",
+                    display_label=display_name,
+                    family="claude" if model_id.startswith("claude-") else None,
+                    snapshot=str(created_at) if created_at else None,
+                    catalog_source="provider_api",
+                    capabilities=("text",),
+                )
+            )
+        return ModelCatalog(
+            provider_id="anthropic",
+            catalog_source="provider_api",
+            status="available",
+            models=tuple(sorted(models, key=lambda entry: entry.model_id)),
+        )
+
 
 # ── OpenAIArtistProvider ──────────────────────────────────────────────────────
 
@@ -441,6 +472,37 @@ class OpenAIArtistProvider:
 
     def test_connection(self) -> None:
         self._client.models.list()
+
+    def model_catalog(self) -> ModelCatalog:
+        rows = self._client.models.list()
+        data = getattr(rows, "data", rows)
+        models: list[ModelCatalogEntry] = []
+        for item in data or []:
+            model_id = str(getattr(item, "id", "") or "").strip()
+            if not model_id:
+                continue
+            if not model_id.startswith(("gpt-", "o", "chatgpt-")):
+                continue
+            models.append(
+                ModelCatalogEntry(
+                    model_id=model_id,
+                    provider_id="openai",
+                    display_label=model_id,
+                    family=(
+                        "gpt" if model_id.startswith("gpt-")
+                        else "o" if model_id.startswith("o")
+                        else None
+                    ),
+                    catalog_source="provider_api",
+                    capabilities=("text",),
+                )
+            )
+        return ModelCatalog(
+            provider_id="openai",
+            catalog_source="provider_api",
+            status="available",
+            models=tuple(sorted(models, key=lambda entry: entry.model_id)),
+        )
 
 
 # ── GeminiArtistProvider ──────────────────────────────────────────────────────
@@ -506,6 +568,40 @@ class GeminiArtistProvider:
 
     def test_connection(self) -> None:
         next(iter(self._client.models.list()))
+
+    def model_catalog(self) -> ModelCatalog:
+        rows = self._client.models.list()
+        models: list[ModelCatalogEntry] = []
+        for item in rows or []:
+            raw_name = str(
+                getattr(item, "name", "") or getattr(item, "model", "") or ""
+            ).strip()
+            if not raw_name:
+                continue
+            model_id = raw_name.removeprefix("models/")
+            supported_actions = tuple(
+                str(action)
+                for action in (getattr(item, "supported_actions", None) or [])
+            )
+            if supported_actions and "generateContent" not in supported_actions:
+                continue
+            display_name = str(getattr(item, "display_name", "") or "").strip() or None
+            models.append(
+                ModelCatalogEntry(
+                    model_id=model_id,
+                    provider_id="gemini",
+                    display_label=display_name or model_id,
+                    family="gemini" if model_id.startswith("gemini-") else None,
+                    catalog_source="provider_api",
+                    capabilities=supported_actions or ("text",),
+                )
+            )
+        return ModelCatalog(
+            provider_id="gemini",
+            catalog_source="provider_api",
+            status="available",
+            models=tuple(sorted(models, key=lambda entry: entry.model_id)),
+        )
 
 
 # ── GrokArtistProvider ────────────────────────────────────────────────────────

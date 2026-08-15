@@ -32,7 +32,12 @@ from ..cli.health import (
     observation_count,
     perspective_count,
 )
-from ..narrative.provider_registry import ProviderRegistry
+from ..narrative.provider_registry import (
+    ModelCatalog,
+    ModelCatalogEntry,
+    ProviderRegistry,
+    unavailable_model_catalog,
+)
 from ..compiler.critic import generate_critic_report
 from ..compiler.critic.policy import VALID_POLICIES
 from ..compiler.staging.interpretation import (
@@ -58,9 +63,11 @@ from ..connections_settings import (
     provider_credential_source,
     save_connections_settings,
     selected_ollama_model,
+    selected_provider_model,
     set_provider_credential_source,
     set_ollama_host,
     set_selected_ollama_model,
+    set_selected_provider_model,
 )
 from ..credentials import (
     CredentialStore,
@@ -248,7 +255,7 @@ def create_app(
         provider_id: str | None = None,
         model_id: str | None = None,
     ) -> str:
-        if provider_id and provider_id.startswith("ollama-") and model_id:
+        if provider_id and model_id:
             return f"{participant_key}::{provider_id}::{model_id}"
         return participant_key
 
@@ -500,7 +507,7 @@ def create_app(
         selected_model: str,
         default_model: str,
     ) -> dict[str, str]:
-        if provider_id.startswith("ollama-") and selected_model != default_model:
+        if selected_model != default_model:
             return {role: "untested" for role in _CALIBRATION_ROLES}
         return _ROLE_SUITABILITY.get(participant_key, {})
 
@@ -511,17 +518,24 @@ def create_app(
         default_model: str,
     ) -> dict:
         setup = dict(_PROVIDER_SETUP.get(participant_key, {}))
-        if provider_id.startswith("ollama-") and selected_model != default_model:
-            setup["about"] = (
-                "Local model running via Ollama. No static Hermeneia suitability "
-                "judgment is recorded for this exact selected model; use calibration "
-                "to establish role readiness."
-            )
-            setup["setup_steps"] = [
-                "Install Ollama from ollama.com",
-                "Choose an installed local model explicitly",
-                "Run: ollama serve",
-            ]
+        if selected_model != default_model:
+            if provider_id.startswith("ollama-"):
+                setup["about"] = (
+                    "Local model running via Ollama. No static Hermeneia suitability "
+                    "judgment is recorded for this exact selected model; use calibration "
+                    "to establish role readiness."
+                )
+                setup["setup_steps"] = [
+                    "Install Ollama from ollama.com",
+                    "Choose an installed local model explicitly",
+                    "Run: ollama serve",
+                ]
+            else:
+                setup["about"] = (
+                    "Explicitly selected cloud model. No static Hermeneia suitability "
+                    "judgment is recorded for this exact selected model; use calibration "
+                    "to establish role readiness."
+                )
         return setup
 
     def _conn() -> sqlite3.Connection:
@@ -904,6 +918,78 @@ def create_app(
             "error": catalog.get("error"),
         }
 
+    def _ollama_model_catalog_payload(catalog: dict) -> dict[str, object]:
+        models = [
+            ModelCatalogEntry(
+                model_id=model,
+                provider_id="ollama",
+                display_label=model,
+                catalog_source="provider_api",
+                capabilities=("text",),
+            ).to_dict()
+            for model in (catalog.get("installed_models") or [])
+        ]
+        return {
+            "provider": "ollama",
+            "catalog_source": "provider_api" if catalog.get("online") else "unavailable",
+            "status": "available" if catalog.get("online") else "unavailable",
+            "error": catalog.get("error"),
+            "models": models,
+        }
+
+    def _provider_model_catalog(provider_id: str, provider: dict) -> dict[str, object]:
+        if provider_id.startswith("ollama-"):
+            return _ollama_model_catalog_payload(_ollama_catalog())
+        if provider.get("local_or_remote") != "remote":
+            return unavailable_model_catalog(
+                provider_id,
+                "Model catalog is not exposed for this provider.",
+            ).to_dict()
+        if not provider.get("adapter_available"):
+            return unavailable_model_catalog(
+                provider_id,
+                "Provider adapter is not installed.",
+            ).to_dict()
+        if provider.get("required_environment") and not _credential_configured(provider):
+            return unavailable_model_catalog(
+                provider_id,
+                "Selected credential source is not configured.",
+            ).to_dict()
+        try:
+            adapter = active_provider_registry.create(
+                provider_id,
+                **_provider_kwargs(provider_id),
+            )
+            catalog_fn = getattr(adapter, "model_catalog", None)
+            if not callable(catalog_fn):
+                return unavailable_model_catalog(
+                    provider_id,
+                    "Provider adapter does not expose a model catalog.",
+                ).to_dict()
+            catalog = catalog_fn()
+            if not isinstance(catalog, ModelCatalog):
+                return unavailable_model_catalog(
+                    provider_id,
+                    "Provider adapter returned an invalid model catalog.",
+                ).to_dict()
+            return catalog.to_dict()
+        except CredentialStoreError as exc:
+            return unavailable_model_catalog(provider_id, str(exc)).to_dict()
+        except Exception:
+            return unavailable_model_catalog(
+                provider_id,
+                "Could not retrieve model catalog. Check provider credentials and connectivity.",
+            ).to_dict()
+
+    def _catalog_model_ids(catalog: dict[str, object]) -> set[str]:
+        ids: set[str] = set()
+        for model in catalog.get("models") or []:
+            if isinstance(model, dict):
+                model_id = str(model.get("model_id") or model.get("id") or "").strip()
+                if model_id:
+                    ids.add(model_id)
+        return ids
+
     def _provider_default_model(provider_id: str, fallback: str | None = None) -> str | None:
         try:
             definition = active_provider_registry.definition(provider_id)
@@ -916,10 +1002,12 @@ def create_app(
         fallback: str | None = None,
     ) -> tuple[str | None, str]:
         default_model = _provider_default_model(provider_id, fallback)
-        if not provider_id.startswith("ollama-"):
-            return default_model, "default"
         with _connections_settings_lock:
-            stored = selected_ollama_model(runtime_connections_settings, provider_id)
+            stored = (
+                selected_ollama_model(runtime_connections_settings, provider_id)
+                if provider_id.startswith("ollama-")
+                else selected_provider_model(runtime_connections_settings, provider_id)
+            )
         if stored:
             return stored, "user_config"
         return default_model, "default"
@@ -928,11 +1016,18 @@ def create_app(
         with _connections_settings_lock:
             if _connections_settings_load_error:
                 raise UnsupportedConnectionsSettingsError(_connections_settings_load_error)
-            next_settings = set_selected_ollama_model(
-                runtime_connections_settings,
-                provider_id,
-                model,
-            )
+            if provider_id.startswith("ollama-"):
+                next_settings = set_selected_ollama_model(
+                    runtime_connections_settings,
+                    provider_id,
+                    model,
+                )
+            else:
+                next_settings = set_selected_provider_model(
+                    runtime_connections_settings,
+                    provider_id,
+                    model,
+                )
             save_connections_settings(next_settings)
             runtime_connections_settings.clear()
             runtime_connections_settings.update(next_settings)
@@ -1060,10 +1155,10 @@ def create_app(
 
     def _provider_kwargs(provider_id: str, *, api_key: str | None = None) -> dict:
         kwargs: dict[str, object] = {}
+        selected_model, _ = _selected_model_for_provider(provider_id)
+        if selected_model:
+            kwargs["model"] = selected_model
         if provider_id.startswith("ollama-"):
-            selected_model, _ = _selected_model_for_provider(provider_id)
-            if selected_model:
-                kwargs["model"] = selected_model
             kwargs["host"] = _ollama_host()
         resolved_key = api_key if api_key is not None else _credential_secret_for_provider(provider_id)
         if resolved_key:
@@ -1103,6 +1198,7 @@ def create_app(
             is_ollama = provider_id.startswith("ollama-")
             default_model = provider.get("default_model") or draft_model
             selected_model, selected_model_source = _selected_model_for_provider(provider_id, default_model)
+            model_catalog: dict[str, object]
 
             # Ollama: check actual server + model readiness, not just package install
             ollama_ready = None
@@ -1110,9 +1206,18 @@ def create_app(
                 if ollama_catalog is None:
                     ollama_catalog = _ollama_catalog()
                 ollama_ready = _ollama_readiness(selected_model or "", ollama_catalog)
+                model_catalog = _ollama_model_catalog_payload(ollama_catalog)
                 ollama_fully_ready = ollama_ready["server_running"] and ollama_ready["model_pulled"]
             else:
+                model_catalog = _provider_model_catalog(provider_id, provider)
                 ollama_fully_ready = True  # non-Ollama providers are governed by credential
+            catalog_ids = _catalog_model_ids(model_catalog)
+            catalog_status = str(model_catalog.get("status") or "unavailable")
+            selected_model_available = (
+                bool(selected_model)
+                and catalog_status == "available"
+                and selected_model in catalog_ids
+            )
 
             if is_ollama and adapter_available and not ollama_fully_ready:
                 setup_action = ollama_ready["setup_action"] if ollama_ready else None
@@ -1124,6 +1229,19 @@ def create_app(
                         f"'{selected_model}' is not installed. Choose an installed model "
                         "or pull the model outside this PR's governed-install scope."
                     )
+                effective_status = "not_connected"
+            elif (
+                provider.get("local_or_remote") == "remote"
+                and adapter_available
+                and configured
+                and catalog_status == "available"
+                and selected_model
+                and not selected_model_available
+            ):
+                message = (
+                    f"Selected model '{selected_model}' is not present in the current "
+                    "provider catalog. Choose an available model explicitly."
+                )
                 effective_status = "not_connected"
             elif available and not requires_credential:
                 message = "Ollama server is running and model is ready." if is_ollama else (
@@ -1165,6 +1283,12 @@ def create_app(
                 "default_model": default_model,
                 "selected_model": selected_model,
                 "selected_model_source": selected_model_source,
+                "selected_model_available": selected_model_available,
+                "model_catalog": model_catalog,
+                "model_catalog_source": model_catalog.get("catalog_source"),
+                "model_catalog_status": model_catalog.get("status"),
+                "model_catalog_error": model_catalog.get("error"),
+                "available_models": sorted(catalog_ids),
                 "execution_mode": "deterministic_local_draft",
                 "message": message,
                 "role_suitability": _model_specific_role_suitability(
@@ -1185,6 +1309,7 @@ def create_app(
                 row["ollama_server_running"] = bool(ollama_ready and ollama_ready["server_running"])
                 row["ollama_model_pulled"] = bool(ollama_ready and ollama_ready["model_pulled"])
                 row["selected_model_installed"] = bool(ollama_ready and ollama_ready["model_pulled"])
+                row["selected_model_available"] = bool(ollama_ready and ollama_ready["model_pulled"])
                 row["ollama_host"] = (ollama_ready or {}).get("host") or _ollama_host()
                 row["ollama_host_source"] = _ollama_host_source()
                 row["installed_models"] = installed_models
@@ -3784,12 +3909,8 @@ def create_app(
             return jsonify({"error": f"unsupported participant: {participant}"}), 400
         key, label, _ = participant_info
         provider_id = _E10_PARTICIPANTS[key][1]
-        if not provider_id.startswith("ollama-"):
-            return jsonify({
-                "error": "model selection is currently implemented only for Ollama local providers"
-            }), 400
         try:
-            active_provider_registry.definition(provider_id)
+            definition = active_provider_registry.definition(provider_id)
         except KeyError:
             return jsonify({
                 "error": f"{label} has no registered provider adapter"
@@ -3800,22 +3921,36 @@ def create_app(
         if not model:
             return jsonify({"error": "model is required"}), 400
 
-        catalog = _ollama_catalog()
-        installed_models = set(catalog.get("installed_models") or [])
-        if not catalog.get("online"):
+        catalog = _provider_model_catalog(provider_id, definition.metadata())
+        catalog_ids = _catalog_model_ids(catalog)
+        if catalog.get("status") != "available":
+            verify_error = (
+                "Ollama is not reachable, so Hermeneia cannot verify installed models. "
+                "Start Ollama and choose from the discovered installed models."
+                if provider_id.startswith("ollama-")
+                else (
+                    "Hermeneia cannot verify available models for this provider. "
+                    "Resolve the catalog status and choose from the discovered models."
+                )
+            )
             return jsonify({
-                "error": (
-                    "Ollama is not reachable, so Hermeneia cannot verify installed models. "
-                    "Start Ollama and choose from the discovered installed models."
-                ),
-                "ollama_host": catalog.get("host") or _ollama_host(),
-                "installed_models": sorted(installed_models),
+                "error": verify_error,
+                "catalog_source": catalog.get("catalog_source"),
+                "catalog_status": catalog.get("status"),
+                "catalog_error": catalog.get("error"),
+                "available_models": sorted(catalog_ids),
             }), 409
-        if model not in installed_models:
+        if model not in catalog_ids:
+            missing_message = (
+                f"model '{model}' is not installed on the configured Ollama host"
+                if provider_id.startswith("ollama-")
+                else f"model '{model}' is not present in the current provider catalog"
+            )
             return jsonify({
-                "error": f"model '{model}' is not installed on the configured Ollama host",
-                "ollama_host": catalog.get("host") or _ollama_host(),
-                "installed_models": sorted(installed_models),
+                "error": missing_message,
+                "catalog_source": catalog.get("catalog_source"),
+                "catalog_status": catalog.get("status"),
+                "available_models": sorted(catalog_ids),
             }), 400
 
         try:
@@ -3830,7 +3965,7 @@ def create_app(
         )
         return jsonify({
             **status,
-            "message": f"Selected Ollama model for {label}: {model}",
+            "message": f"Selected model for {label}: {model}",
         })
 
     @app.route("/api/e10/ollama/host", methods=["PUT"])
