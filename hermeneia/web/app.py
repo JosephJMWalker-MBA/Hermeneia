@@ -47,6 +47,15 @@ from ..compiler.projections.interpretive_divergence import (
 )
 from ..storage.sqlite import SQLiteStore
 from ..reader_span import reader_span_display_locator, reader_span_raw_locator
+from ..connections_settings import (
+    DEFAULT_OLLAMA_HOST,
+    load_connections_settings,
+    ollama_host_from_settings,
+    save_connections_settings,
+    selected_ollama_model,
+    set_ollama_host,
+    set_selected_ollama_model,
+)
 from ..workspace import (
     DEFAULT_LEGACY_DB,
     WorkspaceAlreadyExistsError,
@@ -147,6 +156,8 @@ def create_app(
     runtime_provider_keys: dict[str, str] = {}
     runtime_selected_models: dict[str, str] = {}
     runtime_provider_keys_lock = threading.RLock()
+    _connections_settings_lock = threading.RLock()
+    runtime_connections_settings: dict = load_connections_settings()
 
     # ── Calibration store ──────────────────────────────────────────────────────
     # Persisted to calibration.json alongside the DB; loaded once at startup.
@@ -792,7 +803,20 @@ def create_app(
         return key, item[0], item[2]
 
     def _ollama_host() -> str:
-        return os.environ.get("OLLAMA_HOST") or "http://localhost:11434"
+        env_host = str(os.environ.get("OLLAMA_HOST") or "").strip()
+        if env_host:
+            return env_host
+        with _connections_settings_lock:
+            configured_host = ollama_host_from_settings(runtime_connections_settings)
+        return configured_host or DEFAULT_OLLAMA_HOST
+
+    def _ollama_host_source() -> str:
+        if str(os.environ.get("OLLAMA_HOST") or "").strip():
+            return "environment"
+        with _connections_settings_lock:
+            if ollama_host_from_settings(runtime_connections_settings):
+                return "user_config"
+        return "default"
 
     def _ollama_model_names(model_rows: object) -> list[str]:
         names: list[str] = []
@@ -820,11 +844,7 @@ def create_app(
                 "error": "ollama Python package is not installed",
             }
         try:
-            client = (
-                _ollama.Client(host=os.environ.get("OLLAMA_HOST"))
-                if os.environ.get("OLLAMA_HOST")
-                else _ollama.Client()
-            )
+            client = _ollama.Client(host=host)
             result = client.list()
             model_rows = getattr(result, "models", None)
             if model_rows is None and isinstance(result, dict):
@@ -882,11 +902,31 @@ def create_app(
             selected = str(runtime_selected_models.get(provider_id) or "").strip()
         if selected:
             return selected, "session"
+        with _connections_settings_lock:
+            stored = selected_ollama_model(runtime_connections_settings, provider_id)
+        if stored:
+            return stored, "user_config"
         return default_model, "default"
 
     def _set_selected_model_for_provider(provider_id: str, model: str) -> None:
         with runtime_provider_keys_lock:
             runtime_selected_models[provider_id] = model
+        with _connections_settings_lock:
+            next_settings = set_selected_ollama_model(
+                runtime_connections_settings,
+                provider_id,
+                model,
+            )
+            runtime_connections_settings.clear()
+            runtime_connections_settings.update(next_settings)
+            save_connections_settings(runtime_connections_settings)
+
+    def _set_ollama_host(host: str) -> None:
+        with _connections_settings_lock:
+            next_settings = set_ollama_host(runtime_connections_settings, host)
+            runtime_connections_settings.clear()
+            runtime_connections_settings.update(next_settings)
+            save_connections_settings(runtime_connections_settings)
 
     def _provider_kwargs(provider_id: str, *, api_key: str | None = None) -> dict:
         kwargs: dict[str, object] = {}
@@ -894,6 +934,7 @@ def create_app(
             selected_model, _ = _selected_model_for_provider(provider_id)
             if selected_model:
                 kwargs["model"] = selected_model
+            kwargs["host"] = _ollama_host()
         if api_key:
             kwargs["api_key"] = api_key
         return kwargs
@@ -1012,6 +1053,7 @@ def create_app(
                 row["ollama_model_pulled"] = bool(ollama_ready and ollama_ready["model_pulled"])
                 row["selected_model_installed"] = bool(ollama_ready and ollama_ready["model_pulled"])
                 row["ollama_host"] = (ollama_ready or {}).get("host") or _ollama_host()
+                row["ollama_host_source"] = _ollama_host_source()
                 row["installed_models"] = installed_models
                 row["ollama_setup_action"] = ollama_ready["setup_action"] if ollama_ready else None
                 row["ollama_error"] = ollama_ready.get("error") if ollama_ready else None
@@ -3531,6 +3573,30 @@ def create_app(
         return jsonify({
             **status,
             "message": f"Selected Ollama model for {label}: {model}",
+        })
+
+    @app.route("/api/e10/ollama/host", methods=["PUT"])
+    def api_e10_ollama_host():
+        payload = request.get_json(silent=True) or {}
+        host = str(payload.get("host") or "").strip()
+        if not host:
+            return jsonify({"error": "host is required"}), 400
+        if not (host.startswith("http://") or host.startswith("https://")):
+            return jsonify({"error": "host must begin with http:// or https://"}), 400
+
+        _set_ollama_host(host)
+        source = _ollama_host_source()
+        effective_host = _ollama_host()
+        return jsonify({
+            "ollama_host": effective_host,
+            "ollama_host_source": source,
+            "configured_ollama_host": host,
+            "message": (
+                "Ollama host saved in user Connections settings. "
+                "The OLLAMA_HOST environment variable remains authoritative for this server session."
+                if source == "environment"
+                else "Ollama host saved in user Connections settings."
+            ),
         })
 
     @app.route("/api/e10/providers/<participant>/test", methods=["POST"])
