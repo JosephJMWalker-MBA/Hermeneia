@@ -25,7 +25,7 @@ class ModelCatalogEntry:
     display_label: str | None = None
     family: str | None = None
     snapshot: str | None = None
-    availability: str = "available"
+    availability: str = "known_unverified"
     catalog_source: str = "provider_api"
     capabilities: tuple[str, ...] = ()
 

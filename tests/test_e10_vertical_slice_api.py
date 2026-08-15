@@ -119,7 +119,7 @@ class _CatalogProvider(_CapturingProvider):
                     availability=self.__class__.catalog_availability.get(
                         self.provider_id,
                         {},
-                    ).get(model, "available"),
+                    ).get(model, "known_unverified"),
                     catalog_source="provider_api",
                     capabilities=("text",),
                 )
@@ -303,7 +303,13 @@ def _reset_catalog_provider() -> None:
         "openai": ["gpt-4o", "gpt-4.1"],
         "anthropic": ["claude-sonnet-4-6", "claude-opus-4-1"],
     }
-    _CatalogProvider.catalog_availability = {}
+    _CatalogProvider.catalog_availability = {
+        "openai": {"gpt-4o": "available", "gpt-4.1": "available"},
+        "anthropic": {
+            "claude-sonnet-4-6": "available",
+            "claude-opus-4-1": "available",
+        },
+    }
     _CatalogProvider.catalog_errors = {}
     _CatalogProvider.catalog_calls = []
     _CatalogProvider.reject_constructor_models = set()
@@ -1342,6 +1348,7 @@ def test_e10_cloud_catalog_preserves_known_unverified_availability(
     assert unverified["selected_model"] == "gpt-unverified"
     assert unverified["selected_model_availability"] == "known_unverified"
     assert unverified["selected_model_available"] is False
+    assert unverified["status"] == "configured"
     assert "known from provider discovery" in unverified["message"]
     assert "not present" not in unverified["message"]
     option = next(

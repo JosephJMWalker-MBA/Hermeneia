@@ -924,6 +924,7 @@ def create_app(
                 model_id=model,
                 provider_id="ollama",
                 display_label=model,
+                availability="available",
                 catalog_source="provider_api",
                 capabilities=("text",),
             ).to_dict()
@@ -1270,7 +1271,7 @@ def create_app(
                     f"Selected model '{selected_model}' is known from provider discovery; "
                     "Hermeneia adapter compatibility has not been established."
                 )
-                effective_status = "not_connected"
+                effective_status = "configured"
             elif available and not requires_credential:
                 message = "Ollama server is running and model is ready." if is_ollama else (
                     "Local SDK is installed. Use Test Connection to verify the runtime and selected model."
