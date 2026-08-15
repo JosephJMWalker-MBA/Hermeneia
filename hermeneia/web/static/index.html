@@ -9722,6 +9722,7 @@ async function _crPreviewArtistDraft() {
     _crLastArtistDraft = {
       text: d.text || '', profileSlug: d.profile_slug || '', profileName: d.profile_name || '',
       planId: sk.planId || '', provider: d.provider || 'null', skeleton: sk,
+      executionConfig: d.execution_config || null,
     };
     const canJudge = !!(d.profile_slug);
     out.innerHTML = `
@@ -9835,7 +9836,13 @@ async function _crRatifyDraft() {
     const resp = await fetch('/api/pipeline/ratify-draft', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       // The EXACT previewed bytes — never re-rendered.
-      body: JSON.stringify({ plan_id: d.planId, provider: d.provider, profile_slug: d.profileSlug || null, text: d.text }),
+      body: JSON.stringify({
+        plan_id: d.planId,
+        provider: d.provider,
+        profile_slug: d.profileSlug || null,
+        text: d.text,
+        execution_config: d.executionConfig || null,
+      }),
     });
     const r = await resp.json();
     if (!resp.ok) { result.innerHTML = `<div style="color:#f87171;font-size:13px;margin-top:8px">✗ ${x(r.error || 'ratify failed')}</div>`; return; }

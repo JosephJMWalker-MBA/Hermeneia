@@ -110,19 +110,24 @@ def make_rendered_narrative_id(
     architect_plan_id: str,
     provider: str,
     system_prompt_id: str | None = None,
+    execution_identity: str | None = None,
 ) -> str:
     """Deterministic RenderedNarrative ID.
 
-    sha256(json({architect_plan_id, provider, system_prompt_id}))
-    Same plan + same provider + same theme = same ID slot (INSERT OR IGNORE = idempotent).
+    sha256(json({architect_plan_id, provider, system_prompt_id, execution_identity}))
+    Same plan + same provider + same theme + same execution identity = same ID slot.
     system_prompt_id=None means "no theme selected".
+    execution_identity=None preserves the legacy pre-configuration ID shape.
     """
+    payload_data = {
+        "architect_plan_id": architect_plan_id,
+        "provider": provider,
+        "system_prompt_id": system_prompt_id or "",
+    }
+    if execution_identity:
+        payload_data["execution_identity"] = execution_identity
     payload = json.dumps(
-        {
-            "architect_plan_id": architect_plan_id,
-            "provider": provider,
-            "system_prompt_id": system_prompt_id or "",
-        },
+        payload_data,
         sort_keys=True,
         ensure_ascii=True,
         separators=(",", ":"),

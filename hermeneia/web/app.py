@@ -1156,22 +1156,25 @@ def create_app(
             )
         if selected_config:
             model_id = str(selected_config["model_id"])
-            parameters = _validate_configuration_parameters(
+            stored_parameters = _validate_configuration_parameters(
                 provider_id,
                 selected_config.get("parameters")
                 if isinstance(selected_config.get("parameters"), dict)
                 else {}
             )
+            effective_parameters = dict(default_parameters)
+            effective_parameters.update(stored_parameters)
+            effective_parameters = normalized_configuration_parameters(effective_parameters)
             revision = str(
                 selected_config.get("revision")
-                or model_configuration_revision(provider_id, model_id, parameters)
+                or model_configuration_revision(provider_id, model_id, stored_parameters)
             )
             configuration_id = str(selected_config["configuration_id"])
             return {
                 "provider_id": provider_id,
                 "model_id": model_id,
-                "parameters": parameters,
-                "effective_parameters": parameters,
+                "parameters": stored_parameters,
+                "effective_parameters": effective_parameters,
                 "configuration_id": configuration_id,
                 "configuration_label": selected_config.get("label"),
                 "configuration_revision": revision,
@@ -1180,11 +1183,24 @@ def create_app(
                 "execution_fingerprint": model_configuration_fingerprint(
                     provider_id,
                     model_id,
-                    parameters,
+                    effective_parameters,
                 ),
             }
+        if selected_config_id:
+            raise InvalidConnectionsSettingError(
+                f"selected saved configuration is unavailable: {selected_config_id}"
+            )
         model_id = selected_model or default_model
         parameters = default_parameters
+        execution_fingerprint = (
+            model_configuration_fingerprint(
+                provider_id,
+                str(model_id or ""),
+                parameters,
+            )
+            if model_id or parameters
+            else None
+        )
         return {
             "provider_id": provider_id,
             "model_id": model_id,
@@ -1197,11 +1213,7 @@ def create_app(
                 "bare_model" if selected_model else "registry_default"
             ),
             "selection_source": "user_config" if selected_model else "default",
-            "execution_fingerprint": model_configuration_fingerprint(
-                provider_id,
-                str(model_id or ""),
-                parameters,
-            ),
+            "execution_fingerprint": execution_fingerprint,
         }
 
     def _set_selected_model_for_provider(provider_id: str, model: str) -> None:
@@ -1385,26 +1397,38 @@ def create_app(
         return bool(source.get("configured"))
 
     def _provider_kwargs(provider_id: str, *, api_key: str | None = None) -> dict:
-        kwargs = _provider_connection_kwargs(provider_id, api_key=api_key)
         resolved = _resolved_execution_configuration(provider_id)
+        return _provider_kwargs_from_resolved(provider_id, resolved, api_key=api_key)
+
+    def _provider_kwargs_from_resolved(
+        provider_id: str,
+        resolved: dict[str, object],
+        *,
+        api_key: str | None = None,
+    ) -> dict:
+        kwargs = _provider_connection_kwargs(provider_id, api_key=api_key)
         selected_model = resolved.get("model_id")
         if selected_model:
             kwargs["model"] = selected_model
-        for name, value in resolved.get("parameters", {}).items():
+        for name, value in dict(resolved.get("effective_parameters") or {}).items():
             kwargs[str(name)] = value
         return kwargs
 
-    def _execution_metadata_for_provider(provider_id: str) -> dict[str, object]:
-        resolved = _resolved_execution_configuration(provider_id)
+    def _execution_metadata_from_resolved(resolved: dict[str, object]) -> dict[str, object]:
         return {
-            "provider": provider_id,
+            "provider": resolved.get("provider_id"),
             "model_id": resolved.get("model_id"),
+            "stored_parameters": dict(resolved.get("parameters") or {}),
             "inference_parameters": dict(resolved.get("effective_parameters") or {}),
             "saved_configuration_id": resolved.get("configuration_id"),
             "configuration_revision": resolved.get("configuration_revision"),
             "configuration_selection_source": resolved.get("configuration_selection_source"),
             "execution_fingerprint": resolved.get("execution_fingerprint"),
         }
+
+    def _execution_metadata_for_provider(provider_id: str) -> dict[str, object]:
+        resolved = _resolved_execution_configuration(provider_id)
+        return _execution_metadata_from_resolved(resolved)
 
     def _provider_connection_kwargs(provider_id: str, *, api_key: str | None = None) -> dict:
         kwargs: dict[str, object] = {}
@@ -4599,7 +4623,7 @@ def create_app(
         execution_fingerprint = str(resolved.get("execution_fingerprint") or "")
         inference_parameters = dict(resolved.get("effective_parameters") or {})
         try:
-            kwargs = _provider_kwargs(provider_id)
+            kwargs = _provider_kwargs_from_resolved(provider_id, resolved)
             adapter = active_provider_registry.create(provider_id, **kwargs)
             raw_output = adapter.render(prompt)
         except Exception as exc:
@@ -6564,8 +6588,9 @@ Return ONLY valid JSON, no markdown, no explanation:
         import traceback as _tb
         conn = _conn_rw()
         try:
-            provider_kwargs = _provider_kwargs(provider)
-            execution_metadata = _execution_metadata_for_provider(provider)
+            resolved = _resolved_execution_configuration(provider)
+            provider_kwargs = _provider_kwargs_from_resolved(provider, resolved)
+            execution_metadata = _execution_metadata_from_resolved(resolved)
             if plan_id:
                 result = render_for_plan(
                     plan_id,
@@ -6634,8 +6659,9 @@ Return ONLY valid JSON, no markdown, no explanation:
         # Read-only connection: structurally guarantees the preview writes nothing.
         conn = _conn()
         try:
-            provider_kwargs = _provider_kwargs(provider)
-            execution_metadata = _execution_metadata_for_provider(provider)
+            resolved = _resolved_execution_configuration(provider)
+            provider_kwargs = _provider_kwargs_from_resolved(provider, resolved)
+            execution_metadata = _execution_metadata_from_resolved(resolved)
             result = render_for_plan(
                 plan_id,
                 conn,
@@ -6654,6 +6680,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "profile_slug": profile,
                 "profile_name": (prof["name"] if prof else None),
                 "text": result.row["text"],
+                "execution_config": execution_metadata,
             }), 200
         except ArtistRenderError as exc:
             return jsonify({"error": str(exc), "error_type": type(exc).__name__}), 400
@@ -6683,6 +6710,11 @@ Return ONLY valid JSON, no markdown, no explanation:
         provider = str(payload.get("provider", "")).strip() or "null"
         profile_slug = str(payload.get("profile_slug", "")).strip() or None
         text = payload.get("text")
+        execution_metadata = (
+            dict(payload.get("execution_config"))
+            if isinstance(payload.get("execution_config"), dict)
+            else None
+        )
         if not plan_id:
             return jsonify({"error": "plan_id is required"}), 400
         if not isinstance(text, str) or not text.strip():
@@ -6693,7 +6725,12 @@ Return ONLY valid JSON, no markdown, no explanation:
         conn = _conn_rw()
         try:
             result = ratify_draft(
-                plan_id, conn, provider=provider, profile_slug=profile_slug, text=text,
+                plan_id,
+                conn,
+                provider=provider,
+                profile_slug=profile_slug,
+                text=text,
+                execution_metadata=execution_metadata,
             )
         except ArtistRenderError as exc:
             return jsonify({"error": str(exc), "error_type": type(exc).__name__}), 400
@@ -6768,8 +6805,9 @@ Return ONLY valid JSON, no markdown, no explanation:
 
         conn = _conn_rw()
         try:
-            provider_kwargs = _provider_kwargs(provider)
-            execution_metadata = _execution_metadata_for_provider(provider)
+            resolved = _resolved_execution_configuration(provider)
+            provider_kwargs = _provider_kwargs_from_resolved(provider, resolved)
+            execution_metadata = _execution_metadata_from_resolved(resolved)
 
             profiles = list_profiles(conn)
             if not profiles:

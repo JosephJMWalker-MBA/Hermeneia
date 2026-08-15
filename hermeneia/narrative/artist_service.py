@@ -34,6 +34,19 @@ class ArtistRenderResult:
     created: bool
 
 
+def _execution_identity(execution_metadata: dict[str, Any] | None) -> str | None:
+    if not isinstance(execution_metadata, dict):
+        return None
+    value = str(execution_metadata.get("execution_fingerprint") or "").strip()
+    return value or None
+
+
+def _legacy_identity_allowed(execution_metadata: dict[str, Any] | None) -> bool:
+    if not isinstance(execution_metadata, dict):
+        return True
+    return not execution_metadata.get("saved_configuration_id")
+
+
 def _parse_obs_ref(obs_ref: str) -> int:
     ref = obs_ref.upper().strip()
     if ref.startswith("OBS-"):
@@ -135,15 +148,26 @@ def render_for_plan(
     provider = get_provider(provider_name, **kwargs)
 
     expression_profile_id = profile["id"] if profile else None
+    execution_identity = _execution_identity(execution_metadata)
     narrative_id = make_rendered_narrative_id(
         plan_dict["id"],
         provider.provider_name,
         expression_profile_id,
+        execution_identity=execution_identity,
     )
 
     existing = conn.execute(
         "SELECT * FROM rendered_narratives WHERE id = ?", (narrative_id,)
     ).fetchone()
+    if existing is None and execution_identity and _legacy_identity_allowed(execution_metadata):
+        legacy_id = make_rendered_narrative_id(
+            plan_dict["id"],
+            provider.provider_name,
+            expression_profile_id,
+        )
+        existing = conn.execute(
+            "SELECT * FROM rendered_narratives WHERE id = ?", (legacy_id,)
+        ).fetchone()
     if existing is not None:
         return ArtistRenderResult(
             row=dict(existing),
@@ -262,16 +286,28 @@ def render_for_observation(
     provider = get_provider(provider_name, **kwargs)
 
     expression_profile_id = profile["id"] if profile else None
+    execution_identity = _execution_identity(execution_metadata)
     narrative_id = make_rendered_narrative_id(
         plan_dict["id"],
         provider.provider_name,
         expression_profile_id,
+        execution_identity=execution_identity,
     )
 
     existing = conn.execute(
         "SELECT * FROM rendered_narratives WHERE id = ?",
         (narrative_id,),
     ).fetchone()
+    if existing is None and execution_identity and _legacy_identity_allowed(execution_metadata):
+        legacy_id = make_rendered_narrative_id(
+            plan_dict["id"],
+            provider.provider_name,
+            expression_profile_id,
+        )
+        existing = conn.execute(
+            "SELECT * FROM rendered_narratives WHERE id = ?",
+            (legacy_id,),
+        ).fetchone()
     if existing is not None:
         return ArtistRenderResult(
             row=dict(existing),
@@ -335,6 +371,7 @@ def ratify_draft(
     provider: str,
     profile_slug: str | None,
     text: str,
+    execution_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Persist the EXACT previewed draft bytes as a RenderedNarrative.
 
@@ -342,8 +379,9 @@ def ratify_draft(
     It must save the artifact the steward actually saw and judged — so this does
     NOT call the provider and NEVER re-renders. The supplied ``text`` is stored
     verbatim; ``prompt_used`` is reconstructed deterministically (no LLM) for
-    provenance. The narrative id is deterministic on (plan, provider, profile),
-    so a second ratify is idempotent and the immutable table is never rewritten.
+    provenance. The narrative id is deterministic on (plan, provider, profile,
+    execution identity), so a second ratify is idempotent and the immutable
+    table is never rewritten.
 
     Returns {"row": <dict>, "created": bool}.
     """
@@ -359,10 +397,25 @@ def ratify_draft(
         raise ArtistRenderError(f"Expression profile '{profile_slug}' not found.")
     expression_profile_id = profile["id"] if profile else None
 
-    narrative_id = make_rendered_narrative_id(plan_dict["id"], provider, expression_profile_id)
+    execution_identity = _execution_identity(execution_metadata)
+    narrative_id = make_rendered_narrative_id(
+        plan_dict["id"],
+        provider,
+        expression_profile_id,
+        execution_identity=execution_identity,
+    )
     existing = conn.execute(
         "SELECT * FROM rendered_narratives WHERE id = ?", (narrative_id,)
     ).fetchone()
+    if existing is None and execution_identity and _legacy_identity_allowed(execution_metadata):
+        legacy_id = make_rendered_narrative_id(
+            plan_dict["id"],
+            provider,
+            expression_profile_id,
+        )
+        existing = conn.execute(
+            "SELECT * FROM rendered_narratives WHERE id = ?", (legacy_id,)
+        ).fetchone()
     if existing is not None:
         # Already ratified for this (plan, provider, profile) — the record is
         # immutable, so return it unchanged rather than overwriting.
@@ -377,6 +430,9 @@ def ratify_draft(
     ]
     prompt = generate_prompt(plan_dict, paragraphs, conn, theme=profile)
     now = datetime.now(timezone.utc).isoformat()
+    execution_config = {"source": "ratified_preview", "provider": provider}
+    if execution_metadata:
+        execution_config["resolved_execution_configuration"] = dict(execution_metadata)
     row = {
         "id": narrative_id,
         "architect_plan_id": plan_dict["id"],
@@ -384,7 +440,7 @@ def ratify_draft(
         "expression_profile_id": expression_profile_id,
         "text": text,
         "prompt_used": prompt,
-        "execution_config": json.dumps({"source": "ratified_preview", "provider": provider}),
+        "execution_config": json.dumps(execution_config),
         "created_at": now,
     }
     conn.execute(

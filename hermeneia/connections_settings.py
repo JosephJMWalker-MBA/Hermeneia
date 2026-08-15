@@ -254,6 +254,10 @@ def _coerce_settings(raw: object, *, allow_unsupported: bool = False) -> dict[st
                 }
                 if selected_configuration_id in config_ids:
                     clean_provider["selected_configuration_id"] = selected_configuration_id
+            elif selected_configuration_id:
+                clean_provider["selected_configuration_id"] = selected_configuration_id
+            if selected_configuration_id and "selected_configuration_id" not in clean_provider:
+                clean_provider["selected_configuration_id"] = selected_configuration_id
             if isinstance(credential_source, dict):
                 kind = str(credential_source.get("kind") or "").strip()
                 environment_variable = str(
@@ -426,6 +430,8 @@ def upsert_saved_model_configuration(
     configs.append(clean)
     configs.sort(key=lambda item: (str(item.get("label") or ""), str(item.get("configuration_id") or "")))
     provider_settings["saved_model_configurations"] = configs
+    if provider_settings.get("selected_configuration_id") == clean["configuration_id"]:
+        provider_settings["selected_model"] = str(clean["model_id"])
     return next_settings
 
 
