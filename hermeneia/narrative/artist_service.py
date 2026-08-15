@@ -51,6 +51,7 @@ def _execute_render(
     paragraphs: list[dict],
     recursive: bool,
     execution_ts: str,
+    execution_metadata: dict[str, Any] | None = None,
 ) -> tuple[str, dict]:
     """Core render logic shared by render_for_plan and render_for_observation.
 
@@ -83,6 +84,8 @@ def _execute_render(
         text = provider.render(prompt)
         execution_config = provider.execution_config()
         execution_config["execution_timestamp"] = execution_ts
+    if execution_metadata:
+        execution_config["resolved_execution_configuration"] = dict(execution_metadata)
 
     return text, execution_config
 
@@ -95,6 +98,7 @@ def render_for_plan(
     profile_slug: str | None = None,
     model: str | None = None,
     provider_kwargs: dict[str, Any] | None = None,
+    execution_metadata: dict[str, Any] | None = None,
     recursive: bool = False,
     persist: bool = True,
 ) -> ArtistRenderResult:
@@ -160,7 +164,7 @@ def render_for_plan(
     prompt = generate_prompt(plan_dict, paragraphs, conn, theme=profile)
     execution_ts = datetime.now(timezone.utc).isoformat()
     text, execution_config = _execute_render(
-        provider, prompt, plan_dict, paragraphs, recursive, execution_ts
+        provider, prompt, plan_dict, paragraphs, recursive, execution_ts, execution_metadata
     )
 
     row = {
@@ -205,6 +209,7 @@ def render_for_observation(
     profile_slug: str | None = None,
     model: str | None = None,
     provider_kwargs: dict[str, Any] | None = None,
+    execution_metadata: dict[str, Any] | None = None,
     recursive: bool = False,
 ) -> ArtistRenderResult:
     """Render and persist a RenderedNarrative for an observation's plan.
@@ -287,7 +292,7 @@ def render_for_observation(
     prompt = generate_prompt(plan_dict, paragraphs, conn, theme=profile)
     execution_ts = datetime.now(timezone.utc).isoformat()
     text, execution_config = _execute_render(
-        provider, prompt, plan_dict, paragraphs, recursive, execution_ts
+        provider, prompt, plan_dict, paragraphs, recursive, execution_ts, execution_metadata
     )
 
     row = {

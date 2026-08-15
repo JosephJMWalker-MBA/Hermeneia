@@ -13,6 +13,7 @@ import pytest
 from hermeneia.narrative.provider_registry import (
     ModelCatalog,
     ModelCatalogEntry,
+    ModelConfigurationControl,
     ProviderDefinition,
     ProviderRegistration,
     ProviderRegistry,
@@ -27,6 +28,16 @@ from hermeneia.web.app import create_app
 from hermeneia.credentials import CredentialStoreError, KeyringCredentialStore, default_credential_store
 
 from test_constitutional_p0 import _seed_full_chain
+
+
+_MAX_OUTPUT_CONTROL = ModelConfigurationControl(
+    name="max_output_tokens",
+    value_type="integer",
+    default=4096,
+    minimum=1,
+    maximum=200000,
+    label="Max output tokens",
+)
 
 
 class _FakeOllamaClient:
@@ -258,6 +269,7 @@ def _cloud_registry() -> ProviderRegistry:
                     local_or_remote="remote",
                     required_environment="OPENAI_API_KEY",
                     default_model="gpt-4o",
+                    model_configuration_controls=(_MAX_OUTPUT_CONTROL,),
                 ),
                 _CapturingProvider,
             ),
@@ -278,6 +290,7 @@ def _cloud_catalog_registry() -> ProviderRegistry:
                     local_or_remote="remote",
                     required_environment="OPENAI_API_KEY",
                     default_model="gpt-4o",
+                    model_configuration_controls=(_MAX_OUTPUT_CONTROL,),
                 ),
                 lambda **kwargs: _CatalogProvider(provider_id="openai", **kwargs),
             ),
@@ -291,6 +304,7 @@ def _cloud_catalog_registry() -> ProviderRegistry:
                     local_or_remote="remote",
                     required_environment="ANTHROPIC_API_KEY",
                     default_model="claude-sonnet-4-6",
+                    model_configuration_controls=(_MAX_OUTPUT_CONTROL,),
                 ),
                 lambda **kwargs: _CatalogProvider(provider_id="anthropic", **kwargs),
             ),
@@ -515,7 +529,7 @@ def test_e10_ollama_model_selection_persists_in_user_settings_not_calibration(
     assert not (tmp_path / "calibration.json").exists()
     settings = json.loads(settings_path.read_text())
     assert settings["schema"] == "hermeneia.connections_settings.v1"
-    assert settings["version"] == 1
+    assert settings["version"] == 2
     assert settings["providers"]["ollama-local"]["selected_model"] == "llama3.2:1b"
 
     restarted = create_app(
@@ -782,7 +796,7 @@ def test_e10_ollama_unsupported_future_settings_are_not_overwritten(
     settings_path.parent.mkdir(parents=True)
     future_settings = {
         "schema": "hermeneia.connections_settings.v1",
-        "version": 2,
+        "version": 3,
         "future_field": {"preserve": True},
     }
     settings_path.write_text(json.dumps(future_settings, indent=2))
@@ -899,7 +913,8 @@ def test_e10_ollama_selected_model_reaches_test_and_calibration_calls(
         "llama3.2:1b",
     ]
     stored = json.loads((tmp_path / "calibration.json").read_text())
-    tests = stored["records"]["local::ollama-local::llama3.2:1b"]["calibration_tests"]
+    key = next(k for k in stored["records"] if k.startswith("local::ollama-local::llama3.2:1b::"))
+    tests = stored["records"][key]["calibration_tests"]
     assert tests[-1]["provider_id"] == "ollama-local"
     assert tests[-1]["model_id"] == "llama3.2:1b"
 
@@ -1119,6 +1134,40 @@ def test_e10_openai_adapter_normalizes_provider_api_model_catalog(monkeypatch):
     assert {entry.capabilities for entry in catalog.models} == {()}
 
 
+def test_e10_openai_adapter_uses_default_and_overridden_max_output_tokens(monkeypatch):
+    calls: list[dict] = []
+
+    class _FakeCompletions:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            return types.SimpleNamespace(
+                choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ok"))]
+            )
+
+    class _FakeOpenAI:
+        def __init__(self, api_key):
+            self.chat = types.SimpleNamespace(
+                completions=_FakeCompletions(),
+            )
+            self.models = types.SimpleNamespace(list=lambda: [])
+
+    monkeypatch.setitem(sys.modules, "openai", types.SimpleNamespace(OpenAI=_FakeOpenAI))
+
+    default_provider = OpenAIArtistProvider(api_key="secret-openai-key")
+    override_provider = OpenAIArtistProvider(
+        api_key="secret-openai-key",
+        max_output_tokens=1536,
+    )
+
+    default_provider.render("hello")
+    override_provider.render("hello")
+
+    assert calls[0]["max_tokens"] == 4096
+    assert default_provider.execution_config()["max_output_tokens"] == 4096
+    assert calls[1]["max_tokens"] == 1536
+    assert override_provider.execution_config()["max_output_tokens"] == 1536
+
+
 def test_e10_anthropic_adapter_normalizes_provider_api_model_catalog(monkeypatch):
     class _FakeModels:
         def list(self, limit=100):
@@ -1142,6 +1191,38 @@ def test_e10_anthropic_adapter_normalizes_provider_api_model_catalog(monkeypatch
     assert catalog.models[0].snapshot is None
     assert catalog.models[0].availability == "known_unverified"
     assert catalog.models[0].capabilities == ()
+
+
+def test_e10_anthropic_adapter_uses_default_and_overridden_max_output_tokens(monkeypatch):
+    calls: list[dict] = []
+
+    class _FakeMessages:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            return types.SimpleNamespace(
+                content=[types.SimpleNamespace(text="ok")]
+            )
+
+    class _FakeAnthropic:
+        def __init__(self, api_key):
+            self.messages = _FakeMessages()
+            self.models = types.SimpleNamespace(list=lambda limit=100: [])
+
+    monkeypatch.setitem(sys.modules, "anthropic", types.SimpleNamespace(Anthropic=_FakeAnthropic))
+
+    default_provider = AnthropicArtistProvider(api_key="secret-anthropic-key")
+    override_provider = AnthropicArtistProvider(
+        api_key="secret-anthropic-key",
+        max_output_tokens=1536,
+    )
+
+    default_provider.render("hello")
+    override_provider.render("hello")
+
+    assert calls[0]["max_tokens"] == 4096
+    assert default_provider.execution_config()["max_output_tokens"] == 4096
+    assert calls[1]["max_tokens"] == 1536
+    assert override_provider.execution_config()["max_output_tokens"] == 1536
 
 
 def test_e10_gemini_adapter_preserves_unknown_capability_metadata(monkeypatch):
@@ -1387,18 +1468,315 @@ def test_e10_cloud_calibration_isolated_by_selected_model(
     first_cal = client.get("/api/e10/calibration").get_json()["calibration"]["gpt"]
     assert first.status_code == 201
     assert first.get_json()["model_id"] == "gpt-4o"
-    assert first_cal["calibration_identity"] == "gpt::openai::gpt-4o"
+    assert first_cal["calibration_identity"].startswith("gpt::openai::gpt-4o::")
     assert len(first_cal["calibration_tests"]) == 1
 
     assert client.put("/api/e10/providers/gpt/model", json={"model": "gpt-4.1"}).status_code == 200
     second_cal = client.get("/api/e10/calibration").get_json()["calibration"]["gpt"]
-    assert second_cal["calibration_identity"] == "gpt::openai::gpt-4.1"
+    assert second_cal["calibration_identity"].startswith("gpt::openai::gpt-4.1::")
     assert second_cal["calibration_tests"] == []
 
     assert client.put("/api/e10/providers/gpt/model", json={"model": "gpt-4o"}).status_code == 200
     restored = client.get("/api/e10/calibration").get_json()["calibration"]["gpt"]
-    assert restored["calibration_identity"] == "gpt::openai::gpt-4o"
+    assert restored["calibration_identity"] == first_cal["calibration_identity"]
     assert len(restored["calibration_tests"]) == 1
+
+
+def test_e10_connections_v1_migrates_saved_model_configuration_schema(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    settings_path.parent.mkdir(parents=True)
+    settings_path.write_text(json.dumps({
+        "schema": "hermeneia.connections_settings.v1",
+        "version": 1,
+        "ollama": {"host": "http://jetson.local:11434"},
+        "providers": {
+            "openai": {
+                "selected_model": "gpt-4.1",
+                "credential_source": {
+                    "kind": "environment",
+                    "environment_variable": "OPENAI_API_KEY",
+                },
+            }
+        },
+    }))
+    _reset_catalog_provider()
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+
+    gpt = next(
+        row for row in client.get("/api/e10/providers").get_json()["providers"]
+        if row["participant"] == "gpt"
+    )
+    assert gpt["selected_model"] == "gpt-4.1"
+    assert gpt["credential_source_kind"] == "environment"
+
+    response = client.post(
+        "/api/e10/providers/gpt/configurations",
+        json={
+            "label": "Long OpenAI",
+            "model_id": "gpt-4.1",
+            "parameters": {"max_output_tokens": 8192},
+        },
+    )
+
+    assert response.status_code == 201
+    migrated = json.loads(settings_path.read_text())
+    assert migrated["version"] == 2
+    assert migrated["ollama"]["host"] == "http://jetson.local:11434"
+    assert migrated["providers"]["openai"]["selected_model"] == "gpt-4.1"
+    assert migrated["providers"]["openai"]["credential_source"]["environment_variable"] == "OPENAI_API_KEY"
+    assert migrated["providers"]["openai"]["saved_model_configurations"][0]["parameters"] == {
+        "max_output_tokens": 8192,
+    }
+
+
+def test_e10_saved_model_configuration_lifecycle_and_validation(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    _reset_catalog_provider()
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+
+    created = client.post(
+        "/api/e10/providers/gpt/configurations",
+        json={
+            "label": "Draft long",
+            "model_id": "gpt-4o",
+            "parameters": {"max_output_tokens": 8192},
+        },
+    )
+    assert created.status_code == 201
+    config = created.get_json()["configuration"]
+    config_id = config["configuration_id"]
+    first_revision = config["revision"]
+
+    renamed = client.put(
+        f"/api/e10/providers/gpt/configurations/{config_id}",
+        json={
+            "label": "Renamed only",
+            "model_id": "gpt-4o",
+            "parameters": {"max_output_tokens": 8192},
+        },
+    )
+    assert renamed.status_code == 200
+    assert renamed.get_json()["configuration"]["revision"] == first_revision
+
+    edited = client.put(
+        f"/api/e10/providers/gpt/configurations/{config_id}",
+        json={
+            "label": "Shorter",
+            "model_id": "gpt-4o",
+            "parameters": {"max_output_tokens": 2048},
+        },
+    )
+    assert edited.status_code == 200
+    assert edited.get_json()["configuration"]["revision"] != first_revision
+
+    assert client.post(
+        "/api/e10/providers/gpt/configurations",
+        json={
+            "label": "Invalid",
+            "model_id": "gpt-4o",
+            "parameters": {"temperature": 0.2},
+        },
+    ).status_code == 400
+
+    selected = client.put(
+        "/api/e10/providers/gpt/configuration",
+        json={"configuration_id": config_id},
+    )
+    assert selected.status_code == 200
+    selected_provider = selected.get_json()
+    assert selected_provider["selected_configuration_id"] == config_id
+    assert selected_provider["selected_model"] == "gpt-4o"
+    assert selected_provider["selected_model_source"] == "connection_default"
+    assert selected_provider["resolved_inference_parameters"] == {"max_output_tokens": 2048}
+
+    blocked_delete = client.delete(f"/api/e10/providers/gpt/configurations/{config_id}")
+    assert blocked_delete.status_code == 409
+
+    explicit_model = client.put("/api/e10/providers/gpt/model", json={"model": "gpt-4.1"})
+    assert explicit_model.status_code == 200
+    assert explicit_model.get_json()["selected_configuration_id"] is None
+    assert explicit_model.get_json()["selected_model"] == "gpt-4.1"
+
+    assert client.put(
+        "/api/e10/providers/gpt/configuration",
+        json={"configuration_id": config_id},
+    ).status_code == 200
+    bare = client.put("/api/e10/providers/gpt/configuration", json={"configuration_id": None})
+    assert bare.status_code == 200
+    assert bare.get_json()["selected_configuration_id"] is None
+    assert bare.get_json()["selected_model"] == "gpt-4o"
+    assert bare.get_json()["selected_model_source"] == "user_config"
+
+    deleted = client.delete(f"/api/e10/providers/gpt/configurations/{config_id}")
+    assert deleted.status_code == 200
+    assert deleted.get_json()["provider"]["saved_model_configurations"] == []
+
+
+def test_e10_saved_configuration_default_survives_restart_and_workspace_switch(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    _reset_catalog_provider()
+    first = create_app(
+        db_path=tmp_path / "workspace-a" / "missing.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+    config = first.post(
+        "/api/e10/providers/gpt/configurations",
+        json={
+            "label": "Portable machine default",
+            "model_id": "gpt-4.1",
+            "parameters": {"max_output_tokens": 8192},
+        },
+    ).get_json()["configuration"]
+    assert first.put(
+        "/api/e10/providers/gpt/configuration",
+        json={"configuration_id": config["configuration_id"]},
+    ).status_code == 200
+
+    second = create_app(
+        db_path=tmp_path / "workspace-b" / "missing.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+    gpt = next(
+        row for row in second.get("/api/e10/providers").get_json()["providers"]
+        if row["participant"] == "gpt"
+    )
+
+    assert gpt["selected_configuration_id"] == config["configuration_id"]
+    assert gpt["selected_model"] == "gpt-4.1"
+    assert gpt["resolved_inference_parameters"] == {"max_output_tokens": 8192}
+    assert not (tmp_path / "workspace-a" / "calibration.json").exists()
+    assert not (tmp_path / "workspace-b" / "calibration.json").exists()
+
+
+def test_e10_saved_configuration_reaches_provider_calls_and_calibration_identity(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    _reset_catalog_provider()
+    _CatalogProvider.calls = []
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_catalog_registry(),
+    ).test_client()
+
+    a = client.post(
+        "/api/e10/providers/gpt/configurations",
+        json={
+            "label": "A",
+            "model_id": "gpt-4o",
+            "parameters": {"max_output_tokens": 1024},
+        },
+    ).get_json()["configuration"]
+    b = client.post(
+        "/api/e10/providers/gpt/configurations",
+        json={
+            "label": "B",
+            "model_id": "gpt-4o",
+            "parameters": {"max_output_tokens": 2048},
+        },
+    ).get_json()["configuration"]
+
+    assert client.put("/api/e10/providers/gpt/configuration", json={"configuration_id": a["configuration_id"]}).status_code == 200
+    first = client.post("/api/e10/providers/gpt/calibrate/Explorer", json={})
+    first_cal = client.get("/api/e10/calibration").get_json()["calibration"]["gpt"]
+    assert first.status_code == 201
+    assert _CatalogProvider.calls[-1]["kwargs"]["max_output_tokens"] == 1024
+    assert first_cal["configuration_id"] == a["configuration_id"]
+    assert len(first_cal["calibration_tests"]) == 1
+
+    assert client.put("/api/e10/providers/gpt/configuration", json={"configuration_id": b["configuration_id"]}).status_code == 200
+    second_cal = client.get("/api/e10/calibration").get_json()["calibration"]["gpt"]
+    assert second_cal["configuration_id"] == b["configuration_id"]
+    assert second_cal["calibration_tests"] == []
+
+    assert client.put("/api/e10/providers/gpt/configuration", json={"configuration_id": a["configuration_id"]}).status_code == 200
+    restored = client.get("/api/e10/calibration").get_json()["calibration"]["gpt"]
+    assert restored["calibration_identity"] == first_cal["calibration_identity"]
+    assert len(restored["calibration_tests"]) == 1
+
+
+def test_e10_artist_execution_config_records_resolved_saved_configuration(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    _reset_catalog_provider()
+    registry = _cloud_catalog_registry()
+    monkeypatch.setattr(
+        "hermeneia.narrative.artist_providers.DEFAULT_PROVIDER_REGISTRY",
+        registry,
+    )
+    db_path = tmp_path / "herm.db"
+    store = SQLiteStore(db_path)
+    ids = _seed_full_chain(store)
+    store.close()
+    client = create_app(
+        db_path=db_path,
+        provider_registry=registry,
+    ).test_client()
+    config = client.post(
+        "/api/e10/providers/gpt/configurations",
+        json={
+            "label": "Receipt config",
+            "model_id": "gpt-4o",
+            "parameters": {"max_output_tokens": 1536},
+        },
+    ).get_json()["configuration"]
+    assert client.put(
+        "/api/e10/providers/gpt/configuration",
+        json={"configuration_id": config["configuration_id"]},
+    ).status_code == 200
+
+    rendered = client.post(
+        "/api/pipeline/run-artist",
+        json={
+            "plan_id": ids["plan_id"],
+            "provider": "openai",
+            "profile": "literary-en",
+        },
+    )
+
+    assert rendered.status_code in {200, 201}
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT execution_config FROM rendered_narratives WHERE provider LIKE 'openai/%' ORDER BY created_at DESC LIMIT 1"
+    ).fetchone()
+    conn.close()
+    execution = json.loads(row["execution_config"])
+    resolved = execution["resolved_execution_configuration"]
+    assert resolved["provider"] == "openai"
+    assert resolved["model_id"] == "gpt-4o"
+    assert resolved["inference_parameters"] == {"max_output_tokens": 1536}
+    assert resolved["saved_configuration_id"] == config["configuration_id"]
+    assert resolved["configuration_revision"] == config["revision"]
+    assert "environment-openai-key" not in json.dumps(execution)
 
 
 def test_e10_blueprint_extraction_ignores_legacy_request_model_override(
