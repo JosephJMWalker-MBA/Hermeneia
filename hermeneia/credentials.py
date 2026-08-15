@@ -36,6 +36,9 @@ class CredentialStore(Protocol):
     def get_password(self, provider_id: str) -> str | None:
         ...
 
+    def has_password(self, provider_id: str) -> bool:
+        ...
+
     def delete_password(self, provider_id: str) -> None:
         ...
 
@@ -60,6 +63,9 @@ class UnavailableCredentialStore:
     def get_password(self, provider_id: str) -> str | None:
         raise CredentialStoreUnavailable(self.reason)
 
+    def has_password(self, provider_id: str) -> bool:
+        raise CredentialStoreUnavailable(self.reason)
+
     def delete_password(self, provider_id: str) -> None:
         raise CredentialStoreUnavailable(self.reason)
 
@@ -73,7 +79,12 @@ class KeyringCredentialStore:
         import keyring  # type: ignore
 
         self._keyring = keyring
-        backend = keyring.get_keyring()
+        try:
+            backend = keyring.get_keyring()
+        except Exception as exc:
+            raise CredentialStoreUnavailable(
+                "System credential backend could not be initialized."
+            ) from exc
         backend_module = backend.__class__.__module__.lower()
         backend_name = backend.__class__.__name__
         priority = getattr(backend, "priority", 0)
@@ -107,10 +118,19 @@ class KeyringCredentialStore:
         }
 
     def set_password(self, provider_id: str, secret: str) -> None:
-        self._keyring.set_password(SERVICE_NAME, provider_id, secret)
+        try:
+            self._keyring.set_password(SERVICE_NAME, provider_id, secret)
+        except Exception as exc:
+            raise CredentialStoreError("System credential store write failed.") from exc
 
     def get_password(self, provider_id: str) -> str | None:
-        return self._keyring.get_password(SERVICE_NAME, provider_id)
+        try:
+            return self._keyring.get_password(SERVICE_NAME, provider_id)
+        except Exception as exc:
+            raise CredentialStoreError("System credential store read failed.") from exc
+
+    def has_password(self, provider_id: str) -> bool:
+        return self.get_password(provider_id) is not None
 
     def delete_password(self, provider_id: str) -> None:
         try:
@@ -118,7 +138,7 @@ class KeyringCredentialStore:
         except Exception as exc:
             if exc.__class__.__name__ == "PasswordDeleteError":
                 return
-            raise
+            raise CredentialStoreError("System credential store delete failed.") from exc
 
 
 def default_credential_store() -> CredentialStore:
@@ -126,3 +146,5 @@ def default_credential_store() -> CredentialStore:
         return KeyringCredentialStore()
     except CredentialStoreUnavailable as exc:
         return UnavailableCredentialStore(str(exc))
+    except Exception:
+        return UnavailableCredentialStore("System credential store is unavailable.")

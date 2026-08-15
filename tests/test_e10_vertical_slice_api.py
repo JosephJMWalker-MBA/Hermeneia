@@ -17,7 +17,7 @@ from hermeneia.narrative.provider_registry import (
 )
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.web.app import create_app
-from hermeneia.credentials import CredentialStoreError
+from hermeneia.credentials import CredentialStoreError, KeyringCredentialStore, default_credential_store
 
 from test_constitutional_p0 import _seed_full_chain
 
@@ -69,6 +69,7 @@ class _FakeCredentialStore:
     def __init__(self) -> None:
         self.passwords: dict[str, str] = {}
         self.fail_set = False
+        self.fail_get = False
         self.fail_delete = False
 
     def available(self) -> bool:
@@ -87,7 +88,12 @@ class _FakeCredentialStore:
         self.passwords[provider_id] = secret
 
     def get_password(self, provider_id: str) -> str | None:
+        if self.fail_get:
+            raise CredentialStoreError("read failed")
         return self.passwords.get(provider_id)
+
+    def has_password(self, provider_id: str) -> bool:
+        return self.get_password(provider_id) is not None
 
     def delete_password(self, provider_id: str) -> None:
         if self.fail_delete:
@@ -110,6 +116,9 @@ class _UnavailableCredentialStore:
         raise CredentialStoreError("unavailable")
 
     def get_password(self, provider_id: str) -> str | None:
+        raise CredentialStoreError("unavailable")
+
+    def has_password(self, provider_id: str) -> bool:
         raise CredentialStoreError("unavailable")
 
     def delete_password(self, provider_id: str) -> None:
@@ -1094,6 +1103,239 @@ def test_e10_system_store_failed_delete_preserves_secret_and_metadata(
     assert settings_path.read_text() == before
 
 
+def test_e10_system_store_replacement_metadata_failure_restores_prior_secret(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    store = _FakeCredentialStore()
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_registry(),
+        credential_store=store,
+    ).test_client()
+    assert client.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "system_store", "api_key": "old-openai-secret"},
+    ).status_code == 200
+    before = settings_path.read_text()
+
+    def _fail_save(settings, path=None):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("hermeneia.web.app.save_connections_settings", _fail_save)
+    replaced = client.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "system_store", "api_key": "new-openai-secret"},
+    )
+
+    assert replaced.status_code == 500
+    assert store.passwords["openai"] == "old-openai-secret"
+    assert settings_path.read_text() == before
+
+
+def test_e10_system_store_replacement_failed_rollback_is_reported(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    store = _FakeCredentialStore()
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_registry(),
+        credential_store=store,
+    ).test_client()
+    assert client.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "system_store", "api_key": "old-openai-secret"},
+    ).status_code == 200
+
+    def _fail_save(settings, path=None):
+        raise OSError("disk full")
+
+    original_set_password = store.set_password
+
+    def _fail_restore(provider_id: str, secret: str) -> None:
+        if secret == "old-openai-secret":
+            raise CredentialStoreError("restore failed")
+        original_set_password(provider_id, secret)
+
+    monkeypatch.setattr("hermeneia.web.app.save_connections_settings", _fail_save)
+    monkeypatch.setattr(store, "set_password", _fail_restore)
+    replaced = client.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "system_store", "api_key": "new-openai-secret"},
+    )
+
+    assert replaced.status_code == 500
+    assert "could not restore the prior credential" in replaced.get_json()["error"]
+    assert store.passwords["openai"] == "new-openai-secret"
+
+
+def test_e10_system_store_delete_metadata_failure_failed_restore_is_reported(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    store = _FakeCredentialStore()
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_registry(),
+        credential_store=store,
+    ).test_client()
+    assert client.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "system_store", "api_key": "system-openai-secret"},
+    ).status_code == 200
+
+    def _fail_save(settings, path=None):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("hermeneia.web.app.save_connections_settings", _fail_save)
+    store.fail_set = True
+    removed = client.delete("/api/e10/providers/gpt/key", json={"credential_source": "system_store"})
+
+    assert removed.status_code == 500
+    assert "could not restore it" in removed.get_json()["error"]
+    assert "openai" not in store.passwords
+
+
+def test_e10_system_store_presence_is_independent_of_selected_source(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    store = _FakeCredentialStore()
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_registry(),
+        credential_store=store,
+    ).test_client()
+
+    assert client.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "system_store", "api_key": "system-openai-secret"},
+    ).status_code == 200
+    assert client.put("/api/e10/providers/gpt/key", json={"credential_source": "environment"}).status_code == 200
+    status = client.get("/api/e10/providers").get_json()["providers"]
+    gpt = next(provider for provider in status if provider["participant"] == "gpt")
+    assert gpt["credential_scope"] == "environment"
+    assert gpt["system_credential_configured"] is True
+
+    deleted = client.delete("/api/e10/providers/gpt/key", json={"credential_source": "system_store"})
+    status = client.get("/api/e10/providers").get_json()["providers"]
+    gpt = next(provider for provider in status if provider["participant"] == "gpt")
+    assert deleted.status_code == 200
+    assert gpt["credential_scope"] == "environment"
+    assert gpt["configured"] is True
+    assert gpt["system_credential_configured"] is False
+    assert json.loads(settings_path.read_text())["providers"]["openai"]["credential_source"]["kind"] == "environment"
+
+
+def test_e10_system_store_selection_can_reuse_existing_secret_without_reentering(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    store = _FakeCredentialStore()
+    _CapturingProvider.calls = []
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_registry(),
+        credential_store=store,
+    ).test_client()
+
+    assert client.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "system_store", "api_key": "system-openai-secret"},
+    ).status_code == 200
+    assert client.put("/api/e10/providers/gpt/key", json={"credential_source": "environment"}).status_code == 200
+    selected = client.put("/api/e10/providers/gpt/key", json={"credential_source": "system_store"})
+    tested = client.post("/api/e10/providers/gpt/test", json={})
+
+    assert selected.status_code == 200
+    assert tested.status_code == 200
+    assert _CapturingProvider.calls[-1]["kwargs"]["api_key"] == "system-openai-secret"
+
+
+def test_e10_system_store_presence_does_not_trust_stale_configured_metadata(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    store = _FakeCredentialStore()
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_cloud_registry(),
+        credential_store=store,
+    ).test_client()
+    assert client.put(
+        "/api/e10/providers/gpt/key",
+        json={"credential_source": "system_store", "api_key": "system-openai-secret"},
+    ).status_code == 200
+    store.passwords.pop("openai")
+
+    status = client.get("/api/e10/providers").get_json()["providers"]
+    gpt = next(provider for provider in status if provider["participant"] == "gpt")
+
+    assert gpt["credential_scope"] == "system_store"
+    assert gpt["configured"] is False
+    assert gpt["system_credential_configured"] is False
+
+
+def test_e10_keyring_backend_errors_are_sanitized(monkeypatch):
+    class _FakeBackend:
+        priority = 1
+
+    fake_keyring = types.SimpleNamespace()
+    fake_keyring.get_keyring = lambda: _FakeBackend()
+
+    def _raise_backend_error(*args, **kwargs):
+        raise RuntimeError("raw dbus secret backend failure")
+
+    fake_keyring.set_password = _raise_backend_error
+    fake_keyring.get_password = _raise_backend_error
+    fake_keyring.delete_password = _raise_backend_error
+
+    monkeypatch.setattr("hermeneia.credentials.importlib.util.find_spec", lambda name: object())
+    monkeypatch.setitem(sys.modules, "keyring", fake_keyring)
+    store = KeyringCredentialStore()
+
+    for action in (
+        lambda: store.set_password("openai", "secret"),
+        lambda: store.get_password("openai"),
+        lambda: store.delete_password("openai"),
+    ):
+        with pytest.raises(CredentialStoreError) as exc:
+            action()
+        assert "raw dbus" not in str(exc.value)
+        assert "secret backend failure" not in str(exc.value)
+
+
+def test_e10_default_credential_store_sanitizes_backend_initialization_error(monkeypatch):
+    fake_keyring = types.SimpleNamespace()
+    fake_keyring.get_keyring = lambda: (_ for _ in ()).throw(
+        RuntimeError("raw keychain initialization token")
+    )
+    monkeypatch.setattr("hermeneia.credentials.importlib.util.find_spec", lambda name: object())
+    monkeypatch.setitem(sys.modules, "keyring", fake_keyring)
+
+    store = default_credential_store()
+    status = store.status()
+
+    assert status["available"] is False
+    assert "raw keychain" not in str(status["message"])
+    assert "token" not in str(status["message"])
+
+
 def test_e10_selected_credential_source_precedence_is_exact(
     tmp_path,
     monkeypatch,
@@ -1176,7 +1418,8 @@ def test_e10_ui_exposes_provider_configuration_surface():
     assert "Use Session Only" in index_html
     assert "Use Environment" in index_html
     assert "Save to System Store" in index_html
-    assert "Remove Credential" in index_html
+    assert "Remove Session Credential" in index_html
+    assert "Remove System Credential" in index_html
     assert "Credential storage" in index_html
     assert "server memory" in index_html
     assert "credential_source: 'environment'" in index_html

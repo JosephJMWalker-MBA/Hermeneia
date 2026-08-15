@@ -959,30 +959,49 @@ def create_app(
             runtime_connections_settings.clear()
             runtime_connections_settings.update(next_settings)
 
+    def _system_credential_state(provider_id: str) -> dict[str, object]:
+        status = active_credential_store.status()
+        state: dict[str, object] = {
+            "system_store_available": bool(status.get("available")),
+            "system_store_backend": status.get("backend"),
+            "message": status.get("message"),
+            "system_credential_present": False,
+        }
+        if not state["system_store_available"]:
+            return state
+        try:
+            state["system_credential_present"] = active_credential_store.has_password(provider_id)
+        except CredentialStoreError as exc:
+            state["system_store_available"] = False
+            state["message"] = str(exc)
+            state["system_credential_present"] = False
+        return state
+
     def _credential_source_for_provider(provider: dict) -> dict[str, object]:
         provider_id = str(provider["id"])
         env_name = provider.get("required_environment")
         if not env_name:
             return {"kind": "not_required", "configured": True}
+        system_state = _system_credential_state(provider_id)
         with runtime_provider_keys_lock:
             runtime_source = runtime_credential_sources.get(provider_id)
             session_present = bool(runtime_provider_keys.get(provider_id))
         if runtime_source == "session":
-            return {"kind": "session", "configured": session_present}
+            return {"kind": "session", "configured": session_present, **system_state}
         with _connections_settings_lock:
             persisted = provider_credential_source(runtime_connections_settings, provider_id)
         if persisted:
             kind = persisted.get("kind")
             if kind == "session":
-                return {"kind": "session", "configured": session_present}
+                return {"kind": "session", "configured": session_present, **system_state}
             if kind == "system_store":
-                status = active_credential_store.status()
                 return {
                     "kind": "system_store",
-                    "configured": bool(persisted.get("configured")),
-                    "system_store_available": bool(status.get("available")),
-                    "system_store_backend": status.get("backend"),
-                    "message": status.get("message"),
+                    "configured": bool(
+                        system_state.get("system_store_available")
+                        and system_state.get("system_credential_present")
+                    ),
+                    **system_state,
                     "service": persisted.get("service"),
                     "account": persisted.get("account"),
                 }
@@ -992,11 +1011,13 @@ def create_app(
                     "kind": "environment",
                     "environment_variable": env_var,
                     "configured": bool(os.environ.get(env_var)),
+                    **system_state,
                 }
         return {
             "kind": "environment",
             "environment_variable": env_name,
             "configured": bool(os.environ.get(str(env_name))),
+            **system_state,
         }
 
     def _credential_secret_for_provider(provider_id: str) -> str | None:
@@ -1140,11 +1161,7 @@ def create_app(
                 "credential_environment_variable": credential_source_state.get("environment_variable"),
                 "system_credential_store_available": credential_source_state.get("system_store_available"),
                 "system_credential_store_backend": credential_source_state.get("system_store_backend"),
-                "system_credential_configured": (
-                    credential_source_state.get("configured")
-                    if credential_source_state.get("kind") == "system_store"
-                    else None
-                ),
+                "system_credential_configured": credential_source_state.get("system_credential_present"),
                 "default_model": default_model,
                 "selected_model": selected_model,
                 "selected_model_source": selected_model_source,
@@ -3624,21 +3641,29 @@ def create_app(
             source_kind = str(payload.get("credential_source") or source_state.get("kind") or "").strip()
             if source_kind == "system_store":
                 old_secret = None
+                old_secret_present = False
                 try:
                     old_secret = active_credential_store.get_password(provider_id)
+                    old_secret_present = old_secret is not None
                     active_credential_store.delete_password(provider_id)
-                    _set_persisted_credential_source(provider_id, {
-                        "kind": "system_store",
-                        "configured": False,
-                        "service": CREDENTIAL_SERVICE_NAME,
-                        "account": provider_id,
-                    })
+                    if source_state.get("kind") == "system_store":
+                        _set_persisted_credential_source(provider_id, {
+                            "kind": "system_store",
+                            "configured": False,
+                            "service": CREDENTIAL_SERVICE_NAME,
+                            "account": provider_id,
+                        })
                 except (UnsupportedConnectionsSettingsError, OSError) as exc:
-                    if old_secret:
+                    if old_secret_present and old_secret is not None:
                         try:
                             active_credential_store.set_password(provider_id, old_secret)
-                        except CredentialStoreError:
-                            pass
+                        except CredentialStoreError as rollback_exc:
+                            return jsonify({
+                                "error": (
+                                    "System credential was removed, but Hermeneia could not restore it "
+                                    f"after metadata update failed: {rollback_exc}"
+                                )
+                            }), 500
                     return jsonify({"error": f"Could not update credential source after removing system credential: {exc}"}), 500
                 except CredentialStoreError as exc:
                     return jsonify({"error": f"Could not remove system credential: {exc}"}), 500
@@ -3685,11 +3710,20 @@ def create_app(
             })
         if source_kind not in {"session", "system_store"}:
             return jsonify({"error": "credential_source must be session, environment, or system_store"}), 400
-        if len(api_key) < 8:
+        if source_kind != "system_store" and len(api_key) < 8:
             return jsonify({"error": "api_key must contain at least 8 characters"}), 400
         if source_kind == "system_store":
+            prior_secret = None
+            prior_secret_present = False
             try:
-                active_credential_store.set_password(provider_id, api_key)
+                prior_secret = active_credential_store.get_password(provider_id)
+                prior_secret_present = prior_secret is not None
+                if api_key:
+                    if len(api_key) < 8:
+                        return jsonify({"error": "api_key must contain at least 8 characters"}), 400
+                    active_credential_store.set_password(provider_id, api_key)
+                elif not active_credential_store.has_password(provider_id):
+                    return jsonify({"error": "System credential is not configured; enter an API key to save one."}), 400
                 _set_persisted_credential_source(provider_id, {
                     "kind": "system_store",
                     "configured": True,
@@ -3700,9 +3734,17 @@ def create_app(
                 return jsonify({"error": f"System credential store unavailable: {exc}"}), 503
             except (UnsupportedConnectionsSettingsError, OSError, InvalidConnectionsSettingError) as exc:
                 try:
-                    active_credential_store.delete_password(provider_id)
-                except CredentialStoreError:
-                    pass
+                    if prior_secret_present and prior_secret is not None:
+                        active_credential_store.set_password(provider_id, prior_secret)
+                    elif api_key:
+                        active_credential_store.delete_password(provider_id)
+                except CredentialStoreError as rollback_exc:
+                    return jsonify({
+                        "error": (
+                            "System credential was changed, but Hermeneia could not restore the prior "
+                            f"credential after metadata update failed: {rollback_exc}"
+                        )
+                    }), 500
                 return jsonify({"error": f"Could not save credential source: {exc}"}), 500
             with runtime_provider_keys_lock:
                 runtime_provider_keys.pop(provider_id, None)

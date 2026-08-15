@@ -11986,8 +11986,9 @@ function e10ManageKey(participant) {
     <div class="e10-actions">
       <button class="btn-trace" onclick="e10SaveKey('${x(participant)}','session')">Use Session Only</button>
       <button class="btn-trace" onclick="e10UseEnvironmentKey('${x(participant)}')">Use Environment</button>
-      <button class="btn-trace" ${systemAvailable ? '' : 'disabled'} onclick="e10SaveKey('${x(participant)}','system_store')">Save to System Store</button>
-      ${sourceKind === 'session' || sourceKind === 'system_store' ? `<button class="btn-trace" onclick="e10RemoveKey('${x(participant)}','${x(sourceKind)}')">Remove Credential</button>` : ''}
+      <button class="btn-trace" ${systemAvailable ? '' : 'disabled'} onclick="e10SaveKey('${x(participant)}','system_store')">${systemConfigured ? 'Use System Store' : 'Save to System Store'}</button>
+      ${sourceKind === 'session' ? `<button class="btn-trace" onclick="e10RemoveKey('${x(participant)}','session')">Remove Session Credential</button>` : ''}
+      ${systemConfigured ? `<button class="btn-trace" onclick="e10RemoveKey('${x(participant)}','system_store')">Remove System Credential</button>` : ''}
     </div>` : ''}
   </div>`;
 }
@@ -11995,15 +11996,14 @@ function e10ManageKey(participant) {
 async function e10SaveKey(participant, credentialSource = 'session') {
   const input = document.getElementById(`key-input-${participant}`);
   const apiKey = input?.value.trim() || '';
-  if (!apiKey) {
+  if (!apiKey && credentialSource !== 'system_store') {
     showAppError('Enter an API key before saving.');
     input?.focus();
     return;
   }
-  const result = await put(`/api/e10/providers/${encodeURIComponent(participant)}/key`, {
-    api_key: apiKey,
-    credential_source: credentialSource,
-  });
+  const payload = { credential_source: credentialSource };
+  if (apiKey) payload.api_key = apiKey;
+  const result = await put(`/api/e10/providers/${encodeURIComponent(participant)}/key`, payload);
   input.value = '';
   _e10ProviderNotices[participant] = result.message;
   await e10LoadProviders();
