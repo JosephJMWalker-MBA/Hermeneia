@@ -1,3 +1,23 @@
 cff-version: 1.2.0
+message: "If you use Hermeneia in academic or research work, please cite this software."
 title: Hermeneia
-message: Cite this repository if used in academic work.
+type: software
+authors:
+  - family-names: Walker
+    given-names: Joseph JM
+version: 0.1.0
+license: MIT
+repository-code: "https://github.com/JosephJMWalker-MBA/Hermeneia"
+url: "https://github.com/JosephJMWalker-MBA/Hermeneia"
+abstract: >-
+  An operating environment for the disciplined evolution of understanding,
+  separating discovery, reconstruction, communication, verification, and
+  human governance while preserving evidence, provenance, and the evolution
+  of inquiry.
+keywords:
+  - epistemic systems
+  - AI-assisted inquiry
+  - provenance
+  - human governance
+  - semantic contracts
+  - interpretability
