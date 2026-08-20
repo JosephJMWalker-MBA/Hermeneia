@@ -7556,6 +7556,32 @@ function e10ProviderCard(provider, cal, perf) {
     return `<option value="${x(id)}" ${id === selectedModel ? 'selected' : ''}>${x(label)}</option>`;
   }).join('');
   const modelSelectorDisabled = !catalogAvailable || knownModelIds.length === 0;
+  const savedConfigs = Array.isArray(provider.saved_model_configurations) ? provider.saved_model_configurations : [];
+  const controls = Array.isArray(provider.model_configuration_controls) ? provider.model_configuration_controls : [];
+  const configRows = savedConfigs.length
+    ? savedConfigs.map(cfg => {
+      const params = cfg.parameters || {};
+      const maxOut = params.max_output_tokens ? ` · ${x(params.max_output_tokens)} max output` : '';
+      const active = cfg.configuration_id === provider.selected_configuration_id;
+      return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:5px;margin-top:5px">
+        <span style="font-family:var(--mono);color:${active ? 'var(--green)' : 'var(--fg2)'}">${x(cfg.label || cfg.configuration_id)}</span>
+        <span style="color:var(--dim2)">${x(provider.provider_id)} · ${x(cfg.model_id)}${maxOut}</span>
+        <button class="btn-trace" style="font-size:10px;padding:2px 7px" onclick="e10SelectModelConfig(${pk},${JSON.stringify(cfg.configuration_id)})">${active ? 'Selected' : 'Use'}</button>
+        <button class="btn-trace" style="font-size:10px;padding:2px 7px" onclick="e10EditModelConfig(${pk},${JSON.stringify(cfg.configuration_id)})">Edit</button>
+        <button class="btn-trace" style="font-size:10px;padding:2px 7px" onclick="e10DeleteModelConfig(${pk},${JSON.stringify(cfg.configuration_id)})">Delete</button>
+      </div>`;
+    }).join('')
+    : '<div style="font-size:11px;color:var(--dim2);margin-top:5px">No saved model configurations.</div>';
+  const configSection = provider.default_model ? `<div style="margin:6px 0 8px;font-size:11px;color:var(--dim2)">
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px">
+      <span style="color:var(--fg2)">Saved configurations</span>
+      <button class="btn-trace" style="font-size:10px;padding:2px 7px" onclick="e10CreateModelConfig(${pk})">Create</button>
+      <button class="btn-trace" style="font-size:10px;padding:2px 7px" onclick="e10SelectModelConfig(${pk},null)">Use bare model defaults</button>
+      ${controls.length ? `<span>${controls.map(c => x(c.label || c.name)).join(', ')}</span>` : '<span>no configurable parameters</span>'}
+    </div>
+    ${provider.selected_configuration_id ? `<div style="font-size:10px;color:var(--dim2)">Default configuration: <span style="font-family:var(--mono);color:var(--fg2)">${x(provider.selected_configuration_label || provider.selected_configuration_id)}</span></div>` : ''}
+    ${configRows}
+  </div>` : '';
   const modelSection = provider.default_model ? `<div style="margin:8px 0 4px;font-size:11px;color:var(--dim2)">
     <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 8px;margin-bottom:8px">
       <span>Selected model</span><span style="font-family:var(--mono);color:${provider.selected_model_available ? 'var(--green)' : 'var(--yellow)'}">${x(selectedModel || '—')} <span style="font-family:var(--sans);color:var(--dim2)">(${x(modelSourceLabel)})</span></span>
@@ -7570,6 +7596,7 @@ function e10ProviderCard(provider, cal, perf) {
       </select>
       <span style="font-size:10px;color:var(--dim2)">${knownModelIds.length ? `${knownModelIds.length} known · ${availableModelIds.length} available` : 'none verified'}</span>
     </div>
+    ${configSection}
   </div>` : '';
 
   // Ollama readiness steps
@@ -9695,6 +9722,7 @@ async function _crPreviewArtistDraft() {
     _crLastArtistDraft = {
       text: d.text || '', profileSlug: d.profile_slug || '', profileName: d.profile_name || '',
       planId: sk.planId || '', provider: d.provider || 'null', skeleton: sk,
+      executionConfig: d.execution_config || null,
     };
     const canJudge = !!(d.profile_slug);
     out.innerHTML = `
@@ -9808,7 +9836,13 @@ async function _crRatifyDraft() {
     const resp = await fetch('/api/pipeline/ratify-draft', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       // The EXACT previewed bytes — never re-rendered.
-      body: JSON.stringify({ plan_id: d.planId, provider: d.provider, profile_slug: d.profileSlug || null, text: d.text }),
+      body: JSON.stringify({
+        plan_id: d.planId,
+        provider: d.provider,
+        profile_slug: d.profileSlug || null,
+        text: d.text,
+        execution_config: d.executionConfig || null,
+      }),
     });
     const r = await resp.json();
     if (!resp.ok) { result.innerHTML = `<div style="color:#f87171;font-size:13px;margin-top:8px">✗ ${x(r.error || 'ratify failed')}</div>`; return; }
@@ -12068,6 +12102,95 @@ async function e10SelectProviderModel(participant, model, selectEl) {
     showAppError(e.message);
   } finally {
     if (selectEl) selectEl.disabled = false;
+  }
+}
+
+function _e10ProviderByParticipant(participant) {
+  return (_e10Providers || []).find(p => p.participant === participant) || null;
+}
+
+function _e10PromptConfigParameters(provider, existing = {}) {
+  const controls = Array.isArray(provider.model_configuration_controls) ? provider.model_configuration_controls : [];
+  const params = {};
+  for (const control of controls) {
+    const name = control.name;
+    if (!name) continue;
+    const current = existing[name] ?? control.default ?? '';
+    const raw = prompt(`${control.label || name}`, String(current));
+    if (raw === null) return null;
+    if ((control.value_type || '') === 'integer') {
+      const parsed = Number.parseInt(raw, 10);
+      if (!Number.isInteger(parsed)) {
+        showAppError(`${control.label || name} must be an integer.`);
+        return null;
+      }
+      params[name] = parsed;
+    }
+  }
+  return params;
+}
+
+async function e10CreateModelConfig(participant) {
+  const provider = _e10ProviderByParticipant(participant);
+  if (!provider) return;
+  const model = prompt('Model ID', provider.selected_model || provider.default_model || '');
+  if (!model) return;
+  const label = prompt('Configuration label', `${provider.label} · ${model}`);
+  if (label === null) return;
+  const parameters = _e10PromptConfigParameters(provider, {});
+  if (parameters === null) return;
+  try {
+    const result = await post(`/api/e10/providers/${encodeURIComponent(participant)}/configurations`, {
+      label, model_id: model, parameters,
+    });
+    _e10ProviderNotices[participant] = `Saved configuration: ${result.configuration.label}`;
+    await e10LoadProviders();
+  } catch(e) {
+    showAppError(e.message);
+  }
+}
+
+async function e10EditModelConfig(participant, configurationId) {
+  const provider = _e10ProviderByParticipant(participant);
+  const config = (provider?.saved_model_configurations || []).find(c => c.configuration_id === configurationId);
+  if (!provider || !config) return;
+  const label = prompt('Configuration label', config.label || '');
+  if (label === null) return;
+  const model = prompt('Model ID', config.model_id || '');
+  if (!model) return;
+  const parameters = _e10PromptConfigParameters(provider, config.parameters || {});
+  if (parameters === null) return;
+  try {
+    const result = await put(`/api/e10/providers/${encodeURIComponent(participant)}/configurations/${encodeURIComponent(configurationId)}`, {
+      label, model_id: model, parameters,
+    });
+    _e10ProviderNotices[participant] = `Updated configuration: ${result.configuration.label}`;
+    await e10LoadProviders();
+  } catch(e) {
+    showAppError(e.message);
+  }
+}
+
+async function e10DeleteModelConfig(participant, configurationId) {
+  if (!confirm('Delete this saved model configuration?')) return;
+  try {
+    const result = await del(`/api/e10/providers/${encodeURIComponent(participant)}/configurations/${encodeURIComponent(configurationId)}`);
+    _e10ProviderNotices[participant] = `Deleted configuration: ${result.deleted}`;
+    await e10LoadProviders();
+  } catch(e) {
+    showAppError(e.message);
+  }
+}
+
+async function e10SelectModelConfig(participant, configurationId) {
+  try {
+    const result = await put(`/api/e10/providers/${encodeURIComponent(participant)}/configuration`, {
+      configuration_id: configurationId,
+    });
+    _e10ProviderNotices[participant] = result.message;
+    await e10LoadProviders();
+  } catch(e) {
+    showAppError(e.message);
   }
 }
 

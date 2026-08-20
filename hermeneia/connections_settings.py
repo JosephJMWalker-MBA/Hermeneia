@@ -13,6 +13,7 @@ import os
 import sys
 import tempfile
 from copy import deepcopy
+from hashlib import sha256
 from ipaddress import ip_address
 from pathlib import Path
 from typing import Any
@@ -20,7 +21,7 @@ from urllib.parse import urlparse
 
 
 CONNECTIONS_SETTINGS_SCHEMA = "hermeneia.connections_settings.v1"
-CONNECTIONS_SETTINGS_VERSION = 1
+CONNECTIONS_SETTINGS_VERSION = 2
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 VALID_CREDENTIAL_SOURCE_KINDS = {"session", "environment", "system_store", "not_required"}
 
@@ -64,6 +65,53 @@ def empty_connections_settings() -> dict[str, Any]:
         "ollama": {},
         "providers": {},
     }
+
+
+def normalized_configuration_parameters(parameters: dict[str, Any] | None) -> dict[str, object]:
+    if not isinstance(parameters, dict):
+        return {}
+    clean: dict[str, object] = {}
+    for key, value in sorted(parameters.items()):
+        name = str(key or "").strip()
+        if not name:
+            continue
+        if isinstance(value, bool) or value is None:
+            clean[name] = value
+        elif isinstance(value, int):
+            clean[name] = value
+        elif isinstance(value, float):
+            clean[name] = value
+        elif isinstance(value, str):
+            clean[name] = value.strip()
+    return clean
+
+
+def model_configuration_revision(
+    provider_id: str,
+    model_id: str,
+    parameters: dict[str, Any] | None,
+) -> str:
+    payload = {
+        "provider_id": provider_id,
+        "model_id": model_id,
+        "parameters": normalized_configuration_parameters(parameters),
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return "rev_" + sha256(encoded.encode("utf-8")).hexdigest()[:16]
+
+
+def model_configuration_fingerprint(
+    provider_id: str,
+    model_id: str,
+    parameters: dict[str, Any] | None,
+) -> str:
+    payload = {
+        "provider_id": provider_id,
+        "model_id": model_id,
+        "parameters": normalized_configuration_parameters(parameters),
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return "cfgfp_" + sha256(encoded.encode("utf-8")).hexdigest()[:16]
 
 
 def _is_hermeneia_connections_schema(value: object) -> bool:
@@ -127,6 +175,31 @@ def validate_ollama_host(host: str) -> str:
     return f"{parsed.scheme}://{netloc}"
 
 
+def _coerce_model_configuration(
+    provider_id: str,
+    config: object,
+) -> dict[str, object] | None:
+    if not isinstance(config, dict):
+        return None
+    configuration_id = str(config.get("configuration_id") or "").strip()
+    label = str(config.get("label") or "").strip()
+    model_id = str(config.get("model_id") or "").strip()
+    stored_provider_id = str(config.get("provider_id") or provider_id).strip()
+    if not configuration_id or not model_id or stored_provider_id != provider_id:
+        return None
+    parameters = normalized_configuration_parameters(
+        config.get("parameters") if isinstance(config.get("parameters"), dict) else {}
+    )
+    return {
+        "configuration_id": configuration_id,
+        "label": label or model_id,
+        "provider_id": provider_id,
+        "model_id": model_id,
+        "parameters": parameters,
+        "revision": model_configuration_revision(provider_id, model_id, parameters),
+    }
+
+
 def _coerce_settings(raw: object, *, allow_unsupported: bool = False) -> dict[str, Any]:
     if not isinstance(raw, dict):
         return empty_connections_settings()
@@ -138,7 +211,7 @@ def _coerce_settings(raw: object, *, allow_unsupported: bool = False) -> dict[st
                 f"Unsupported Hermeneia Connections settings schema: {schema}"
             )
         return empty_connections_settings()
-    if version != CONNECTIONS_SETTINGS_VERSION:
+    if version not in {1, CONNECTIONS_SETTINGS_VERSION}:
         if not allow_unsupported:
             raise UnsupportedConnectionsSettingsError(
                 f"Unsupported Hermeneia Connections settings version: {version}"
@@ -159,10 +232,32 @@ def _coerce_settings(raw: object, *, allow_unsupported: bool = False) -> dict[st
             if not isinstance(provider_id, str) or not isinstance(provider_settings, dict):
                 continue
             selected_model = str(provider_settings.get("selected_model") or "").strip()
+            selected_configuration_id = str(
+                provider_settings.get("selected_configuration_id") or ""
+            ).strip()
             credential_source = provider_settings.get("credential_source")
             clean_provider: dict[str, Any] = {}
             if selected_model:
                 clean_provider["selected_model"] = selected_model
+            configurations = provider_settings.get("saved_model_configurations")
+            clean_configurations: list[dict[str, object]] = []
+            if isinstance(configurations, list):
+                for config in configurations:
+                    clean_config = _coerce_model_configuration(provider_id, config)
+                    if clean_config:
+                        clean_configurations.append(clean_config)
+            if clean_configurations:
+                clean_provider["saved_model_configurations"] = clean_configurations
+                config_ids = {
+                    str(config["configuration_id"])
+                    for config in clean_configurations
+                }
+                if selected_configuration_id in config_ids:
+                    clean_provider["selected_configuration_id"] = selected_configuration_id
+            elif selected_configuration_id:
+                clean_provider["selected_configuration_id"] = selected_configuration_id
+            if selected_configuration_id and "selected_configuration_id" not in clean_provider:
+                clean_provider["selected_configuration_id"] = selected_configuration_id
             if isinstance(credential_source, dict):
                 kind = str(credential_source.get("kind") or "").strip()
                 environment_variable = str(
@@ -241,6 +336,51 @@ def selected_provider_model(settings: dict[str, Any], provider_id: str) -> str |
     return selected or None
 
 
+def saved_model_configurations(
+    settings: dict[str, Any],
+    provider_id: str,
+) -> list[dict[str, object]]:
+    providers = settings.get("providers")
+    if not isinstance(providers, dict):
+        return []
+    provider_settings = providers.get(provider_id)
+    if not isinstance(provider_settings, dict):
+        return []
+    configs = provider_settings.get("saved_model_configurations")
+    if not isinstance(configs, list):
+        return []
+    return [
+        dict(config)
+        for config in configs
+        if isinstance(config, dict)
+    ]
+
+
+def saved_model_configuration(
+    settings: dict[str, Any],
+    provider_id: str,
+    configuration_id: str,
+) -> dict[str, object] | None:
+    for config in saved_model_configurations(settings, provider_id):
+        if str(config.get("configuration_id") or "") == configuration_id:
+            return config
+    return None
+
+
+def selected_provider_configuration_id(
+    settings: dict[str, Any],
+    provider_id: str,
+) -> str | None:
+    providers = settings.get("providers")
+    if not isinstance(providers, dict):
+        return None
+    provider_settings = providers.get(provider_id)
+    if not isinstance(provider_settings, dict):
+        return None
+    selected = str(provider_settings.get("selected_configuration_id") or "").strip()
+    return selected or None
+
+
 def set_selected_provider_model(
     settings: dict[str, Any],
     provider_id: str,
@@ -249,6 +389,70 @@ def set_selected_provider_model(
     next_settings = _coerce_settings(deepcopy(settings))
     provider_settings = next_settings["providers"].setdefault(provider_id, {})
     provider_settings["selected_model"] = model
+    provider_settings.pop("selected_configuration_id", None)
+    return next_settings
+
+
+def set_selected_provider_configuration(
+    settings: dict[str, Any],
+    provider_id: str,
+    configuration_id: str | None,
+) -> dict[str, Any]:
+    next_settings = _coerce_settings(deepcopy(settings))
+    provider_settings = next_settings["providers"].setdefault(provider_id, {})
+    if configuration_id is None:
+        provider_settings.pop("selected_configuration_id", None)
+        return next_settings
+    config = saved_model_configuration(next_settings, provider_id, configuration_id)
+    if config is None:
+        raise InvalidConnectionsSettingError("saved configuration does not exist")
+    provider_settings["selected_configuration_id"] = configuration_id
+    provider_settings["selected_model"] = str(config["model_id"])
+    return next_settings
+
+
+def upsert_saved_model_configuration(
+    settings: dict[str, Any],
+    provider_id: str,
+    config: dict[str, object],
+) -> dict[str, Any]:
+    next_settings = _coerce_settings(deepcopy(settings))
+    provider_settings = next_settings["providers"].setdefault(provider_id, {})
+    clean = _coerce_model_configuration(provider_id, config)
+    if clean is None:
+        raise InvalidConnectionsSettingError("invalid saved model configuration")
+    configs = [
+        dict(existing)
+        for existing in provider_settings.get("saved_model_configurations", [])
+        if isinstance(existing, dict)
+        and existing.get("configuration_id") != clean["configuration_id"]
+    ]
+    configs.append(clean)
+    configs.sort(key=lambda item: (str(item.get("label") or ""), str(item.get("configuration_id") or "")))
+    provider_settings["saved_model_configurations"] = configs
+    if provider_settings.get("selected_configuration_id") == clean["configuration_id"]:
+        provider_settings["selected_model"] = str(clean["model_id"])
+    return next_settings
+
+
+def delete_saved_model_configuration(
+    settings: dict[str, Any],
+    provider_id: str,
+    configuration_id: str,
+) -> dict[str, Any]:
+    next_settings = _coerce_settings(deepcopy(settings))
+    provider_settings = next_settings["providers"].setdefault(provider_id, {})
+    if provider_settings.get("selected_configuration_id") == configuration_id:
+        raise InvalidConnectionsSettingError(
+            "cannot delete the active saved configuration; select bare model defaults first"
+        )
+    configs = [
+        dict(existing)
+        for existing in provider_settings.get("saved_model_configurations", [])
+        if isinstance(existing, dict)
+        and existing.get("configuration_id") != configuration_id
+    ]
+    provider_settings["saved_model_configurations"] = configs
     return next_settings
 
 

@@ -63,6 +63,28 @@ class ModelCatalog:
         }
 
 
+@dataclass(frozen=True)
+class ModelConfigurationControl:
+    """Provider-owned non-secret inference parameter control metadata."""
+
+    name: str
+    value_type: str
+    default: int | float | str | bool | None = None
+    minimum: int | float | None = None
+    maximum: int | float | None = None
+    label: str | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "name": self.name,
+            "value_type": self.value_type,
+            "default": self.default,
+            "minimum": self.minimum,
+            "maximum": self.maximum,
+            "label": self.label or self.name,
+        }
+
+
 def unavailable_model_catalog(provider_id: str, error: str) -> ModelCatalog:
     return ModelCatalog(
         provider_id=provider_id,
@@ -85,6 +107,7 @@ class ProviderDefinition:
     required_environment: str | None = None
     sdk_module: str | None = None
     default_model: str | None = None
+    model_configuration_controls: tuple[ModelConfigurationControl, ...] = ()
 
     def configured(self) -> bool:
         """Whether required local configuration is present.
@@ -127,6 +150,10 @@ class ProviderDefinition:
             "local_or_remote": self.local_or_remote,
             "required_environment": self.required_environment,
             "default_model": self.default_model,
+            "model_configuration_controls": [
+                control.to_dict()
+                for control in self.model_configuration_controls
+            ],
         }
 
 

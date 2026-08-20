@@ -17,6 +17,7 @@ import os
 import sqlite3
 import tempfile
 import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -59,15 +60,24 @@ from ..connections_settings import (
     UnsupportedConnectionsSettingsError,
     empty_connections_settings,
     load_connections_settings,
+    model_configuration_fingerprint,
+    model_configuration_revision,
+    normalized_configuration_parameters,
     ollama_host_from_settings,
     provider_credential_source,
     save_connections_settings,
+    delete_saved_model_configuration,
+    saved_model_configurations,
+    saved_model_configuration,
+    selected_provider_configuration_id,
     selected_ollama_model,
     selected_provider_model,
     set_provider_credential_source,
     set_ollama_host,
+    set_selected_provider_configuration,
     set_selected_ollama_model,
     set_selected_provider_model,
+    upsert_saved_model_configuration,
 )
 from ..credentials import (
     CredentialStore,
@@ -235,6 +245,7 @@ def create_app(
         *,
         provider_id: str | None = None,
         model_id: str | None = None,
+        execution_fingerprint: str | None = None,
     ) -> dict:
         record = {
             "participant": participant_key,
@@ -248,14 +259,19 @@ def create_app(
             record["provider_id"] = provider_id
         if model_id:
             record["model_id"] = model_id
+        if execution_fingerprint:
+            record["execution_fingerprint"] = execution_fingerprint
         return record
 
     def _calibration_key(
         participant_key: str,
         provider_id: str | None = None,
         model_id: str | None = None,
+        execution_fingerprint: str | None = None,
     ) -> str:
         if provider_id and model_id:
+            if execution_fingerprint:
+                return f"{participant_key}::{provider_id}::{model_id}::{execution_fingerprint}"
             return f"{participant_key}::{provider_id}::{model_id}"
         return participant_key
 
@@ -264,16 +280,23 @@ def create_app(
         *,
         provider_id: str | None = None,
         model_id: str | None = None,
+        execution_fingerprint: str | None = None,
     ) -> dict:
         """Return calibration for the exact participant/provider/model identity."""
         with _calibration_lock:
             store = runtime_calibration
-            key = _calibration_key(participant_key, provider_id, model_id)
+            key = _calibration_key(
+                participant_key,
+                provider_id,
+                model_id,
+                execution_fingerprint,
+            )
             if key not in store.get("records", {}):
                 store.setdefault("records", {})[key] = _empty_calibration_record(
                     participant_key,
                     provider_id=provider_id,
                     model_id=model_id,
+                    execution_fingerprint=execution_fingerprint,
                 )
             return store["records"][key]
 
@@ -291,12 +314,17 @@ def create_app(
         recommendation: str,
         provider_id: str | None = None,
         model_id: str | None = None,
+        execution_fingerprint: str | None = None,
+        inference_parameters: dict[str, object] | None = None,
+        configuration_id: str | None = None,
+        configuration_revision: str | None = None,
     ) -> None:
         with _calibration_lock:
             rec = _get_calibration_record(
                 participant_key,
                 provider_id=provider_id,
                 model_id=model_id,
+                execution_fingerprint=execution_fingerprint,
             )
             now = datetime.now(timezone.utc).isoformat()
             test_id = f"t-{now[:10].replace('-','')}-{len(rec['calibration_tests'])+1:03d}"
@@ -305,6 +333,10 @@ def create_app(
                 "timestamp": now,
                 "provider_id": provider_id,
                 "model_id": model_id,
+                "execution_fingerprint": execution_fingerprint,
+                "inference_parameters": inference_parameters or {},
+                "configuration_id": configuration_id,
+                "configuration_revision": configuration_revision,
                 "role": role,
                 "test_name": test_name,
                 "status": status,
@@ -1004,6 +1036,18 @@ def create_app(
     ) -> tuple[str | None, str]:
         default_model = _provider_default_model(provider_id, fallback)
         with _connections_settings_lock:
+            selected_config_id = selected_provider_configuration_id(
+                runtime_connections_settings,
+                provider_id,
+            )
+            if selected_config_id:
+                selected_config = saved_model_configuration(
+                    runtime_connections_settings,
+                    provider_id,
+                    selected_config_id,
+                )
+                if selected_config:
+                    return str(selected_config["model_id"]), "connection_default"
             stored = (
                 selected_ollama_model(runtime_connections_settings, provider_id)
                 if provider_id.startswith("ollama-")
@@ -1012,6 +1056,165 @@ def create_app(
         if stored:
             return stored, "user_config"
         return default_model, "default"
+
+    def _configuration_controls_for_provider(provider_id: str) -> dict[str, dict]:
+        try:
+            controls = active_provider_registry.definition(provider_id).metadata().get(
+                "model_configuration_controls",
+                [],
+            )
+        except KeyError:
+            return {}
+        result: dict[str, dict] = {}
+        for control in controls if isinstance(controls, list) else []:
+            if not isinstance(control, dict):
+                continue
+            name = str(control.get("name") or "").strip()
+            if name:
+                result[name] = dict(control)
+        return result
+
+    def _default_parameters_for_provider(provider_id: str) -> dict[str, object]:
+        params: dict[str, object] = {}
+        for name, control in _configuration_controls_for_provider(provider_id).items():
+            if "default" in control and control.get("default") is not None:
+                params[name] = control["default"]
+        return normalized_configuration_parameters(params)
+
+    def _validate_configuration_parameters(
+        provider_id: str,
+        parameters: dict[str, object] | None,
+    ) -> dict[str, object]:
+        controls = _configuration_controls_for_provider(provider_id)
+        raw = parameters if isinstance(parameters, dict) else {}
+        clean: dict[str, object] = {}
+        for name, value in raw.items():
+            key = str(name or "").strip()
+            if key not in controls:
+                raise InvalidConnectionsSettingError(f"unsupported parameter for provider: {key}")
+            control = controls[key]
+            value_type = str(control.get("value_type") or "")
+            if value_type == "integer":
+                if isinstance(value, bool) or not isinstance(value, int):
+                    raise InvalidConnectionsSettingError(f"{key} must be an integer")
+                minimum = control.get("minimum")
+                maximum = control.get("maximum")
+                if minimum is not None and value < int(minimum):
+                    raise InvalidConnectionsSettingError(f"{key} is below the supported minimum")
+                if maximum is not None and value > int(maximum):
+                    raise InvalidConnectionsSettingError(f"{key} is above the supported maximum")
+                clean[key] = value
+            else:
+                raise InvalidConnectionsSettingError(f"unsupported parameter type for provider: {key}")
+        return normalized_configuration_parameters(clean)
+
+    def _configuration_payload(
+        provider_id: str,
+        *,
+        configuration_id: str,
+        label: str,
+        model_id: str,
+        parameters: dict[str, object] | None,
+    ) -> dict[str, object]:
+        clean_parameters = _validate_configuration_parameters(provider_id, parameters)
+        model = str(model_id or "").strip()
+        if not model:
+            raise InvalidConnectionsSettingError("model_id is required")
+        return {
+            "configuration_id": configuration_id,
+            "label": str(label or model).strip() or model,
+            "provider_id": provider_id,
+            "model_id": model,
+            "parameters": clean_parameters,
+            "revision": model_configuration_revision(provider_id, model, clean_parameters),
+        }
+
+    def _resolved_execution_configuration(
+        provider_id: str,
+        fallback: str | None = None,
+    ) -> dict[str, object]:
+        default_model = _provider_default_model(provider_id, fallback)
+        default_parameters = _default_parameters_for_provider(provider_id)
+        with _connections_settings_lock:
+            selected_config_id = selected_provider_configuration_id(
+                runtime_connections_settings,
+                provider_id,
+            )
+            selected_config = (
+                saved_model_configuration(
+                    runtime_connections_settings,
+                    provider_id,
+                    selected_config_id,
+                )
+                if selected_config_id
+                else None
+            )
+            selected_model = (
+                selected_ollama_model(runtime_connections_settings, provider_id)
+                if provider_id.startswith("ollama-")
+                else selected_provider_model(runtime_connections_settings, provider_id)
+            )
+        if selected_config:
+            model_id = str(selected_config["model_id"])
+            stored_parameters = _validate_configuration_parameters(
+                provider_id,
+                selected_config.get("parameters")
+                if isinstance(selected_config.get("parameters"), dict)
+                else {}
+            )
+            effective_parameters = dict(default_parameters)
+            effective_parameters.update(stored_parameters)
+            effective_parameters = normalized_configuration_parameters(effective_parameters)
+            revision = str(
+                selected_config.get("revision")
+                or model_configuration_revision(provider_id, model_id, stored_parameters)
+            )
+            configuration_id = str(selected_config["configuration_id"])
+            return {
+                "provider_id": provider_id,
+                "model_id": model_id,
+                "parameters": stored_parameters,
+                "effective_parameters": effective_parameters,
+                "configuration_id": configuration_id,
+                "configuration_label": selected_config.get("label"),
+                "configuration_revision": revision,
+                "configuration_selection_source": "connection_default",
+                "selection_source": "connection_default",
+                "execution_fingerprint": model_configuration_fingerprint(
+                    provider_id,
+                    model_id,
+                    effective_parameters,
+                ),
+            }
+        if selected_config_id:
+            raise InvalidConnectionsSettingError(
+                f"selected saved configuration is unavailable: {selected_config_id}"
+            )
+        model_id = selected_model or default_model
+        parameters = default_parameters
+        execution_fingerprint = (
+            model_configuration_fingerprint(
+                provider_id,
+                str(model_id or ""),
+                parameters,
+            )
+            if model_id or parameters
+            else None
+        )
+        return {
+            "provider_id": provider_id,
+            "model_id": model_id,
+            "parameters": parameters,
+            "effective_parameters": parameters,
+            "configuration_id": None,
+            "configuration_label": None,
+            "configuration_revision": None,
+            "configuration_selection_source": (
+                "bare_model" if selected_model else "registry_default"
+            ),
+            "selection_source": "user_config" if selected_model else "default",
+            "execution_fingerprint": execution_fingerprint,
+        }
 
     def _set_selected_model_for_provider(provider_id: str, model: str) -> None:
         with _connections_settings_lock:
@@ -1029,6 +1232,45 @@ def create_app(
                     provider_id,
                     model,
                 )
+            save_connections_settings(next_settings)
+            runtime_connections_settings.clear()
+            runtime_connections_settings.update(next_settings)
+
+    def _save_model_configuration(provider_id: str, config: dict[str, object]) -> None:
+        with _connections_settings_lock:
+            if _connections_settings_load_error:
+                raise UnsupportedConnectionsSettingsError(_connections_settings_load_error)
+            next_settings = upsert_saved_model_configuration(
+                runtime_connections_settings,
+                provider_id,
+                config,
+            )
+            save_connections_settings(next_settings)
+            runtime_connections_settings.clear()
+            runtime_connections_settings.update(next_settings)
+
+    def _select_model_configuration(provider_id: str, configuration_id: str | None) -> None:
+        with _connections_settings_lock:
+            if _connections_settings_load_error:
+                raise UnsupportedConnectionsSettingsError(_connections_settings_load_error)
+            next_settings = set_selected_provider_configuration(
+                runtime_connections_settings,
+                provider_id,
+                configuration_id,
+            )
+            save_connections_settings(next_settings)
+            runtime_connections_settings.clear()
+            runtime_connections_settings.update(next_settings)
+
+    def _delete_model_configuration(provider_id: str, configuration_id: str) -> None:
+        with _connections_settings_lock:
+            if _connections_settings_load_error:
+                raise UnsupportedConnectionsSettingsError(_connections_settings_load_error)
+            next_settings = delete_saved_model_configuration(
+                runtime_connections_settings,
+                provider_id,
+                configuration_id,
+            )
             save_connections_settings(next_settings)
             runtime_connections_settings.clear()
             runtime_connections_settings.update(next_settings)
@@ -1155,11 +1397,38 @@ def create_app(
         return bool(source.get("configured"))
 
     def _provider_kwargs(provider_id: str, *, api_key: str | None = None) -> dict:
+        resolved = _resolved_execution_configuration(provider_id)
+        return _provider_kwargs_from_resolved(provider_id, resolved, api_key=api_key)
+
+    def _provider_kwargs_from_resolved(
+        provider_id: str,
+        resolved: dict[str, object],
+        *,
+        api_key: str | None = None,
+    ) -> dict:
         kwargs = _provider_connection_kwargs(provider_id, api_key=api_key)
-        selected_model, _ = _selected_model_for_provider(provider_id)
+        selected_model = resolved.get("model_id")
         if selected_model:
             kwargs["model"] = selected_model
+        for name, value in dict(resolved.get("effective_parameters") or {}).items():
+            kwargs[str(name)] = value
         return kwargs
+
+    def _execution_metadata_from_resolved(resolved: dict[str, object]) -> dict[str, object]:
+        return {
+            "provider": resolved.get("provider_id"),
+            "model_id": resolved.get("model_id"),
+            "stored_parameters": dict(resolved.get("parameters") or {}),
+            "inference_parameters": dict(resolved.get("effective_parameters") or {}),
+            "saved_configuration_id": resolved.get("configuration_id"),
+            "configuration_revision": resolved.get("configuration_revision"),
+            "configuration_selection_source": resolved.get("configuration_selection_source"),
+            "execution_fingerprint": resolved.get("execution_fingerprint"),
+        }
+
+    def _execution_metadata_for_provider(provider_id: str) -> dict[str, object]:
+        resolved = _resolved_execution_configuration(provider_id)
+        return _execution_metadata_from_resolved(resolved)
 
     def _provider_connection_kwargs(provider_id: str, *, api_key: str | None = None) -> dict:
         kwargs: dict[str, object] = {}
@@ -1203,6 +1472,27 @@ def create_app(
             is_ollama = provider_id.startswith("ollama-")
             default_model = provider.get("default_model") or draft_model
             selected_model, selected_model_source = _selected_model_for_provider(provider_id, default_model)
+            configuration_error = None
+            try:
+                resolved_execution = _resolved_execution_configuration(provider_id, default_model)
+            except InvalidConnectionsSettingError as exc:
+                configuration_error = str(exc)
+                resolved_execution = {
+                    "configuration_label": None,
+                    "configuration_revision": None,
+                    "configuration_selection_source": "invalid",
+                    "effective_parameters": {},
+                    "execution_fingerprint": None,
+                }
+            with _connections_settings_lock:
+                provider_saved_configurations = saved_model_configurations(
+                    runtime_connections_settings,
+                    provider_id,
+                )
+                selected_configuration_id = selected_provider_configuration_id(
+                    runtime_connections_settings,
+                    provider_id,
+                )
             model_catalog: dict[str, object]
 
             # Ollama: check actual server + model readiness, not just package install
@@ -1235,7 +1525,10 @@ def create_app(
                 and selected_model_availability == "available"
             )
 
-            if is_ollama and adapter_available and not ollama_fully_ready:
+            if configuration_error:
+                message = f"Selected saved configuration is invalid: {configuration_error}"
+                effective_status = "not_connected"
+            elif is_ollama and adapter_available and not ollama_fully_ready:
                 setup_action = ollama_ready["setup_action"] if ollama_ready else None
                 if not ollama_ready["server_running"]:
                     message = f"Ollama package is installed, but the server is not running. {setup_action or 'Run: ollama serve'}"
@@ -1312,6 +1605,14 @@ def create_app(
                 "default_model": default_model,
                 "selected_model": selected_model,
                 "selected_model_source": selected_model_source,
+                "selected_configuration_id": selected_configuration_id,
+                "selected_configuration_label": resolved_execution.get("configuration_label"),
+                "selected_configuration_revision": resolved_execution.get("configuration_revision"),
+                "configuration_selection_source": resolved_execution.get("configuration_selection_source"),
+                "resolved_inference_parameters": resolved_execution.get("effective_parameters"),
+                "execution_fingerprint": resolved_execution.get("execution_fingerprint"),
+                "saved_model_configurations": provider_saved_configurations,
+                "model_configuration_controls": provider.get("model_configuration_controls", []),
                 "selected_model_available": selected_model_available,
                 "selected_model_availability": selected_model_availability or (
                     "absent" if selected_model and catalog_status == "available" else "unknown"
@@ -4009,6 +4310,139 @@ def create_app(
             "message": f"Selected model for {label}: {model}",
         })
 
+    def _provider_for_participant(participant: str) -> tuple[str, str, str] | tuple[None, None, None]:
+        participant_info = _e10_participant(participant)
+        if participant_info is None:
+            return None, None, None
+        key, label, _ = participant_info
+        return key, label, _E10_PARTICIPANTS[key][1]
+
+    @app.route("/api/e10/providers/<participant>/configurations", methods=["POST"])
+    def api_e10_create_model_configuration(participant: str):
+        key, label, provider_id = _provider_for_participant(participant)
+        if key is None:
+            return jsonify({"error": f"unsupported participant: {participant}"}), 400
+        payload = request.get_json(silent=True) or {}
+        model_id = str(payload.get("model_id") or payload.get("model") or "").strip()
+        if not model_id:
+            return jsonify({"error": "model_id is required"}), 400
+        try:
+            definition = active_provider_registry.definition(provider_id)
+        except KeyError:
+            return jsonify({"error": f"{label} has no registered provider adapter"}), 409
+        catalog = _provider_model_catalog(provider_id, definition.metadata())
+        known_model_ids = set(_catalog_model_availability(catalog))
+        if catalog.get("status") == "available" and model_id not in known_model_ids:
+            return jsonify({"error": f"model '{model_id}' is not present in the current provider catalog"}), 400
+        try:
+            config = _configuration_payload(
+                provider_id,
+                configuration_id=f"cfg_{uuid.uuid4().hex}",
+                label=str(payload.get("label") or model_id).strip(),
+                model_id=model_id,
+                parameters=payload.get("parameters") if isinstance(payload.get("parameters"), dict) else {},
+            )
+            _save_model_configuration(provider_id, config)
+        except InvalidConnectionsSettingError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except UnsupportedConnectionsSettingsError as exc:
+            return jsonify({"error": str(exc)}), 409
+        except OSError as exc:
+            return jsonify({"error": f"Could not save Connections settings: {exc}"}), 500
+        return jsonify({
+            "configuration": config,
+            "provider": next(row for row in _e10_provider_statuses() if row["participant"] == key),
+        }), 201
+
+    @app.route("/api/e10/providers/<participant>/configurations/<configuration_id>", methods=["PUT"])
+    def api_e10_update_model_configuration(participant: str, configuration_id: str):
+        key, label, provider_id = _provider_for_participant(participant)
+        if key is None:
+            return jsonify({"error": f"unsupported participant: {participant}"}), 400
+        with _connections_settings_lock:
+            existing = saved_model_configuration(
+                runtime_connections_settings,
+                provider_id,
+                configuration_id,
+            )
+        if existing is None:
+            return jsonify({"error": "saved configuration not found"}), 404
+        payload = request.get_json(silent=True) or {}
+        model_id = str(payload.get("model_id") or existing.get("model_id") or "").strip()
+        try:
+            config = _configuration_payload(
+                provider_id,
+                configuration_id=configuration_id,
+                label=str(payload.get("label") or existing.get("label") or model_id).strip(),
+                model_id=model_id,
+                parameters=(
+                    payload.get("parameters")
+                    if isinstance(payload.get("parameters"), dict)
+                    else existing.get("parameters") if isinstance(existing.get("parameters"), dict) else {}
+                ),
+            )
+            _save_model_configuration(provider_id, config)
+        except InvalidConnectionsSettingError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except UnsupportedConnectionsSettingsError as exc:
+            return jsonify({"error": str(exc)}), 409
+        except OSError as exc:
+            return jsonify({"error": f"Could not save Connections settings: {exc}"}), 500
+        return jsonify({
+            "configuration": config,
+            "provider": next(row for row in _e10_provider_statuses() if row["participant"] == key),
+        })
+
+    @app.route("/api/e10/providers/<participant>/configurations/<configuration_id>", methods=["DELETE"])
+    def api_e10_delete_model_configuration(participant: str, configuration_id: str):
+        key, _, provider_id = _provider_for_participant(participant)
+        if key is None:
+            return jsonify({"error": f"unsupported participant: {participant}"}), 400
+        with _connections_settings_lock:
+            existing = saved_model_configuration(
+                runtime_connections_settings,
+                provider_id,
+                configuration_id,
+            )
+        if existing is None:
+            return jsonify({"error": "saved configuration not found"}), 404
+        try:
+            _delete_model_configuration(provider_id, configuration_id)
+        except InvalidConnectionsSettingError as exc:
+            return jsonify({"error": str(exc)}), 409
+        except UnsupportedConnectionsSettingsError as exc:
+            return jsonify({"error": str(exc)}), 409
+        except OSError as exc:
+            return jsonify({"error": f"Could not save Connections settings: {exc}"}), 500
+        return jsonify({
+            "deleted": configuration_id,
+            "provider": next(row for row in _e10_provider_statuses() if row["participant"] == key),
+        })
+
+    @app.route("/api/e10/providers/<participant>/configuration", methods=["PUT"])
+    def api_e10_select_model_configuration(participant: str):
+        key, label, provider_id = _provider_for_participant(participant)
+        if key is None:
+            return jsonify({"error": f"unsupported participant: {participant}"}), 400
+        payload = request.get_json(silent=True) or {}
+        raw_id = payload.get("configuration_id")
+        configuration_id = str(raw_id or "").strip() or None
+        try:
+            _select_model_configuration(provider_id, configuration_id)
+        except InvalidConnectionsSettingError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except UnsupportedConnectionsSettingsError as exc:
+            return jsonify({"error": str(exc)}), 409
+        except OSError as exc:
+            return jsonify({"error": f"Could not save Connections settings: {exc}"}), 500
+        status = next(row for row in _e10_provider_statuses() if row["participant"] == key)
+        message = (
+            f"Selected saved configuration for {label}: {configuration_id}"
+            if configuration_id
+            else f"{label} returned to bare selected model defaults."
+        )
+        return jsonify({**status, "message": message})
+
     @app.route("/api/e10/ollama/host", methods=["PUT"])
     def api_e10_ollama_host():
         payload = request.get_json(silent=True) or {}
@@ -4104,11 +4538,14 @@ def create_app(
             result = {}
             for key in _E10_PARTICIPANTS:
                 provider_id = _E10_PARTICIPANTS[key][1]
-                selected_model, _ = _selected_model_for_provider(provider_id, _E10_PARTICIPANTS[key][2])
+                resolved = _resolved_execution_configuration(provider_id, _E10_PARTICIPANTS[key][2])
+                selected_model = str(resolved.get("model_id") or "")
+                execution_fingerprint = str(resolved.get("execution_fingerprint") or "")
                 rec = _get_calibration_record(
                     key,
                     provider_id=provider_id,
                     model_id=selected_model,
+                    execution_fingerprint=execution_fingerprint,
                 )
                 performance = (
                     _empty_performance_record(suppressed=True)
@@ -4117,7 +4554,15 @@ def create_app(
                 )
                 result[key] = {
                     **rec,
-                    "calibration_identity": _calibration_key(key, provider_id, selected_model),
+                    "calibration_identity": _calibration_key(
+                        key,
+                        provider_id,
+                        selected_model,
+                        execution_fingerprint,
+                    ),
+                    "resolved_inference_parameters": resolved.get("effective_parameters"),
+                    "configuration_id": resolved.get("configuration_id"),
+                    "configuration_revision": resolved.get("configuration_revision"),
                     "performance": performance,
                 }
         return jsonify({"calibration": result, "roles": _CALIBRATION_ROLES})
@@ -4173,9 +4618,12 @@ def create_app(
         start = _time.monotonic()
         raw_output = None
         error_msg = None
-        selected_model = provider_status.get("selected_model") or provider_status.get("default_model")
+        resolved = _resolved_execution_configuration(provider_id, _E10_PARTICIPANTS[key][2])
+        selected_model = str(resolved.get("model_id") or provider_status.get("default_model") or "")
+        execution_fingerprint = str(resolved.get("execution_fingerprint") or "")
+        inference_parameters = dict(resolved.get("effective_parameters") or {})
         try:
-            kwargs = _provider_kwargs(provider_id)
+            kwargs = _provider_kwargs_from_resolved(provider_id, resolved)
             adapter = active_provider_registry.create(provider_id, **kwargs)
             raw_output = adapter.render(prompt)
         except Exception as exc:
@@ -4188,6 +4636,10 @@ def create_app(
                 error_msg, f"Provider call failed: {error_msg}",
                 provider_id=provider_id,
                 model_id=selected_model,
+                execution_fingerprint=execution_fingerprint,
+                inference_parameters=inference_parameters,
+                configuration_id=resolved.get("configuration_id"),
+                configuration_revision=resolved.get("configuration_revision"),
             )
             _log_performance_event({
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -4199,6 +4651,10 @@ def create_app(
                 "participant": key, "role": role, "test_name": test_name,
                 "provider_id": provider_id,
                 "model_id": selected_model,
+                "execution_fingerprint": execution_fingerprint,
+                "inference_parameters": inference_parameters,
+                "configuration_id": resolved.get("configuration_id"),
+                "configuration_revision": resolved.get("configuration_revision"),
                 "status": "fail",
                 "failure_reason": error_msg,
                 "latency_ms": latency_ms,
@@ -4245,6 +4701,10 @@ def create_app(
             recommendation,
             provider_id=provider_id,
             model_id=selected_model,
+            execution_fingerprint=execution_fingerprint,
+            inference_parameters=inference_parameters,
+            configuration_id=resolved.get("configuration_id"),
+            configuration_revision=resolved.get("configuration_revision"),
         )
         _log_performance_event({
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -4257,11 +4717,16 @@ def create_app(
             key,
             provider_id=provider_id,
             model_id=selected_model,
+            execution_fingerprint=execution_fingerprint,
         )
         return jsonify({
             "participant": key, "role": role, "test_name": test_name,
             "provider_id": provider_id,
             "model_id": selected_model,
+            "execution_fingerprint": execution_fingerprint,
+            "inference_parameters": inference_parameters,
+            "configuration_id": resolved.get("configuration_id"),
+            "configuration_revision": resolved.get("configuration_revision"),
             "status": status,
             "failure_reason": failure_reason,
             "latency_ms": latency_ms,
@@ -4290,13 +4755,16 @@ def create_app(
 
         key, label, _ = participant_info
         provider_id = _E10_PARTICIPANTS[key][1]
-        selected_model, _ = _selected_model_for_provider(provider_id, _E10_PARTICIPANTS[key][2])
+        resolved = _resolved_execution_configuration(provider_id, _E10_PARTICIPANTS[key][2])
+        selected_model = str(resolved.get("model_id") or "")
+        execution_fingerprint = str(resolved.get("execution_fingerprint") or "")
         now = datetime.now(timezone.utc).isoformat()
         with _calibration_lock:
             rec = _get_calibration_record(
                 key,
                 provider_id=provider_id,
                 model_id=selected_model,
+                execution_fingerprint=execution_fingerprint,
             )
             rec["role_status"][role] = {"status": status, "last_updated": now, "steward_note": note}
             _save_calibration_store(runtime_calibration)
@@ -4305,6 +4773,7 @@ def create_app(
             "participant": key, "role": role,
             "provider_id": provider_id,
             "model_id": selected_model,
+            "execution_fingerprint": execution_fingerprint,
             "status": status, "steward_note": note, "updated_at": now,
             "message": f"{label}: {role} role status set to '{status}' by Steward.",
         })
@@ -6119,7 +6588,9 @@ Return ONLY valid JSON, no markdown, no explanation:
         import traceback as _tb
         conn = _conn_rw()
         try:
-            provider_kwargs = _provider_kwargs(provider)
+            resolved = _resolved_execution_configuration(provider)
+            provider_kwargs = _provider_kwargs_from_resolved(provider, resolved)
+            execution_metadata = _execution_metadata_from_resolved(resolved)
             if plan_id:
                 result = render_for_plan(
                     plan_id,
@@ -6127,6 +6598,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                     provider_name=provider,
                     profile_slug=profile,
                     provider_kwargs=provider_kwargs,
+                    execution_metadata=execution_metadata,
                 )
             else:
                 result = render_for_observation(
@@ -6135,6 +6607,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                     provider_name=provider,
                     profile_slug=profile,
                     provider_kwargs=provider_kwargs,
+                    execution_metadata=execution_metadata,
                 )
             status_code = 201 if result.created else 200
             return jsonify({
@@ -6186,13 +6659,16 @@ Return ONLY valid JSON, no markdown, no explanation:
         # Read-only connection: structurally guarantees the preview writes nothing.
         conn = _conn()
         try:
-            provider_kwargs = _provider_kwargs(provider)
+            resolved = _resolved_execution_configuration(provider)
+            provider_kwargs = _provider_kwargs_from_resolved(provider, resolved)
+            execution_metadata = _execution_metadata_from_resolved(resolved)
             result = render_for_plan(
                 plan_id,
                 conn,
                 provider_name=provider,
                 profile_slug=profile,
                 provider_kwargs=provider_kwargs,
+                execution_metadata=execution_metadata,
                 persist=False,
             )
             prof = result.profile
@@ -6204,6 +6680,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "profile_slug": profile,
                 "profile_name": (prof["name"] if prof else None),
                 "text": result.row["text"],
+                "execution_config": execution_metadata,
             }), 200
         except ArtistRenderError as exc:
             return jsonify({"error": str(exc), "error_type": type(exc).__name__}), 400
@@ -6233,6 +6710,11 @@ Return ONLY valid JSON, no markdown, no explanation:
         provider = str(payload.get("provider", "")).strip() or "null"
         profile_slug = str(payload.get("profile_slug", "")).strip() or None
         text = payload.get("text")
+        execution_metadata = (
+            dict(payload.get("execution_config"))
+            if isinstance(payload.get("execution_config"), dict)
+            else None
+        )
         if not plan_id:
             return jsonify({"error": "plan_id is required"}), 400
         if not isinstance(text, str) or not text.strip():
@@ -6243,7 +6725,12 @@ Return ONLY valid JSON, no markdown, no explanation:
         conn = _conn_rw()
         try:
             result = ratify_draft(
-                plan_id, conn, provider=provider, profile_slug=profile_slug, text=text,
+                plan_id,
+                conn,
+                provider=provider,
+                profile_slug=profile_slug,
+                text=text,
+                execution_metadata=execution_metadata,
             )
         except ArtistRenderError as exc:
             return jsonify({"error": str(exc), "error_type": type(exc).__name__}), 400
@@ -6318,7 +6805,9 @@ Return ONLY valid JSON, no markdown, no explanation:
 
         conn = _conn_rw()
         try:
-            provider_kwargs = _provider_kwargs(provider)
+            resolved = _resolved_execution_configuration(provider)
+            provider_kwargs = _provider_kwargs_from_resolved(provider, resolved)
+            execution_metadata = _execution_metadata_from_resolved(resolved)
 
             profiles = list_profiles(conn)
             if not profiles:
@@ -6333,6 +6822,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                         provider_name=provider,
                         profile_slug=slug,
                         provider_kwargs=provider_kwargs,
+                        execution_metadata=execution_metadata,
                     )
                     results.append({
                         "profile_slug": slug,

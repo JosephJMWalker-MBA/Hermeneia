@@ -31,6 +31,7 @@ from typing import Any, Protocol, runtime_checkable
 from .provider_registry import (
     ModelCatalog,
     ModelCatalogEntry,
+    ModelConfigurationControl,
     ProviderDefinition,
     ProviderRegistration,
     ProviderRegistry,
@@ -333,6 +334,7 @@ class AnthropicArtistProvider:
         self,
         model: str = "claude-sonnet-4-6",
         api_key: str | None = None,
+        max_output_tokens: int = 4096,
     ) -> None:
         try:
             import anthropic as _anthropic
@@ -350,6 +352,7 @@ class AnthropicArtistProvider:
 
         self._client = _anthropic.Anthropic(api_key=key)
         self._model = model
+        self._max_output_tokens = max_output_tokens
 
     @property
     def provider_name(self) -> str:
@@ -363,7 +366,8 @@ class AnthropicArtistProvider:
         return {
             "provider": "anthropic",
             "model_id": self._model,
-            "max_tokens": 4096,
+            "max_tokens": self._max_output_tokens,
+            "max_output_tokens": self._max_output_tokens,
             "sdk_version": sdk_ver,
             "request_schema_version": "1",
             "constitutional_profile": CONSTITUTIONAL_PROFILE,
@@ -372,7 +376,7 @@ class AnthropicArtistProvider:
     def render(self, prompt: str) -> str:
         message = self._client.messages.create(
             model=self._model,
-            max_tokens=4096,
+            max_tokens=self._max_output_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
         return message.content[0].text
@@ -426,6 +430,7 @@ class OpenAIArtistProvider:
         self,
         model: str = "gpt-4o",
         api_key: str | None = None,
+        max_output_tokens: int = 4096,
     ) -> None:
         try:
             from openai import OpenAI as _OpenAI
@@ -441,6 +446,7 @@ class OpenAIArtistProvider:
 
         self._client = _OpenAI(api_key=key)
         self._model = model
+        self._max_output_tokens = max_output_tokens
 
     @property
     def provider_name(self) -> str:
@@ -454,7 +460,8 @@ class OpenAIArtistProvider:
         return {
             "provider": "openai",
             "model_id": self._model,
-            "max_tokens": 4096,
+            "max_tokens": self._max_output_tokens,
+            "max_output_tokens": self._max_output_tokens,
             "sdk_version": sdk_ver,
             "request_schema_version": "1",
             "constitutional_profile": CONSTITUTIONAL_PROFILE,
@@ -463,7 +470,7 @@ class OpenAIArtistProvider:
     def render(self, prompt: str) -> str:
         response = self._client.chat.completions.create(
             model=self._model,
-            max_tokens=4096,
+            max_tokens=self._max_output_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
         return response.choices[0].message.content
@@ -785,6 +792,16 @@ DEFAULT_PROVIDER_REGISTRY = ProviderRegistry(
                 required_environment="ANTHROPIC_API_KEY",
                 sdk_module="anthropic",
                 default_model="claude-sonnet-4-6",
+                model_configuration_controls=(
+                    ModelConfigurationControl(
+                        name="max_output_tokens",
+                        value_type="integer",
+                        default=4096,
+                        minimum=1,
+                        maximum=200000,
+                        label="Max output tokens",
+                    ),
+                ),
             ),
             factory=AnthropicArtistProvider,
         ),
@@ -799,6 +816,16 @@ DEFAULT_PROVIDER_REGISTRY = ProviderRegistry(
                 required_environment="OPENAI_API_KEY",
                 sdk_module="openai",
                 default_model="gpt-4o",
+                model_configuration_controls=(
+                    ModelConfigurationControl(
+                        name="max_output_tokens",
+                        value_type="integer",
+                        default=4096,
+                        minimum=1,
+                        maximum=200000,
+                        label="Max output tokens",
+                    ),
+                ),
             ),
             factory=OpenAIArtistProvider,
         ),
