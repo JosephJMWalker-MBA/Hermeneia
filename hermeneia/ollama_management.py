@@ -97,6 +97,7 @@ def install_ollama_model(
     host: str,
     model_id: str,
     client_factory: Callable[..., Any] | None = None,
+    on_event: Callable[[OllamaInstallEvent], None] | None = None,
 ) -> list[OllamaInstallEvent]:
     """Pull one validated model through the Ollama client API.
 
@@ -120,13 +121,29 @@ def install_ollama_model(
         events: list[OllamaInstallEvent] = [
             OllamaInstallEvent(status="installing", detail=f"pull {model}")
         ]
+        if on_event:
+            on_event(events[-1])
         if isinstance(result, dict):
-            events.append(_event_from_chunk(result))
+            event = _event_from_chunk(result)
+            events.append(event)
+            if on_event:
+                on_event(event)
         else:
-            for chunk in result if isinstance(result, Iterable) else (result,):
-                events.append(_event_from_chunk(chunk))
+            chunks = (
+                result
+                if isinstance(result, Iterable) and not isinstance(result, (str, bytes))
+                else (result,)
+            )
+            for chunk in chunks:
+                event = _event_from_chunk(chunk)
+                events.append(event)
+                if on_event:
+                    on_event(event)
         if not events or events[-1].status.lower() not in {"success", "done"}:
-            events.append(OllamaInstallEvent(status="success", detail=f"{model} installed"))
+            event = OllamaInstallEvent(status="success", detail=f"{model} installed")
+            events.append(event)
+            if on_event:
+                on_event(event)
         return events
     except Exception as exc:
         raise OllamaModelInstallError("Ollama model install failed. Check runtime connectivity, network access, and disk space.") from exc

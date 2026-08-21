@@ -218,6 +218,8 @@ def create_app(
     # In-memory performance log — capped at 500 events per session
     _perf_log: list[dict] = []
     _PERF_LOG_MAX = 500
+    _OLLAMA_INSTALL_EVENT_LIMIT = 80
+    _OLLAMA_COMPLETED_JOB_LIMIT = 20
     _ollama_install_jobs: dict[str, dict[str, object]] = {}
     _ollama_install_lock = threading.RLock()
 
@@ -935,6 +937,40 @@ def create_app(
             return str(exc)
         return "Ollama model install failed. Check runtime connectivity, network access, and disk space."
 
+    def _append_ollama_install_event(job_id: str, event: OllamaInstallEvent) -> None:
+        with _ollama_install_lock:
+            job = _ollama_install_jobs.get(job_id)
+            if job is None:
+                return
+            events = list(job.get("events") or [])
+            events.append(event.to_dict())
+            job["events"] = events[-_OLLAMA_INSTALL_EVENT_LIMIT:]
+
+    def _prune_ollama_install_jobs() -> None:
+        with _ollama_install_lock:
+            completed = [
+                (str(job.get("finished_at") or ""), job_id)
+                for job_id, job in _ollama_install_jobs.items()
+                if job.get("status") != "running"
+            ]
+            completed.sort()
+            excess = len(completed) - _OLLAMA_COMPLETED_JOB_LIMIT
+            if excess <= 0:
+                return
+            for _, job_id in completed[:excess]:
+                _ollama_install_jobs.pop(job_id, None)
+
+    def _active_ollama_install_job_id(host: str, model: str) -> str | None:
+        with _ollama_install_lock:
+            for job_id, job in _ollama_install_jobs.items():
+                if (
+                    job.get("status") == "running"
+                    and job.get("ollama_host") == host
+                    and job.get("model") == model
+                ):
+                    return job_id
+        return None
+
     def _ollama_install_job_payload(job_id: str) -> dict[str, object]:
         with _ollama_install_lock:
             job = dict(_ollama_install_jobs.get(job_id) or {})
@@ -986,26 +1022,30 @@ def create_app(
 
         def _run() -> None:
             try:
-                events = install_ollama_model(host=host, model_id=model)
-                event_payloads = [event.to_dict() for event in events]
+                install_ollama_model(
+                    host=host,
+                    model_id=model,
+                    on_event=lambda event: _append_ollama_install_event(job_id, event),
+                )
                 status = "succeeded"
                 message = f"Installed {model} on Ollama runtime {host}."
             except Exception as exc:
-                event_payloads = [
+                _append_ollama_install_event(
+                    job_id,
                     OllamaInstallEvent(
                         status="failed",
                         detail=_sanitize_ollama_install_error(exc),
-                    ).to_dict()
-                ]
+                    ),
+                )
                 status = "failed"
                 message = _sanitize_ollama_install_error(exc)
             with _ollama_install_lock:
                 job = _ollama_install_jobs.get(job_id)
                 if job is not None:
-                    job["events"] = list(job.get("events") or []) + event_payloads
                     job["status"] = status
                     job["message"] = message
                     job["finished_at"] = datetime.now(timezone.utc).isoformat()
+            _prune_ollama_install_jobs()
 
         threading.Thread(target=_run, name=f"hermeneia-{job_id}", daemon=True).start()
         return _ollama_install_job_payload(job_id)
@@ -4167,7 +4207,7 @@ def create_app(
                 ),
                 "configuration_valid": False,
                 "ollama_host": host,
-                "ollama_error": catalog.get("error"),
+                "runtime_status": "offline",
             }), 409
         installed = set(catalog.get("installed_models") or [])
         if model in installed:
@@ -4180,6 +4220,13 @@ def create_app(
                 "message": f"{model} is already installed on Ollama runtime {host}.",
                 "provider": status,
             }), 200
+
+        active_job_id = _active_ollama_install_job_id(host, model)
+        if active_job_id:
+            job = _ollama_install_job_payload(active_job_id)
+            job["duplicate_suppressed"] = True
+            job["message"] = f"{model} is already installing on Ollama runtime {host}."
+            return jsonify(job), 202
 
         job = _start_ollama_install_job(
             participant=key,
