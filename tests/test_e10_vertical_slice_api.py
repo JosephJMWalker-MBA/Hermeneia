@@ -8,6 +8,7 @@ import tempfile
 import threading
 import time
 import types
+from queue import Queue
 from pathlib import Path
 
 import pytest
@@ -1129,6 +1130,86 @@ def test_e10_ollama_install_suppresses_duplicate_active_host_model_pull(
     )
     assert already.status_code == 200
     assert already.get_json()["status"] == "already_installed"
+
+
+def test_e10_ollama_install_reservation_is_atomic_for_concurrent_same_model_requests(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    block = threading.Event()
+    _FakeOllamaClient.pull_events = [
+        {"status": "pulling manifest"},
+        {"status": "success"},
+    ]
+    _FakeOllamaClient.pull_block_event = block
+    app = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    )
+    barrier = threading.Barrier(3)
+    results: Queue[tuple[int, dict]] = Queue()
+
+    def post_install() -> None:
+        with app.test_client() as client:
+            barrier.wait(timeout=2)
+            response = client.post(
+                "/api/e10/ollama/install",
+                json={"participant": "local", "model": "llama3.2:3b"},
+            )
+            results.put((response.status_code, response.get_json()))
+
+    threads = [threading.Thread(target=post_install) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    barrier.wait(timeout=2)
+    for thread in threads:
+        thread.join(timeout=2)
+
+    responses = [results.get(timeout=1) for _ in range(2)]
+    assert [status for status, _ in responses] == [202, 202]
+    job_ids = {body["job_id"] for _, body in responses}
+    assert len(job_ids) == 1
+    assert len(_FakeOllamaClient.pull_calls) == 1
+    assert any(body.get("duplicate_suppressed") is True for _, body in responses)
+
+    job_id = next(iter(job_ids))
+    running = _wait_for_ollama_event(app.test_client(), job_id, "pulling manifest")
+    assert running["status"] == "running"
+    block.set()
+    completed = _wait_for_ollama_install(app.test_client(), job_id)
+    assert completed["status"] == "succeeded"
+
+
+def test_e10_ollama_install_same_host_different_models_create_separate_jobs(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    _FakeOllamaClient.pull_events = [{"status": "success"}]
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    first = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    second = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "mistral:7b"},
+    )
+
+    assert first.status_code == 202
+    assert second.status_code == 202
+    assert first.get_json()["job_id"] != second.get_json()["job_id"]
+    assert _wait_for_ollama_install(client, first.get_json()["job_id"])["status"] == "succeeded"
+    assert _wait_for_ollama_install(client, second.get_json()["job_id"])["status"] == "succeeded"
+    assert sorted(call["model"] for call in _FakeOllamaClient.pull_calls) == [
+        "llama3.2:3b",
+        "mistral:7b",
+    ]
 
 
 def test_e10_ollama_install_releases_duplicate_guard_after_failure(

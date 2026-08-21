@@ -960,17 +960,6 @@ def create_app(
             for _, job_id in completed[:excess]:
                 _ollama_install_jobs.pop(job_id, None)
 
-    def _active_ollama_install_job_id(host: str, model: str) -> str | None:
-        with _ollama_install_lock:
-            for job_id, job in _ollama_install_jobs.items():
-                if (
-                    job.get("status") == "running"
-                    and job.get("ollama_host") == host
-                    and job.get("model") == model
-                ):
-                    return job_id
-        return None
-
     def _ollama_install_job_payload(job_id: str) -> dict[str, object]:
         with _ollama_install_lock:
             job = dict(_ollama_install_jobs.get(job_id) or {})
@@ -999,10 +988,18 @@ def create_app(
         provider_id: str,
         model: str,
         host: str,
-    ) -> dict[str, object]:
-        job_id = f"ollama-install-{uuid.uuid4().hex}"
-        now = datetime.now(timezone.utc).isoformat()
+    ) -> tuple[str, bool]:
         with _ollama_install_lock:
+            for existing_id, job in _ollama_install_jobs.items():
+                if (
+                    job.get("status") == "running"
+                    and job.get("ollama_host") == host
+                    and job.get("model") == model
+                ):
+                    return existing_id, False
+
+            job_id = f"ollama-install-{uuid.uuid4().hex}"
+            now = datetime.now(timezone.utc).isoformat()
             _ollama_install_jobs[job_id] = {
                 "participant": participant,
                 "provider_id": provider_id,
@@ -1019,7 +1016,14 @@ def create_app(
                 "started_at": now,
                 "finished_at": None,
             }
+        return job_id, True
 
+    def _launch_ollama_install_worker(
+        *,
+        job_id: str,
+        model: str,
+        host: str,
+    ) -> None:
         def _run() -> None:
             try:
                 install_ollama_model(
@@ -1047,8 +1051,24 @@ def create_app(
                     job["finished_at"] = datetime.now(timezone.utc).isoformat()
             _prune_ollama_install_jobs()
 
-        threading.Thread(target=_run, name=f"hermeneia-{job_id}", daemon=True).start()
-        return _ollama_install_job_payload(job_id)
+        thread = threading.Thread(target=_run, name=f"hermeneia-{job_id}", daemon=True)
+        try:
+            thread.start()
+        except Exception as exc:
+            _append_ollama_install_event(
+                job_id,
+                OllamaInstallEvent(
+                    status="failed",
+                    detail=_sanitize_ollama_install_error(exc),
+                ),
+            )
+            with _ollama_install_lock:
+                job = _ollama_install_jobs.get(job_id)
+                if job is not None:
+                    job["status"] = "failed"
+                    job["message"] = _sanitize_ollama_install_error(exc)
+                    job["finished_at"] = datetime.now(timezone.utc).isoformat()
+            _prune_ollama_install_jobs()
 
     def _ollama_model_catalog_payload(catalog: dict) -> dict[str, object]:
         models = [
@@ -4221,20 +4241,20 @@ def create_app(
                 "provider": status,
             }), 200
 
-        active_job_id = _active_ollama_install_job_id(host, model)
-        if active_job_id:
-            job = _ollama_install_job_payload(active_job_id)
-            job["duplicate_suppressed"] = True
-            job["message"] = f"{model} is already installing on Ollama runtime {host}."
-            return jsonify(job), 202
-
-        job = _start_ollama_install_job(
+        job_id, created = _start_ollama_install_job(
             participant=key,
             provider_id=provider_id,
             model=model,
             host=host,
         )
-        return jsonify(job), 202
+        if not created:
+            job = _ollama_install_job_payload(job_id)
+            job["duplicate_suppressed"] = True
+            job["message"] = f"{model} is already installing on Ollama runtime {host}."
+            return jsonify(job), 202
+
+        _launch_ollama_install_worker(job_id=job_id, model=model, host=host)
+        return jsonify(_ollama_install_job_payload(job_id)), 202
 
     @app.route("/api/e10/ollama/install/<job_id>")
     def api_e10_ollama_install_job(job_id: str):
