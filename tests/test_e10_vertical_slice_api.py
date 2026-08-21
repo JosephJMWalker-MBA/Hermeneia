@@ -5,7 +5,10 @@ import json
 import os
 import sys
 import tempfile
+import threading
+import time
 import types
+from queue import Queue
 from pathlib import Path
 
 import pytest
@@ -32,15 +35,39 @@ from test_constitutional_p0 import _seed_full_chain
 class _FakeOllamaClient:
     models: list[str] = []
     error: Exception | None = None
+    pull_error: Exception | None = None
+    pull_calls: list[dict] = []
+    pull_events: list[dict] = []
+    pull_block_event: threading.Event | None = None
+    pull_fail_after_block: Exception | None = None
     hosts: list[str | None] = []
 
     def __init__(self, host: str | None = None) -> None:
+        self.host = host
         self.__class__.hosts.append(host)
 
     def list(self):
         if self.__class__.error:
             raise self.__class__.error
         return {"models": [{"model": model} for model in self.__class__.models]}
+
+    def pull(self, model: str, stream: bool = True):
+        self.__class__.pull_calls.append({"model": model, "stream": stream, "host": self.host})
+        if self.__class__.pull_error:
+            raise self.__class__.pull_error
+        for event in self.__class__.pull_events or [
+            {"status": "pulling manifest"},
+            {"status": "pulling layers", "completed": 1, "total": 2},
+            {"status": "success"},
+        ]:
+            yield event
+            if self.__class__.pull_block_event is not None:
+                self.__class__.pull_block_event.wait(timeout=2)
+                if self.__class__.pull_fail_after_block is not None:
+                    raise self.__class__.pull_fail_after_block
+                self.__class__.pull_block_event = None
+        if model not in self.__class__.models:
+            self.__class__.models.append(model)
 
 
 class _CapturingProvider:
@@ -202,6 +229,11 @@ def _install_fake_ollama(
         )
     _FakeOllamaClient.models = models
     _FakeOllamaClient.error = error
+    _FakeOllamaClient.pull_error = None
+    _FakeOllamaClient.pull_calls = []
+    _FakeOllamaClient.pull_events = []
+    _FakeOllamaClient.pull_block_event = None
+    _FakeOllamaClient.pull_fail_after_block = None
     _FakeOllamaClient.hosts = []
     monkeypatch.setitem(
         sys.modules,
@@ -212,6 +244,32 @@ def _install_fake_ollama(
         "hermeneia.narrative.provider_registry.ProviderDefinition.adapter_available",
         lambda self: True if self.id.startswith("ollama-") else self.sdk_module is None,
     )
+
+
+def _wait_for_ollama_install(client, job_id: str, *, timeout: float = 2.0) -> dict:
+    deadline = time.monotonic() + timeout
+    last = {}
+    while time.monotonic() < deadline:
+        response = client.get(f"/api/e10/ollama/install/{job_id}")
+        assert response.status_code == 200
+        last = response.get_json()
+        if last["status"] in {"succeeded", "failed"}:
+            return last
+        time.sleep(0.02)
+    raise AssertionError(f"Ollama install job did not finish: {last}")
+
+
+def _wait_for_ollama_event(client, job_id: str, status: str, *, timeout: float = 2.0) -> dict:
+    deadline = time.monotonic() + timeout
+    last = {}
+    while time.monotonic() < deadline:
+        response = client.get(f"/api/e10/ollama/install/{job_id}")
+        assert response.status_code == 200
+        last = response.get_json()
+        if any(event.get("status") == status for event in last.get("events", [])):
+            return last
+        time.sleep(0.02)
+    raise AssertionError(f"Ollama install job did not report {status!r}: {last}")
 
 
 def _ollama_registry() -> ProviderRegistry:
@@ -874,6 +932,431 @@ def test_e10_ollama_refuses_uninstalled_or_unverified_model_selection(
     offline = client.put("/api/e10/providers/local/model", json={"model": "qwen3:4b"})
     assert offline.status_code == 409
     assert "cannot verify installed models" in offline.get_json()["error"]
+
+
+def test_e10_ollama_install_missing_selected_model_refreshes_catalog_without_investigation_mutation(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    settings_path.parent.mkdir(parents=True)
+    settings_path.write_text(json.dumps({
+        "schema": "hermeneia.connections_settings.v1",
+        "version": 1,
+        "providers": {"ollama-local": {"selected_model": "llama3.2:3b"}},
+    }))
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    db_path = tmp_path / "e10.db"
+    store = SQLiteStore(db_path)
+    _seed_full_chain(store)
+    store.close()
+    conn = sqlite3.connect(db_path)
+    before = {
+        table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        for table in ("source_documents", "source_extractions", "observations")
+    }
+    conn.close()
+    client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
+
+    missing = next(
+        provider for provider in client.get("/api/e10/providers").get_json()["providers"]
+        if provider["participant"] == "local"
+    )
+    assert missing["selected_model"] == "llama3.2:3b"
+    assert missing["selected_model_installed"] is False
+
+    started = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    assert started.status_code == 202
+    completed = _wait_for_ollama_install(client, started.get_json()["job_id"])
+
+    assert completed["status"] == "succeeded"
+    assert _FakeOllamaClient.pull_calls == [
+        {"model": "llama3.2:3b", "stream": True, "host": "http://localhost:11434"}
+    ]
+    local = completed["provider"]
+    assert local["selected_model"] == "llama3.2:3b"
+    assert local["selected_model_source"] == "user_config"
+    assert local["selected_model_installed"] is True
+    assert "llama3.2:3b" in local["installed_models"]
+    assert any(event["status"] == "pulling manifest" for event in completed["events"])
+
+    conn = sqlite3.connect(db_path)
+    after = {
+        table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        for table in ("source_documents", "source_extractions", "observations")
+    }
+    conn.close()
+    assert after == before
+
+
+def test_e10_ollama_install_one_model_does_not_silently_select_it(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    started = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    assert started.status_code == 202
+    completed = _wait_for_ollama_install(client, started.get_json()["job_id"])
+
+    assert completed["status"] == "succeeded"
+    local = completed["provider"]
+    assert local["selected_model"] == "qwen3:4b"
+    assert local["selected_model_installed"] is True
+    assert "llama3.2:3b" in local["installed_models"]
+
+
+def test_e10_ollama_install_progress_is_visible_before_completion(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    block = threading.Event()
+    _FakeOllamaClient.pull_events = [
+        {"status": "pulling manifest"},
+        {"status": "success"},
+    ]
+    _FakeOllamaClient.pull_block_event = block
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    started = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    assert started.status_code == 202
+    job_id = started.get_json()["job_id"]
+
+    running = _wait_for_ollama_event(client, job_id, "pulling manifest")
+
+    assert running["status"] == "running"
+    assert any(event["status"] == "pulling manifest" for event in running["events"])
+    assert _FakeOllamaClient.pull_calls == [
+        {"model": "llama3.2:3b", "stream": True, "host": "http://localhost:11434"}
+    ]
+
+    block.set()
+    completed = _wait_for_ollama_install(client, job_id)
+
+    assert completed["status"] == "succeeded"
+    assert "llama3.2:3b" in completed["provider"]["installed_models"]
+
+
+def test_e10_ollama_install_preserves_partial_progress_on_later_failure(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    block = threading.Event()
+    _FakeOllamaClient.pull_events = [{"status": "pulling manifest"}]
+    _FakeOllamaClient.pull_block_event = block
+    _FakeOllamaClient.pull_fail_after_block = RuntimeError("network lost token=sk-hidden")
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    started = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    job_id = started.get_json()["job_id"]
+    running = _wait_for_ollama_event(client, job_id, "pulling manifest")
+    assert running["status"] == "running"
+
+    block.set()
+    failed = _wait_for_ollama_install(client, job_id)
+    body = json.dumps(failed)
+
+    assert failed["status"] == "failed"
+    assert any(event["status"] == "pulling manifest" for event in failed["events"])
+    assert any(event["status"] == "failed" for event in failed["events"])
+    assert "sk-hidden" not in body
+    assert "token=" not in body
+    assert "llama3.2:3b" not in failed["provider"]["installed_models"]
+
+
+def test_e10_ollama_install_suppresses_duplicate_active_host_model_pull(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    block = threading.Event()
+    _FakeOllamaClient.pull_events = [
+        {"status": "pulling manifest"},
+        {"status": "success"},
+    ]
+    _FakeOllamaClient.pull_block_event = block
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    first = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    job_id = first.get_json()["job_id"]
+    _wait_for_ollama_event(client, job_id, "pulling manifest")
+    duplicate = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+
+    assert duplicate.status_code == 202
+    assert duplicate.get_json()["job_id"] == job_id
+    assert duplicate.get_json()["duplicate_suppressed"] is True
+    assert len(_FakeOllamaClient.pull_calls) == 1
+
+    block.set()
+    completed = _wait_for_ollama_install(client, job_id)
+    assert completed["status"] == "succeeded"
+    already = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    assert already.status_code == 200
+    assert already.get_json()["status"] == "already_installed"
+
+
+def test_e10_ollama_install_reservation_is_atomic_for_concurrent_same_model_requests(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    block = threading.Event()
+    _FakeOllamaClient.pull_events = [
+        {"status": "pulling manifest"},
+        {"status": "success"},
+    ]
+    _FakeOllamaClient.pull_block_event = block
+    app = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    )
+    barrier = threading.Barrier(3)
+    results: Queue[tuple[int, dict]] = Queue()
+
+    def post_install() -> None:
+        with app.test_client() as client:
+            barrier.wait(timeout=2)
+            response = client.post(
+                "/api/e10/ollama/install",
+                json={"participant": "local", "model": "llama3.2:3b"},
+            )
+            results.put((response.status_code, response.get_json()))
+
+    threads = [threading.Thread(target=post_install) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    barrier.wait(timeout=2)
+    for thread in threads:
+        thread.join(timeout=2)
+
+    responses = [results.get(timeout=1) for _ in range(2)]
+    assert [status for status, _ in responses] == [202, 202]
+    job_ids = {body["job_id"] for _, body in responses}
+    assert len(job_ids) == 1
+    assert len(_FakeOllamaClient.pull_calls) == 1
+    assert any(body.get("duplicate_suppressed") is True for _, body in responses)
+
+    job_id = next(iter(job_ids))
+    running = _wait_for_ollama_event(app.test_client(), job_id, "pulling manifest")
+    assert running["status"] == "running"
+    block.set()
+    completed = _wait_for_ollama_install(app.test_client(), job_id)
+    assert completed["status"] == "succeeded"
+
+
+def test_e10_ollama_install_same_host_different_models_create_separate_jobs(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    _FakeOllamaClient.pull_events = [{"status": "success"}]
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    first = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    second = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "mistral:7b"},
+    )
+
+    assert first.status_code == 202
+    assert second.status_code == 202
+    assert first.get_json()["job_id"] != second.get_json()["job_id"]
+    assert _wait_for_ollama_install(client, first.get_json()["job_id"])["status"] == "succeeded"
+    assert _wait_for_ollama_install(client, second.get_json()["job_id"])["status"] == "succeeded"
+    assert sorted(call["model"] for call in _FakeOllamaClient.pull_calls) == [
+        "llama3.2:3b",
+        "mistral:7b",
+    ]
+
+
+def test_e10_ollama_install_releases_duplicate_guard_after_failure(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    block = threading.Event()
+    _FakeOllamaClient.pull_events = [{"status": "pulling manifest"}]
+    _FakeOllamaClient.pull_block_event = block
+    _FakeOllamaClient.pull_fail_after_block = RuntimeError("interrupted")
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    first = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    job_id = first.get_json()["job_id"]
+    _wait_for_ollama_event(client, job_id, "pulling manifest")
+    duplicate = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    assert duplicate.get_json()["job_id"] == job_id
+    block.set()
+    assert _wait_for_ollama_install(client, job_id)["status"] == "failed"
+
+    _FakeOllamaClient.pull_fail_after_block = None
+    _FakeOllamaClient.pull_block_event = None
+    retried = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    assert retried.status_code == 202
+    assert retried.get_json()["job_id"] != job_id
+    assert len(_FakeOllamaClient.pull_calls) == 2
+
+
+def test_e10_ollama_install_job_and_event_retention_are_bounded(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    _FakeOllamaClient.pull_events = [
+        {"status": f"layer-{idx}", "completed": idx, "total": 120}
+        for idx in range(120)
+    ]
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    first = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "retention0:1b"},
+    )
+    first_job_id = first.get_json()["job_id"]
+    first_done = _wait_for_ollama_install(client, first_job_id)
+    assert first_done["status"] == "succeeded"
+    assert len(first_done["events"]) == 80
+    assert first_done["events"][-1]["status"] == "success"
+    assert first_done["events"][0]["status"] != "queued"
+
+    _FakeOllamaClient.pull_events = [{"status": "success"}]
+    for idx in range(1, 23):
+        response = client.post(
+            "/api/e10/ollama/install",
+            json={"participant": "local", "model": f"retention{idx}:1b"},
+        )
+        assert response.status_code == 202
+        assert _wait_for_ollama_install(client, response.get_json()["job_id"])["status"] == "succeeded"
+
+    assert client.get(f"/api/e10/ollama/install/{first_job_id}").status_code == 404
+
+
+def test_e10_ollama_install_rejects_unsafe_model_identities_without_pull(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    for model in ["bad model", "llama;rm -rf", "../secret", "http://host/model", "model:bad:tag"]:
+        rejected = client.post("/api/e10/ollama/install", json={"participant": "local", "model": model})
+        assert rejected.status_code == 400, model
+        assert rejected.get_json()["configuration_valid"] is False
+
+    assert _FakeOllamaClient.pull_calls == []
+
+
+def test_e10_ollama_install_failure_is_clean_and_preserves_selection(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-secret-should-not-leak")
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    _FakeOllamaClient.pull_error = RuntimeError("disk full token=sk-secret-should-not-leak")
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    started = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    assert started.status_code == 202
+    failed = _wait_for_ollama_install(client, started.get_json()["job_id"])
+    body = json.dumps(failed)
+
+    assert failed["status"] == "failed"
+    assert "sk-secret-should-not-leak" not in body
+    assert "token=" not in body
+    local = failed["provider"]
+    assert local["selected_model"] == "qwen3:4b"
+    assert "llama3.2:3b" not in local["installed_models"]
+
+
+def test_e10_ollama_install_offline_runtime_is_actionable_and_no_pull_occurs(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, [], error=ConnectionError("offline token=sk-hidden"))
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    response = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "qwen3:4b"},
+    )
+
+    assert response.status_code == 409
+    body = json.dumps(response.get_json())
+    assert "runtime is not reachable" in response.get_json()["error"]
+    assert response.get_json()["ollama_host"] == "http://localhost:11434"
+    assert response.get_json()["runtime_status"] == "offline"
+    assert "sk-hidden" not in body
+    assert "token=" not in body
+    assert _FakeOllamaClient.pull_calls == []
 
 
 def test_e10_ollama_selected_model_reaches_test_and_calibration_calls(
@@ -2017,6 +2500,14 @@ def test_e10_ui_exposes_provider_configuration_surface():
     assert "e10SelectOllamaModel" in index_html
     assert "e10SaveOllamaHost" in index_html
     assert "/api/e10/ollama/host" in index_html
+    assert "/api/e10/ollama/install" in index_html
+    assert "e10InstallOllamaModel" in index_html
+    assert "e10PollOllamaInstall" in index_html
+    assert "_e10OllamaInstallJobs" in index_html
+    assert "Install ${x(selectedModel)}" in index_html
+    assert "Use Install model" in index_html
+    assert "activeInstallForSelected" in index_html
+    assert "!activeInstallForSelected" in index_html
     assert "ollama_host_source" in index_html
     assert "user setting" in index_html
     assert "/api/e10/providers/${encodeURIComponent(participant)}/model" in index_html

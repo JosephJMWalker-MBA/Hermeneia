@@ -3111,6 +3111,7 @@ let _activeCell = null, _covOpen = false;
 let _e10Selected = null, _e10Detail = null, _e10ActiveProposal = null;
 let _e10Providers = null;
 let _e10ProviderNotices = {};
+let _e10OllamaInstallJobs = {};
 
 // ── Runtime connectivity and local authored drafts ────
 const _RUNTIME_HEALTH_URL = '/api/health';
@@ -7587,8 +7588,28 @@ function e10ProviderCard(provider, cal, perf) {
     const steps = [];
     if (!provider.ollama_server_running) steps.push({ ok: false, label: 'Ollama server running', action: 'ollama serve' });
     else steps.push({ ok: true, label: 'Ollama server running', action: null });
-    if (!provider.ollama_model_pulled) steps.push({ ok: false, label: `Selected model installed (${x(selectedModel)})`, action: `ollama pull ${x(selectedModel)}` });
+    if (!provider.ollama_model_pulled) steps.push({ ok: false, label: `Selected model installed (${x(selectedModel)})`, action: provider.ollama_server_running ? 'Use Install model' : null });
     else steps.push({ ok: true, label: `Selected model installed (${x(selectedModel)})`, action: null });
+    const installJob = _e10OllamaInstallJobs[provider.participant] || null;
+    const installEvents = installJob && Array.isArray(installJob.events) ? installJob.events : [];
+    const activeInstallForSelected = Boolean(
+      installJob &&
+      installJob.status === 'running' &&
+      installJob.model === selectedModel &&
+      (!installJob.ollama_host || installJob.ollama_host === provider.ollama_host)
+    );
+    const canInstallSelected = Boolean(provider.ollama_server_running && selectedModel && !provider.selected_model_installed && !activeInstallForSelected);
+    const selectedModelArg = JSON.stringify(selectedModel).replace(/</g, '\\u003c');
+    const installPanel = installJob ? `<div style="margin:8px 0;padding:7px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg)">
+        <div style="font-size:11px;color:${installJob.status === 'failed' ? 'var(--red)' : installJob.status === 'succeeded' ? 'var(--green)' : 'var(--yellow)'};margin-bottom:4px">${x(installJob.message || installJob.status || 'Installing model...')}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--dim2);line-height:1.6;max-height:92px;overflow:auto">
+          ${installEvents.length ? installEvents.map(ev => `<div>${x(ev.status || 'working')}${ev.detail ? ` · ${x(ev.detail)}` : ''}${ev.total ? ` · ${Math.round((Number(ev.completed || 0) / Number(ev.total || 1)) * 100)}%` : ''}</div>`).join('') : '<div>queued</div>'}
+        </div>
+      </div>` : '';
+    const installAction = canInstallSelected ? `<div style="display:flex;align-items:center;gap:8px;margin:8px 0">
+        <button class="btn-trace" style="font-size:10px;padding:3px 8px" onclick="e10InstallOllamaModel('${x(provider.participant)}',${selectedModelArg},this)">Install ${x(selectedModel)}</button>
+        <span style="font-size:10px;color:var(--dim2)">on ${x(provider.ollama_host || 'http://localhost:11434')}</span>
+      </div>` : '';
     ollamaSteps = `<div style="margin:8px 0 4px;font-size:11px;color:var(--dim2)">
       <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 8px;margin-bottom:8px">
         <span>Host</span><span style="font-family:var(--mono);color:var(--fg2)">${x(provider.ollama_host || 'http://localhost:11434')} <span style="font-family:var(--sans);color:var(--dim2)">(${x(hostSourceLabel)})</span></span>
@@ -7601,6 +7622,8 @@ function e10ProviderCard(provider, cal, perf) {
       </div>
       <label style="display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);margin-bottom:3px">Installed models</label>
       ${installedHtml}
+      ${installAction}
+      ${installPanel}
       ${steps.map(s => `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
         <span style="color:${s.ok ? 'var(--green)' : 'var(--yellow)'}">${s.ok ? '✓' : '○'}</span>
         <span style="color:${s.ok ? 'var(--fg2)' : 'var(--dim2)'}">${s.label}</span>
@@ -12086,6 +12109,37 @@ async function e10SaveOllamaHost(participant) {
   const result = await put('/api/e10/ollama/host', { host });
   _e10ProviderNotices[participant] = result.message;
   await e10LoadProviders();
+}
+
+async function e10InstallOllamaModel(participant, model, buttonEl) {
+  if (!model) return;
+  if (buttonEl) buttonEl.disabled = true;
+  try {
+    const job = await post('/api/e10/ollama/install', { participant, model });
+    _e10OllamaInstallJobs[participant] = job;
+    _e10ProviderNotices[participant] = job.message || `Installing ${model}`;
+    await e10LoadProviders();
+    if (job.job_id) e10PollOllamaInstall(participant, job.job_id);
+  } catch(e) {
+    showAppError(e.message);
+    await e10LoadProviders();
+  } finally {
+    if (buttonEl) buttonEl.disabled = false;
+  }
+}
+
+async function e10PollOllamaInstall(participant, jobId) {
+  try {
+    const job = await get(`/api/e10/ollama/install/${encodeURIComponent(jobId)}`);
+    _e10OllamaInstallJobs[participant] = job;
+    _e10ProviderNotices[participant] = job.message || job.status || 'Ollama install running';
+    await e10LoadProviders();
+    if (job.status === 'running') {
+      setTimeout(() => e10PollOllamaInstall(participant, jobId), 900);
+    }
+  } catch(e) {
+    showAppError(e.message);
+  }
 }
 
 async function e10TestProvider(participant) {
