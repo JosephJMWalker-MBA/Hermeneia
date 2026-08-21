@@ -2550,7 +2550,7 @@ def _reader_selection_scope(text: str = "Only this selected passage participates
             "source_locators": ["page:3:block:1"],
             "extraction_ids": ["ex-selected"],
         },
-        "included": {"governing_question": True},
+        "included": {"governing_question": False},
     }
 
 
@@ -2617,7 +2617,7 @@ def test_perspective_run_uses_selected_reader_text_and_exact_local_execution_ide
             "question": "What tension in this passage deserves more attention?",
             "model": "qwen2.5:0.5b",
             "scope": _reader_selection_scope("Selected passage text with punctuation — and Unicode."),
-            "governing_question": "How does attention become evidence?",
+            "governing_question": "Ambient thesis must not enter this selected-passage Scope.",
         },
     )
 
@@ -2632,13 +2632,15 @@ def test_perspective_run_uses_selected_reader_text_and_exact_local_execution_ide
     assert body["execution"]["model_id"] == "qwen2.5:0.5b"
     assert body["execution"]["selection_source"] == "per_run"
     assert body["scope_receipt"]["primary"]["text"] == "Selected passage text with punctuation — and Unicode."
-    assert body["scope_receipt"]["included"]["governing_question"] is True
+    assert body["scope_receipt"]["primary"]["source_metadata_origin"] == "reader_client"
+    assert body["scope_receipt"]["included"]["governing_question"] is False
+    assert "governing_question_text" not in body["scope_receipt"]
     assert body["scope_receipt"]["excluded"]["entire_corpus"] is True
     assert body["response"] == "Selected model response anchored in the observation."
     assert _CapturingProvider.calls[-1]["model"] == "qwen2.5:0.5b"
     prompt = _CapturingProvider.render_prompts[-1]
     assert "Selected passage text with punctuation — and Unicode." in prompt
-    assert "How does attention become evidence?" in prompt
+    assert "Ambient thesis must not enter this selected-passage Scope." not in prompt
     assert "entire corpus" not in prompt.lower()
     assert _canonical_counts(db_path) == before
 
@@ -2724,8 +2726,9 @@ def test_perspective_run_ui_separates_scope_perspective_question_and_model():
         / "static"
         / "index.html"
     ).read_text()
+    perspective_js = index_html.split("// ── Perspective Run", 1)[1].split("// ── Thesis", 1)[0]
 
-    assert "cr-bottom-tab-perspective" in index_html
+    assert "cr-bottom-tab-perspective" not in index_html
     assert "cr-perspective-run" in index_html
     assert "Perspective Run" in index_html
     assert "Scope" in index_html
@@ -2736,5 +2739,11 @@ def test_perspective_run_ui_separates_scope_perspective_question_and_model():
     assert "/api/perspective/run" in index_html
     assert "_crPerspectiveFromSelection" in index_html
     assert "_crGetReaderSelection({ refresh: false, fallback: true })" in index_html
+    assert "_crOpenBottomWorkstation('perspective')" in index_html
+    assert "onclick=\"_crPerspectiveFromSelection()\"" in index_html
+    assert 'placeholder="What tension in this passage deserves more attention?"' in index_html
+    assert "q.value = 'What tension in this passage is easiest to overlook?'" not in perspective_js
+    assert "governing_question: invLoad()?.thesis" not in perspective_js
+    assert "governing_question: false" in perspective_js
     assert "Local Ollama only · no cloud fallback" in index_html
     assert "Not in interpretation record" in index_html

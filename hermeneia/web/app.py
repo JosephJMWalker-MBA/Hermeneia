@@ -3918,12 +3918,8 @@ def create_app(
             return jsonify({"error": str(exc), "configuration_valid": False}), 400
 
         scope_payload = payload.get("scope") if isinstance(payload.get("scope"), dict) else {}
-        governing_question = str(payload.get("governing_question") or "").strip()
         try:
-            scope_receipt = normalize_reader_selection_scope(
-                scope_payload,
-                governing_question=governing_question or None,
-            )
+            scope_receipt = normalize_reader_selection_scope(scope_payload)
         except ValueError as exc:
             return jsonify({"error": str(exc), "configuration_valid": False}), 400
 

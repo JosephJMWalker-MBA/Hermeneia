@@ -65,24 +65,22 @@ def test_perspective_identity_is_stable_across_execution_models() -> None:
 
 
 def test_reader_selection_scope_receipt_is_explicit_and_excludes_broader_workspace() -> None:
-    receipt = normalize_reader_selection_scope(
-        {
-            "primary": {
-                "kind": "reader_selection",
-                "text": "Exact selected text.",
-                "source_document_id": "doc-1",
-                "page": 7,
-                "locator": "reader-span:v1:%7B%7D",
-                "source_locators": ["p7:b2"],
-                "extraction_ids": ["ex-1"],
-            },
+    receipt = normalize_reader_selection_scope({
+        "primary": {
+            "kind": "reader_selection",
+            "text": "Exact selected text.",
+            "source_document_id": "doc-1",
+            "page": 7,
+            "locator": "reader-span:v1:%7B%7D",
+            "source_locators": ["p7:b2"],
+            "extraction_ids": ["ex-1"],
         },
-        governing_question="Why does this matter?",
-    )
+    })
 
     assert receipt["primary"]["text"] == "Exact selected text."
     assert receipt["primary"]["source_document_id"] == "doc-1"
-    assert receipt["included"]["governing_question"] is True
+    assert receipt["primary"]["source_metadata_origin"] == "reader_client"
+    assert receipt["included"]["governing_question"] is False
     assert receipt["excluded"]["entire_corpus"] is True
     assert receipt["excluded"]["all_notes"] is True
     assert receipt["excluded"]["accepted_interpretations"] is True

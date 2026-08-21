@@ -2722,7 +2722,6 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-search" data-workstation-mode="search" type="button" role="tab" aria-controls="corpus-search" aria-selected="false" onclick="_crOpenBottomWorkstation('search')">Search Corpus</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-timeline" data-workstation-mode="timeline" type="button" role="tab" aria-controls="attn-timeline" aria-selected="false" onclick="_crOpenBottomWorkstation('timeline')">Timeline</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-fieldnotes" data-workstation-mode="fieldnotes" type="button" role="tab" aria-controls="cr-fln-tray" aria-selected="false" onclick="_crOpenBottomWorkstation('fieldnotes')">Field Notes</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-perspective" data-workstation-mode="perspective" type="button" role="tab" aria-controls="cr-perspective-run" aria-selected="false" onclick="_crOpenBottomWorkstation('perspective')">Perspective</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-blueprint" data-workstation-mode="blueprint" type="button" role="tab" aria-controls="cr-blueprint-draft" aria-selected="false" onclick="_crOpenBottomWorkstation('blueprint')">Blueprint</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-render" data-workstation-mode="render" type="button" role="tab" aria-controls="cr-render-preview" aria-selected="false" onclick="_crOpenBottomWorkstation('render')">Render</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-critic" data-workstation-mode="critic" type="button" role="tab" aria-controls="cr-critic-audit" aria-selected="false" onclick="_crOpenBottomWorkstation('critic')">Critic</button>
@@ -9130,7 +9129,7 @@ function _crPerspectiveScopeFromSelection(selection = null) {
       extraction_ids: resolved.extraction_ids || [],
     },
     included: {
-      governing_question: !!(invLoad()?.thesis || '').trim(),
+      governing_question: false,
     },
   };
 }
@@ -9153,7 +9152,7 @@ async function _crLoadPerspectiveRun() {
   const mSel = document.getElementById('cr-perspective-model');
   const q = document.getElementById('cr-perspective-question');
   if (status) status.textContent = 'Scope + Perspective + Question + Model';
-  if (q && !q.value.trim()) q.value = 'What tension in this passage is easiest to overlook?';
+  if (q && !q.value.trim()) q.value = '';
   _crPerspectiveScope = _crPerspectiveScope || _crPerspectiveScopeFromSelection();
   _crPerspectiveRenderScope();
   try {
@@ -9233,7 +9232,6 @@ async function _crRunPerspective() {
       question,
       model,
       scope: _crPerspectiveScope,
-      governing_question: invLoad()?.thesis || '',
     });
     _crPerspectiveLastReceipt = receipt;
     const p = receipt.perspective || {};
@@ -9245,7 +9243,7 @@ async function _crRunPerspective() {
         <div class="e10-text" style="white-space:pre-wrap">${x(receipt.response || '')}</div>
         <div class="e10-badges">
           <span class="e10-badge">Perspective ${x(p.id || '')} v${x(p.version || '')}</span>
-          <span class="e10-badge">Scope used: Selected passage${receipt.scope_receipt?.included?.governing_question ? ' · current governing question' : ''}</span>
+          <span class="e10-badge">Scope used: Selected passage</span>
           <span class="e10-badge">Not in interpretation record</span>
         </div>
         <div style="font-size:11px;color:var(--dim2);line-height:1.6;margin-top:10px">

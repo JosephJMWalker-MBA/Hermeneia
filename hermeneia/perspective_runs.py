@@ -116,11 +116,7 @@ def perspective_definitions_payload() -> list[dict[str, object]]:
     return [definition.to_dict() for definition in PERSPECTIVE_DEFINITIONS]
 
 
-def normalize_reader_selection_scope(
-    scope: dict[str, Any],
-    *,
-    governing_question: str | None = None,
-) -> dict[str, object]:
+def normalize_reader_selection_scope(scope: dict[str, Any]) -> dict[str, object]:
     primary = scope.get("primary") if isinstance(scope.get("primary"), dict) else scope
     text = str(primary.get("text") or "").strip()
     if not text:
@@ -144,9 +140,10 @@ def normalize_reader_selection_scope(
                 for value in primary.get("extraction_ids") or []
                 if str(value).strip()
             ],
+            "source_metadata_origin": "reader_client",
         },
         "included": {
-            "governing_question": bool(governing_question and governing_question.strip()),
+            "governing_question": False,
         },
         "excluded": {
             "entire_corpus": True,
@@ -155,8 +152,6 @@ def normalize_reader_selection_scope(
             "other_documents": True,
         },
     }
-    if governing_question and governing_question.strip():
-        receipt["governing_question_text"] = governing_question.strip()
     return receipt
 
 
@@ -168,7 +163,6 @@ def build_perspective_prompt(
 ) -> str:
     primary = scope_receipt["primary"]
     selected_text = str(primary["text"])
-    governing_question = str(scope_receipt.get("governing_question_text") or "").strip()
     lines = [
         "You are performing a Hermeneia Perspective Run.",
         "",
@@ -195,8 +189,6 @@ def build_perspective_prompt(
         "",
         f"Question: {question.strip()}",
     ]
-    if governing_question:
-        lines.extend(["", f"Current governing question: {governing_question}"])
     lines.extend([
         "",
         "Scope Receipt:",
