@@ -72,6 +72,7 @@ class _FakeOllamaClient:
 
 class _CapturingProvider:
     calls: list[dict] = []
+    render_prompts: list[str] = []
 
     def __init__(self, model: str | None = None, **kwargs) -> None:
         self.model = model
@@ -83,6 +84,7 @@ class _CapturingProvider:
         return f"ollama/{self.model}"
 
     def render(self, prompt: str) -> str:
+        self.__class__.render_prompts.append(prompt)
         if "ONLY valid JSON" in prompt:
             return '{"bucket":"symbol_and_imagery","confidence":"high","rationale":"test"}'
         return "Selected model response anchored in the observation."
@@ -2516,3 +2518,223 @@ def test_e10_ui_exposes_provider_configuration_surface():
     assert "compatibility unverified" in index_html
     assert "await e10LoadProviders();" in index_html
     assert "perf && !perf.suppressed && perf.calls > 0" in index_html
+
+
+def _canonical_counts(db_path: Path) -> dict[str, int]:
+    conn = sqlite3.connect(db_path)
+    try:
+        return {
+            table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            for table in (
+                "source_documents",
+                "source_extractions",
+                "observations",
+                "interpretations",
+                "narrative_blueprints",
+                "architect_plans",
+                "rendered_narratives",
+            )
+        }
+    finally:
+        conn.close()
+
+
+def _reader_selection_scope(text: str = "Only this selected passage participates.") -> dict:
+    return {
+        "primary": {
+            "kind": "reader_selection",
+            "text": text,
+            "source_document_id": "doc-selected",
+            "page": 3,
+            "locator": "reader-span:v1:%7B%22page%22%3A3%7D",
+            "source_locators": ["page:3:block:1"],
+            "extraction_ids": ["ex-selected"],
+        },
+        "included": {"governing_question": True},
+    }
+
+
+def test_perspective_run_requires_explicit_scope_question_and_local_model(tmp_path, monkeypatch):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    client = create_app(
+        db_path=tmp_path / "perspective.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    missing_scope = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+        },
+    )
+    missing_question = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(),
+        },
+    )
+    missing_model = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "question": "What matters?",
+            "scope": _reader_selection_scope(),
+        },
+    )
+
+    assert missing_scope.status_code == 400
+    assert "selected Reader text" in missing_scope.get_json()["error"]
+    assert missing_question.status_code == 400
+    assert "question is required" in missing_question.get_json()["error"]
+    assert missing_model.status_code == 400
+    assert "model is required" in missing_model.get_json()["error"]
+
+
+def test_perspective_run_uses_selected_reader_text_and_exact_local_execution_identity(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("OPENAI_API_KEY", "ambient-openai-key-that-must-not-be-used")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "ambient-anthropic-key-that-must-not-be-used")
+    _install_fake_ollama(monkeypatch, ["qwen3:4b", "qwen2.5:0.5b"])
+    _CapturingProvider.calls = []
+    _CapturingProvider.render_prompts = []
+    db_path = tmp_path / "perspective.db"
+    store = SQLiteStore(db_path)
+    _seed_full_chain(store)
+    store.close()
+    before = _canonical_counts(db_path)
+
+    client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
+    response = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "question": "What tension in this passage deserves more attention?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope("Selected passage text with punctuation — and Unicode."),
+            "governing_question": "How does attention become evidence?",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.get_json()
+    assert body["operation"] == "perspective_run"
+    assert body["canonical_status"] == "not_persisted"
+    assert body["perspective"]["id"] == "close-reader"
+    assert body["perspective"]["version"] == "1"
+    assert body["execution"]["provider_id"] == "ollama-local"
+    assert body["execution"]["provider"] == "ollama"
+    assert body["execution"]["model_id"] == "qwen2.5:0.5b"
+    assert body["execution"]["selection_source"] == "per_run"
+    assert body["scope_receipt"]["primary"]["text"] == "Selected passage text with punctuation — and Unicode."
+    assert body["scope_receipt"]["included"]["governing_question"] is True
+    assert body["scope_receipt"]["excluded"]["entire_corpus"] is True
+    assert body["response"] == "Selected model response anchored in the observation."
+    assert _CapturingProvider.calls[-1]["model"] == "qwen2.5:0.5b"
+    prompt = _CapturingProvider.render_prompts[-1]
+    assert "Selected passage text with punctuation — and Unicode." in prompt
+    assert "How does attention become evidence?" in prompt
+    assert "entire corpus" not in prompt.lower()
+    assert _canonical_counts(db_path) == before
+
+
+def test_perspective_run_per_run_model_does_not_change_connection_selected_model(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b", "qwen2.5:0.5b"])
+    client = create_app(
+        db_path=tmp_path / "perspective.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    selected = client.put("/api/e10/providers/local/model", json={"model": "qwen3:4b"})
+    assert selected.status_code == 200
+
+    run = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "question": "What changes if another local model reads this?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(),
+        },
+    )
+    assert run.status_code == 201
+    assert run.get_json()["perspective"]["id"] == "close-reader"
+    assert run.get_json()["execution"]["model_id"] == "qwen2.5:0.5b"
+
+    providers = client.get("/api/e10/providers").get_json()["providers"]
+    local = next(row for row in providers if row["participant"] == "local")
+    assert local["selected_model"] == "qwen3:4b"
+    assert local["selected_model_source"] == "user_config"
+
+
+def test_perspective_run_missing_or_offline_local_model_fails_without_fallback(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    _CapturingProvider.calls = []
+    client = create_app(
+        db_path=tmp_path / "perspective.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    missing = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(),
+        },
+    )
+    assert missing.status_code == 409
+    assert "not installed" in missing.get_json()["error"]
+    assert "Connections" in missing.get_json()["error"]
+    assert missing.get_json()["provider_id"] == "ollama-local"
+    assert _CapturingProvider.calls == []
+
+    _install_fake_ollama(monkeypatch, [], error=ConnectionError("offline"))
+    offline = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(),
+        },
+    )
+    assert offline.status_code == 409
+    assert offline.get_json()["runtime_status"] == "offline"
+    assert offline.get_json()["provider_id"] == "ollama-local"
+
+
+def test_perspective_run_ui_separates_scope_perspective_question_and_model():
+    index_html = (
+        Path(__file__).parent.parent
+        / "hermeneia"
+        / "web"
+        / "static"
+        / "index.html"
+    ).read_text()
+
+    assert "cr-bottom-tab-perspective" in index_html
+    assert "cr-perspective-run" in index_html
+    assert "Perspective Run" in index_html
+    assert "Scope" in index_html
+    assert "Perspective" in index_html
+    assert "Question" in index_html
+    assert "Model" in index_html
+    assert "/api/perspective/definitions" in index_html
+    assert "/api/perspective/run" in index_html
+    assert "_crPerspectiveFromSelection" in index_html
+    assert "_crGetReaderSelection({ refresh: false, fallback: true })" in index_html
+    assert "Local Ollama only · no cloud fallback" in index_html
+    assert "Not in interpretation record" in index_html

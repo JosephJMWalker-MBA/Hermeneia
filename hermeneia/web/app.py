@@ -84,6 +84,13 @@ from ..ollama_management import (
     install_ollama_model,
     validate_ollama_model_identity,
 )
+from ..perspective_runs import (
+    build_perspective_prompt,
+    build_perspective_receipt,
+    normalize_reader_selection_scope,
+    perspective_definition,
+    perspective_definitions_payload,
+)
 from ..workspace import (
     DEFAULT_LEGACY_DB,
     WorkspaceAlreadyExistsError,
@@ -3885,6 +3892,115 @@ def create_app(
             "live_connection_test": True,
             "providers": _e10_provider_statuses(),
         })
+
+    @app.route("/api/perspective/definitions")
+    def api_perspective_definitions():
+        return jsonify({
+            "perspectives": perspective_definitions_payload(),
+            "canonical": False,
+            "message": "Built-in Perspective frames for transient Perspective Runs.",
+        })
+
+    @app.route("/api/perspective/run", methods=["POST"])
+    def api_perspective_run():
+        payload = request.get_json(silent=True) or {}
+        perspective_id = str(payload.get("perspective_id") or "").strip()
+        question = str(payload.get("question") or "").strip()
+        raw_model = str(payload.get("model") or "").strip()
+        definition = perspective_definition(perspective_id)
+        if definition is None:
+            return jsonify({"error": "unknown Perspective"}), 400
+        if not question:
+            return jsonify({"error": "question is required"}), 400
+        try:
+            model = validate_ollama_model_identity(raw_model)
+        except InvalidOllamaModelIdentity as exc:
+            return jsonify({"error": str(exc), "configuration_valid": False}), 400
+
+        scope_payload = payload.get("scope") if isinstance(payload.get("scope"), dict) else {}
+        governing_question = str(payload.get("governing_question") or "").strip()
+        try:
+            scope_receipt = normalize_reader_selection_scope(
+                scope_payload,
+                governing_question=governing_question or None,
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc), "configuration_valid": False}), 400
+
+        provider_id = "ollama-local"
+        try:
+            definition_meta = active_provider_registry.definition(provider_id)
+        except KeyError:
+            return jsonify({"error": "Local Ollama provider is not registered."}), 409
+        if not definition_meta.adapter_available():
+            return jsonify({
+                "error": "Ollama Python package is not installed.",
+                "configuration_valid": False,
+                "provider_id": provider_id,
+            }), 409
+
+        catalog = _ollama_catalog()
+        host = str(catalog.get("host") or _ollama_host())
+        if not catalog.get("online"):
+            return jsonify({
+                "error": "Ollama runtime is not reachable. Start the configured local runtime.",
+                "configuration_valid": False,
+                "provider_id": provider_id,
+                "model_id": model,
+                "runtime_host": host,
+                "runtime_status": "offline",
+            }), 409
+        installed = set(catalog.get("installed_models") or [])
+        if model not in installed:
+            return jsonify({
+                "error": (
+                    f"Selected local model '{model}' is not installed on the "
+                    "configured Ollama runtime. Install it from Connections."
+                ),
+                "configuration_valid": False,
+                "provider_id": provider_id,
+                "model_id": model,
+                "runtime_host": host,
+                "runtime_status": "online",
+                "installed_models": sorted(installed),
+            }), 409
+
+        prompt = build_perspective_prompt(
+            definition,
+            question=question,
+            scope_receipt=scope_receipt,
+        )
+        try:
+            adapter = active_provider_registry.create(
+                provider_id,
+                model=model,
+                host=host,
+            )
+            response_text = adapter.render(prompt)
+            execution = adapter.execution_config()
+        except Exception:
+            return jsonify({
+                "error": "Local Perspective Run failed. Check Ollama runtime and selected model.",
+                "configuration_valid": False,
+                "provider_id": provider_id,
+                "model_id": model,
+                "runtime_host": host,
+            }), 502
+
+        execution.update({
+            "provider_id": provider_id,
+            "model_id": model,
+            "runtime_host": host,
+            "selection_source": "per_run",
+        })
+        receipt = build_perspective_receipt(
+            definition,
+            question=question,
+            scope_receipt=scope_receipt,
+            execution=execution,
+            response=response_text,
+        )
+        return jsonify(receipt), 201
 
     @app.route("/api/e10/scope")
     def api_e10_scope():
