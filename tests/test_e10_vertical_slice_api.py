@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import types
 from pathlib import Path
 
@@ -32,15 +33,32 @@ from test_constitutional_p0 import _seed_full_chain
 class _FakeOllamaClient:
     models: list[str] = []
     error: Exception | None = None
+    pull_error: Exception | None = None
+    pull_calls: list[dict] = []
+    pull_events: list[dict] = []
     hosts: list[str | None] = []
 
     def __init__(self, host: str | None = None) -> None:
+        self.host = host
         self.__class__.hosts.append(host)
 
     def list(self):
         if self.__class__.error:
             raise self.__class__.error
         return {"models": [{"model": model} for model in self.__class__.models]}
+
+    def pull(self, model: str, stream: bool = True):
+        self.__class__.pull_calls.append({"model": model, "stream": stream, "host": self.host})
+        if self.__class__.pull_error:
+            raise self.__class__.pull_error
+        for event in self.__class__.pull_events or [
+            {"status": "pulling manifest"},
+            {"status": "pulling layers", "completed": 1, "total": 2},
+            {"status": "success"},
+        ]:
+            yield event
+        if model not in self.__class__.models:
+            self.__class__.models.append(model)
 
 
 class _CapturingProvider:
@@ -202,6 +220,9 @@ def _install_fake_ollama(
         )
     _FakeOllamaClient.models = models
     _FakeOllamaClient.error = error
+    _FakeOllamaClient.pull_error = None
+    _FakeOllamaClient.pull_calls = []
+    _FakeOllamaClient.pull_events = []
     _FakeOllamaClient.hosts = []
     monkeypatch.setitem(
         sys.modules,
@@ -212,6 +233,19 @@ def _install_fake_ollama(
         "hermeneia.narrative.provider_registry.ProviderDefinition.adapter_available",
         lambda self: True if self.id.startswith("ollama-") else self.sdk_module is None,
     )
+
+
+def _wait_for_ollama_install(client, job_id: str, *, timeout: float = 2.0) -> dict:
+    deadline = time.monotonic() + timeout
+    last = {}
+    while time.monotonic() < deadline:
+        response = client.get(f"/api/e10/ollama/install/{job_id}")
+        assert response.status_code == 200
+        last = response.get_json()
+        if last["status"] in {"succeeded", "failed"}:
+            return last
+        time.sleep(0.02)
+    raise AssertionError(f"Ollama install job did not finish: {last}")
 
 
 def _ollama_registry() -> ProviderRegistry:
@@ -874,6 +908,156 @@ def test_e10_ollama_refuses_uninstalled_or_unverified_model_selection(
     offline = client.put("/api/e10/providers/local/model", json={"model": "qwen3:4b"})
     assert offline.status_code == 409
     assert "cannot verify installed models" in offline.get_json()["error"]
+
+
+def test_e10_ollama_install_missing_selected_model_refreshes_catalog_without_investigation_mutation(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "user-config" / "connections.json"
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(settings_path))
+    settings_path.parent.mkdir(parents=True)
+    settings_path.write_text(json.dumps({
+        "schema": "hermeneia.connections_settings.v1",
+        "version": 1,
+        "providers": {"ollama-local": {"selected_model": "llama3.2:3b"}},
+    }))
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    db_path = tmp_path / "e10.db"
+    store = SQLiteStore(db_path)
+    _seed_full_chain(store)
+    store.close()
+    conn = sqlite3.connect(db_path)
+    before = {
+        table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        for table in ("source_documents", "source_extractions", "observations")
+    }
+    conn.close()
+    client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
+
+    missing = next(
+        provider for provider in client.get("/api/e10/providers").get_json()["providers"]
+        if provider["participant"] == "local"
+    )
+    assert missing["selected_model"] == "llama3.2:3b"
+    assert missing["selected_model_installed"] is False
+
+    started = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    assert started.status_code == 202
+    completed = _wait_for_ollama_install(client, started.get_json()["job_id"])
+
+    assert completed["status"] == "succeeded"
+    assert _FakeOllamaClient.pull_calls == [
+        {"model": "llama3.2:3b", "stream": True, "host": "http://localhost:11434"}
+    ]
+    local = completed["provider"]
+    assert local["selected_model"] == "llama3.2:3b"
+    assert local["selected_model_source"] == "user_config"
+    assert local["selected_model_installed"] is True
+    assert "llama3.2:3b" in local["installed_models"]
+    assert any(event["status"] == "pulling manifest" for event in completed["events"])
+
+    conn = sqlite3.connect(db_path)
+    after = {
+        table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        for table in ("source_documents", "source_extractions", "observations")
+    }
+    conn.close()
+    assert after == before
+
+
+def test_e10_ollama_install_one_model_does_not_silently_select_it(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    started = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    assert started.status_code == 202
+    completed = _wait_for_ollama_install(client, started.get_json()["job_id"])
+
+    assert completed["status"] == "succeeded"
+    local = completed["provider"]
+    assert local["selected_model"] == "qwen3:4b"
+    assert local["selected_model_installed"] is True
+    assert "llama3.2:3b" in local["installed_models"]
+
+
+def test_e10_ollama_install_rejects_unsafe_model_identities_without_pull(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    for model in ["bad model", "llama;rm -rf", "../secret", "http://host/model", "model:bad:tag"]:
+        rejected = client.post("/api/e10/ollama/install", json={"participant": "local", "model": model})
+        assert rejected.status_code == 400, model
+        assert rejected.get_json()["configuration_valid"] is False
+
+    assert _FakeOllamaClient.pull_calls == []
+
+
+def test_e10_ollama_install_failure_is_clean_and_preserves_selection(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-secret-should-not-leak")
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    _FakeOllamaClient.pull_error = RuntimeError("disk full token=sk-secret-should-not-leak")
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    started = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "llama3.2:3b"},
+    )
+    assert started.status_code == 202
+    failed = _wait_for_ollama_install(client, started.get_json()["job_id"])
+    body = json.dumps(failed)
+
+    assert failed["status"] == "failed"
+    assert "sk-secret-should-not-leak" not in body
+    assert "token=" not in body
+    local = failed["provider"]
+    assert local["selected_model"] == "qwen3:4b"
+    assert "llama3.2:3b" not in local["installed_models"]
+
+
+def test_e10_ollama_install_offline_runtime_is_actionable_and_no_pull_occurs(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, [], error=ConnectionError("offline"))
+    client = create_app(
+        db_path=tmp_path / "missing.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    response = client.post(
+        "/api/e10/ollama/install",
+        json={"participant": "local", "model": "qwen3:4b"},
+    )
+
+    assert response.status_code == 409
+    assert "runtime is not reachable" in response.get_json()["error"]
+    assert response.get_json()["ollama_host"] == "http://localhost:11434"
+    assert _FakeOllamaClient.pull_calls == []
 
 
 def test_e10_ollama_selected_model_reaches_test_and_calibration_calls(
@@ -2017,6 +2201,12 @@ def test_e10_ui_exposes_provider_configuration_surface():
     assert "e10SelectOllamaModel" in index_html
     assert "e10SaveOllamaHost" in index_html
     assert "/api/e10/ollama/host" in index_html
+    assert "/api/e10/ollama/install" in index_html
+    assert "e10InstallOllamaModel" in index_html
+    assert "e10PollOllamaInstall" in index_html
+    assert "_e10OllamaInstallJobs" in index_html
+    assert "Install ${x(selectedModel)}" in index_html
+    assert "Use Install model" in index_html
     assert "ollama_host_source" in index_html
     assert "user setting" in index_html
     assert "/api/e10/providers/${encodeURIComponent(participant)}/model" in index_html

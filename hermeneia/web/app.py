@@ -17,6 +17,7 @@ import os
 import sqlite3
 import tempfile
 import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -75,6 +76,13 @@ from ..credentials import (
     CredentialStoreUnavailable,
     SERVICE_NAME as CREDENTIAL_SERVICE_NAME,
     default_credential_store,
+)
+from ..ollama_management import (
+    InvalidOllamaModelIdentity,
+    OllamaInstallEvent,
+    OllamaModelInstallError,
+    install_ollama_model,
+    validate_ollama_model_identity,
 )
 from ..workspace import (
     DEFAULT_LEGACY_DB,
@@ -210,6 +218,8 @@ def create_app(
     # In-memory performance log — capped at 500 events per session
     _perf_log: list[dict] = []
     _PERF_LOG_MAX = 500
+    _ollama_install_jobs: dict[str, dict[str, object]] = {}
+    _ollama_install_lock = threading.RLock()
 
     _CALIBRATION_ROLES = ["Explorer", "Architect", "Artist", "Critic", "Witness"]
 
@@ -467,8 +477,8 @@ def create_app(
             "credential_hint": None,
             "setup_steps": [
                 "Install Ollama from ollama.com",
-                "Run: ollama pull llama3.2:3b",
-                "Run: ollama serve",
+                "Start the configured Ollama runtime",
+                "Install missing models from Connections",
             ],
         },
         "local": {
@@ -477,8 +487,8 @@ def create_app(
             "credential_hint": None,
             "setup_steps": [
                 "Install Ollama from ollama.com",
-                "Run: ollama pull qwen3:4b",
-                "Run: ollama serve",
+                "Start the configured Ollama runtime",
+                "Install missing models from Connections",
             ],
         },
     }
@@ -913,10 +923,92 @@ def create_app(
             "setup_action": (
                 None if model_pulled
                 else catalog.get("setup_action") if not server_running
-                else f"Run: ollama pull {model}"
+                else f"Install {model} from Connections"
             ),
             "error": catalog.get("error"),
         }
+
+    def _sanitize_ollama_install_error(exc: Exception) -> str:
+        if isinstance(exc, InvalidOllamaModelIdentity):
+            return str(exc)
+        if isinstance(exc, OllamaModelInstallError):
+            return str(exc)
+        return "Ollama model install failed. Check runtime connectivity, network access, and disk space."
+
+    def _ollama_install_job_payload(job_id: str) -> dict[str, object]:
+        with _ollama_install_lock:
+            job = dict(_ollama_install_jobs.get(job_id) or {})
+        if not job:
+            return {"error": "install job not found"}
+        events = job.get("events")
+        if not isinstance(events, list):
+            events = []
+        return {
+            "job_id": job_id,
+            "operation": "install_ollama_model",
+            "participant": job.get("participant"),
+            "provider_id": job.get("provider_id"),
+            "model": job.get("model"),
+            "ollama_host": job.get("ollama_host"),
+            "status": job.get("status"),
+            "message": job.get("message"),
+            "events": events,
+            "started_at": job.get("started_at"),
+            "finished_at": job.get("finished_at"),
+        }
+
+    def _start_ollama_install_job(
+        *,
+        participant: str,
+        provider_id: str,
+        model: str,
+        host: str,
+    ) -> dict[str, object]:
+        job_id = f"ollama-install-{uuid.uuid4().hex}"
+        now = datetime.now(timezone.utc).isoformat()
+        with _ollama_install_lock:
+            _ollama_install_jobs[job_id] = {
+                "participant": participant,
+                "provider_id": provider_id,
+                "model": model,
+                "ollama_host": host,
+                "status": "running",
+                "message": f"Installing {model} on Ollama runtime {host}.",
+                "events": [
+                    {
+                        "status": "queued",
+                        "detail": f"install {model} on {host}",
+                    }
+                ],
+                "started_at": now,
+                "finished_at": None,
+            }
+
+        def _run() -> None:
+            try:
+                events = install_ollama_model(host=host, model_id=model)
+                event_payloads = [event.to_dict() for event in events]
+                status = "succeeded"
+                message = f"Installed {model} on Ollama runtime {host}."
+            except Exception as exc:
+                event_payloads = [
+                    OllamaInstallEvent(
+                        status="failed",
+                        detail=_sanitize_ollama_install_error(exc),
+                    ).to_dict()
+                ]
+                status = "failed"
+                message = _sanitize_ollama_install_error(exc)
+            with _ollama_install_lock:
+                job = _ollama_install_jobs.get(job_id)
+                if job is not None:
+                    job["events"] = list(job.get("events") or []) + event_payloads
+                    job["status"] = status
+                    job["message"] = message
+                    job["finished_at"] = datetime.now(timezone.utc).isoformat()
+
+        threading.Thread(target=_run, name=f"hermeneia-{job_id}", daemon=True).start()
+        return _ollama_install_job_payload(job_id)
 
     def _ollama_model_catalog_payload(catalog: dict) -> dict[str, object]:
         models = [
@@ -1243,7 +1335,7 @@ def create_app(
                     message = (
                         f"Ollama server is running, but the selected model "
                         f"'{selected_model}' is not installed. Choose an installed model "
-                        "or pull the model outside this PR's governed-install scope."
+                        "or install this exact model from Connections."
                     )
                 effective_status = "not_connected"
             elif (
@@ -4038,6 +4130,78 @@ def create_app(
                 else "Ollama host saved in user Connections settings."
             ),
         })
+
+    @app.route("/api/e10/ollama/install", methods=["POST"])
+    def api_e10_ollama_install_model():
+        payload = request.get_json(silent=True) or {}
+        participant = str(payload.get("participant") or "local").strip()
+        participant_info = _e10_participant(participant)
+        if participant_info is None:
+            return jsonify({"error": f"unsupported participant: {participant}"}), 400
+        key, label, _ = participant_info
+        provider_id = _E10_PARTICIPANTS[key][1]
+        if not provider_id.startswith("ollama-"):
+            return jsonify({"error": f"{label} is not an Ollama provider"}), 400
+        try:
+            model = validate_ollama_model_identity(str(payload.get("model") or ""))
+        except InvalidOllamaModelIdentity as exc:
+            return jsonify({"error": str(exc), "configuration_valid": False}), 400
+
+        try:
+            definition = active_provider_registry.definition(provider_id)
+        except KeyError:
+            return jsonify({"error": f"{label} has no registered provider adapter"}), 409
+        if not definition.adapter_available():
+            return jsonify({
+                "error": "Ollama Python package is not installed.",
+                "configuration_valid": False,
+            }), 409
+
+        catalog = _ollama_catalog()
+        host = str(catalog.get("host") or _ollama_host())
+        if not catalog.get("online"):
+            return jsonify({
+                "error": (
+                    "Ollama runtime is not reachable. Start the configured Ollama "
+                    "runtime before installing a model."
+                ),
+                "configuration_valid": False,
+                "ollama_host": host,
+                "ollama_error": catalog.get("error"),
+            }), 409
+        installed = set(catalog.get("installed_models") or [])
+        if model in installed:
+            status = next(row for row in _e10_provider_statuses() if row["participant"] == key)
+            return jsonify({
+                "operation": "install_ollama_model",
+                "status": "already_installed",
+                "model": model,
+                "ollama_host": host,
+                "message": f"{model} is already installed on Ollama runtime {host}.",
+                "provider": status,
+            }), 200
+
+        job = _start_ollama_install_job(
+            participant=key,
+            provider_id=provider_id,
+            model=model,
+            host=host,
+        )
+        return jsonify(job), 202
+
+    @app.route("/api/e10/ollama/install/<job_id>")
+    def api_e10_ollama_install_job(job_id: str):
+        payload = _ollama_install_job_payload(job_id)
+        if "error" in payload:
+            return jsonify(payload), 404
+        if payload.get("status") in {"succeeded", "failed"}:
+            participant = str(payload.get("participant") or "")
+            provider = next(
+                (row for row in _e10_provider_statuses() if row["participant"] == participant),
+                None,
+            )
+            payload["provider"] = provider
+        return jsonify(payload)
 
     @app.route("/api/e10/providers/<participant>/test", methods=["POST"])
     def api_e10_provider_test(participant: str):
