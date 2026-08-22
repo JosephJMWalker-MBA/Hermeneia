@@ -3288,7 +3288,9 @@ def test_perspective_run_ui_separates_scope_perspective_question_and_model():
     assert "cr-perspective-include-governing" in index_html
     assert "cr-perspective-include-page" in index_html
     assert "Built-in" in index_html
+    assert "Saved" in index_html
     assert "Custom" in index_html
+    assert "cr-perspective-saved-panel" in index_html
     assert "cr-perspective-custom-panel" in index_html
     assert "Custom Perspective · Draft · Not saved" in index_html
     assert "Name" in index_html
@@ -3298,7 +3300,12 @@ def test_perspective_run_ui_separates_scope_perspective_question_and_model():
     assert "Known limitations" in index_html
     assert "Preview frame" in index_html
     assert "Use for this inquiry" in index_html
+    assert "Save Perspective" in index_html
+    assert "Save new revision" in index_html
+    assert "Declared by" in index_html
+    assert "Revision reason" in index_html
     assert "/api/perspective/definitions" in index_html
+    assert "/api/perspective/saved" in index_html
     assert "/api/perspective/run" in index_html
     assert "_crPerspectiveFromSelection" in index_html
     assert "_crGetReaderSelection({ refresh: false, fallback: true })" in index_html
@@ -3314,9 +3321,47 @@ def test_perspective_run_ui_separates_scope_perspective_question_and_model():
     assert "function _crPerspectiveCurrentPageScope()" in perspective_js
     assert "_crCurrentExtractions || []" in perspective_js
     assert "perspective_draft: _crPerspectiveDraftActive" in perspective_js
+    assert "saved_perspective_id: savedPerspectiveId" in perspective_js
     assert "Draft changed · apply before running" in perspective_js
     assert "Local Ollama only · no cloud fallback" in index_html
     assert "Not in interpretation record" in index_html
+
+
+def test_perspective_run_ui_saved_mode_uses_existing_workstation_not_room_roster():
+    index_html = (
+        Path(__file__).parent.parent
+        / "hermeneia"
+        / "web"
+        / "static"
+        / "index.html"
+    ).read_text()
+    perspective_js = index_html.split("// ── Perspective Run", 1)[1].split("// ── Thesis", 1)[0]
+    saved_panel = index_html.split('id="cr-perspective-saved-panel"', 1)[1].split(
+        '<div id="cr-perspective-custom-panel"',
+        1,
+    )[0]
+    run_fn = perspective_js.split("async function _crRunPerspective()", 1)[1].split(
+        "window._crPerspectiveFromSelection",
+        1,
+    )[0]
+
+    assert "Built-in" in index_html
+    assert "Saved" in index_html
+    assert "Custom" in index_html
+    assert "cr-perspective-kind-saved" in index_html
+    assert "cr-perspective-saved-select" in saved_panel
+    assert "Saved canonical Perspective" in perspective_js
+    assert "Edit as draft" in perspective_js
+    assert "Historical · ordinary revision blocked" in perspective_js
+    assert "post('/api/perspective/saved'" in perspective_js
+    assert "/api/perspective/saved/${encodeURIComponent(_crPerspectiveRevisionBaseId)}/revisions" in perspective_js
+    assert "saved_perspective_id: savedPerspectiveId" in run_fn
+    assert "Choose a saved Perspective before running." in run_fn
+    room_payload = perspective_js.split("const payload = _crPerspectiveMode === 'room' ?", 1)[1].split(
+        "} : (_crPerspectiveKind === 'custom' ?",
+        1,
+    )[0]
+    assert "saved_perspective_id" not in room_payload
 
 
 def test_perspective_builder_ui_is_transient_frame_only_and_local_preview():

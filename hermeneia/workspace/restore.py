@@ -25,14 +25,17 @@ from ..storage.sqlite import SQLiteStore
 
 
 # Restore order respects foreign keys:
-#   documents → extractions → observations → highlights → field notes → investigation
+#   documents → extractions → observations → perspectives → highlights → field notes → investigation
 _TABLE_FILES: list[tuple[str, str]] = [
     ("source_documents", "corpus/documents.json"),
     ("source_extractions", "corpus/extractions.json"),
     ("observations", "corpus/observations.json"),
+    ("perspectives", "study/perspectives.json"),
     ("reader_highlights", "study/highlights.json"),
     ("investigation_log", "study/field_notes.json"),
 ]
+
+_PERSPECTIVE_SUPERSESSION_FILE = "study/perspective_supersessions.json"
 
 # Tables whose presence means the workspace is not empty.
 _OCCUPANCY_TABLES = [table for table, _ in _TABLE_FILES] + ["workspace_investigation"]
@@ -92,6 +95,7 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
         return json.loads(path.read_text()) if path.is_file() else None
 
     tables = {table: (_load(rel) or []) for table, rel in _TABLE_FILES}
+    perspective_supersessions = _load(_PERSPECTIVE_SUPERSESSION_FILE) or []
     investigation = _load("investigation.json")
     uploads_dir = root / "corpus" / "uploads"
     uploads = sorted(
@@ -102,6 +106,7 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
     return {
         "manifest": manifest,
         "tables": tables,
+        "perspective_supersessions": perspective_supersessions,
         "investigation": investigation,
         "uploads": uploads,
     }
@@ -135,6 +140,7 @@ def preview_restore(db_path: str | Path, bundle_dir: str | Path) -> dict[str, An
         finally:
             conn.close()
     counts = {table: len(rows) for table, rows in bundle["tables"].items()}
+    counts["perspective_supersessions"] = len(bundle["perspective_supersessions"])
     counts["uploads"] = len(bundle["uploads"])
     return {
         "wbs_version": bundle["manifest"].get("wbs_version"),
@@ -179,6 +185,14 @@ def restore_workspace(
             columns = _table_columns(conn, table)
             rows = bundle["tables"][table]
             restored[table] = _insert_rows(conn, table, rows, columns)
+
+        columns = _table_columns(conn, "supersession_relations")
+        restored["perspective_supersessions"] = _insert_rows(
+            conn,
+            "supersession_relations",
+            bundle["perspective_supersessions"],
+            columns,
+        )
 
         investigation = bundle["investigation"]
         if investigation is not None:

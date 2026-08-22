@@ -94,6 +94,15 @@ from ..perspective_runs import (
     room_definitions_payload,
     room_perspective_definitions,
 )
+from ..perspective_identity import (
+    FRAME_V2_SCHEME,
+    frame_v2_payload,
+    frame_v2_row_from_draft,
+    normalize_declared_by,
+    normalize_revision_reason,
+    resolution_from_frame_v2_row,
+    utc_now_iso,
+)
 from ..workspace import (
     DEFAULT_LEGACY_DB,
     WorkspaceAlreadyExistsError,
@@ -3905,6 +3914,161 @@ def create_app(
             "message": "Built-in Perspective frames for transient Perspective Runs.",
         })
 
+    def _saved_perspective_resolution(saved_perspective_id: str):
+        store = _store()
+        try:
+            row = store.get_perspective_by_id(saved_perspective_id)
+        finally:
+            store.close()
+        if row is None:
+            raise ValueError("unknown saved Perspective")
+        if row.get("identity_scheme") != FRAME_V2_SCHEME:
+            raise ValueError("saved Perspective must be a frame-v2 Perspective")
+        return resolution_from_frame_v2_row(row)
+
+    @app.route("/api/perspective/saved")
+    def api_perspective_saved_list():
+        if not db_path.exists():
+            rows = []
+        else:
+            conn = _conn()
+            try:
+                rows = [
+                    dict(row)
+                    for row in conn.execute(
+                        """
+                        SELECT p.*,
+                               CASE WHEN outgoing.old_id IS NULL THEN 1 ELSE 0 END AS is_current_leaf
+                        FROM perspectives p
+                        LEFT JOIN (
+                            SELECT DISTINCT old_id
+                            FROM supersession_relations
+                            WHERE old_id IN (SELECT id FROM perspectives)
+                              AND new_id IN (SELECT id FROM perspectives)
+                        ) outgoing ON outgoing.old_id = p.id
+                        WHERE p.identity_scheme = ?
+                        ORDER BY is_current_leaf DESC, p.name, p.declared_date, p.id
+                        """,
+                        (FRAME_V2_SCHEME,),
+                    ).fetchall()
+                ]
+            finally:
+                conn.close()
+        return jsonify({
+            "perspectives": [frame_v2_payload(row) for row in rows],
+            "identity_scheme": FRAME_V2_SCHEME,
+        })
+
+    @app.route("/api/perspective/saved/<path:perspective_id>")
+    def api_perspective_saved_get(perspective_id: str):
+        if not db_path.exists():
+            row = None
+            incoming = []
+            outgoing = []
+        else:
+            conn = _conn()
+            try:
+                fetched = conn.execute(
+                    "SELECT * FROM perspectives WHERE id = ?", (perspective_id,)
+                ).fetchone()
+                row = dict(fetched) if fetched else None
+                if row is not None:
+                    has_outgoing = conn.execute(
+                        """
+                        SELECT 1 FROM supersession_relations
+                        WHERE old_id = ?
+                          AND new_id IN (SELECT id FROM perspectives)
+                        LIMIT 1
+                        """,
+                        (perspective_id,),
+                    ).fetchone()
+                    row["is_current_leaf"] = has_outgoing is None
+                    incoming = [
+                        dict(item) for item in conn.execute(
+                            "SELECT * FROM supersession_relations WHERE new_id = ? ORDER BY ratified_at, old_id",
+                            (perspective_id,),
+                        ).fetchall()
+                    ]
+                    outgoing = [
+                        dict(item) for item in conn.execute(
+                            "SELECT * FROM supersession_relations WHERE old_id = ? ORDER BY ratified_at, new_id",
+                            (perspective_id,),
+                        ).fetchall()
+                    ]
+                else:
+                    incoming = []
+                    outgoing = []
+            finally:
+                conn.close()
+        if row is None or row.get("identity_scheme") != FRAME_V2_SCHEME:
+            return jsonify({"error": "unknown saved Perspective"}), 404
+        payload = frame_v2_payload(row)
+        payload["incoming_supersessions"] = incoming
+        payload["outgoing_supersessions"] = outgoing
+        return jsonify(payload)
+
+    @app.route("/api/perspective/saved", methods=["POST"])
+    def api_perspective_saved_create():
+        payload = request.get_json(silent=True) or {}
+        draft = payload.get("perspective_draft")
+        try:
+            declared_by = normalize_declared_by(payload.get("declared_by"))
+            row, _resolution = frame_v2_row_from_draft(
+                draft if isinstance(draft, dict) else {},
+                declared_by=declared_by,
+                declared_date=utc_now_iso(),
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc), "configuration_valid": False}), 400
+        store = _store()
+        try:
+            saved = store.insert_frame_perspective(row)
+            saved["is_current_leaf"] = store.perspective_is_current_leaf(str(saved["id"]))
+        except ValueError as exc:
+            return jsonify({"error": str(exc), "configuration_valid": False}), 409
+        finally:
+            store.close()
+        return jsonify(frame_v2_payload(saved)), 201
+
+    @app.route("/api/perspective/saved/<path:perspective_id>/revisions", methods=["POST"])
+    def api_perspective_saved_revision(perspective_id: str):
+        payload = request.get_json(silent=True) or {}
+        draft = payload.get("perspective_draft")
+        try:
+            declared_by = normalize_declared_by(payload.get("declared_by"))
+            reason = normalize_revision_reason(payload.get("reason"))
+            declared_date = utc_now_iso()
+            row, _resolution = frame_v2_row_from_draft(
+                draft if isinstance(draft, dict) else {},
+                declared_by=declared_by,
+                declared_date=declared_date,
+                predecessor_perspective_id=perspective_id,
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc), "configuration_valid": False}), 400
+        store = _store()
+        try:
+            saved = store.insert_perspective_revision(
+                perspective_id,
+                row,
+                reason,
+                declared_date,
+            )
+            saved["is_current_leaf"] = store.perspective_is_current_leaf(str(saved["id"]))
+        except ValueError as exc:
+            return jsonify({"error": str(exc), "configuration_valid": False}), 409
+        finally:
+            store.close()
+        return jsonify({
+            "perspective": frame_v2_payload(saved),
+            "supersession": {
+                "old_id": perspective_id,
+                "new_id": saved["id"],
+                "reason": reason,
+                "ratified_at": declared_date,
+            },
+        }), 201
+
     def _local_perspective_execution_context(raw_model: str):
         try:
             model = validate_ollama_model_identity(raw_model)
@@ -4002,6 +4166,8 @@ def create_app(
             perspective = resolve_perspective_request(
                 perspective_id=payload.get("perspective_id"),
                 perspective_draft=payload.get("perspective_draft"),
+                saved_perspective_id=payload.get("saved_perspective_id"),
+                saved_resolver=_saved_perspective_resolution,
             )
         except ValueError as exc:
             return jsonify({"error": str(exc), "configuration_valid": False}), 400

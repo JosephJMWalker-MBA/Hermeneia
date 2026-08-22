@@ -1,4 +1,4 @@
-"""Deterministic Workspace Bundle exporter (WBS v1).
+"""Deterministic Workspace Bundle exporter (WBS v1.1).
 
 Reads the runtime SQLite database read-only and produces the bundle described in
 docs/workspace-bundle-spec.md. Every JSON file is serialized with sorted keys
@@ -6,9 +6,9 @@ and stable record ordering so identical database state yields a byte-identical
 bundle — the property that makes Git diffs an intellectual history rather than
 noise. No secrets, no localStorage, and no `workspace.db` ever enter the bundle.
 
-v1 coverage (the smallest complete representation):
+v1.1 coverage (the smallest complete representation):
   canonical  — corpus/documents, corpus/extractions, corpus/observations, uploads
-  authored   — investigation, study/highlights, field_notes, questions, buckets, rankings
+  authored   — investigation, study/highlights, perspectives, field_notes, questions, buckets, rankings
   derived    — synthesis/, lineage/, evaluation/  (marked derived; regenerable)
 
 Deferred to a later exporter PR (additive, no contract change): rendered
@@ -33,7 +33,7 @@ from ..study.evaluation import (
 )
 
 
-WBS_VERSION = "1.0"
+WBS_VERSION = "1.1"
 
 # Role of each file on restore (see spec §3).
 CANONICAL = "canonical"
@@ -210,6 +210,18 @@ def build_bundle_files(
     highlights = _rows(
         conn, "SELECT * FROM reader_highlights ORDER BY page, created_at, id"
     )
+    perspectives = _rows(
+        conn,
+        "SELECT * FROM perspectives ORDER BY identity_scheme, name, created_at, id",
+    )
+    perspective_ids = {row["id"] for row in perspectives}
+    perspective_supersessions = [
+        row for row in _rows(
+            conn,
+            "SELECT * FROM supersession_relations ORDER BY ratified_at, old_id, new_id, reason",
+        )
+        if row["old_id"] in perspective_ids and row["new_id"] in perspective_ids
+    ]
     field_notes = _rows(
         conn,
         "SELECT il.*, sd.original_filename FROM investigation_log il "
@@ -234,6 +246,8 @@ def build_bundle_files(
         "corpus/extractions.json": (CANONICAL, _dumps(extractions)),
         "corpus/observations.json": (CANONICAL, _dumps(observations)),
         "study/highlights.json": (AUTHORED, _dumps(highlights)),
+        "study/perspectives.json": (AUTHORED, _dumps(perspectives)),
+        "study/perspective_supersessions.json": (AUTHORED, _dumps(perspective_supersessions)),
         "study/field_notes.json": (AUTHORED, _dumps(field_notes)),
         "study/questions.json": (AUTHORED, _dumps(projections["questions"])),
         "study/buckets.json": (AUTHORED, _dumps(projections["buckets"])),
@@ -266,6 +280,8 @@ def build_bundle_files(
             "extractions": len(extractions),
             "observations": len(observations),
             "highlights": len(highlights),
+            "perspectives": len(perspectives),
+            "perspective_supersessions": len(perspective_supersessions),
             "field_notes": len(field_notes),
         },
     }

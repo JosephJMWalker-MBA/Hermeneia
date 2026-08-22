@@ -259,16 +259,23 @@ def resolve_perspective_request(
     *,
     perspective_id: Any = None,
     perspective_draft: Any = None,
+    saved_perspective_id: Any = None,
+    saved_resolver: Any = None,
 ) -> PerspectiveResolution:
     has_id = bool(_clean_text(perspective_id))
     has_draft = isinstance(perspective_draft, dict)
-    if has_id == has_draft:
-        raise ValueError("Provide exactly one of perspective_id or perspective_draft.")
+    has_saved = bool(_clean_text(saved_perspective_id))
+    if sum(1 for item in (has_id, has_draft, has_saved) if item) != 1:
+        raise ValueError("Provide exactly one of perspective_id, perspective_draft, or saved_perspective_id.")
     if has_id:
         definition = perspective_definition(_clean_text(perspective_id))
         if definition is None:
             raise ValueError("unknown Perspective")
         return PerspectiveResolution(definition=definition)
+    if has_saved:
+        if saved_resolver is None:
+            raise ValueError("saved Perspective resolver is unavailable")
+        return saved_resolver(_clean_text(saved_perspective_id))
     return normalize_transient_perspective_draft(perspective_draft)
 
 

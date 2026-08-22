@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from hermeneia.perspective_identity import frame_v2_row_from_draft
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.workspace import (
     RestoreError,
@@ -73,6 +74,39 @@ def _seed(db_path: Path) -> str:
     conn.commit()
     conn.close()
 
+    store = SQLiteStore(db_path)
+    root, _ = frame_v2_row_from_draft(
+        {
+            "label": "Institutional Trust Reader",
+            "purpose": "Examine trust.",
+            "questions": ["Who trusts whom?"],
+            "challenges": ["Challenge unsupported legitimacy."],
+            "limitations": ["May overemphasize institutions."],
+        },
+        declared_by="Primary Human Steward",
+        declared_date="2026-08-22T12:00:00+00:00",
+    )
+    successor, _ = frame_v2_row_from_draft(
+        {
+            "label": "Institutional Trust Reader",
+            "purpose": "Examine institutional trust with refined attention.",
+            "questions": ["Who trusts whom?"],
+            "challenges": ["Challenge unsupported legitimacy."],
+            "limitations": ["May overemphasize institutions."],
+        },
+        declared_by="Primary Human Steward",
+        declared_date="2026-08-22T12:05:00+00:00",
+        predecessor_perspective_id=root["id"],
+    )
+    store.insert_frame_perspective(root)
+    store.insert_perspective_revision(
+        root["id"],
+        successor,
+        "Refined semantic scope.",
+        "2026-08-22T12:05:00+00:00",
+    )
+    store.close()
+
     uploads = db_path.parent / "uploads"
     uploads.mkdir(parents=True, exist_ok=True)
     (uploads / "gatsby_x.pdf").write_bytes(b"%PDF-1.7 fake gatsby")
@@ -115,6 +149,8 @@ def test_round_trip_preserves_canonical_and_authored(tmp_path: Path):
         "SELECT * FROM source_documents",
         "SELECT * FROM source_extractions",
         "SELECT * FROM reader_highlights ORDER BY id",
+        "SELECT * FROM perspectives ORDER BY identity_scheme, name, created_at, id",
+        "SELECT * FROM supersession_relations ORDER BY old_id, new_id, reason, ratified_at",
         "SELECT * FROM investigation_log ORDER BY id",
         "SELECT thesis, purpose, lenses, reconsider, created_at FROM workspace_investigation",
     ):
@@ -153,10 +189,30 @@ def test_restored_workspace_re_exports_identically(tmp_path: Path):
         "corpus/documents.json",
         "corpus/extractions.json",
         "study/highlights.json",
+        "study/perspectives.json",
+        "study/perspective_supersessions.json",
         "study/field_notes.json",
         "investigation.json",
     ):
         assert (b1 / rel).read_bytes() == (b2 / rel).read_bytes(), rel
+
+
+def test_wbs_10_without_perspectives_restores_as_before(tmp_path: Path):
+    src = tmp_path / "src" / "workspace.db"
+    src.parent.mkdir(parents=True)
+    _seed(src)
+    bundle = tmp_path / "bundle"
+    _export(src, bundle)
+    (bundle / "study" / "perspectives.json").unlink()
+    (bundle / "study" / "perspective_supersessions.json").unlink()
+
+    dst = tmp_path / "dst" / "workspace.db"
+    dst.parent.mkdir(parents=True)
+    result = restore_workspace(dst, bundle)
+
+    assert result["restored"]["source_documents"] == 1
+    assert result["restored"]["perspectives"] == 0
+    assert result["restored"]["perspective_supersessions"] == 0
 
 
 # ── Preview + safety ───────────────────────────────────────────────────────
@@ -174,7 +230,7 @@ def test_preview_reports_what_would_be_created(tmp_path: Path):
     assert preview["would_create"]["source_documents"] == 1
     assert preview["would_create"]["uploads"] == 1
     assert preview["has_investigation"] is True
-    assert preview["wbs_version"] == "1.0"
+    assert preview["wbs_version"] == "1.1"
 
 
 def test_restore_refuses_nonempty_workspace_without_overwrite(tmp_path: Path):

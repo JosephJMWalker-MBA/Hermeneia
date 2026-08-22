@@ -1,4 +1,4 @@
-# Hermeneia Workspace Bundle Specification — WBS v1
+# Hermeneia Workspace Bundle Specification — WBS v1.1
 
 **Status:** Design (no implementation)
 **Issue:** #70 (storage abstraction), builds on #69 (storage audit), #71/#72 (durable governing question)
@@ -33,7 +33,7 @@ implementation detail; **the bundle becomes the contract.**
 
 ---
 
-## 2. Layout (WBS v1)
+## 2. Layout (WBS v1.1)
 
 ```
 workspace/
@@ -46,6 +46,8 @@ workspace/
 │   └── uploads/           # original source files (PDFs, …), named by hash
 ├── study/
 │   ├── highlights.json    # reader highlights: text, notes, questions, tags
+│   ├── perspectives.json  # authored canonical Perspective declarations/revisions
+│   ├── perspective_supersessions.json # append-only Perspective revision edges
 │   ├── field_notes.json   # investigation_log (append-only)
 │   ├── questions.json     # unresolved questions (highlight- and field-note-sourced)
 │   ├── buckets.json       # theme + evidence buckets
@@ -90,7 +92,7 @@ safe). This is what keeps the bundle honest across versions.
 
 ```json
 {
-  "wbs_version": "1.0",
+  "wbs_version": "1.1",
   "workspace_id": "<uuid>",
   "created_at": "<iso8601>",
   "updated_at": "<iso8601>",
@@ -202,6 +204,8 @@ Git history becomes an **intellectual** history, not a binary snapshot.
 | `source_extractions` | `corpus/extractions.json` | canonical (the exact substrate; see §5.1) |
 | `observations` (+ terms) | `corpus/observations.json` | canonical |
 | `reader_highlights` | `study/highlights.json` (+ `questions`/`buckets`/`rankings` projections) | authored |
+| `perspectives` | `study/perspectives.json` | authored |
+| Perspective `supersession_relations` | `study/perspective_supersessions.json` | authored |
 | `investigation_log` | `study/field_notes.json` | authored |
 | `observation_reviews`, `inquiry_notes` | `study/reviews.json` | authored |
 | `proposed_interpretations`, `interpretations` | `reports/interpretations.json` | machine / authored-on-adopt |
@@ -214,6 +218,30 @@ Git history becomes an **intellectual** history, not a binary snapshot.
 
 **Excluded by design:** browser UI preferences (theme, focus-scroll, dismissed
 banners) and provider API keys (secrets never enter the bundle — audit #69 §4).
+
+### 6.1 WBS 1.1 Perspective declarations
+
+WBS 1.1 additively preserves human-authored Perspective identity and revision
+lineage. Restore accepts older WBS 1.0 bundles that lack these files and treats
+their absence as an empty Perspective declaration set.
+
+`study/perspectives.json` stores verbatim `perspectives` rows for both identity
+schemes:
+
+- `perspective-label-v1` legacy rows retain exact `id`, `name`,
+  `description`, and `created_at`; migration metadata may identify their scheme
+  but does not fabricate historical declaration provenance.
+- `perspective-frame-v2` rows retain exact canonical Perspective ID, definition
+  fingerprint, rich frame semantics, declared steward, and declared date.
+
+`study/perspective_supersessions.json` stores only `supersession_relations`
+whose endpoints are Perspectives. These rows are restored after
+`study/perspectives.json`, preserving append-only revision lineage without
+mutating predecessor rows.
+
+Both files have manifest role `authored`: they are human intellectual judgment
+and must be restored verbatim. They are not `canonical` source evidence and are
+not derived projections.
 
 ---
 

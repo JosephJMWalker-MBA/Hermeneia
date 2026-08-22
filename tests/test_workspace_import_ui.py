@@ -72,7 +72,7 @@ def test_preview_reports_summary_into_empty_workspace(tmp_path: Path):
     assert body["target_empty"] is True
     assert body["would_create"]["source_documents"] == 1
     assert body["has_investigation"] is True
-    assert body["wbs_version"] == "1.0"
+    assert body["wbs_version"] == "1.1"
 
 
 def test_preview_flags_nonempty_target(tmp_path: Path):

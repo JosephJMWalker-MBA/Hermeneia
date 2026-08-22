@@ -1,4 +1,4 @@
-"""Workspace Bundle — the exchange format (WBS v1, issues #70/#76).
+"""Workspace Bundle — the exchange format (WBS v1.1, issues #70/#76).
 
 The database is where Hermeneia works; the Workspace Bundle is where it
 remembers. This package exports a deterministic, human-readable bundle from the
