@@ -2777,6 +2777,39 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       </div>
     </div>
 
+    <aside class="cr-perspective-run" id="cr-perspective-run" hidden aria-label="Perspective Run — proposed reading from selected Reader text">
+      <div class="cr-fln-bar">
+        <span class="cr-fln-bar-label">◇ Perspective Run</span>
+        <span class="cr-fln-count" id="cr-perspective-status"></span>
+        <span style="flex:1"></span>
+        <button class="cr-bottom-workstation-tab" id="cr-perspective-refresh" type="button" onclick="_crPerspectiveRefreshScope()" style="margin-left:8px">Use current selection</button>
+      </div>
+      <div class="cr-fln-body">
+        <div class="cr-fln-hint" style="margin-bottom:10px">A proposed reading over one explicit Reader selection. Nothing here enters the interpretation record unless you later promote an idea through a governed path.</div>
+        <div style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) minmax(180px,1fr);gap:10px;margin-bottom:10px">
+          <div>
+            <label class="cr-form-label" for="cr-perspective-select">Perspective</label>
+            <select class="ob-extract-provider" id="cr-perspective-select" style="width:100%"></select>
+          </div>
+          <div>
+            <label class="cr-form-label" for="cr-perspective-model">Model</label>
+            <select class="ob-extract-provider" id="cr-perspective-model" style="width:100%"></select>
+          </div>
+          <div>
+            <label class="cr-form-label">Scope</label>
+            <div id="cr-perspective-scope-chip" style="font-size:12px;color:var(--dim2);line-height:1.5">No Reader selection.</div>
+          </div>
+        </div>
+        <label class="cr-form-label" for="cr-perspective-question">Question</label>
+        <textarea id="cr-perspective-question" rows="2" placeholder="What tension in this passage deserves more attention?" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;line-height:1.5;padding:7px 9px;resize:vertical"></textarea>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+          <button class="btn-primary" id="cr-perspective-run-btn" onclick="_crRunPerspective()">Run Perspective</button>
+          <span style="font-size:11px;color:var(--dim2)">Local Ollama only · no cloud fallback</span>
+        </div>
+        <div id="cr-perspective-output" style="margin-top:12px"></div>
+      </div>
+    </aside>
+
     <aside class="cr-blueprint-draft" id="cr-blueprint-draft" hidden aria-label="Draft a Blueprint from your reading">
       <div class="cr-fln-bar">
         <span class="cr-fln-bar-label">◈ Draft Blueprint</span>
@@ -9010,6 +9043,7 @@ function _crBottomPanels() {
     search: document.getElementById('corpus-search'),
     timeline: document.getElementById('attn-timeline'),
     fieldnotes: document.getElementById('cr-fln-tray'),
+    perspective: document.getElementById('cr-perspective-run'),
     blueprint: document.getElementById('cr-blueprint-draft'),
     render: document.getElementById('cr-render-preview'),
     critic: document.getElementById('cr-critic-audit'),
@@ -9049,6 +9083,8 @@ async function _crOpenBottomWorkstation(mode) {
   } else if (mode === 'fieldnotes') {
     document.getElementById('cr-fln-tray')?.classList.remove('cr-fln-glow');
     _flnLoadEntries();
+  } else if (mode === 'perspective') {
+    await _crLoadPerspectiveRun();
   } else if (mode === 'blueprint') {
     _crLoadBlueprintDraft();
   } else if (mode === 'render') {
@@ -9070,6 +9106,164 @@ function _crCloseBottomWorkstation() {
   _crBottomMode = '';
   _crSyncBottomWorkstationState();
 }
+
+// ── Perspective Run (Reader workstation) ─────────────────────────────────
+// A transient inquiry primitive: Scope + Perspective + Question + local Model
+// returns a proposed reading. It deliberately does not create a canonical
+// Interpretation or alter the selected Connection default model.
+let _crPerspectiveDefinitions = [];
+let _crPerspectiveScope = null;
+let _crPerspectiveLastReceipt = null;
+
+function _crPerspectiveScopeFromSelection(selection = null) {
+  const resolved = selection || _crGetReaderSelection({ refresh: false, fallback: true });
+  if (!resolved?.valid || !resolved.text) return null;
+  return {
+    primary: {
+      kind: 'reader_selection',
+      text: resolved.text,
+      source_document_id: resolved.source_document_id || _crDocId || '',
+      page: resolved.page || _crPage || null,
+      locator: _crEncodeReaderSpanLocator(resolved),
+      source_locators: resolved.source_locators || [],
+      extraction_ids: resolved.extraction_ids || [],
+    },
+    included: {
+      governing_question: false,
+    },
+  };
+}
+
+function _crPerspectiveRenderScope() {
+  const chip = document.getElementById('cr-perspective-scope-chip');
+  if (!chip) return;
+  const text = _crPerspectiveScope?.primary?.text || '';
+  if (!text) {
+    chip.innerHTML = '<span style="color:var(--yellow)">Select Reader text, then use current selection.</span>';
+    return;
+  }
+  const loc = _crPerspectiveScope.primary.locator || `page ${_crPerspectiveScope.primary.page || '?'}`;
+  chip.innerHTML = `<strong>Selected passage</strong> · ${x(loc)}<br><span style="color:var(--fg2)">"${x(text.slice(0, 140))}${text.length > 140 ? '…' : ''}"</span>`;
+}
+
+async function _crLoadPerspectiveRun() {
+  const status = document.getElementById('cr-perspective-status');
+  const pSel = document.getElementById('cr-perspective-select');
+  const mSel = document.getElementById('cr-perspective-model');
+  const q = document.getElementById('cr-perspective-question');
+  if (status) status.textContent = 'Scope + Perspective + Question + Model';
+  if (q && !q.value.trim()) q.value = '';
+  _crPerspectiveScope = _crPerspectiveScope || _crPerspectiveScopeFromSelection();
+  _crPerspectiveRenderScope();
+  try {
+    const [defs, providers] = await Promise.all([
+      get('/api/perspective/definitions'),
+      get('/api/e10/providers'),
+    ]);
+    _crPerspectiveDefinitions = defs.perspectives || [];
+    if (pSel) {
+      pSel.innerHTML = _crPerspectiveDefinitions.map(p =>
+        `<option value="${x(p.id)}">${x(p.label)} · v${x(p.version)}</option>`
+      ).join('');
+      if (!pSel.value && _crPerspectiveDefinitions.length) pSel.value = _crPerspectiveDefinitions[0].id;
+    }
+    const local = (providers.providers || []).find(p => p.provider_id === 'ollama-local') || null;
+    const installed = Array.isArray(local?.installed_models) ? local.installed_models : [];
+    const selected = local?.selected_model || local?.default_model || '';
+    if (mSel) {
+      const options = [];
+      if (selected && !installed.includes(selected)) {
+        options.push(`<option value="${x(selected)}" disabled>${x(selected)} (not installed)</option>`);
+      }
+      installed.forEach(model => {
+        options.push(`<option value="${x(model)}"${model === selected ? ' selected' : ''}>${x(model)}</option>`);
+      });
+      mSel.innerHTML = options.length
+        ? options.join('')
+        : '<option value="" disabled>No installed local models</option>';
+      if (installed.length && !installed.includes(mSel.value)) mSel.value = installed[0];
+    }
+  } catch (e) {
+    if (status) status.textContent = e.message;
+  }
+}
+
+async function _crPerspectiveRefreshScope() {
+  const selection = _crGetReaderSelection({ refresh: true, fallback: true });
+  _crPerspectiveScope = _crPerspectiveScopeFromSelection(selection);
+  _crPerspectiveRenderScope();
+}
+
+async function _crPerspectiveFromSelection() {
+  const selection = _crGetReaderSelection({ refresh: false, fallback: true });
+  _crPerspectiveScope = _crPerspectiveScopeFromSelection(selection);
+  _crHideToolbar();
+  await _crOpenBottomWorkstation('perspective');
+  document.getElementById('cr-perspective-question')?.focus();
+}
+
+async function _crRunPerspective() {
+  const btn = document.getElementById('cr-perspective-run-btn');
+  const out = document.getElementById('cr-perspective-output');
+  const status = document.getElementById('cr-perspective-status');
+  const perspectiveId = document.getElementById('cr-perspective-select')?.value || '';
+  const model = document.getElementById('cr-perspective-model')?.value || '';
+  const question = document.getElementById('cr-perspective-question')?.value?.trim() || '';
+  _crPerspectiveScope = _crPerspectiveScope || _crPerspectiveScopeFromSelection();
+  if (!_crPerspectiveScope?.primary?.text) {
+    showAppError('Select Reader text before running a Perspective.');
+    return;
+  }
+  if (!question) {
+    showAppError('Enter a question before running a Perspective.');
+    document.getElementById('cr-perspective-question')?.focus();
+    return;
+  }
+  if (!model) {
+    showAppError('Choose an installed local Ollama model before running a Perspective.');
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+  if (status) status.textContent = 'Running local Perspective';
+  if (out) out.innerHTML = '<div class="e10-empty">Asking the selected local model…</div>';
+  try {
+    const receipt = await post('/api/perspective/run', {
+      perspective_id: perspectiveId,
+      question,
+      model,
+      scope: _crPerspectiveScope,
+    });
+    _crPerspectiveLastReceipt = receipt;
+    const p = receipt.perspective || {};
+    const ex = receipt.execution || {};
+    const scope = receipt.scope_receipt?.primary || {};
+    if (out) out.innerHTML = `
+      <div class="e10-card">
+        <div class="e10-meta">${x(p.label || 'Perspective')} · via ${x(ex.provider_id || 'ollama-local')} / ${x(ex.model_id || model)}</div>
+        <div class="e10-text" style="white-space:pre-wrap">${x(receipt.response || '')}</div>
+        <div class="e10-badges">
+          <span class="e10-badge">Perspective ${x(p.id || '')} v${x(p.version || '')}</span>
+          <span class="e10-badge">Scope used: Selected passage</span>
+          <span class="e10-badge">Not in interpretation record</span>
+        </div>
+        <div style="font-size:11px;color:var(--dim2);line-height:1.6;margin-top:10px">
+          Scope locator: ${x(scope.locator || 'unknown')}<br>
+          Runtime host: ${x(ex.runtime_host || '')}<br>
+          This is a proposed reading. Nothing has entered the canonical interpretation record.
+        </div>
+      </div>`;
+    if (status) status.textContent = 'Proposed reading';
+  } catch (e) {
+    if (out) out.innerHTML = `<div class="e10-empty" style="color:var(--red)">${x(e.message)}</div>`;
+    if (status) status.textContent = 'Unavailable';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Perspective'; }
+  }
+}
+
+window._crPerspectiveFromSelection = _crPerspectiveFromSelection;
+window._crLoadPerspectiveRun = _crLoadPerspectiveRun;
+window._crRunPerspective = _crRunPerspective;
 // ── Thesis → Blueprint (bottom workstation "Blueprint" tab) ──────────────
 // Forward path: turn the governing question + what the reader has captured into
 // a proposed Intent Hypothesis. Reuses POST /api/pipeline/extract-blueprint —
@@ -11303,6 +11497,7 @@ function _crShowToolbar(rect, fallbackX, fallbackY) {
       <button class="cr-sel-btn" onclick="_crHighlightSelected('question')">? Question</button>
       <button class="cr-sel-btn" onclick="_crHighlightSelected('concept')">✦ Concept</button>
       <button class="cr-sel-btn" onclick="_crHighlightSelected('candidate')" style="color:var(--accent)">→ Observation</button>
+      <button class="cr-sel-btn" onclick="_crPerspectiveFromSelection()" title="Run a Perspective over only this passage">◇ Perspective</button>
       <button class="cr-sel-btn" onclick="_crAskCompanion()" title="Ask the Companion about only this passage">⁘ Ask</button>
       <button class="cr-sel-btn" onclick="_crReadResolvedSelection()" title="Read aloud">▶ Read</button>
     </div>`;
