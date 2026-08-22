@@ -76,16 +76,28 @@ ADR-0015 also states:
 Those rules are insufficient once a Perspective's executable semantic
 definition is richer than a label.
 
-The narrow conflict is:
+The narrow conflict is a three-way identity distinction:
 
 ```text
-old identity ~= normalized label
-new execution identity = exact frame semantics
+legacy object identity
+= normalized canonical label
+
+frame-v2 semantic identity
+= exact normalized frame semantics
+= definition_fingerprint
+
+frame-v2 canonical object identity
+= immutable human-declared Perspective node
+= perspective_id
 ```
 
-This ADR proposes that newly saved rich Perspectives use exact frame semantics
-as durable identity while preserving all legacy label-derived Perspective
-records.
+`definition_fingerprint` identifies what the frame means.
+
+`perspective_id` identifies this declaration/revision occurrence in history.
+
+This ADR does not use "execution identity" for Perspective fingerprints.
+Execution identity belongs to provider, model, version/snapshot, and inference
+configuration.
 
 ---
 
@@ -262,6 +274,31 @@ same normalized definition
 + same declaration context
 -> same Perspective object
 ```
+
+For frame-v2, declaration context is:
+
+```text
+root declaration context
+= ROOT + declared_by
+
+revision declaration context
+= predecessor_perspective_id + declared_by
+```
+
+Together with `identity_scheme` and `definition_fingerprint`, this yields the
+deterministic ID formulas above.
+
+Intended consequences:
+
+- same steward + same root frame -> idempotently converges;
+- different steward + same root frame -> may be distinct declared Perspective
+  nodes;
+- same predecessor + same steward + same revised frame -> idempotently
+  converges;
+- later reversion after another revision -> different predecessor, therefore
+  different Perspective ID.
+
+Do not introduce a timestamp or random nonce merely to force object uniqueness.
 
 Hermeneia must not claim that every identical semantic frame everywhere is the
 same canonical Perspective object. Semantic equivalence across distinct
@@ -784,20 +821,52 @@ explicitly selected.
 
 No destructive migration is authorized.
 
+Current implementation facts:
+
+- `perspectives.name` is globally `UNIQUE`.
+- `interpretations.perspective_id` references `perspectives(id)`.
+- generic SupersessionRelation endpoint validation recognizes
+  `perspectives(id)`.
+
+Therefore same-label frame-v2 Perspectives cannot be implemented by simply
+adding rich semantic columns to the current table while leaving global
+`UNIQUE(name)` unchanged.
+
 Future implementation should:
 
 1. Preserve existing `perspective-label-v1` records exactly.
-2. Add support for `perspective-frame-v2` records through additive schema or
-   compatible storage.
-3. Preserve old Interpretation references to old Perspective IDs.
-4. Preserve export/restore of both identity schemes.
-5. Preserve old `.herm` bundles as readable and meaningful.
-6. Avoid UPDATE/DELETE of canonical Perspective rows, Interpretation
+2. Allow multiple frame-v2 Perspectives to share a label.
+3. Preserve legacy v1 name uniqueness behavior for legacy registrations.
+4. Preserve old Interpretation references to old Perspective IDs.
+5. Preserve export/restore of both identity schemes.
+6. Preserve old `.herm` bundles as readable and meaningful.
+7. Avoid semantic UPDATE/DELETE of canonical Perspective rows, Interpretation
    references, SupersessionRelation rows, or forensic evidence.
-7. Never re-identify a legacy Perspective under frame-v2.
+8. Never re-identify a legacy Perspective under frame-v2.
+9. Ensure frame-v2 Perspective IDs participate in the same canonical
+   Perspective namespace for Interpretation references and SupersessionRelation
+   endpoint validation.
 
-If additive schema is required, it must be reviewed in a later implementation
-PR. This ADR does not implement storage.
+The next implementation PR must choose an explicit storage topology. Likely
+implementation families include:
+
+1. Transactional rebuild/evolution of the `perspectives` storage table,
+   preserving every legacy row byte-for-field and replacing global name
+   uniqueness with scheme-aware uniqueness.
+2. Another compatible storage topology that still preserves one canonical
+   Perspective namespace for foreign-key and supersession purposes.
+
+This ADR does not select one of those families.
+
+This ADR rules out a disconnected v2 table whose IDs cannot satisfy existing
+Interpretation or SupersessionRelation canonical-reference semantics.
+
+"No destructive migration" means no semantic rewriting, deletion, or
+re-identification of historical objects. A transactional SQLite schema rebuild
+that copies legacy logical rows unchanged is not automatically prohibited,
+provided the implementation proves exact legacy identity/content preservation
+before commit. This distinction matters because SQLite may require table
+reconstruction to alter a UNIQUE constraint.
 
 ---
 
@@ -915,9 +984,15 @@ Future implementation should add tests proving:
 - provider/model/configuration changes do not change Perspective identity;
 - Scope/Question changes do not change Perspective identity;
 - tone/audience/language/style are rejected as Perspective semantic fields;
-- same normalized rich frame saves idempotently;
+- same normalized rich frame + same declaration context saves idempotently;
 - identical semantic frames in distinct declaration contexts can remain
   distinct Perspective objects with equal fingerprints;
+- same-label frame-v2 rows can coexist;
+- legacy v1 label uniqueness remains enforced for v1 registrations;
+- legacy Interpretation foreign-key targets remain unchanged;
+- frame-v2 IDs are valid Perspective endpoints for SupersessionRelation;
+- schema migration round-trip preserves all pre-migration Perspective rows
+  exactly;
 - same label with changed semantic definition creates a distinct Perspective;
 - reversion creates a new Perspective occurrence with equal fingerprint and
   different ID from the ancestor;
@@ -957,22 +1032,44 @@ Future implementation should add tests proving:
 If ratified, this ADR supersedes only these ADR-0015 rules for newly saved
 rich-frame Perspectives:
 
-- Perspective identity is only a deterministic hash of `canonical_label`.
-- No two Perspectives may share the same `canonical_label`.
-- Label uniqueness alone is sufficient to identify a durable Perspective.
-- `description` remains the only rich semantic successor field.
-- `tradition` carries forward automatically into rich-frame v2 semantics or
-  identity.
-- `declared_by` and `declared_date` may be treated as incidental storage
-  metadata rather than required immutable declaration provenance.
-- `superseded_by` and `active` fields on the old Perspective are the preferred
-  revision mechanism.
-- A mutable or label-only "Perspective + version" notion is sufficient for
-  exact historical audit.
+- `Perspective.id` as only a deterministic hash of `canonical_label`.
+- `canonical_label` as globally unique for all Perspectives.
+- `canonical_label` as the durable identity boundary.
+- ADR-0015 Perspective schema field `canonical_label`, which becomes
+  frame-v2 `label`.
+- ADR-0015 required `description`, which becomes the frame-v2 semantic
+  definition: `purpose`, `questions`, `challenges`, and `limitations`.
+- ADR-0015 optional `tradition`, which is not carried into the initial
+  frame-v2 semantics/storage contract and is deferred.
+- ADR-0015 `superseded_by` pointer and `active` boolean, which become
+  append-only SupersessionRelation plus graph-derived state for frame-v2.
 
-This ADR explicitly preserves ADR-0015's broader conclusions about the
-Interpretation/Perspective distinction, human declaration, permanence,
-append-only accumulation, global scope, and provider/model separation.
+### Clarified Previously Underspecified Behavior
+
+ADR-0015 did not distinguish semantic equivalence from declaration occurrence
+identity. ADR-0045 clarifies that distinction for frame-v2 with
+`definition_fingerprint` and `perspective_id`.
+
+ADR-0015 did not specify rich-frame canonicalization. ADR-0045 freezes the
+frame-v2 normalization and serialization contract.
+
+ADR-0015 did not define branching/cycle invariants for Perspective
+SupersessionRelation usage. ADR-0045 specifies those future validation
+requirements for frame-v2 revision operations.
+
+### Preserved ADR-0015 Schema Requirements
+
+This ADR explicitly preserves:
+
+- `declared_by` remains REQUIRED.
+- `declared_date` remains REQUIRED.
+- Perspective permanence remains.
+- Human declaration remains.
+- Global Perspective scope remains.
+- Interpretation -> exact Perspective reference remains.
+- The broader Interpretation/Perspective distinction remains.
+- Perspective remains separate from provider/model execution and
+  ExpressionProfile constraints.
 
 ---
 
