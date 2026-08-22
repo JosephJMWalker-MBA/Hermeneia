@@ -87,9 +87,12 @@ from ..ollama_management import (
 from ..perspective_runs import (
     build_perspective_prompt,
     build_perspective_receipt,
+    build_perspective_room_receipt,
     normalize_reader_selection_scope,
     perspective_definition,
     perspective_definitions_payload,
+    room_definitions_payload,
+    room_perspective_definitions,
 )
 from ..workspace import (
     DEFAULT_LEGACY_DB,
@@ -3897,9 +3900,98 @@ def create_app(
     def api_perspective_definitions():
         return jsonify({
             "perspectives": perspective_definitions_payload(),
+            "default_room": room_definitions_payload(),
             "canonical": False,
             "message": "Built-in Perspective frames for transient Perspective Runs.",
         })
+
+    def _local_perspective_execution_context(raw_model: str):
+        try:
+            model = validate_ollama_model_identity(raw_model)
+        except InvalidOllamaModelIdentity as exc:
+            return None, ({"error": str(exc), "configuration_valid": False}, 400)
+
+        provider_id = "ollama-local"
+        try:
+            definition_meta = active_provider_registry.definition(provider_id)
+        except KeyError:
+            return None, ({"error": "Local Ollama provider is not registered."}, 409)
+        if not definition_meta.adapter_available():
+            return None, ({
+                "error": "Ollama Python package is not installed.",
+                "configuration_valid": False,
+                "provider_id": provider_id,
+            }, 409)
+
+        catalog = _ollama_catalog()
+        host = str(catalog.get("host") or _ollama_host())
+        if not catalog.get("online"):
+            return None, ({
+                "error": "Ollama runtime is not reachable. Start the configured local runtime.",
+                "configuration_valid": False,
+                "provider_id": provider_id,
+                "model_id": model,
+                "runtime_host": host,
+                "runtime_status": "offline",
+            }, 409)
+        installed = set(catalog.get("installed_models") or [])
+        if model not in installed:
+            return None, ({
+                "error": (
+                    f"Selected local model '{model}' is not installed on the "
+                    "configured Ollama runtime. Install it from Connections."
+                ),
+                "configuration_valid": False,
+                "provider_id": provider_id,
+                "model_id": model,
+                "runtime_host": host,
+                "runtime_status": "online",
+                "installed_models": sorted(installed),
+            }, 409)
+        return {
+            "provider_id": provider_id,
+            "model_id": model,
+            "runtime_host": host,
+        }, None
+
+    def _run_local_perspective(definition, *, question, scope_receipt, context, prior_readings=None):
+        prompt = build_perspective_prompt(
+            definition,
+            question=question,
+            scope_receipt=scope_receipt,
+            prior_proposed_readings=prior_readings,
+        )
+        provider_id = str(context["provider_id"])
+        model = str(context["model_id"])
+        host = str(context["runtime_host"])
+
+        try:
+            adapter = active_provider_registry.create(
+                provider_id,
+                model=model,
+                host=host,
+            )
+            response_text = adapter.render(prompt)
+            execution = adapter.execution_config()
+        except Exception:
+            return None, {
+                "error": "Local Perspective Run failed. Check Ollama runtime and selected model.",
+                "configuration_valid": False,
+                "provider_id": provider_id,
+                "model_id": model,
+                "runtime_host": host,
+            }
+
+        execution.update({
+            "provider_id": provider_id,
+            "model_id": model,
+            "runtime_host": host,
+            "selection_source": "per_run",
+        })
+        return {
+            "response": response_text,
+            "execution": execution,
+        }, None
 
     @app.route("/api/perspective/run", methods=["POST"])
     def api_perspective_run():
@@ -3912,10 +4004,6 @@ def create_app(
             return jsonify({"error": "unknown Perspective"}), 400
         if not question:
             return jsonify({"error": "question is required"}), 400
-        try:
-            model = validate_ollama_model_identity(raw_model)
-        except InvalidOllamaModelIdentity as exc:
-            return jsonify({"error": str(exc), "configuration_valid": False}), 400
 
         scope_payload = payload.get("scope") if isinstance(payload.get("scope"), dict) else {}
         try:
@@ -3923,80 +4011,120 @@ def create_app(
         except ValueError as exc:
             return jsonify({"error": str(exc), "configuration_valid": False}), 400
 
-        provider_id = "ollama-local"
-        try:
-            definition_meta = active_provider_registry.definition(provider_id)
-        except KeyError:
-            return jsonify({"error": "Local Ollama provider is not registered."}), 409
-        if not definition_meta.adapter_available():
-            return jsonify({
-                "error": "Ollama Python package is not installed.",
-                "configuration_valid": False,
-                "provider_id": provider_id,
-            }), 409
-
-        catalog = _ollama_catalog()
-        host = str(catalog.get("host") or _ollama_host())
-        if not catalog.get("online"):
-            return jsonify({
-                "error": "Ollama runtime is not reachable. Start the configured local runtime.",
-                "configuration_valid": False,
-                "provider_id": provider_id,
-                "model_id": model,
-                "runtime_host": host,
-                "runtime_status": "offline",
-            }), 409
-        installed = set(catalog.get("installed_models") or [])
-        if model not in installed:
-            return jsonify({
-                "error": (
-                    f"Selected local model '{model}' is not installed on the "
-                    "configured Ollama runtime. Install it from Connections."
-                ),
-                "configuration_valid": False,
-                "provider_id": provider_id,
-                "model_id": model,
-                "runtime_host": host,
-                "runtime_status": "online",
-                "installed_models": sorted(installed),
-            }), 409
-
-        prompt = build_perspective_prompt(
+        context, error = _local_perspective_execution_context(raw_model)
+        if error is not None:
+            body, status = error
+            return jsonify(body), status
+        result, run_error = _run_local_perspective(
             definition,
             question=question,
             scope_receipt=scope_receipt,
+            context=context,
         )
-        try:
-            adapter = active_provider_registry.create(
-                provider_id,
-                model=model,
-                host=host,
-            )
-            response_text = adapter.render(prompt)
-            execution = adapter.execution_config()
-        except Exception:
-            return jsonify({
-                "error": "Local Perspective Run failed. Check Ollama runtime and selected model.",
-                "configuration_valid": False,
-                "provider_id": provider_id,
-                "model_id": model,
-                "runtime_host": host,
-            }), 502
-
-        execution.update({
-            "provider_id": provider_id,
-            "model_id": model,
-            "runtime_host": host,
-            "selection_source": "per_run",
-        })
+        if run_error is not None:
+            return jsonify(run_error), 502
         receipt = build_perspective_receipt(
             definition,
             question=question,
             scope_receipt=scope_receipt,
-            execution=execution,
-            response=response_text,
+            execution=result["execution"],
+            response=result["response"],
         )
         return jsonify(receipt), 201
+
+    @app.route("/api/perspective/room", methods=["POST"])
+    def api_perspective_room():
+        payload = request.get_json(silent=True) or {}
+        question = str(payload.get("question") or "").strip()
+        raw_model = str(payload.get("model") or "").strip()
+        if not question:
+            return jsonify({"error": "question is required"}), 400
+        scope_payload = payload.get("scope") if isinstance(payload.get("scope"), dict) else {}
+        try:
+            scope_receipt = normalize_reader_selection_scope(scope_payload)
+        except ValueError as exc:
+            return jsonify({"error": str(exc), "configuration_valid": False}), 400
+        context, error = _local_perspective_execution_context(raw_model)
+        if error is not None:
+            body, status = error
+            return jsonify(body), status
+
+        definitions = room_perspective_definitions()
+        participants: list[dict[str, object]] = []
+        prior_readings: list[dict[str, object]] = []
+        failed = False
+        for index, definition in enumerate(definitions, start=1):
+            prior_ids = [str(item["perspective"]["id"]) for item in prior_readings]
+            if failed:
+                participants.append({
+                    "order": index,
+                    "perspective": {
+                        "id": definition.id,
+                        "version": definition.version,
+                        "label": definition.label,
+                    },
+                    "prior_participant_ids": prior_ids,
+                    "status": "not_run",
+                    "canonical_status": "not_persisted",
+                })
+                continue
+            result, run_error = _run_local_perspective(
+                definition,
+                question=question,
+                scope_receipt=scope_receipt,
+                context=context,
+                prior_readings=prior_readings,
+            )
+            if run_error is not None:
+                failed = True
+                participants.append({
+                    "order": index,
+                    "perspective": {
+                        "id": definition.id,
+                        "version": definition.version,
+                        "label": definition.label,
+                    },
+                    "prior_participant_ids": prior_ids,
+                    "status": "failed",
+                    "canonical_status": "not_persisted",
+                    "execution": {
+                        "provider_id": context["provider_id"],
+                        "model_id": context["model_id"],
+                        "runtime_host": context["runtime_host"],
+                        "selection_source": "per_run",
+                    },
+                    "error": run_error["error"],
+                })
+                continue
+            participant = {
+                "order": index,
+                "perspective": {
+                    "id": definition.id,
+                    "version": definition.version,
+                    "label": definition.label,
+                },
+                "prior_participant_ids": prior_ids,
+                "response": result["response"],
+                "execution": result["execution"],
+                "status": "succeeded",
+                "canonical_status": "not_persisted",
+            }
+            participants.append(participant)
+            prior_readings.append(participant)
+
+        receipt = build_perspective_room_receipt(
+            question=question,
+            scope_receipt=scope_receipt,
+            model={
+                "provider_id": context["provider_id"],
+                "model_id": context["model_id"],
+                "runtime_host": context["runtime_host"],
+                "selection_source": "per_run",
+            },
+            participants=participants,
+            status="failed" if failed else "succeeded",
+        )
+        return jsonify(receipt), 502 if failed else 201
 
     @app.route("/api/e10/scope")
     def api_e10_scope():
