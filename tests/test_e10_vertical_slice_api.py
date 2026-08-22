@@ -2965,10 +2965,36 @@ def test_perspective_room_ui_is_contextual_without_permanent_tab():
     assert "cr-bottom-tab-perspective" not in index_html
     assert "Ask the Room" in index_html
     assert "cr-perspective-mode-room" in index_html
-    assert "1 Close Reader" in index_html
-    assert "2 Contextual Reader" in index_html
-    assert "3 Skeptical Reader" in index_html
+    assert '<div id="cr-perspective-room-plan" hidden' in index_html
+    assert "1 Close Reader" not in index_html
+    assert "2 Contextual Reader" not in index_html
+    assert "3 Skeptical Reader" not in index_html
+    assert "_crPerspectiveRoomDefinitions = defs.default_room || []" in perspective_js
+    assert "function _crRenderPerspectiveRoomPlan()" in perspective_js
+    assert "_crPerspectiveRoomDefinitions.map((p, idx)" in perspective_js
     assert "/api/perspective/room" in perspective_js
     assert "Final answer" not in perspective_js
     assert "Consensus" not in perspective_js
     assert "q.value = 'What tension" not in perspective_js
+
+
+def test_perspective_room_ui_renders_participant_status_truthfully():
+    index_html = (
+        Path(__file__).parent.parent
+        / "hermeneia"
+        / "web"
+        / "static"
+        / "index.html"
+    ).read_text()
+    perspective_js = index_html.split("function _crRenderPerspectiveRoom(", 1)[1].split("async function _crRunPerspective", 1)[0]
+
+    assert "status === 'succeeded'" in perspective_js
+    assert "Proposed reading · not in interpretation record" in perspective_js
+    assert "status === 'failed'" in perspective_js
+    assert "Execution failed · no proposed reading" in perspective_js
+    assert "status === 'not_run'" in perspective_js
+    assert "Not run because an earlier Perspective failed." in perspective_js
+    assert "Not executed · no proposed reading" in perspective_js
+    assert "Planned model:" in perspective_js
+    assert "row.execution?.provider_id || receipt.model?.provider_id" not in perspective_js
+    assert "row.execution?.model_id || receipt.model?.model_id" not in perspective_js

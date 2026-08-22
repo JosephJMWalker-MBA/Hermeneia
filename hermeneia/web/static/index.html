@@ -2804,12 +2804,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
             <div id="cr-perspective-scope-chip" style="font-size:12px;color:var(--dim2);line-height:1.5">No Reader selection.</div>
           </div>
         </div>
-        <div id="cr-perspective-room-plan" hidden style="font-size:12px;color:var(--dim2);line-height:1.6;margin-bottom:10px">
-          <strong style="color:var(--fg2)">Room</strong><br>
-          1 Close Reader<br>
-          2 Contextual Reader<br>
-          3 Skeptical Reader
-        </div>
+        <div id="cr-perspective-room-plan" hidden style="font-size:12px;color:var(--dim2);line-height:1.6;margin-bottom:10px"></div>
         <label class="cr-form-label" for="cr-perspective-question">Question</label>
         <textarea id="cr-perspective-question" rows="2" placeholder="What tension in this passage deserves more attention?" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;line-height:1.5;padding:7px 9px;resize:vertical"></textarea>
         <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
@@ -9158,6 +9153,20 @@ function _crPerspectiveRenderScope() {
   chip.innerHTML = `<strong>Selected passage</strong> · ${x(loc)}<br><span style="color:var(--fg2)">"${x(text.slice(0, 140))}${text.length > 140 ? '…' : ''}"</span>`;
 }
 
+function _crRenderPerspectiveRoomPlan() {
+  const roomPlan = document.getElementById('cr-perspective-room-plan');
+  if (!roomPlan) return;
+  if (!_crPerspectiveRoomDefinitions.length) {
+    roomPlan.innerHTML = '<strong style="color:var(--fg2)">Room</strong><br><span style="color:var(--yellow)">Room definition unavailable.</span>';
+    return;
+  }
+  roomPlan.innerHTML = `<strong style="color:var(--fg2)">Room</strong><br>${
+    _crPerspectiveRoomDefinitions.map((p, idx) =>
+      `${x(p.order || idx + 1)} ${x(p.label || p.id || 'Perspective')}`
+    ).join('<br>')
+  }`;
+}
+
 function _crSetPerspectiveMode(mode) {
   _crPerspectiveMode = mode === 'room' ? 'room' : 'single';
   document.getElementById('cr-perspective-mode-single')?.classList.toggle('active', _crPerspectiveMode === 'single');
@@ -9166,6 +9175,7 @@ function _crSetPerspectiveMode(mode) {
   if (selectWrap) selectWrap.hidden = _crPerspectiveMode === 'room';
   const roomPlan = document.getElementById('cr-perspective-room-plan');
   if (roomPlan) roomPlan.hidden = _crPerspectiveMode !== 'room';
+  _crRenderPerspectiveRoomPlan();
   const btn = document.getElementById('cr-perspective-run-btn');
   if (btn) btn.textContent = _crPerspectiveMode === 'room' ? 'Ask the Room' : 'Run Perspective';
   const status = document.getElementById('cr-perspective-status');
@@ -9252,6 +9262,37 @@ async function _crPostPerspectiveRoom(payload) {
 
 function _crRenderPerspectiveRoom(receipt, model) {
   const participants = receipt.participants || [];
+  const rowHtml = participants.map(row => {
+    const status = String(row.status || '');
+    const plannedModel = receipt.model?.model_id || model || '';
+    let body = row.response || '';
+    const badges = [
+      `<span class="e10-badge">Perspective ${x(row.perspective?.id || '')} v${x(row.perspective?.version || '')}</span>`,
+    ];
+    if (status === 'succeeded') {
+      badges.push(`<span class="e10-badge">${x(row.execution?.provider_id || '')} / ${x(row.execution?.model_id || '')}</span>`);
+      badges.push('<span class="e10-badge">Proposed reading · not in interpretation record</span>');
+    } else if (status === 'failed') {
+      body = row.error || 'Local Perspective execution failed.';
+      if (row.execution?.provider_id || row.execution?.model_id) {
+        badges.push(`<span class="e10-badge">Attempted ${x(row.execution?.provider_id || '')} / ${x(row.execution?.model_id || '')}</span>`);
+      }
+      badges.push('<span class="e10-badge">Execution failed · no proposed reading</span>');
+    } else if (status === 'not_run') {
+      body = 'Not run because an earlier Perspective failed.';
+      if (plannedModel) badges.push(`<span class="e10-badge">Planned model: ${x(plannedModel)}</span>`);
+      badges.push('<span class="e10-badge">Not executed · no proposed reading</span>');
+    } else {
+      body = body || 'No proposed reading.';
+      badges.push('<span class="e10-badge">No proposed reading</span>');
+    }
+    return `
+      <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
+        <div class="e10-meta">${x(row.perspective?.label || row.perspective?.id || 'Perspective')} · ${x(status)}</div>
+        <div class="e10-text" style="white-space:pre-wrap">${x(body)}</div>
+        <div class="e10-badges">${badges.join('')}</div>
+      </div>`;
+  }).join('');
   return `
     <div class="e10-card">
       <div class="e10-meta">Ask the Room · via ${x(receipt.model?.provider_id || 'ollama-local')} / ${x(receipt.model?.model_id || model)}</div>
@@ -9262,17 +9303,7 @@ function _crRenderPerspectiveRoom(receipt, model) {
       <div style="font-size:12px;color:var(--dim2);line-height:1.6;margin-top:10px">
         <strong style="color:var(--fg2)">You</strong><br>${x(receipt.question || '')}
       </div>
-      ${participants.map(row => `
-        <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
-          <div class="e10-meta">${x(row.perspective?.label || row.perspective?.id || 'Perspective')} · ${x(row.status || '')}</div>
-          <div class="e10-text" style="white-space:pre-wrap">${x(row.response || row.error || 'Not run.')}</div>
-          <div class="e10-badges">
-            <span class="e10-badge">Perspective ${x(row.perspective?.id || '')} v${x(row.perspective?.version || '')}</span>
-            <span class="e10-badge">${x(row.execution?.provider_id || receipt.model?.provider_id || 'ollama-local')} / ${x(row.execution?.model_id || receipt.model?.model_id || model)}</span>
-            <span class="e10-badge">Proposed reading · not in interpretation record</span>
-          </div>
-        </div>
-      `).join('')}
+      ${rowHtml}
     </div>`;
 }
 
