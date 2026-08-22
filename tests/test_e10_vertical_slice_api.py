@@ -2550,8 +2550,12 @@ def _canonical_counts(db_path: Path) -> dict[str, int]:
         conn.close()
 
 
-def _reader_selection_scope(text: str = "Only this selected passage participates.") -> dict:
-    return {
+def _reader_selection_scope(
+    text: str = "Only this selected passage participates.",
+    *,
+    supporting: dict | None = None,
+) -> dict:
+    scope = {
         "primary": {
             "kind": "reader_selection",
             "text": text,
@@ -2561,8 +2565,11 @@ def _reader_selection_scope(text: str = "Only this selected passage participates
             "source_locators": ["page:3:block:1"],
             "extraction_ids": ["ex-selected"],
         },
-        "included": {"governing_question": False},
+        "included": {"governing_question": False, "current_page": False},
     }
+    if supporting is not None:
+        scope["supporting"] = supporting
+    return scope
 
 
 def test_perspective_run_requires_explicit_scope_question_and_local_model(tmp_path, monkeypatch):
@@ -2645,6 +2652,7 @@ def test_perspective_run_uses_selected_reader_text_and_exact_local_execution_ide
     assert body["scope_receipt"]["primary"]["text"] == "Selected passage text with punctuation — and Unicode."
     assert body["scope_receipt"]["primary"]["source_metadata_origin"] == "reader_client"
     assert body["scope_receipt"]["included"]["governing_question"] is False
+    assert body["scope_receipt"]["included"]["current_page"] is False
     assert "governing_question_text" not in body["scope_receipt"]
     assert body["scope_receipt"]["excluded"]["entire_corpus"] is True
     assert body["response"] == "Selected model response anchored in the observation."
@@ -2654,6 +2662,98 @@ def test_perspective_run_uses_selected_reader_text_and_exact_local_execution_ide
     assert "Ambient thesis must not enter this selected-passage Scope." not in prompt
     assert "entire corpus" not in prompt.lower()
     assert _canonical_counts(db_path) == before
+
+
+def test_perspective_run_includes_only_explicit_supporting_scope(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    _CapturingProvider.render_prompts = []
+    client = create_app(
+        db_path=tmp_path / "perspective.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    response = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "contextual-reader",
+            "question": "What is happening in this sentence?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(
+                "Selected passage remains primary.",
+                supporting={
+                    "governing_question": {
+                        "include": True,
+                        "text": "How does aspiration distort perception?",
+                    },
+                    "current_page": {
+                        "include": True,
+                        "text": "Current page source context.",
+                        "source_document_id": "doc-selected",
+                        "page": 3,
+                        "source_locators": ["page:3:block:1", "page:3:block:2"],
+                        "extraction_ids": ["ex-page-1", "ex-page-2"],
+                    },
+                    "entire_corpus": {"include": False},
+                },
+            ),
+            "entire_corpus": True,
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.get_json()
+    receipt = body["scope_receipt"]
+    assert receipt["primary"]["text"] == "Selected passage remains primary."
+    assert receipt["included"] == {
+        "governing_question": True,
+        "current_page": True,
+    }
+    assert receipt["excluded"]["entire_corpus"] is True
+    assert [item["kind"] for item in receipt["supporting"]] == [
+        "governing_question",
+        "current_page",
+    ]
+    governing, page = receipt["supporting"]
+    assert governing["evidence_status"] == "investigation_context"
+    assert page["evidence_status"] == "source_context"
+    assert page["source_locators"] == ["page:3:block:1", "page:3:block:2"]
+    assert page["extraction_ids"] == ["ex-page-1", "ex-page-2"]
+    prompt = _CapturingProvider.render_prompts[-1]
+    assert "Question: What is happening in this sentence?" in prompt
+    assert "PRIMARY SOURCE ATTENTION:" in prompt
+    assert "Selected passage remains primary." in prompt
+    assert "SUPPORTING SOURCE CONTEXT:" in prompt
+    assert "Current page source context." in prompt
+    assert "SUPPORTING INVESTIGATION CONTEXT:" in prompt
+    assert "not source evidence" in prompt
+    assert "How does aspiration distort perception?" in prompt
+    assert "entire corpus" not in prompt.lower()
+
+
+def test_perspective_run_rejects_unsupported_scope_expansion(tmp_path, monkeypatch):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    client = create_app(
+        db_path=tmp_path / "perspective.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    response = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(
+                supporting={"accepted_interpretations": {"include": True}},
+            ),
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Unsupported Scope inclusion" in response.get_json()["error"]
 
 
 def test_perspective_run_per_run_model_does_not_change_connection_selected_model(
@@ -2792,7 +2892,19 @@ def test_perspective_room_sequences_three_perspectives_with_one_scope_question_a
         json={
             "question": "What is this passage asking us to notice?",
             "model": "qwen2.5:0.5b",
-            "scope": _reader_selection_scope("Room source text only."),
+            "scope": _reader_selection_scope(
+                "Room source text only.",
+                supporting={
+                    "current_page": {
+                        "include": True,
+                        "text": "Stable page context for every Room participant.",
+                        "source_document_id": "doc-selected",
+                        "page": 3,
+                        "source_locators": ["page:3:block:1", "page:3:block:2"],
+                        "extraction_ids": ["ex-page-1", "ex-page-2"],
+                    },
+                },
+            ),
             "governing_question": "Ambient thesis must not enter the Room.",
         },
     )
@@ -2808,7 +2920,10 @@ def test_perspective_room_sequences_three_perspectives_with_one_scope_question_a
     assert body["model"]["selection_source"] == "per_run"
     assert body["scope_receipt"]["primary"]["text"] == "Room source text only."
     assert body["scope_receipt"]["included"]["governing_question"] is False
+    assert body["scope_receipt"]["included"]["current_page"] is True
     assert "governing_question_text" not in body["scope_receipt"]
+    assert body["scope_receipt"]["supporting"][0]["kind"] == "current_page"
+    assert body["scope_receipt"]["supporting"][0]["text"] == "Stable page context for every Room participant."
     assert [row["perspective"]["id"] for row in body["participants"]] == [
         "close-reader",
         "contextual-reader",
@@ -2840,6 +2955,9 @@ def test_perspective_room_sequences_three_perspectives_with_one_scope_question_a
     assert "Room source text only." in first_prompt
     assert "Room source text only." in second_prompt
     assert "Room source text only." in third_prompt
+    assert "Stable page context for every Room participant." in first_prompt
+    assert "Stable page context for every Room participant." in second_prompt
+    assert "Stable page context for every Room participant." in third_prompt
     assert "Close reading A." not in str(body["scope_receipt"])
     assert _canonical_counts(db_path) == before
 
@@ -2938,6 +3056,11 @@ def test_perspective_run_ui_separates_scope_perspective_question_and_model():
     assert "Perspective" in index_html
     assert "Question" in index_html
     assert "Model" in index_html
+    assert "Selected passage</strong><br>Primary source attention" in index_html
+    assert "Include governing question" in index_html
+    assert "Include current page" in index_html
+    assert "cr-perspective-include-governing" in index_html
+    assert "cr-perspective-include-page" in index_html
     assert "/api/perspective/definitions" in index_html
     assert "/api/perspective/run" in index_html
     assert "_crPerspectiveFromSelection" in index_html
@@ -2947,9 +3070,71 @@ def test_perspective_run_ui_separates_scope_perspective_question_and_model():
     assert 'placeholder="What tension in this passage deserves more attention?"' in index_html
     assert "q.value = 'What tension in this passage is easiest to overlook?'" not in perspective_js
     assert "governing_question: invLoad()?.thesis" not in perspective_js
-    assert "governing_question: false" in perspective_js
+    assert "includeGoverning && !!governingQuestion" in perspective_js
+    assert "includePage && !!currentPage" in perspective_js
+    assert "Unavailable: no governing question set" in perspective_js
+    assert "Unavailable: current page source text not resolved" in perspective_js
+    assert "function _crPerspectiveCurrentPageScope()" in perspective_js
+    assert "_crCurrentExtractions || []" in perspective_js
     assert "Local Ollama only · no cloud fallback" in index_html
     assert "Not in interpretation record" in index_html
+
+
+def test_perspective_run_ui_renders_completed_scope_receipt_from_response():
+    index_html = (
+        Path(__file__).parent.parent
+        / "hermeneia"
+        / "web"
+        / "static"
+        / "index.html"
+    ).read_text()
+    perspective_js = index_html.split("// ── Perspective Run", 1)[1].split("// ── Thesis", 1)[0]
+    receipt_renderer = perspective_js.split(
+        "function _crRenderPerspectiveScopeReceipt(scopeReceipt)",
+        1,
+    )[1].split("async function _crPostPerspectiveRoom", 1)[0]
+    room_renderer = perspective_js.split(
+        "function _crRenderPerspectiveRoom(receipt, model)",
+        1,
+    )[1].split("async function _crRunPerspective", 1)[0]
+    run_renderer = perspective_js.split(
+        "async function _crRunPerspective()",
+        1,
+    )[1].split("window._crPerspectiveFromSelection", 1)[0]
+
+    assert "Scope used: Selected passage" not in perspective_js
+    assert "function _crRenderPerspectiveScopeReceipt(scopeReceipt)" in perspective_js
+    assert "_crRenderPerspectiveScopeReceipt(receipt.scope_receipt)" in room_renderer
+    assert "_crRenderPerspectiveScopeReceipt(receipt.scope_receipt)" in run_renderer
+    assert "receipt.scope_receipt?.primary" not in run_renderer
+    assert "Scope locator:" not in perspective_js
+
+    assert "Scope Receipt" in receipt_renderer
+    assert "Primary" in receipt_renderer
+    assert "Selected passage" in receipt_renderer
+    assert "source evidence" in receipt_renderer
+    assert "Locator:" in receipt_renderer
+    assert "Supporting" in receipt_renderer
+    assert "None included." in receipt_renderer
+    assert "Governing question not included" in receipt_renderer
+    assert "Current page not included" in receipt_renderer
+    assert "entire corpus" in receipt_renderer
+    assert "all notes" in receipt_renderer
+    assert "accepted interpretations" in receipt_renderer
+    assert "other documents" in receipt_renderer
+
+    assert "Governing question" in receipt_renderer
+    assert "Supporting investigation context" in receipt_renderer
+    assert "Current page" in receipt_renderer
+    assert "Supporting source context" in receipt_renderer
+    assert "source locator" in receipt_renderer
+    assert "extraction ID" in receipt_renderer
+    assert "Reader/client metadata" in receipt_renderer
+
+    assert "invLoad()" not in receipt_renderer
+    assert "_crPage" not in receipt_renderer
+    assert "cr-perspective-include-governing" not in receipt_renderer
+    assert "cr-perspective-include-page" not in receipt_renderer
 
 
 def test_perspective_room_ui_is_contextual_without_permanent_tab():
@@ -2973,6 +3158,7 @@ def test_perspective_room_ui_is_contextual_without_permanent_tab():
     assert "function _crRenderPerspectiveRoomPlan()" in perspective_js
     assert "_crPerspectiveRoomDefinitions.map((p, idx)" in perspective_js
     assert "/api/perspective/room" in perspective_js
+    assert "_crRenderPerspectiveScopeReceipt(receipt.scope_receipt)" in perspective_js
     assert "Final answer" not in perspective_js
     assert "Consensus" not in perspective_js
     assert "q.value = 'What tension" not in perspective_js
@@ -2998,3 +3184,4 @@ def test_perspective_room_ui_renders_participant_status_truthfully():
     assert "Planned model:" in perspective_js
     assert "row.execution?.provider_id || receipt.model?.provider_id" not in perspective_js
     assert "row.execution?.model_id || receipt.model?.model_id" not in perspective_js
+    assert "e10-scope-receipt" not in perspective_js

@@ -105,7 +105,8 @@ def test_prior_room_responses_are_deliberation_context_not_scope() -> None:
         prior_proposed_readings=prior,
     )
 
-    assert "Selected Reader passage:\nOnly selected source text." in prompt
+    assert "PRIMARY SOURCE ATTENTION:" in prompt
+    assert "Only selected source text." in prompt
     assert "Prior Proposed Readings (Deliberation Context):" in prompt
     assert "not source evidence" in prompt
     assert "may be wrong" in prompt
@@ -113,7 +114,7 @@ def test_prior_room_responses_are_deliberation_context_not_scope() -> None:
     assert "Prior proposed reading A." not in str(scope_receipt)
 
 
-def test_reader_selection_scope_receipt_is_explicit_and_excludes_broader_workspace() -> None:
+def test_reader_selection_scope_receipt_is_explicit_primary_and_defaults_supporting_off() -> None:
     receipt = normalize_reader_selection_scope({
         "primary": {
             "kind": "reader_selection",
@@ -128,12 +129,137 @@ def test_reader_selection_scope_receipt_is_explicit_and_excludes_broader_workspa
 
     assert receipt["primary"]["text"] == "Exact selected text."
     assert receipt["primary"]["source_document_id"] == "doc-1"
+    assert receipt["primary"]["role"] == "primary"
+    assert receipt["primary"]["evidence_status"] == "source_evidence"
     assert receipt["primary"]["source_metadata_origin"] == "reader_client"
     assert receipt["included"]["governing_question"] is False
+    assert receipt["included"]["current_page"] is False
+    assert receipt["supporting"] == []
+    assert receipt["excluded"]["governing_question"] is True
+    assert receipt["excluded"]["current_page"] is True
     assert receipt["excluded"]["entire_corpus"] is True
     assert receipt["excluded"]["all_notes"] is True
     assert receipt["excluded"]["accepted_interpretations"] is True
     assert receipt["excluded"]["other_documents"] is True
+
+
+def test_reader_selection_scope_can_explicitly_include_governing_question_and_page() -> None:
+    receipt = normalize_reader_selection_scope({
+        "primary": {
+            "kind": "reader_selection",
+            "text": "Exact selected text.",
+            "source_document_id": "doc-1",
+            "page": 7,
+            "locator": "reader-span:v1:%7B%7D",
+        },
+        "supporting": {
+            "governing_question": {
+                "include": True,
+                "text": "How does aspiration distort perception?",
+            },
+            "current_page": {
+                "include": True,
+                "text": "Page source text.",
+                "source_document_id": "doc-1",
+                "page": 7,
+                "source_locators": ["p7:b1", "p7:b2"],
+                "extraction_ids": ["ex-1", "ex-2"],
+            },
+        },
+    })
+
+    assert receipt["included"] == {
+        "governing_question": True,
+        "current_page": True,
+    }
+    assert receipt["excluded"]["governing_question"] is False
+    assert receipt["excluded"]["current_page"] is False
+    assert [item["kind"] for item in receipt["supporting"]] == [
+        "governing_question",
+        "current_page",
+    ]
+    governing, page = receipt["supporting"]
+    assert governing["evidence_status"] == "investigation_context"
+    assert governing["text"] == "How does aspiration distort perception?"
+    assert page["evidence_status"] == "source_context"
+    assert page["text"] == "Page source text."
+    assert page["source_locators"] == ["p7:b1", "p7:b2"]
+    assert page["extraction_ids"] == ["ex-1", "ex-2"]
+    assert page["source_metadata_origin"] == "reader_client"
+
+
+def test_perspective_prompt_separates_primary_supporting_and_deliberation_context() -> None:
+    definition = perspective_definition("skeptical-reader")
+    assert definition is not None
+    receipt = normalize_reader_selection_scope({
+        "primary": {"kind": "reader_selection", "text": "Selected passage."},
+        "supporting": {
+            "governing_question": {
+                "include": True,
+                "text": "How does aspiration distort perception?",
+            },
+            "current_page": {
+                "include": True,
+                "text": "Current page source text.",
+                "page": 21,
+            },
+        },
+    })
+    prompt = build_perspective_prompt(
+        definition,
+        question="What is happening in this sentence?",
+        scope_receipt=receipt,
+        prior_proposed_readings=[{
+            "perspective": {"id": "close-reader", "version": "1", "label": "Close Reader"},
+            "response": "Prior model response.",
+        }],
+    )
+
+    assert "Question: What is happening in this sentence?" in prompt
+    assert "PRIMARY SOURCE ATTENTION:" in prompt
+    assert "Selected passage." in prompt
+    assert "SUPPORTING SOURCE CONTEXT:" in prompt
+    assert "Current page 21:" in prompt
+    assert "Current page source text." in prompt
+    assert "SUPPORTING INVESTIGATION CONTEXT:" in prompt
+    assert "This is investigation context, not source evidence" in prompt
+    assert "Governing Question:" in prompt
+    assert "How does aspiration distort perception?" in prompt
+    assert "Prior Proposed Readings (Deliberation Context):" in prompt
+    assert "Prior model response." in prompt
+    assert "Prior model response." not in str(receipt)
+
+
+def test_scope_rejects_unsupported_included_material_and_missing_requested_context() -> None:
+    for bad_scope, expected in (
+        (
+            {
+                "primary": {"kind": "reader_selection", "text": "Text."},
+                "supporting": {"entire_corpus": {"include": True}},
+            },
+            "Unsupported Scope inclusion",
+        ),
+        (
+            {
+                "primary": {"kind": "reader_selection", "text": "Text."},
+                "supporting": {"governing_question": {"include": True, "text": " "}},
+            },
+            "governing question is unavailable",
+        ),
+        (
+            {
+                "primary": {"kind": "reader_selection", "text": "Text."},
+                "supporting": {"current_page": {"include": True, "text": " "}},
+            },
+            "current page source text is unavailable",
+        ),
+    ):
+        try:
+            normalize_reader_selection_scope(bad_scope)
+        except ValueError as exc:
+            assert expected in str(exc)
+        else:
+            raise AssertionError("invalid Scope request was accepted")
 
 
 def test_reader_selection_scope_requires_text_and_reader_selection_kind() -> None:

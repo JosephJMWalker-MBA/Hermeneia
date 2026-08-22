@@ -122,36 +122,95 @@ def perspective_definitions_payload() -> list[dict[str, object]]:
     return [definition.to_dict() for definition in PERSPECTIVE_DEFINITIONS]
 
 
+def _clean_text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _clean_string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item).strip()]
+
+
 def normalize_reader_selection_scope(scope: dict[str, Any]) -> dict[str, object]:
     primary = scope.get("primary") if isinstance(scope.get("primary"), dict) else scope
-    text = str(primary.get("text") or "").strip()
+    text = _clean_text(primary.get("text"))
     if not text:
         raise ValueError("Scope requires selected Reader text.")
-    if str(primary.get("kind") or "reader_selection") != "reader_selection":
+    if _clean_text(primary.get("kind") or "reader_selection") != "reader_selection":
         raise ValueError("This Perspective Run supports only Reader selection Scope.")
+    supporting_payload = scope.get("supporting") if isinstance(scope.get("supporting"), dict) else {}
+    supported_keys = {"governing_question", "current_page"}
+    for key, value in supporting_payload.items():
+        if key not in supported_keys and isinstance(value, dict) and value.get("include"):
+            raise ValueError(f"Unsupported Scope inclusion: {key}.")
+
+    supporting: list[dict[str, object]] = []
+    governing_payload = (
+        supporting_payload.get("governing_question")
+        if isinstance(supporting_payload.get("governing_question"), dict)
+        else {}
+    )
+    include_governing = bool(governing_payload.get("include"))
+    governing_text = _clean_text(governing_payload.get("text"))
+    if include_governing:
+        if not governing_text:
+            raise ValueError("Included governing question is unavailable.")
+        supporting.append({
+            "kind": "governing_question",
+            "text": governing_text,
+            "included": True,
+            "role": "supporting",
+            "evidence_status": "investigation_context",
+            "source_metadata_origin": "reader_client",
+        })
+
+    page_payload = (
+        supporting_payload.get("current_page")
+        if isinstance(supporting_payload.get("current_page"), dict)
+        else {}
+    )
+    include_current_page = bool(page_payload.get("include"))
+    page_text = _clean_text(page_payload.get("text"))
+    if include_current_page:
+        if not page_text:
+            raise ValueError("Included current page source text is unavailable.")
+        supporting.append({
+            "kind": "current_page",
+            "text": page_text,
+            "included": True,
+            "role": "supporting",
+            "evidence_status": "source_context",
+            "source_document_id": _clean_text(
+                page_payload.get("source_document_id") or primary.get("source_document_id")
+            ),
+            "page": page_payload.get("page") or primary.get("page"),
+            "source_locators": _clean_string_list(page_payload.get("source_locators")),
+            "extraction_ids": _clean_string_list(page_payload.get("extraction_ids")),
+            "source_metadata_origin": "reader_client",
+        })
+
     receipt: dict[str, object] = {
         "primary": {
             "kind": "reader_selection",
             "text": text,
-            "source_document_id": str(primary.get("source_document_id") or ""),
+            "role": "primary",
+            "evidence_status": "source_evidence",
+            "source_document_id": _clean_text(primary.get("source_document_id")),
             "page": primary.get("page"),
-            "locator": str(primary.get("locator") or ""),
-            "source_locators": [
-                str(value)
-                for value in primary.get("source_locators") or []
-                if str(value).strip()
-            ],
-            "extraction_ids": [
-                str(value)
-                for value in primary.get("extraction_ids") or []
-                if str(value).strip()
-            ],
+            "locator": _clean_text(primary.get("locator")),
+            "source_locators": _clean_string_list(primary.get("source_locators")),
+            "extraction_ids": _clean_string_list(primary.get("extraction_ids")),
             "source_metadata_origin": "reader_client",
         },
+        "supporting": supporting,
         "included": {
-            "governing_question": False,
+            "governing_question": include_governing,
+            "current_page": include_current_page,
         },
         "excluded": {
+            "governing_question": not include_governing,
+            "current_page": not include_current_page,
             "entire_corpus": True,
             "all_notes": True,
             "accepted_interpretations": True,
@@ -170,6 +229,10 @@ def build_perspective_prompt(
 ) -> str:
     primary = scope_receipt["primary"]
     selected_text = str(primary["text"])
+    supporting = [
+        item for item in scope_receipt.get("supporting", [])
+        if isinstance(item, dict) and item.get("included")
+    ]
     lines = [
         "You are performing a Hermeneia Perspective Run.",
         "",
@@ -195,7 +258,42 @@ def build_perspective_prompt(
         *[f"- {item}" for item in definition.limitations],
         "",
         f"Question: {question.strip()}",
+        "",
+        "Scope Receipt:",
+        f"- Primary kind: {primary.get('kind')}",
+        f"- Source document: {primary.get('source_document_id') or 'unknown'}",
+        f"- Page: {primary.get('page') or 'unknown'}",
+        f"- Locator: {primary.get('locator') or 'unknown'}",
+        f"- Supporting items: {len(supporting)}",
+        "",
+        "PRIMARY SOURCE ATTENTION:",
+        "The following selected Reader passage is the center of the Question.",
+        selected_text,
     ]
+    current_pages = [item for item in supporting if item.get("kind") == "current_page"]
+    if current_pages:
+        lines.extend([
+            "",
+            "SUPPORTING SOURCE CONTEXT:",
+            "This source material was explicitly included for context. The primary passage remains the center of the Question.",
+        ])
+        for item in current_pages:
+            lines.extend([
+                "",
+                f"Current page {item.get('page') or 'unknown'}:",
+                str(item.get("text") or ""),
+            ])
+    governing_questions = [
+        item for item in supporting if item.get("kind") == "governing_question"
+    ]
+    if governing_questions:
+        lines.extend([
+            "",
+            "SUPPORTING INVESTIGATION CONTEXT:",
+            "This is investigation context, not source evidence, and it does not replace the User Question.",
+        ])
+        for item in governing_questions:
+            lines.extend(["", "Governing Question:", str(item.get("text") or "")])
     prior_readings = prior_proposed_readings or []
     if prior_readings:
         lines.extend([
@@ -214,15 +312,6 @@ def build_perspective_prompt(
             response = str(item.get("response") or "")
             lines.extend(["", f"{label} v{version}:".rstrip(), response])
     lines.extend([
-        "",
-        "Scope Receipt:",
-        f"- Primary kind: {primary.get('kind')}",
-        f"- Source document: {primary.get('source_document_id') or 'unknown'}",
-        f"- Page: {primary.get('page') or 'unknown'}",
-        f"- Locator: {primary.get('locator') or 'unknown'}",
-        "",
-        "Selected Reader passage:",
-        selected_text,
         "",
         "Return a concise proposed reading that answers the Question through the selected Perspective.",
         "Do not claim the response has entered the interpretation record.",
