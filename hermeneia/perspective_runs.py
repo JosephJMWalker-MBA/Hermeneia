@@ -6,6 +6,8 @@ proposed reading. It does not create a canonical Interpretation.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -29,6 +31,12 @@ class PerspectiveDefinition:
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class PerspectiveResolution:
+    definition: PerspectiveDefinition
+    receipt_metadata: dict[str, object] | None = None
 
 
 PERSPECTIVE_DEFINITIONS: tuple[PerspectiveDefinition, ...] = (
@@ -110,6 +118,36 @@ DEFAULT_ROOM_PERSPECTIVES: tuple[str, ...] = (
     "skeptical-reader",
 )
 
+TRANSIENT_PERSPECTIVE_ORIGIN = "user_authored_transient"
+TRANSIENT_PERSPECTIVE_VERSION = "draft"
+_TRANSIENT_ALLOWED_FIELDS = {
+    "label",
+    "name",
+    "purpose",
+    "questions",
+    "challenges",
+    "limitations",
+}
+_TRANSIENT_FORBIDDEN_FIELDS = {
+    "provider",
+    "provider_id",
+    "model",
+    "model_id",
+    "temperature",
+    "top_p",
+    "inference_configuration",
+    "execution_config",
+    "audience",
+    "tone",
+    "voice",
+    "writing_style",
+    "style",
+    "output_language",
+    "language",
+    "output_format",
+    "rhetorical_style",
+}
+
 
 def perspective_definition(perspective_id: str) -> PerspectiveDefinition | None:
     for definition in PERSPECTIVE_DEFINITIONS:
@@ -130,6 +168,108 @@ def _clean_string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item) for item in value if str(item).strip()]
+
+
+def _clean_frame_items(value: Any, *, field: str, required: bool) -> tuple[str, ...]:
+    if isinstance(value, str):
+        raw_items = value.splitlines()
+    elif isinstance(value, list):
+        raw_items = value
+    else:
+        raw_items = []
+    items = tuple(str(item).strip() for item in raw_items if str(item).strip())
+    if required and not items:
+        raise ValueError(f"Transient Perspective {field} require at least one item.")
+    if len(items) > 12:
+        raise ValueError(f"Transient Perspective {field} may contain at most 12 items.")
+    for item in items:
+        if len(item) > 500:
+            raise ValueError(f"Transient Perspective {field} items must be 500 characters or fewer.")
+    return items
+
+
+def transient_perspective_semantics(definition: PerspectiveDefinition) -> dict[str, object]:
+    return {
+        "label": definition.label,
+        "purpose": definition.purpose,
+        "questions": list(definition.questions),
+        "challenges": list(definition.challenges),
+        "limitations": list(definition.limitations),
+    }
+
+
+def transient_perspective_fingerprint(definition: PerspectiveDefinition) -> str:
+    payload = json.dumps(
+        transient_perspective_semantics(definition),
+        sort_keys=True,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    return f"sha256:{hashlib.sha256(payload.encode('utf-8')).hexdigest()}"
+
+
+def normalize_transient_perspective_draft(draft: dict[str, Any]) -> PerspectiveResolution:
+    if not isinstance(draft, dict):
+        raise ValueError("Transient Perspective draft is required.")
+    for field, value in draft.items():
+        if field not in _TRANSIENT_ALLOWED_FIELDS:
+            if field in _TRANSIENT_FORBIDDEN_FIELDS or value not in (None, "", [], {}):
+                raise ValueError(f"Unsupported Perspective field: {field}")
+    label = _clean_text(draft.get("label") or draft.get("name"))
+    purpose = _clean_text(draft.get("purpose"))
+    if not label:
+        raise ValueError("Transient Perspective name is required.")
+    if len(label) > 80:
+        raise ValueError("Transient Perspective name must be 80 characters or fewer.")
+    if not purpose:
+        raise ValueError("Transient Perspective purpose is required.")
+    if len(purpose) > 1000:
+        raise ValueError("Transient Perspective purpose must be 1000 characters or fewer.")
+    questions = _clean_frame_items(draft.get("questions"), field="questions", required=True)
+    challenges = _clean_frame_items(draft.get("challenges"), field="challenges", required=False)
+    limitations = _clean_frame_items(draft.get("limitations"), field="limitations", required=False)
+    definition = PerspectiveDefinition(
+        id="transient:pending",
+        version=TRANSIENT_PERSPECTIVE_VERSION,
+        label=label,
+        purpose=purpose,
+        questions=questions,
+        challenges=challenges,
+        limitations=limitations,
+    )
+    fingerprint = transient_perspective_fingerprint(definition)
+    definition = PerspectiveDefinition(
+        id=f"transient:{fingerprint.removeprefix('sha256:')[:12]}",
+        version=TRANSIENT_PERSPECTIVE_VERSION,
+        label=label,
+        purpose=purpose,
+        questions=questions,
+        challenges=challenges,
+        limitations=limitations,
+    )
+    metadata = {
+        "origin": TRANSIENT_PERSPECTIVE_ORIGIN,
+        "definition_fingerprint": fingerprint,
+        "definition": transient_perspective_semantics(definition),
+    }
+    return PerspectiveResolution(definition=definition, receipt_metadata=metadata)
+
+
+def resolve_perspective_request(
+    *,
+    perspective_id: Any = None,
+    perspective_draft: Any = None,
+) -> PerspectiveResolution:
+    has_id = bool(_clean_text(perspective_id))
+    has_draft = isinstance(perspective_draft, dict)
+    if has_id == has_draft:
+        raise ValueError("Provide exactly one of perspective_id or perspective_draft.")
+    if has_id:
+        definition = perspective_definition(_clean_text(perspective_id))
+        if definition is None:
+            raise ValueError("unknown Perspective")
+        return PerspectiveResolution(definition=definition)
+    return normalize_transient_perspective_draft(perspective_draft)
 
 
 def normalize_reader_selection_scope(scope: dict[str, Any]) -> dict[str, object]:
@@ -326,14 +466,18 @@ def build_perspective_receipt(
     scope_receipt: dict[str, object],
     execution: dict[str, object],
     response: str,
+    perspective_metadata: dict[str, object] | None = None,
 ) -> dict[str, object]:
+    perspective = {
+        "id": definition.id,
+        "version": definition.version,
+        "label": definition.label,
+    }
+    if perspective_metadata:
+        perspective.update(perspective_metadata)
     return {
         "operation": "perspective_run",
-        "perspective": {
-            "id": definition.id,
-            "version": definition.version,
-            "label": definition.label,
-        },
+        "perspective": perspective,
         "question": question.strip(),
         "scope_receipt": scope_receipt,
         "execution": execution,
