@@ -2733,6 +2733,232 @@ def test_perspective_run_includes_only_explicit_supporting_scope(
     assert "entire corpus" not in prompt.lower()
 
 
+def _transient_perspective_draft(**overrides) -> dict:
+    draft = {
+        "label": "Institutional Trust Reader",
+        "purpose": "Examine how authority and trust are being established or questioned.",
+        "questions": [
+            "Who is being asked to trust whom?",
+            "What source of authority is assumed?",
+        ],
+        "challenges": ["Challenge unsupported claims of legitimacy."],
+        "limitations": ["May overemphasize institutional relationships."],
+    }
+    draft.update(overrides)
+    return draft
+
+
+def test_transient_perspective_run_uses_same_local_execution_path_and_receipt(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("OPENAI_API_KEY", "ambient-openai-key-that-must-not-be-used")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "ambient-anthropic-key-that-must-not-be-used")
+    _install_fake_ollama(monkeypatch, ["qwen3:4b", "qwen2.5:0.5b"])
+    _CapturingProvider.calls = []
+    _CapturingProvider.render_prompts = []
+    db_path = tmp_path / "transient-perspective.db"
+    store = SQLiteStore(db_path)
+    _seed_full_chain(store)
+    store.close()
+    before = _canonical_counts(db_path)
+    client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
+    selected = client.put("/api/e10/providers/local/model", json={"model": "qwen3:4b"})
+    assert selected.status_code == 200
+
+    response = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_draft": _transient_perspective_draft(),
+            "question": "What is this passage asking the reader to trust?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(
+                "Authority appears before trust is earned.",
+                supporting={
+                    "governing_question": {
+                        "include": True,
+                        "text": "How does aspiration distort perception?",
+                    },
+                    "current_page": {
+                        "include": True,
+                        "text": "Current page source context.",
+                        "source_document_id": "doc-selected",
+                        "page": 3,
+                        "source_locators": ["page:3:block:1"],
+                        "extraction_ids": ["ex-page-1"],
+                    },
+                },
+            ),
+            "perspective_id": "",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.get_json()
+    assert body["operation"] == "perspective_run"
+    assert body["canonical_status"] == "not_persisted"
+    assert body["perspective"]["id"].startswith("transient:")
+    assert body["perspective"]["version"] == "draft"
+    assert body["perspective"]["label"] == "Institutional Trust Reader"
+    assert body["perspective"]["origin"] == "user_authored_transient"
+    assert body["perspective"]["definition_fingerprint"].startswith("sha256:")
+    assert body["perspective"]["definition"] == _transient_perspective_draft()
+    assert body["execution"]["provider_id"] == "ollama-local"
+    assert body["execution"]["model_id"] == "qwen2.5:0.5b"
+    assert body["execution"]["selection_source"] == "per_run"
+    assert body["scope_receipt"]["included"] == {
+        "governing_question": True,
+        "current_page": True,
+    }
+    assert len(_CapturingProvider.calls) == 1
+    assert _CapturingProvider.calls[-1]["model"] == "qwen2.5:0.5b"
+    prompt = _CapturingProvider.render_prompts[-1]
+    assert "Perspective: Institutional Trust Reader" in prompt
+    assert "Perspective ID: transient:" in prompt
+    assert "Perspective version: draft" in prompt
+    assert "Who is being asked to trust whom?" in prompt
+    assert "Challenge unsupported claims of legitimacy." in prompt
+    assert "PRIMARY SOURCE ATTENTION:" in prompt
+    assert "SUPPORTING SOURCE CONTEXT:" in prompt
+    assert "SUPPORTING INVESTIGATION CONTEXT:" in prompt
+    assert "ambient-openai-key-that-must-not-be-used" not in prompt
+    assert _canonical_counts(db_path) == before
+
+    providers = client.get("/api/e10/providers").get_json()["providers"]
+    local = next(row for row in providers if row["participant"] == "local")
+    assert local["selected_model"] == "qwen3:4b"
+
+
+def test_transient_perspective_fingerprint_is_independent_of_question_scope_and_model(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b", "qwen2.5:0.5b"])
+    client = create_app(
+        db_path=tmp_path / "transient-perspective.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    first = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_draft": _transient_perspective_draft(),
+            "question": "Question A?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope("First selected passage."),
+        },
+    )
+    second = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_draft": _transient_perspective_draft(),
+            "question": "Question B?",
+            "model": "qwen3:4b",
+            "scope": _reader_selection_scope("Second selected passage."),
+        },
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    first_body = first.get_json()
+    second_body = second.get_json()
+    assert first_body["question"] == "Question A?"
+    assert second_body["question"] == "Question B?"
+    assert first_body["execution"]["model_id"] == "qwen2.5:0.5b"
+    assert second_body["execution"]["model_id"] == "qwen3:4b"
+    assert first_body["scope_receipt"]["primary"]["text"] == "First selected passage."
+    assert second_body["scope_receipt"]["primary"]["text"] == "Second selected passage."
+    assert (
+        first_body["perspective"]["definition_fingerprint"]
+        == second_body["perspective"]["definition_fingerprint"]
+    )
+
+
+def test_transient_perspective_request_shape_and_forbidden_fields_are_rejected(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    client = create_app(
+        db_path=tmp_path / "transient-perspective.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    neither = client.post(
+        "/api/perspective/run",
+        json={
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(),
+        },
+    )
+    both = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "perspective_draft": _transient_perspective_draft(),
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(),
+        },
+    )
+    missing_question = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_draft": _transient_perspective_draft(questions=[]),
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(),
+        },
+    )
+    forbidden = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_draft": _transient_perspective_draft(tone="warm"),
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(),
+        },
+    )
+
+    assert neither.status_code == 400
+    assert "exactly one" in neither.get_json()["error"]
+    assert both.status_code == 400
+    assert "exactly one" in both.get_json()["error"]
+    assert missing_question.status_code == 400
+    assert "questions require at least one item" in missing_question.get_json()["error"]
+    assert forbidden.status_code == 400
+    assert forbidden.get_json()["error"] == "Unsupported Perspective field: tone"
+
+
+def test_transient_perspective_does_not_enter_builtin_definitions(tmp_path, monkeypatch):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    client = create_app(
+        db_path=tmp_path / "transient-perspective.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    run = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_draft": _transient_perspective_draft(),
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(),
+        },
+    )
+    assert run.status_code == 201
+
+    definitions = client.get("/api/perspective/definitions").get_json()
+    labels = [row["label"] for row in definitions["perspectives"]]
+    assert "Institutional Trust Reader" not in labels
+    assert [row["id"] for row in definitions["default_room"]] == [
+        "close-reader",
+        "contextual-reader",
+        "skeptical-reader",
+    ]
+
+
 def test_perspective_run_rejects_unsupported_scope_expansion(tmp_path, monkeypatch):
     _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
     client = create_app(
@@ -3061,6 +3287,17 @@ def test_perspective_run_ui_separates_scope_perspective_question_and_model():
     assert "Include current page" in index_html
     assert "cr-perspective-include-governing" in index_html
     assert "cr-perspective-include-page" in index_html
+    assert "Built-in" in index_html
+    assert "Custom" in index_html
+    assert "cr-perspective-custom-panel" in index_html
+    assert "Custom Perspective · Draft · Not saved" in index_html
+    assert "Name" in index_html
+    assert "Purpose / standpoint" in index_html
+    assert "Questions this frame tends to ask" in index_html
+    assert "What this frame should challenge" in index_html
+    assert "Known limitations" in index_html
+    assert "Preview frame" in index_html
+    assert "Use for this inquiry" in index_html
     assert "/api/perspective/definitions" in index_html
     assert "/api/perspective/run" in index_html
     assert "_crPerspectiveFromSelection" in index_html
@@ -3076,8 +3313,55 @@ def test_perspective_run_ui_separates_scope_perspective_question_and_model():
     assert "Unavailable: current page source text not resolved" in perspective_js
     assert "function _crPerspectiveCurrentPageScope()" in perspective_js
     assert "_crCurrentExtractions || []" in perspective_js
+    assert "perspective_draft: _crPerspectiveDraftActive" in perspective_js
+    assert "Draft changed · apply before running" in perspective_js
     assert "Local Ollama only · no cloud fallback" in index_html
     assert "Not in interpretation record" in index_html
+
+
+def test_perspective_builder_ui_is_transient_frame_only_and_local_preview():
+    index_html = (
+        Path(__file__).parent.parent
+        / "hermeneia"
+        / "web"
+        / "static"
+        / "index.html"
+    ).read_text()
+    perspective_js = index_html.split("// ── Perspective Run", 1)[1].split("// ── Thesis", 1)[0]
+    custom_panel = index_html.split('id="cr-perspective-custom-panel"', 1)[1].split(
+        '<div id="cr-perspective-room-plan"',
+        1,
+    )[0]
+    preview_fn = perspective_js.split("function _crPreviewPerspectiveDraft()", 1)[1].split(
+        "function _crUsePerspectiveDraft()",
+        1,
+    )[0]
+    run_fn = perspective_js.split("async function _crRunPerspective()", 1)[1].split(
+        "window._crPerspectiveFromSelection",
+        1,
+    )[0]
+
+    assert "Custom Perspectives can be used in Single Perspective runs in this version." in custom_panel
+    for forbidden_id in (
+        "cr-perspective-draft-model",
+        "cr-perspective-draft-provider",
+        "cr-perspective-draft-tone",
+        "cr-perspective-draft-audience",
+        "cr-perspective-draft-language",
+        "cr-perspective-draft-output-format",
+    ):
+        assert forbidden_id not in index_html
+    assert "runtimeApiFetch" not in preview_fn
+    assert "post(" not in preview_fn
+    assert "get(" not in preview_fn
+    assert "_crRenderPerspectiveDraftFrame(draft)" in preview_fn
+    assert "_crPerspectiveDraftActive = JSON.parse(JSON.stringify(draft))" in perspective_js
+    assert "_crPerspectiveDraftDirty = true" in perspective_js
+    assert "Draft changed · apply before running" in perspective_js
+    assert "if (_crPerspectiveMode === 'single' && _crPerspectiveKind === 'custom')" in run_fn
+    assert "Preview and use a Custom Perspective draft before running." in run_fn
+    assert "perspective_draft: _crPerspectiveDraftActive" in run_fn
+    assert "question,\n      model,\n      scope: _crPerspectiveScope" in run_fn
 
 
 def test_perspective_run_ui_renders_completed_scope_receipt_from_response():
@@ -3101,11 +3385,17 @@ def test_perspective_run_ui_renders_completed_scope_receipt_from_response():
         "async function _crRunPerspective()",
         1,
     )[1].split("window._crPerspectiveFromSelection", 1)[0]
+    perspective_renderer = perspective_js.split(
+        "function _crRenderPerspectiveDefinitionReceipt(perspective)",
+        1,
+    )[1].split("function _crRenderPerspectiveScopeReceipt", 1)[0]
 
     assert "Scope used: Selected passage" not in perspective_js
     assert "function _crRenderPerspectiveScopeReceipt(scopeReceipt)" in perspective_js
+    assert "function _crRenderPerspectiveDefinitionReceipt(perspective)" in perspective_js
     assert "_crRenderPerspectiveScopeReceipt(receipt.scope_receipt)" in room_renderer
     assert "_crRenderPerspectiveScopeReceipt(receipt.scope_receipt)" in run_renderer
+    assert "_crRenderPerspectiveDefinitionReceipt(p)" in run_renderer
     assert "receipt.scope_receipt?.primary" not in run_renderer
     assert "Scope locator:" not in perspective_js
 
@@ -3135,6 +3425,11 @@ def test_perspective_run_ui_renders_completed_scope_receipt_from_response():
     assert "_crPage" not in receipt_renderer
     assert "cr-perspective-include-governing" not in receipt_renderer
     assert "cr-perspective-include-page" not in receipt_renderer
+    assert "User-authored transient draft" in perspective_renderer
+    assert "Definition fingerprint" in perspective_renderer
+    assert "p.definition || {}" in perspective_renderer
+    assert "cr-perspective-draft-label" not in perspective_renderer
+    assert "cr-perspective-draft-purpose" not in perspective_renderer
 
 
 def test_perspective_room_ui_is_contextual_without_permanent_tab():
@@ -3151,6 +3446,7 @@ def test_perspective_room_ui_is_contextual_without_permanent_tab():
     assert "Ask the Room" in index_html
     assert "cr-perspective-mode-room" in index_html
     assert '<div id="cr-perspective-room-plan" hidden' in index_html
+    assert "cr-bottom-tab-perspective" not in index_html
     assert "1 Close Reader" not in index_html
     assert "2 Contextual Reader" not in index_html
     assert "3 Skeptical Reader" not in index_html
@@ -3159,6 +3455,12 @@ def test_perspective_room_ui_is_contextual_without_permanent_tab():
     assert "_crPerspectiveRoomDefinitions.map((p, idx)" in perspective_js
     assert "/api/perspective/room" in perspective_js
     assert "_crRenderPerspectiveScopeReceipt(receipt.scope_receipt)" in perspective_js
+    room_payload = perspective_js.split("const payload = _crPerspectiveMode === 'room' ?", 1)[1].split(
+        "} : (_crPerspectiveKind === 'custom' ?",
+        1,
+    )[0]
+    assert "perspective_draft" not in room_payload
+    assert "perspective_id" not in room_payload
     assert "Final answer" not in perspective_js
     assert "Consensus" not in perspective_js
     assert "q.value = 'What tension" not in perspective_js

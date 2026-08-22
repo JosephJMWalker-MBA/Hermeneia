@@ -2793,7 +2793,32 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
         <div style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) minmax(180px,1fr);gap:10px;margin-bottom:10px">
           <div id="cr-perspective-select-wrap">
             <label class="cr-form-label" for="cr-perspective-select">Perspective</label>
-            <select class="ob-extract-provider" id="cr-perspective-select" style="width:100%"></select>
+            <div style="display:flex;gap:6px;align-items:center;margin-bottom:7px;flex-wrap:wrap">
+              <button class="cr-bottom-workstation-tab active" id="cr-perspective-kind-built-in" type="button" onclick="_crSetPerspectiveKind('built-in')">Built-in</button>
+              <button class="cr-bottom-workstation-tab" id="cr-perspective-kind-custom" type="button" onclick="_crSetPerspectiveKind('custom')">Custom</button>
+            </div>
+            <div id="cr-perspective-built-in-panel">
+              <select class="ob-extract-provider" id="cr-perspective-select" style="width:100%"></select>
+            </div>
+            <div id="cr-perspective-custom-panel" hidden style="font-size:12px;color:var(--dim2);line-height:1.5">
+              <div style="margin-bottom:7px"><strong style="color:var(--fg2)">Custom Perspective · Draft · Not saved</strong><br>Custom Perspectives can be used in Single Perspective runs in this version.</div>
+              <label class="cr-form-label" for="cr-perspective-draft-label">Name</label>
+              <input id="cr-perspective-draft-label" maxlength="80" oninput="_crPerspectiveDraftChanged()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;padding:7px 9px">
+              <label class="cr-form-label" for="cr-perspective-draft-purpose" style="margin-top:7px">Purpose / standpoint</label>
+              <textarea id="cr-perspective-draft-purpose" rows="2" maxlength="1000" oninput="_crPerspectiveDraftChanged()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;line-height:1.5;padding:7px 9px;resize:vertical"></textarea>
+              <label class="cr-form-label" for="cr-perspective-draft-questions" style="margin-top:7px">Questions this frame tends to ask</label>
+              <textarea id="cr-perspective-draft-questions" rows="3" maxlength="6000" placeholder="One per line" oninput="_crPerspectiveDraftChanged()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;line-height:1.5;padding:7px 9px;resize:vertical"></textarea>
+              <label class="cr-form-label" for="cr-perspective-draft-challenges" style="margin-top:7px">What this frame should challenge</label>
+              <textarea id="cr-perspective-draft-challenges" rows="2" maxlength="6000" placeholder="One per line" oninput="_crPerspectiveDraftChanged()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;line-height:1.5;padding:7px 9px;resize:vertical"></textarea>
+              <label class="cr-form-label" for="cr-perspective-draft-limitations" style="margin-top:7px">Known limitations</label>
+              <textarea id="cr-perspective-draft-limitations" rows="2" maxlength="6000" placeholder="One per line" oninput="_crPerspectiveDraftChanged()" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;line-height:1.5;padding:7px 9px;resize:vertical"></textarea>
+              <div style="display:flex;gap:7px;align-items:center;margin-top:7px;flex-wrap:wrap">
+                <button class="cr-bottom-workstation-tab" type="button" onclick="_crPreviewPerspectiveDraft()">Preview frame</button>
+                <button class="cr-bottom-workstation-tab" type="button" onclick="_crUsePerspectiveDraft()">Use for this inquiry</button>
+                <span id="cr-perspective-draft-state">Draft not applied.</span>
+              </div>
+              <div id="cr-perspective-draft-preview" style="margin-top:7px"></div>
+            </div>
           </div>
           <div>
             <label class="cr-form-label" for="cr-perspective-model">Model</label>
@@ -9135,6 +9160,103 @@ let _crPerspectiveRoomDefinitions = [];
 let _crPerspectiveScope = null;
 let _crPerspectiveLastReceipt = null;
 let _crPerspectiveMode = 'single';
+let _crPerspectiveKind = 'built-in';
+let _crPerspectiveDraftActive = null;
+let _crPerspectiveDraftDirty = false;
+
+function _crPerspectiveDraftLines(value) {
+  return String(value || '').split(/\r?\n/).map(item => item.trim()).filter(Boolean);
+}
+
+function _crPerspectiveDraftPayload() {
+  return {
+    label: document.getElementById('cr-perspective-draft-label')?.value?.trim() || '',
+    purpose: document.getElementById('cr-perspective-draft-purpose')?.value?.trim() || '',
+    questions: _crPerspectiveDraftLines(document.getElementById('cr-perspective-draft-questions')?.value || ''),
+    challenges: _crPerspectiveDraftLines(document.getElementById('cr-perspective-draft-challenges')?.value || ''),
+    limitations: _crPerspectiveDraftLines(document.getElementById('cr-perspective-draft-limitations')?.value || ''),
+  };
+}
+
+function _crValidatePerspectiveDraft(draft) {
+  if (!draft.label) return 'Name is required.';
+  if (draft.label.length > 80) return 'Name must be 80 characters or fewer.';
+  if (!draft.purpose) return 'Purpose / standpoint is required.';
+  if (draft.purpose.length > 1000) return 'Purpose / standpoint must be 1000 characters or fewer.';
+  if (!draft.questions.length) return 'At least one question is required.';
+  for (const field of ['questions', 'challenges', 'limitations']) {
+    const items = draft[field] || [];
+    if (items.length > 12) return `${field[0].toUpperCase()}${field.slice(1)} may contain at most 12 items.`;
+    if (items.some(item => item.length > 500)) return `${field[0].toUpperCase()}${field.slice(1)} items must be 500 characters or fewer.`;
+  }
+  return '';
+}
+
+function _crRenderPerspectiveDraftFrame(draft) {
+  const section = (title, items) => `
+    <div style="margin-top:7px">
+      <strong style="color:var(--fg2)">${x(title)}</strong><br>
+      ${items.length ? items.map(item => `• ${x(item)}`).join('<br>') : '<span>None.</span>'}
+    </div>`;
+  return `
+    <div class="e10-card" style="margin-top:0">
+      <div class="e10-meta">${x(draft.label)}</div>
+      <div><strong style="color:var(--fg2)">Purpose</strong><br>${x(draft.purpose)}</div>
+      ${section('Questions', draft.questions)}
+      ${section('Challenges', draft.challenges || [])}
+      ${section('Limitations', draft.limitations || [])}
+      <div class="e10-badges" style="margin-top:8px">
+        <span class="e10-badge">Draft · user-authored · not saved</span>
+      </div>
+    </div>`;
+}
+
+function _crPerspectiveDraftChanged() {
+  if (_crPerspectiveDraftActive) {
+    _crPerspectiveDraftDirty = true;
+  }
+  const state = document.getElementById('cr-perspective-draft-state');
+  if (state) state.textContent = _crPerspectiveDraftActive
+    ? 'Draft changed · apply before running'
+    : 'Draft not applied.';
+}
+
+function _crPreviewPerspectiveDraft() {
+  const draft = _crPerspectiveDraftPayload();
+  const error = _crValidatePerspectiveDraft(draft);
+  const preview = document.getElementById('cr-perspective-draft-preview');
+  if (error) {
+    if (preview) preview.innerHTML = `<div class="e10-empty" style="color:var(--yellow)">${x(error)}</div>`;
+    return null;
+  }
+  if (preview) preview.innerHTML = _crRenderPerspectiveDraftFrame(draft);
+  return draft;
+}
+
+function _crUsePerspectiveDraft() {
+  const draft = _crPreviewPerspectiveDraft();
+  if (!draft) return;
+  _crPerspectiveDraftActive = JSON.parse(JSON.stringify(draft));
+  _crPerspectiveDraftDirty = false;
+  const state = document.getElementById('cr-perspective-draft-state');
+  if (state) state.textContent = `${draft.label} · Draft applied for this inquiry`;
+}
+
+function _crSetPerspectiveKind(kind) {
+  _crPerspectiveKind = kind === 'custom' ? 'custom' : 'built-in';
+  document.getElementById('cr-perspective-kind-built-in')?.classList.toggle('active', _crPerspectiveKind === 'built-in');
+  document.getElementById('cr-perspective-kind-custom')?.classList.toggle('active', _crPerspectiveKind === 'custom');
+  const builtIn = document.getElementById('cr-perspective-built-in-panel');
+  const custom = document.getElementById('cr-perspective-custom-panel');
+  if (builtIn) builtIn.hidden = _crPerspectiveKind !== 'built-in';
+  if (custom) custom.hidden = _crPerspectiveKind !== 'custom';
+  const status = document.getElementById('cr-perspective-status');
+  if (status && _crPerspectiveMode === 'single') {
+    status.textContent = _crPerspectiveKind === 'custom'
+      ? 'Scope + Custom Draft Perspective + Question + Model'
+      : 'Scope + Perspective + Question + Model';
+  }
+}
 
 function _crPerspectiveCurrentPageScope() {
   const blocks = (_crCurrentExtractions || [])
@@ -9265,7 +9387,7 @@ function _crSetPerspectiveMode(mode) {
   const status = document.getElementById('cr-perspective-status');
   if (status) status.textContent = _crPerspectiveMode === 'room'
     ? 'Scope + Question + Model + Room'
-    : 'Scope + Perspective + Question + Model';
+    : (_crPerspectiveKind === 'custom' ? 'Scope + Custom Draft Perspective + Question + Model' : 'Scope + Perspective + Question + Model');
 }
 
 async function _crLoadPerspectiveRun() {
@@ -9309,6 +9431,7 @@ async function _crLoadPerspectiveRun() {
   } catch (e) {
     if (status) status.textContent = e.message;
   }
+  _crSetPerspectiveKind(_crPerspectiveKind);
   _crSetPerspectiveMode(_crPerspectiveMode);
 }
 
@@ -9335,6 +9458,31 @@ function _crScopeReceiptPreview(value, limit = 140) {
 function _crCountLabel(count, singular, plural) {
   const n = Number(count || 0);
   return `${n} ${n === 1 ? singular : plural}`;
+}
+
+function _crRenderPerspectiveDefinitionReceipt(perspective) {
+  const p = perspective || {};
+  const definition = p.definition || {};
+  if (p.origin !== 'user_authored_transient') {
+    return '';
+  }
+  const list = (title, items) => `
+    <div style="margin-top:7px">
+      <strong style="color:var(--fg2)">${x(title)}</strong><br>
+      ${(Array.isArray(items) && items.length) ? items.map(item => `• ${x(item)}`).join('<br>') : '<span>None.</span>'}
+    </div>`;
+  return `
+    <div class="e10-perspective-receipt" style="font-size:11px;color:var(--dim2);line-height:1.6;margin-top:10px">
+      <strong style="color:var(--fg2)">Perspective</strong><br>
+      ${x(p.label || '')}
+      <div style="margin-top:7px"><strong style="color:var(--fg2)">Origin</strong><br>User-authored transient draft</div>
+      <div style="margin-top:7px"><strong style="color:var(--fg2)">Definition fingerprint</strong><br>${x(p.definition_fingerprint || '')}</div>
+      <div style="margin-top:7px"><strong style="color:var(--fg2)">Frame</strong></div>
+      <div><strong style="color:var(--fg2)">Purpose</strong><br>${x(definition.purpose || '')}</div>
+      ${list('Questions', definition.questions || [])}
+      ${list('Challenges', definition.challenges || [])}
+      ${list('Limitations', definition.limitations || [])}
+    </div>`;
 }
 
 function _crRenderPerspectiveScopeReceipt(scopeReceipt) {
@@ -9496,6 +9644,16 @@ async function _crRunPerspective() {
     showAppError('Choose an installed local Ollama model before running a Perspective.');
     return;
   }
+  if (_crPerspectiveMode === 'single' && _crPerspectiveKind === 'custom') {
+    if (!_crPerspectiveDraftActive) {
+      showAppError('Preview and use a Custom Perspective draft before running.');
+      return;
+    }
+    if (_crPerspectiveDraftDirty) {
+      showAppError('Draft changed · apply before running.');
+      return;
+    }
+  }
   if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
   if (status) status.textContent = _crPerspectiveMode === 'room' ? 'Asking the local Room' : 'Running local Perspective';
   if (out) out.innerHTML = '<div class="e10-empty">Asking the selected local model…</div>';
@@ -9504,12 +9662,17 @@ async function _crRunPerspective() {
       question,
       model,
       scope: _crPerspectiveScope,
+    } : (_crPerspectiveKind === 'custom' ? {
+      perspective_draft: _crPerspectiveDraftActive,
+      question,
+      model,
+      scope: _crPerspectiveScope,
     } : {
       perspective_id: perspectiveId,
       question,
       model,
       scope: _crPerspectiveScope,
-    };
+    });
     const receipt = _crPerspectiveMode === 'room'
       ? await _crPostPerspectiveRoom(payload)
       : await post('/api/perspective/run', payload);
@@ -9529,6 +9692,7 @@ async function _crRunPerspective() {
           <span class="e10-badge">Perspective ${x(p.id || '')} v${x(p.version || '')}</span>
           <span class="e10-badge">Not in interpretation record</span>
         </div>
+        ${_crRenderPerspectiveDefinitionReceipt(p)}
         ${_crRenderPerspectiveScopeReceipt(receipt.scope_receipt)}
         <div style="font-size:11px;color:var(--dim2);line-height:1.6;margin-top:10px">
           Runtime host: ${x(ex.runtime_host || '')}<br>

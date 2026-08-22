@@ -5,8 +5,12 @@ from hermeneia.perspective_runs import (
     PERSPECTIVE_DEFINITIONS,
     build_perspective_prompt,
     normalize_reader_selection_scope,
+    normalize_transient_perspective_draft,
     perspective_definition,
+    perspective_definitions_payload,
+    resolve_perspective_request,
     room_perspective_definitions,
+    transient_perspective_fingerprint,
 )
 
 
@@ -33,6 +37,152 @@ def test_perspective_definitions_are_frame_semantics_not_execution_or_style() ->
         assert payload["challenges"]
         assert payload["limitations"]
         assert forbidden.isdisjoint(payload)
+
+
+def test_builtin_perspective_definitions_payload_is_unchanged_by_transient_builder() -> None:
+    assert perspective_definitions_payload() == [
+        definition.to_dict() for definition in PERSPECTIVE_DEFINITIONS
+    ]
+    assert all(
+        "origin" not in payload and "definition_fingerprint" not in payload
+        for payload in perspective_definitions_payload()
+    )
+
+
+def test_transient_perspective_draft_normalizes_and_fingerprints_frame_semantics() -> None:
+    first = normalize_transient_perspective_draft({
+        "name": " Institutional Trust Reader ",
+        "purpose": " Examine how institutions gain, lose, or borrow legitimacy. ",
+        "questions": [
+            " What source of authority is assumed here? ",
+            "",
+            "Who is expected to trust whom?",
+        ],
+        "challenges": " Challenge unsupported legitimacy claims. \n\n",
+        "limitations": [" May overemphasize institutions. "],
+    })
+    second = normalize_transient_perspective_draft({
+        "label": "Institutional Trust Reader",
+        "purpose": "Examine how institutions gain, lose, or borrow legitimacy.",
+        "questions": [
+            "What source of authority is assumed here?",
+            "Who is expected to trust whom?",
+        ],
+        "challenges": ["Challenge unsupported legitimacy claims."],
+        "limitations": ["May overemphasize institutions."],
+    })
+
+    assert first.definition == second.definition
+    assert first.receipt_metadata == second.receipt_metadata
+    assert first.definition.label == "Institutional Trust Reader"
+    assert first.definition.version == "draft"
+    assert first.definition.id.startswith("transient:")
+    assert first.receipt_metadata is not None
+    assert first.receipt_metadata["origin"] == "user_authored_transient"
+    assert first.receipt_metadata["definition_fingerprint"].startswith("sha256:")
+    assert first.receipt_metadata["definition"] == {
+        "label": "Institutional Trust Reader",
+        "purpose": "Examine how institutions gain, lose, or borrow legitimacy.",
+        "questions": [
+            "What source of authority is assumed here?",
+            "Who is expected to trust whom?",
+        ],
+        "challenges": ["Challenge unsupported legitimacy claims."],
+        "limitations": ["May overemphasize institutions."],
+    }
+
+
+def test_transient_perspective_fingerprint_is_only_frame_semantics() -> None:
+    base = normalize_transient_perspective_draft({
+        "label": "Institutional Trust Reader",
+        "purpose": "Examine trust.",
+        "questions": ["Who trusts whom?"],
+        "challenges": ["Challenge unsupported authority."],
+        "limitations": ["May overemphasize institutions."],
+    }).definition
+    same = normalize_transient_perspective_draft({
+        "label": "Institutional Trust Reader",
+        "purpose": "Examine trust.",
+        "questions": ["Who trusts whom?"],
+        "challenges": ["Challenge unsupported authority."],
+        "limitations": ["May overemphasize institutions."],
+    }).definition
+    changed = normalize_transient_perspective_draft({
+        "label": "Institutional Trust Reader",
+        "purpose": "Examine trust and authority.",
+        "questions": ["Who trusts whom?"],
+        "challenges": ["Challenge unsupported authority."],
+        "limitations": ["May overemphasize institutions."],
+    }).definition
+
+    assert transient_perspective_fingerprint(base) == transient_perspective_fingerprint(same)
+    assert transient_perspective_fingerprint(base) != transient_perspective_fingerprint(changed)
+
+    scope_a = normalize_reader_selection_scope({"primary": {"text": "A"}})
+    scope_b = normalize_reader_selection_scope({"primary": {"text": "B"}})
+    assert scope_a != scope_b
+    assert transient_perspective_fingerprint(base) == transient_perspective_fingerprint(same)
+
+
+def test_transient_perspective_requires_name_purpose_and_question() -> None:
+    for draft, expected in (
+        ({"purpose": "P", "questions": ["Q"]}, "name is required"),
+        ({"label": "L", "questions": ["Q"]}, "purpose is required"),
+        ({"label": "L", "purpose": "P", "questions": []}, "questions require at least one item"),
+    ):
+        try:
+            normalize_transient_perspective_draft(draft)
+        except ValueError as exc:
+            assert expected in str(exc)
+        else:
+            raise AssertionError("invalid transient Perspective draft was accepted")
+
+
+def test_transient_perspective_rejects_forbidden_execution_and_style_fields() -> None:
+    for field in ("model", "tone", "audience", "provider", "output_language"):
+        draft = {
+            "label": "Institutional Trust Reader",
+            "purpose": "Examine trust.",
+            "questions": ["Who trusts whom?"],
+            field: "not-frame-semantics",
+        }
+        try:
+            normalize_transient_perspective_draft(draft)
+        except ValueError as exc:
+            assert str(exc) == f"Unsupported Perspective field: {field}"
+        else:
+            raise AssertionError(f"{field} was accepted as a transient Perspective field")
+
+
+def test_resolve_perspective_request_requires_exactly_one_builtin_or_draft() -> None:
+    built_in = resolve_perspective_request(perspective_id="close-reader")
+    assert built_in.definition.id == "close-reader"
+    assert built_in.receipt_metadata is None
+
+    draft = resolve_perspective_request(perspective_draft={
+        "label": "Institutional Trust Reader",
+        "purpose": "Examine trust.",
+        "questions": ["Who trusts whom?"],
+    })
+    assert draft.definition.id.startswith("transient:")
+
+    for kwargs in (
+        {},
+        {
+            "perspective_id": "close-reader",
+            "perspective_draft": {
+                "label": "Institutional Trust Reader",
+                "purpose": "Examine trust.",
+                "questions": ["Who trusts whom?"],
+            },
+        },
+    ):
+        try:
+            resolve_perspective_request(**kwargs)
+        except ValueError as exc:
+            assert "exactly one" in str(exc)
+        else:
+            raise AssertionError("invalid Perspective request shape was accepted")
 
 
 def test_perspective_identity_is_stable_across_execution_models() -> None:

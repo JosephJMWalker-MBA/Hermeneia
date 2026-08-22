@@ -89,8 +89,8 @@ from ..perspective_runs import (
     build_perspective_receipt,
     build_perspective_room_receipt,
     normalize_reader_selection_scope,
-    perspective_definition,
     perspective_definitions_payload,
+    resolve_perspective_request,
     room_definitions_payload,
     room_perspective_definitions,
 )
@@ -3996,12 +3996,15 @@ def create_app(
     @app.route("/api/perspective/run", methods=["POST"])
     def api_perspective_run():
         payload = request.get_json(silent=True) or {}
-        perspective_id = str(payload.get("perspective_id") or "").strip()
         question = str(payload.get("question") or "").strip()
         raw_model = str(payload.get("model") or "").strip()
-        definition = perspective_definition(perspective_id)
-        if definition is None:
-            return jsonify({"error": "unknown Perspective"}), 400
+        try:
+            perspective = resolve_perspective_request(
+                perspective_id=payload.get("perspective_id"),
+                perspective_draft=payload.get("perspective_draft"),
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc), "configuration_valid": False}), 400
         if not question:
             return jsonify({"error": "question is required"}), 400
 
@@ -4016,7 +4019,7 @@ def create_app(
             body, status = error
             return jsonify(body), status
         result, run_error = _run_local_perspective(
-            definition,
+            perspective.definition,
             question=question,
             scope_receipt=scope_receipt,
             context=context,
@@ -4024,11 +4027,12 @@ def create_app(
         if run_error is not None:
             return jsonify(run_error), 502
         receipt = build_perspective_receipt(
-            definition,
+            perspective.definition,
             question=question,
             scope_receipt=scope_receipt,
             execution=result["execution"],
             response=result["response"],
+            perspective_metadata=perspective.receipt_metadata,
         )
         return jsonify(receipt), 201
 
