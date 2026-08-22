@@ -1,11 +1,16 @@
 # ADR-0045: Perspective Definition Revisions
 
-**Status:** PROPOSED
-**Version:** 0.1
+**Status:** RATIFIED
+**Version:** 1.0
 **Date:** 2026-08-22
-**Supersedes:** ADR-0015 in part, IF RATIFIED
+**Supersedes:** ADR-0015 in part
+**Ratified by:** Primary Human Steward
 **Related question:** Q-P0-003
 **Related issues:** #156, #157, #158, #159
+
+**Ratified proposal HEAD:** `2287e115998b8a1a036369e09f04dac503d303f6`
+**Review outcome:** Accepted with no outstanding counterexamples after
+amendment review.
 
 ---
 
@@ -144,11 +149,11 @@ Each saved rich frame revision is a distinct immutable canonical Perspective.
 Semantic identity is content-derived. Revision lineage is append-only through
 SupersessionRelation.
 
-This is the proposed decision.
+This is the ratified decision.
 
 ---
 
-## Proposed Decision
+## Decision
 
 A durable Perspective is one exact immutable human-declared revision
 occurrence carrying one exact immutable interpretive frame definition.
@@ -164,8 +169,8 @@ Do not introduce a second canonical ontology object named `PerspectiveProfile`,
 
 ## Formal Definition
 
-For newly saved rich Perspectives after ratification and implementation, the
-semantic definition of a Perspective is:
+For newly saved rich Perspectives after implementation, the semantic definition
+of a Perspective is:
 
 ```text
 label
@@ -362,7 +367,7 @@ This matches the current transient #171 representation.
 
 No Unicode normalization such as NFC or NFKC is applied in frame-v2. This is
 intentional: preserving exact compatibility with #171 takes precedence over
-introducing new normalization in this proposed amendment.
+introducing new normalization in this amendment.
 
 If a transient frame is saved without semantic change, its transient
 definition fingerprint should equal the saved canonical definition fingerprint.
@@ -941,7 +946,7 @@ other new canonical object.
 
 ### ADR-0015
 
-Partially superseded if ratified. See "Exact Partial Supersession Scope."
+Partially superseded. See "Exact Partial Supersession Scope."
 
 ### ADR-0021
 
@@ -1029,8 +1034,8 @@ Future implementation should add tests proving:
 
 ## Exact Partial Supersession Scope Of ADR-0015
 
-If ratified, this ADR supersedes only these ADR-0015 rules for newly saved
-rich-frame Perspectives:
+This ADR supersedes only these ADR-0015 rules for newly saved rich-frame
+Perspectives:
 
 - `Perspective.id` as only a deterministic hash of `canonical_label`.
 - `canonical_label` as globally unique for all Perspectives.
@@ -1085,6 +1090,4 @@ This ADR does not:
 - add saved custom Room membership;
 - add Perspective/model assignments;
 - add Model Observatory analytics;
-- ratify itself;
 - edit ADR-0015;
-- update the Authority Index supersession register before ratification.

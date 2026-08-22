@@ -105,17 +105,19 @@ If Claims are not first-class objects, every derived statement is attributed to 
 ### Q-P0-003: What distinguishes Interpretation from Perspective?
 
 **Priority:** P0  
-**Status:** Under Amendment
-**Active authority:** [ADR-0015](docs/adr/ADR-0015-interpretation-vs-perspective.md)
-**Proposed successor:** [ADR-0045](docs/adr/ADR-0045-perspective-definition-revisions.md)
-**ADR:** [ADR-0015](docs/adr/ADR-0015-interpretation-vs-perspective.md)  
-**Ratified:** 2026-06-18  
+**Status:** Ratified
+**Active authority:** [ADR-0045](docs/adr/ADR-0045-perspective-definition-revisions.md)
+**ADR:** [ADR-0045](docs/adr/ADR-0045-perspective-definition-revisions.md)
+**Current ratification:** 2026-08-22
+**Original authority:** [ADR-0015](docs/adr/ADR-0015-interpretation-vs-perspective.md)
+**Original ratification:** 2026-06-18
+**Amendment lineage:** ADR-0015 -> ADR-0045
 **Constitutional Cost of Error:** Existential  
 **Dependencies:** Q-P0-001, Q-P0-002
 
-**Amendment note:** ADR-0015 remains active unless and until ADR-0045 is
-explicitly ratified. No implementation of affected durable Perspective
-identity or storage semantics should proceed while this amendment is unresolved.
+**Amendment note:** ADR-0045 was ratified on 2026-08-22 and partially
+supersedes ADR-0015 only within the scope recorded in the Authority Index.
+ADR-0015 remains authoritative for its unaffected decisions.
 
 **The question:**
 The ontology spec names both `Interpretation` and `Perspective` as canonical objects. Their relationship is not formally defined.
