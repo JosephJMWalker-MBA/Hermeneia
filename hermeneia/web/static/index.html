@@ -2786,8 +2786,12 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       </div>
       <div class="cr-fln-body">
         <div class="cr-fln-hint" style="margin-bottom:10px">A proposed reading over one explicit Reader selection. Nothing here enters the interpretation record unless you later promote an idea through a governed path.</div>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap" aria-label="Perspective run mode">
+          <button class="cr-bottom-workstation-tab active" id="cr-perspective-mode-single" type="button" onclick="_crSetPerspectiveMode('single')">Single Perspective</button>
+          <button class="cr-bottom-workstation-tab" id="cr-perspective-mode-room" type="button" onclick="_crSetPerspectiveMode('room')">Ask the Room</button>
+        </div>
         <div style="display:grid;grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) minmax(180px,1fr);gap:10px;margin-bottom:10px">
-          <div>
+          <div id="cr-perspective-select-wrap">
             <label class="cr-form-label" for="cr-perspective-select">Perspective</label>
             <select class="ob-extract-provider" id="cr-perspective-select" style="width:100%"></select>
           </div>
@@ -2800,6 +2804,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
             <div id="cr-perspective-scope-chip" style="font-size:12px;color:var(--dim2);line-height:1.5">No Reader selection.</div>
           </div>
         </div>
+        <div id="cr-perspective-room-plan" hidden style="font-size:12px;color:var(--dim2);line-height:1.6;margin-bottom:10px"></div>
         <label class="cr-form-label" for="cr-perspective-question">Question</label>
         <textarea id="cr-perspective-question" rows="2" placeholder="What tension in this passage deserves more attention?" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;line-height:1.5;padding:7px 9px;resize:vertical"></textarea>
         <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
@@ -9112,8 +9117,10 @@ function _crCloseBottomWorkstation() {
 // returns a proposed reading. It deliberately does not create a canonical
 // Interpretation or alter the selected Connection default model.
 let _crPerspectiveDefinitions = [];
+let _crPerspectiveRoomDefinitions = [];
 let _crPerspectiveScope = null;
 let _crPerspectiveLastReceipt = null;
+let _crPerspectiveMode = 'single';
 
 function _crPerspectiveScopeFromSelection(selection = null) {
   const resolved = selection || _crGetReaderSelection({ refresh: false, fallback: true });
@@ -9146,6 +9153,37 @@ function _crPerspectiveRenderScope() {
   chip.innerHTML = `<strong>Selected passage</strong> · ${x(loc)}<br><span style="color:var(--fg2)">"${x(text.slice(0, 140))}${text.length > 140 ? '…' : ''}"</span>`;
 }
 
+function _crRenderPerspectiveRoomPlan() {
+  const roomPlan = document.getElementById('cr-perspective-room-plan');
+  if (!roomPlan) return;
+  if (!_crPerspectiveRoomDefinitions.length) {
+    roomPlan.innerHTML = '<strong style="color:var(--fg2)">Room</strong><br><span style="color:var(--yellow)">Room definition unavailable.</span>';
+    return;
+  }
+  roomPlan.innerHTML = `<strong style="color:var(--fg2)">Room</strong><br>${
+    _crPerspectiveRoomDefinitions.map((p, idx) =>
+      `${x(p.order || idx + 1)} ${x(p.label || p.id || 'Perspective')}`
+    ).join('<br>')
+  }`;
+}
+
+function _crSetPerspectiveMode(mode) {
+  _crPerspectiveMode = mode === 'room' ? 'room' : 'single';
+  document.getElementById('cr-perspective-mode-single')?.classList.toggle('active', _crPerspectiveMode === 'single');
+  document.getElementById('cr-perspective-mode-room')?.classList.toggle('active', _crPerspectiveMode === 'room');
+  const selectWrap = document.getElementById('cr-perspective-select-wrap');
+  if (selectWrap) selectWrap.hidden = _crPerspectiveMode === 'room';
+  const roomPlan = document.getElementById('cr-perspective-room-plan');
+  if (roomPlan) roomPlan.hidden = _crPerspectiveMode !== 'room';
+  _crRenderPerspectiveRoomPlan();
+  const btn = document.getElementById('cr-perspective-run-btn');
+  if (btn) btn.textContent = _crPerspectiveMode === 'room' ? 'Ask the Room' : 'Run Perspective';
+  const status = document.getElementById('cr-perspective-status');
+  if (status) status.textContent = _crPerspectiveMode === 'room'
+    ? 'Scope + Question + Model + Room'
+    : 'Scope + Perspective + Question + Model';
+}
+
 async function _crLoadPerspectiveRun() {
   const status = document.getElementById('cr-perspective-status');
   const pSel = document.getElementById('cr-perspective-select');
@@ -9161,6 +9199,7 @@ async function _crLoadPerspectiveRun() {
       get('/api/e10/providers'),
     ]);
     _crPerspectiveDefinitions = defs.perspectives || [];
+    _crPerspectiveRoomDefinitions = defs.default_room || [];
     if (pSel) {
       pSel.innerHTML = _crPerspectiveDefinitions.map(p =>
         `<option value="${x(p.id)}">${x(p.label)} · v${x(p.version)}</option>`
@@ -9186,6 +9225,7 @@ async function _crLoadPerspectiveRun() {
   } catch (e) {
     if (status) status.textContent = e.message;
   }
+  _crSetPerspectiveMode(_crPerspectiveMode);
 }
 
 async function _crPerspectiveRefreshScope() {
@@ -9200,6 +9240,71 @@ async function _crPerspectiveFromSelection() {
   _crHideToolbar();
   await _crOpenBottomWorkstation('perspective');
   document.getElementById('cr-perspective-question')?.focus();
+}
+
+async function _crPostPerspectiveRoom(payload) {
+  const response = await runtimeApiFetch('/api/perspective/room', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload || {}),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok && data.operation !== 'perspective_room') {
+    throw new RuntimeHttpError(data.error || `HTTP ${response.status}`, response, data);
+  }
+  if (!response.ok && data.operation === 'perspective_room') {
+    showAppError(data.error || 'Ask the Room stopped before every Perspective responded.');
+  } else {
+    clearAppError();
+  }
+  return data;
+}
+
+function _crRenderPerspectiveRoom(receipt, model) {
+  const participants = receipt.participants || [];
+  const rowHtml = participants.map(row => {
+    const status = String(row.status || '');
+    const plannedModel = receipt.model?.model_id || model || '';
+    let body = row.response || '';
+    const badges = [
+      `<span class="e10-badge">Perspective ${x(row.perspective?.id || '')} v${x(row.perspective?.version || '')}</span>`,
+    ];
+    if (status === 'succeeded') {
+      badges.push(`<span class="e10-badge">${x(row.execution?.provider_id || '')} / ${x(row.execution?.model_id || '')}</span>`);
+      badges.push('<span class="e10-badge">Proposed reading · not in interpretation record</span>');
+    } else if (status === 'failed') {
+      body = row.error || 'Local Perspective execution failed.';
+      if (row.execution?.provider_id || row.execution?.model_id) {
+        badges.push(`<span class="e10-badge">Attempted ${x(row.execution?.provider_id || '')} / ${x(row.execution?.model_id || '')}</span>`);
+      }
+      badges.push('<span class="e10-badge">Execution failed · no proposed reading</span>');
+    } else if (status === 'not_run') {
+      body = 'Not run because an earlier Perspective failed.';
+      if (plannedModel) badges.push(`<span class="e10-badge">Planned model: ${x(plannedModel)}</span>`);
+      badges.push('<span class="e10-badge">Not executed · no proposed reading</span>');
+    } else {
+      body = body || 'No proposed reading.';
+      badges.push('<span class="e10-badge">No proposed reading</span>');
+    }
+    return `
+      <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
+        <div class="e10-meta">${x(row.perspective?.label || row.perspective?.id || 'Perspective')} · ${x(status)}</div>
+        <div class="e10-text" style="white-space:pre-wrap">${x(body)}</div>
+        <div class="e10-badges">${badges.join('')}</div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="e10-card">
+      <div class="e10-meta">Ask the Room · via ${x(receipt.model?.provider_id || 'ollama-local')} / ${x(receipt.model?.model_id || model)}</div>
+      <div class="e10-badges">
+        <span class="e10-badge">Scope used: Selected passage</span>
+        <span class="e10-badge">Proposed readings · not in interpretation record</span>
+      </div>
+      <div style="font-size:12px;color:var(--dim2);line-height:1.6;margin-top:10px">
+        <strong style="color:var(--fg2)">You</strong><br>${x(receipt.question || '')}
+      </div>
+      ${rowHtml}
+    </div>`;
 }
 
 async function _crRunPerspective() {
@@ -9224,16 +9329,28 @@ async function _crRunPerspective() {
     return;
   }
   if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
-  if (status) status.textContent = 'Running local Perspective';
+  if (status) status.textContent = _crPerspectiveMode === 'room' ? 'Asking the local Room' : 'Running local Perspective';
   if (out) out.innerHTML = '<div class="e10-empty">Asking the selected local model…</div>';
   try {
-    const receipt = await post('/api/perspective/run', {
+    const payload = _crPerspectiveMode === 'room' ? {
+      question,
+      model,
+      scope: _crPerspectiveScope,
+    } : {
       perspective_id: perspectiveId,
       question,
       model,
       scope: _crPerspectiveScope,
-    });
+    };
+    const receipt = _crPerspectiveMode === 'room'
+      ? await _crPostPerspectiveRoom(payload)
+      : await post('/api/perspective/run', payload);
     _crPerspectiveLastReceipt = receipt;
+    if (_crPerspectiveMode === 'room') {
+      if (out) out.innerHTML = _crRenderPerspectiveRoom(receipt, model);
+      if (status) status.textContent = receipt.status === 'succeeded' ? 'Room proposed readings' : 'Room stopped early';
+      return;
+    }
     const p = receipt.perspective || {};
     const ex = receipt.execution || {};
     const scope = receipt.scope_receipt?.primary || {};
@@ -9257,13 +9374,14 @@ async function _crRunPerspective() {
     if (out) out.innerHTML = `<div class="e10-empty" style="color:var(--red)">${x(e.message)}</div>`;
     if (status) status.textContent = 'Unavailable';
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Run Perspective'; }
+    if (btn) { btn.disabled = false; btn.textContent = _crPerspectiveMode === 'room' ? 'Ask the Room' : 'Run Perspective'; }
   }
 }
 
 window._crPerspectiveFromSelection = _crPerspectiveFromSelection;
 window._crLoadPerspectiveRun = _crLoadPerspectiveRun;
 window._crRunPerspective = _crRunPerspective;
+window._crSetPerspectiveMode = _crSetPerspectiveMode;
 // ── Thesis → Blueprint (bottom workstation "Blueprint" tab) ──────────────
 // Forward path: turn the governing question + what the reader has captured into
 // a proposed Intent Hypothesis. Reuses POST /api/pipeline/extract-blueprint —

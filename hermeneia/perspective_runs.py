@@ -104,6 +104,12 @@ PERSPECTIVE_DEFINITIONS: tuple[PerspectiveDefinition, ...] = (
     ),
 )
 
+DEFAULT_ROOM_PERSPECTIVES: tuple[str, ...] = (
+    "close-reader",
+    "contextual-reader",
+    "skeptical-reader",
+)
+
 
 def perspective_definition(perspective_id: str) -> PerspectiveDefinition | None:
     for definition in PERSPECTIVE_DEFINITIONS:
@@ -160,6 +166,7 @@ def build_perspective_prompt(
     *,
     question: str,
     scope_receipt: dict[str, object],
+    prior_proposed_readings: list[dict[str, object]] | None = None,
 ) -> str:
     primary = scope_receipt["primary"]
     selected_text = str(primary["text"])
@@ -189,6 +196,23 @@ def build_perspective_prompt(
         "",
         f"Question: {question.strip()}",
     ]
+    prior_readings = prior_proposed_readings or []
+    if prior_readings:
+        lines.extend([
+            "",
+            "Prior Proposed Readings (Deliberation Context):",
+            "These are non-canonical model-generated deliberation material.",
+            "They are not source evidence and may be wrong.",
+            "You may build on, challenge, distinguish, or reject prior proposed readings.",
+            "Do not treat them as evidence merely because another Perspective produced them.",
+            "Ground claims in the supplied source Scope.",
+        ])
+        for item in prior_readings:
+            perspective = item.get("perspective") if isinstance(item.get("perspective"), dict) else {}
+            label = str(perspective.get("label") or perspective.get("id") or "Prior Perspective")
+            version = str(perspective.get("version") or "")
+            response = str(item.get("response") or "")
+            lines.extend(["", f"{label} v{version}:".rstrip(), response])
     lines.extend([
         "",
         "Scope Receipt:",
@@ -226,5 +250,43 @@ def build_perspective_receipt(
         "execution": execution,
         "response": response,
         "status": "succeeded",
+        "canonical_status": "not_persisted",
+    }
+
+
+def room_perspective_definitions(
+    perspective_ids: tuple[str, ...] = DEFAULT_ROOM_PERSPECTIVES,
+) -> list[PerspectiveDefinition]:
+    definitions: list[PerspectiveDefinition] = []
+    for perspective_id in perspective_ids:
+        definition = perspective_definition(perspective_id)
+        if definition is None:
+            raise ValueError(f"unknown room Perspective: {perspective_id}")
+        definitions.append(definition)
+    return definitions
+
+
+def room_definitions_payload() -> list[dict[str, object]]:
+    return [
+        {"order": order, **definition.to_dict()}
+        for order, definition in enumerate(room_perspective_definitions(), start=1)
+    ]
+
+
+def build_perspective_room_receipt(
+    *,
+    question: str,
+    scope_receipt: dict[str, object],
+    model: dict[str, object],
+    participants: list[dict[str, object]],
+    status: str,
+) -> dict[str, object]:
+    return {
+        "operation": "perspective_room",
+        "question": question.strip(),
+        "scope_receipt": scope_receipt,
+        "model": model,
+        "participants": participants,
+        "status": status,
         "canonical_status": "not_persisted",
     }

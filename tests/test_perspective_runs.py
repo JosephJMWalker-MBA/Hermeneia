@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from hermeneia.perspective_runs import (
+    DEFAULT_ROOM_PERSPECTIVES,
     PERSPECTIVE_DEFINITIONS,
     build_perspective_prompt,
     normalize_reader_selection_scope,
     perspective_definition,
+    room_perspective_definitions,
 )
 
 
@@ -62,6 +64,53 @@ def test_perspective_identity_is_stable_across_execution_models() -> None:
     assert (definition.id, definition.version) == before
     assert "qwen" not in first.lower()
     assert "llama" not in second.lower()
+
+
+def test_default_room_order_uses_reader_perspectives_without_critic_or_synthesizer() -> None:
+    assert DEFAULT_ROOM_PERSPECTIVES == (
+        "close-reader",
+        "contextual-reader",
+        "skeptical-reader",
+    )
+    definitions = room_perspective_definitions()
+    assert [definition.id for definition in definitions] == list(DEFAULT_ROOM_PERSPECTIVES)
+    labels = [definition.label for definition in definitions]
+    assert labels == ["Close Reader", "Contextual Reader", "Skeptical Reader"]
+    assert "Synthesizer" not in labels
+    assert "Skeptical Critic" not in labels
+
+
+def test_prior_room_responses_are_deliberation_context_not_scope() -> None:
+    definition = perspective_definition("contextual-reader")
+    assert definition is not None
+    scope_receipt = normalize_reader_selection_scope({
+        "primary": {
+            "kind": "reader_selection",
+            "text": "Only selected source text.",
+        },
+    })
+    prior = [{
+        "perspective": {
+            "id": "close-reader",
+            "version": "1",
+            "label": "Close Reader",
+        },
+        "response": "Prior proposed reading A.",
+    }]
+
+    prompt = build_perspective_prompt(
+        definition,
+        question="What is being tested?",
+        scope_receipt=scope_receipt,
+        prior_proposed_readings=prior,
+    )
+
+    assert "Selected Reader passage:\nOnly selected source text." in prompt
+    assert "Prior Proposed Readings (Deliberation Context):" in prompt
+    assert "not source evidence" in prompt
+    assert "may be wrong" in prompt
+    assert "Prior proposed reading A." in prompt
+    assert "Prior proposed reading A." not in str(scope_receipt)
 
 
 def test_reader_selection_scope_receipt_is_explicit_and_excludes_broader_workspace() -> None:

@@ -73,6 +73,8 @@ class _FakeOllamaClient:
 class _CapturingProvider:
     calls: list[dict] = []
     render_prompts: list[str] = []
+    render_responses: list[str] = []
+    fail_on_render_calls: set[int] = set()
 
     def __init__(self, model: str | None = None, **kwargs) -> None:
         self.model = model
@@ -85,8 +87,13 @@ class _CapturingProvider:
 
     def render(self, prompt: str) -> str:
         self.__class__.render_prompts.append(prompt)
+        call_number = len(self.__class__.render_prompts)
+        if call_number in self.__class__.fail_on_render_calls:
+            raise RuntimeError("simulated local model failure")
         if "ONLY valid JSON" in prompt:
             return '{"bucket":"symbol_and_imagery","confidence":"high","rationale":"test"}'
+        if self.__class__.render_responses:
+            return self.__class__.render_responses.pop(0)
         return "Selected model response anchored in the observation."
 
     def test_connection(self) -> None:
@@ -237,6 +244,10 @@ def _install_fake_ollama(
     _FakeOllamaClient.pull_block_event = None
     _FakeOllamaClient.pull_fail_after_block = None
     _FakeOllamaClient.hosts = []
+    _CapturingProvider.calls = []
+    _CapturingProvider.render_prompts = []
+    _CapturingProvider.render_responses = []
+    _CapturingProvider.fail_on_render_calls = set()
     monkeypatch.setitem(
         sys.modules,
         "ollama",
@@ -2718,6 +2729,198 @@ def test_perspective_run_missing_or_offline_local_model_fails_without_fallback(
     assert offline.get_json()["provider_id"] == "ollama-local"
 
 
+def test_perspective_room_requires_explicit_scope_question_and_local_model(tmp_path, monkeypatch):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    client = create_app(
+        db_path=tmp_path / "perspective.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    missing_scope = client.post(
+        "/api/perspective/room",
+        json={
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+        },
+    )
+    missing_question = client.post(
+        "/api/perspective/room",
+        json={
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(),
+        },
+    )
+    missing_model = client.post(
+        "/api/perspective/room",
+        json={
+            "question": "What matters?",
+            "scope": _reader_selection_scope(),
+        },
+    )
+
+    assert missing_scope.status_code == 400
+    assert "selected Reader text" in missing_scope.get_json()["error"]
+    assert missing_question.status_code == 400
+    assert "question is required" in missing_question.get_json()["error"]
+    assert missing_model.status_code == 400
+    assert "model is required" in missing_model.get_json()["error"]
+
+
+def test_perspective_room_sequences_three_perspectives_with_one_scope_question_and_model(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("OPENAI_API_KEY", "ambient-openai-key-that-must-not-be-used")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "ambient-anthropic-key-that-must-not-be-used")
+    _install_fake_ollama(monkeypatch, ["qwen3:4b", "qwen2.5:0.5b"])
+    _CapturingProvider.render_responses = [
+        "Close reading A.",
+        "Contextual reading B.",
+        "Skeptical reading C.",
+    ]
+    db_path = tmp_path / "perspective-room.db"
+    store = SQLiteStore(db_path)
+    _seed_full_chain(store)
+    store.close()
+    before = _canonical_counts(db_path)
+    client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
+    selected = client.put("/api/e10/providers/local/model", json={"model": "qwen3:4b"})
+    assert selected.status_code == 200
+
+    response = client.post(
+        "/api/perspective/room",
+        json={
+            "question": "What is this passage asking us to notice?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope("Room source text only."),
+            "governing_question": "Ambient thesis must not enter the Room.",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.get_json()
+    assert body["operation"] == "perspective_room"
+    assert body["canonical_status"] == "not_persisted"
+    assert body["status"] == "succeeded"
+    assert body["question"] == "What is this passage asking us to notice?"
+    assert body["model"]["provider_id"] == "ollama-local"
+    assert body["model"]["model_id"] == "qwen2.5:0.5b"
+    assert body["model"]["selection_source"] == "per_run"
+    assert body["scope_receipt"]["primary"]["text"] == "Room source text only."
+    assert body["scope_receipt"]["included"]["governing_question"] is False
+    assert "governing_question_text" not in body["scope_receipt"]
+    assert [row["perspective"]["id"] for row in body["participants"]] == [
+        "close-reader",
+        "contextual-reader",
+        "skeptical-reader",
+    ]
+    assert [row["prior_participant_ids"] for row in body["participants"]] == [
+        [],
+        ["close-reader"],
+        ["close-reader", "contextual-reader"],
+    ]
+    assert [row["response"] for row in body["participants"]] == [
+        "Close reading A.",
+        "Contextual reading B.",
+        "Skeptical reading C.",
+    ]
+    assert all(row["execution"]["model_id"] == "qwen2.5:0.5b" for row in body["participants"])
+    assert all(row["execution"]["provider_id"] == "ollama-local" for row in body["participants"])
+    assert all(row["canonical_status"] == "not_persisted" for row in body["participants"])
+    assert len(_CapturingProvider.calls) == 3
+    assert {call["model"] for call in _CapturingProvider.calls} == {"qwen2.5:0.5b"}
+    first_prompt, second_prompt, third_prompt = _CapturingProvider.render_prompts
+    assert "Prior Proposed Readings" not in first_prompt
+    assert "Close reading A." in second_prompt
+    assert "Close reading A." in third_prompt
+    assert "Contextual reading B." in third_prompt
+    assert "non-canonical model-generated deliberation material" in second_prompt
+    assert "not source evidence" in second_prompt
+    assert "Ambient thesis must not enter the Room." not in "\n".join(_CapturingProvider.render_prompts)
+    assert "Room source text only." in first_prompt
+    assert "Room source text only." in second_prompt
+    assert "Room source text only." in third_prompt
+    assert "Close reading A." not in str(body["scope_receipt"])
+    assert _canonical_counts(db_path) == before
+
+    providers = client.get("/api/e10/providers").get_json()["providers"]
+    local = next(row for row in providers if row["participant"] == "local")
+    assert local["selected_model"] == "qwen3:4b"
+
+
+def test_perspective_room_missing_or_offline_local_model_fails_before_execution(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    client = create_app(
+        db_path=tmp_path / "perspective-room.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    missing = client.post(
+        "/api/perspective/room",
+        json={
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(),
+        },
+    )
+    assert missing.status_code == 409
+    assert "not installed" in missing.get_json()["error"]
+    assert _CapturingProvider.calls == []
+
+    _install_fake_ollama(monkeypatch, [], error=ConnectionError("offline"))
+    offline = client.post(
+        "/api/perspective/room",
+        json={
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(),
+        },
+    )
+    assert offline.status_code == 409
+    assert offline.get_json()["runtime_status"] == "offline"
+    assert _CapturingProvider.calls == []
+
+
+def test_perspective_room_mid_failure_preserves_prior_and_marks_later_not_run(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    _CapturingProvider.render_responses = ["Close reading A."]
+    _CapturingProvider.fail_on_render_calls = {2}
+    client = create_app(
+        db_path=tmp_path / "perspective-room.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    response = client.post(
+        "/api/perspective/room",
+        json={
+            "question": "What stops the sequence?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(),
+        },
+    )
+
+    assert response.status_code == 502
+    body = response.get_json()
+    assert body["operation"] == "perspective_room"
+    assert body["status"] == "failed"
+    participants = body["participants"]
+    assert [row["status"] for row in participants] == ["succeeded", "failed", "not_run"]
+    assert participants[0]["response"] == "Close reading A."
+    assert participants[1]["prior_participant_ids"] == ["close-reader"]
+    assert participants[1]["perspective"]["id"] == "contextual-reader"
+    assert "failed" in participants[1]["error"]
+    assert participants[2]["prior_participant_ids"] == ["close-reader"]
+    assert "response" not in participants[2]
+    assert len(_CapturingProvider.render_prompts) == 2
+    assert _CapturingProvider.render_prompts[1].count("Close reading A.") == 1
+
+
 def test_perspective_run_ui_separates_scope_perspective_question_and_model():
     index_html = (
         Path(__file__).parent.parent
@@ -2747,3 +2950,51 @@ def test_perspective_run_ui_separates_scope_perspective_question_and_model():
     assert "governing_question: false" in perspective_js
     assert "Local Ollama only · no cloud fallback" in index_html
     assert "Not in interpretation record" in index_html
+
+
+def test_perspective_room_ui_is_contextual_without_permanent_tab():
+    index_html = (
+        Path(__file__).parent.parent
+        / "hermeneia"
+        / "web"
+        / "static"
+        / "index.html"
+    ).read_text()
+    perspective_js = index_html.split("// ── Perspective Run", 1)[1].split("// ── Thesis", 1)[0]
+
+    assert "cr-bottom-tab-perspective" not in index_html
+    assert "Ask the Room" in index_html
+    assert "cr-perspective-mode-room" in index_html
+    assert '<div id="cr-perspective-room-plan" hidden' in index_html
+    assert "1 Close Reader" not in index_html
+    assert "2 Contextual Reader" not in index_html
+    assert "3 Skeptical Reader" not in index_html
+    assert "_crPerspectiveRoomDefinitions = defs.default_room || []" in perspective_js
+    assert "function _crRenderPerspectiveRoomPlan()" in perspective_js
+    assert "_crPerspectiveRoomDefinitions.map((p, idx)" in perspective_js
+    assert "/api/perspective/room" in perspective_js
+    assert "Final answer" not in perspective_js
+    assert "Consensus" not in perspective_js
+    assert "q.value = 'What tension" not in perspective_js
+
+
+def test_perspective_room_ui_renders_participant_status_truthfully():
+    index_html = (
+        Path(__file__).parent.parent
+        / "hermeneia"
+        / "web"
+        / "static"
+        / "index.html"
+    ).read_text()
+    perspective_js = index_html.split("function _crRenderPerspectiveRoom(", 1)[1].split("async function _crRunPerspective", 1)[0]
+
+    assert "status === 'succeeded'" in perspective_js
+    assert "Proposed reading · not in interpretation record" in perspective_js
+    assert "status === 'failed'" in perspective_js
+    assert "Execution failed · no proposed reading" in perspective_js
+    assert "status === 'not_run'" in perspective_js
+    assert "Not run because an earlier Perspective failed." in perspective_js
+    assert "Not executed · no proposed reading" in perspective_js
+    assert "Planned model:" in perspective_js
+    assert "row.execution?.provider_id || receipt.model?.provider_id" not in perspective_js
+    assert "row.execution?.model_id || receipt.model?.model_id" not in perspective_js
