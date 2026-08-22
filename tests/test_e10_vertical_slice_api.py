@@ -3304,6 +3304,7 @@ def test_perspective_run_ui_separates_scope_perspective_question_and_model():
     assert "Save new revision" in index_html
     assert "Declared by" in index_html
     assert "Revision reason" in index_html
+    assert "Review declaration identity, then save." in index_html
     assert "/api/perspective/definitions" in index_html
     assert "/api/perspective/saved" in index_html
     assert "/api/perspective/run" in index_html

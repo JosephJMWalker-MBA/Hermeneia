@@ -7,6 +7,7 @@ asserted byte-for-byte.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -205,14 +206,48 @@ def test_wbs_10_without_perspectives_restores_as_before(tmp_path: Path):
     _export(src, bundle)
     (bundle / "study" / "perspectives.json").unlink()
     (bundle / "study" / "perspective_supersessions.json").unlink()
+    manifest_path = bundle / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["wbs_version"] = "1.0"
+    manifest["files"] = [
+        entry for entry in manifest["files"]
+        if entry["path"] not in {"study/perspectives.json", "study/perspective_supersessions.json"}
+    ]
+    manifest["counts"].pop("perspectives", None)
+    manifest["counts"].pop("perspective_supersessions", None)
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True, indent=2, ensure_ascii=False) + "\n")
 
     dst = tmp_path / "dst" / "workspace.db"
     dst.parent.mkdir(parents=True)
     result = restore_workspace(dst, bundle)
 
     assert result["restored"]["source_documents"] == 1
+    assert result["restored"]["reader_highlights"] == 1
     assert result["restored"]["perspectives"] == 0
     assert result["restored"]["perspective_supersessions"] == 0
+    store = SQLiteStore(dst)
+    try:
+        assert store.perspective_count() == 0
+        assert store._conn.execute("SELECT version FROM schema_version").fetchone()[0] == 17
+    finally:
+        store.close()
+
+
+def test_wbs_11_rejects_tampered_frame_v2_identity(tmp_path: Path):
+    src = tmp_path / "src" / "workspace.db"
+    src.parent.mkdir(parents=True)
+    _seed(src)
+    bundle = tmp_path / "bundle"
+    _export(src, bundle)
+    perspectives_path = bundle / "study" / "perspectives.json"
+    perspectives = json.loads(perspectives_path.read_text())
+    perspectives[0]["definition_fingerprint"] = "sha256:" + "0" * 64
+    perspectives_path.write_text(json.dumps(perspectives, sort_keys=True, indent=2, ensure_ascii=False) + "\n")
+
+    dst = tmp_path / "dst" / "workspace.db"
+    dst.parent.mkdir(parents=True)
+    with pytest.raises(RestoreError, match="fingerprint"):
+        restore_workspace(dst, bundle)
 
 
 # ── Preview + safety ───────────────────────────────────────────────────────

@@ -9317,8 +9317,13 @@ async function _crSavePerspectiveDraft() {
   const draft = _crPreviewPerspectiveDraft();
   const declaredBy = document.getElementById('cr-perspective-declared-by')?.value?.trim() || '';
   const state = document.getElementById('cr-perspective-draft-state');
-  document.getElementById('cr-perspective-declaration-panel').hidden = false;
   if (!draft) return;
+  const declarationPanel = document.getElementById('cr-perspective-declaration-panel');
+  if (declarationPanel?.hidden) {
+    declarationPanel.hidden = false;
+    if (state) state.textContent = 'Review declaration identity, then save.';
+    return;
+  }
   if (!declaredBy) {
     if (state) state.textContent = 'Declared by is required to save.';
     return;

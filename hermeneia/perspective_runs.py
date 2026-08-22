@@ -392,7 +392,6 @@ def build_perspective_prompt(
         "",
         f"Perspective: {definition.label}",
         f"Perspective ID: {definition.id}",
-        f"Perspective version: {definition.version}",
         f"Purpose: {definition.purpose}",
         "",
         "This Perspective tends to ask:",
@@ -417,6 +416,8 @@ def build_perspective_prompt(
         "The following selected Reader passage is the center of the Question.",
         selected_text,
     ]
+    if definition.version:
+        lines.insert(11, f"Perspective version: {definition.version}")
     current_pages = [item for item in supporting if item.get("kind") == "current_page"]
     if current_pages:
         lines.extend([
@@ -477,9 +478,10 @@ def build_perspective_receipt(
 ) -> dict[str, object]:
     perspective = {
         "id": definition.id,
-        "version": definition.version,
         "label": definition.label,
     }
+    if definition.version:
+        perspective["version"] = definition.version
     if perspective_metadata:
         perspective.update(perspective_metadata)
     return {

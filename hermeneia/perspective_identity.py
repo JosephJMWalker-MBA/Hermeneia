@@ -47,6 +47,18 @@ def _canonical_json(payload: dict[str, object]) -> str:
     return json.dumps(payload, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
 
 
+def canonical_frame_items_json(items: Any) -> str:
+    if isinstance(items, str):
+        parsed = json.loads(items)
+        if isinstance(parsed, dict):
+            items = parsed.get("items")
+        else:
+            items = parsed
+    if not isinstance(items, list):
+        items = []
+    return _canonical_json({"items": [str(item) for item in items]})
+
+
 def perspective_frame_v2_id(
     *,
     definition_fingerprint: str,
@@ -101,9 +113,9 @@ def frame_v2_row_from_draft(
         "identity_scheme": FRAME_V2_SCHEME,
         "definition_fingerprint": fingerprint,
         "purpose": definition.purpose,
-        "questions_json": _canonical_json({"items": semantics["questions"]}),
-        "challenges_json": _canonical_json({"items": semantics["challenges"]}),
-        "limitations_json": _canonical_json({"items": semantics["limitations"]}),
+        "questions_json": canonical_frame_items_json(semantics["questions"]),
+        "challenges_json": canonical_frame_items_json(semantics["challenges"]),
+        "limitations_json": canonical_frame_items_json(semantics["limitations"]),
         "declared_by": declared_by_clean,
         "declared_date": declared_date,
     }
@@ -126,13 +138,41 @@ def definition_from_frame_v2_row(row: dict[str, Any]) -> PerspectiveDefinition:
         raise ValueError("saved Perspective is not frame-v2")
     return PerspectiveDefinition(
         id=str(row["id"]),
-        version="1",
+        version="",
         label=str(row["name"]),
         purpose=str(row["purpose"] or ""),
         questions=_json_items(row.get("questions_json")),
         challenges=_json_items(row.get("challenges_json")),
         limitations=_json_items(row.get("limitations_json")),
     )
+
+
+def validate_frame_v2_row_identity(
+    row: dict[str, Any],
+    *,
+    predecessor_perspective_id: str | None = None,
+) -> None:
+    if row.get("identity_scheme") != FRAME_V2_SCHEME:
+        raise ValueError("saved Perspective is not frame-v2")
+    declared_by = normalize_declared_by(row.get("declared_by"))
+    definition = definition_from_frame_v2_row(row)
+    recomputed_fingerprint = transient_perspective_fingerprint(definition)
+    if row.get("definition_fingerprint") != recomputed_fingerprint:
+        raise ValueError("Perspective definition fingerprint does not match stored frame semantics.")
+    expected_id = perspective_frame_v2_id(
+        definition_fingerprint=recomputed_fingerprint,
+        declared_by=declared_by,
+        predecessor_perspective_id=predecessor_perspective_id,
+    )
+    if row.get("id") != expected_id:
+        raise ValueError("Perspective ID does not match its declaration context.")
+    for column, values in (
+        ("questions_json", definition.questions),
+        ("challenges_json", definition.challenges),
+        ("limitations_json", definition.limitations),
+    ):
+        if row.get(column) != canonical_frame_items_json(list(values)):
+            raise ValueError(f"Perspective {column} is not normalized.")
 
 
 def frame_v2_payload(row: dict[str, Any]) -> dict[str, object]:

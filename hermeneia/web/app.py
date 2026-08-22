@@ -3931,29 +3931,11 @@ def create_app(
         if not db_path.exists():
             rows = []
         else:
-            conn = _conn()
+            store = _store()
             try:
-                rows = [
-                    dict(row)
-                    for row in conn.execute(
-                        """
-                        SELECT p.*,
-                               CASE WHEN outgoing.old_id IS NULL THEN 1 ELSE 0 END AS is_current_leaf
-                        FROM perspectives p
-                        LEFT JOIN (
-                            SELECT DISTINCT old_id
-                            FROM supersession_relations
-                            WHERE old_id IN (SELECT id FROM perspectives)
-                              AND new_id IN (SELECT id FROM perspectives)
-                        ) outgoing ON outgoing.old_id = p.id
-                        WHERE p.identity_scheme = ?
-                        ORDER BY is_current_leaf DESC, p.name, p.declared_date, p.id
-                        """,
-                        (FRAME_V2_SCHEME,),
-                    ).fetchall()
-                ]
+                rows = store.all_frame_perspectives()
             finally:
-                conn.close()
+                store.close()
         return jsonify({
             "perspectives": [frame_v2_payload(row) for row in rows],
             "identity_scheme": FRAME_V2_SCHEME,
@@ -3966,40 +3948,18 @@ def create_app(
             incoming = []
             outgoing = []
         else:
-            conn = _conn()
+            store = _store()
             try:
-                fetched = conn.execute(
-                    "SELECT * FROM perspectives WHERE id = ?", (perspective_id,)
-                ).fetchone()
-                row = dict(fetched) if fetched else None
+                row = store.get_perspective_by_id(perspective_id)
                 if row is not None:
-                    has_outgoing = conn.execute(
-                        """
-                        SELECT 1 FROM supersession_relations
-                        WHERE old_id = ?
-                          AND new_id IN (SELECT id FROM perspectives)
-                        LIMIT 1
-                        """,
-                        (perspective_id,),
-                    ).fetchone()
-                    row["is_current_leaf"] = has_outgoing is None
-                    incoming = [
-                        dict(item) for item in conn.execute(
-                            "SELECT * FROM supersession_relations WHERE new_id = ? ORDER BY ratified_at, old_id",
-                            (perspective_id,),
-                        ).fetchall()
-                    ]
-                    outgoing = [
-                        dict(item) for item in conn.execute(
-                            "SELECT * FROM supersession_relations WHERE old_id = ? ORDER BY ratified_at, new_id",
-                            (perspective_id,),
-                        ).fetchall()
-                    ]
+                    row["is_current_leaf"] = store.perspective_is_current_leaf(perspective_id)
+                    incoming = store.supersessions_to(perspective_id)
+                    outgoing = store.supersessions_from(perspective_id)
                 else:
                     incoming = []
                     outgoing = []
             finally:
-                conn.close()
+                store.close()
         if row is None or row.get("identity_scheme") != FRAME_V2_SCHEME:
             return jsonify({"error": "unknown saved Perspective"}), 404
         payload = frame_v2_payload(row)

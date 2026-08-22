@@ -21,6 +21,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+from ..perspective_identity import FRAME_V2_SCHEME, validate_frame_v2_row_identity
 from ..storage.sqlite import SQLiteStore
 
 
@@ -181,25 +182,38 @@ def restore_workspace(
         # Insert in FK order; disable FK enforcement during the bulk load so a
         # partially-covered bundle cannot half-fail mid-restore.
         conn.execute("PRAGMA foreign_keys=OFF")
-        for table, _rel in _TABLE_FILES:
-            columns = _table_columns(conn, table)
-            rows = bundle["tables"][table]
-            restored[table] = _insert_rows(conn, table, rows, columns)
+        conn.execute("BEGIN")
+        try:
+            for table, _rel in _TABLE_FILES:
+                columns = _table_columns(conn, table)
+                rows = bundle["tables"][table]
+                restored[table] = _insert_rows(conn, table, rows, columns)
 
-        columns = _table_columns(conn, "supersession_relations")
-        restored["perspective_supersessions"] = _insert_rows(
-            conn,
-            "supersession_relations",
-            bundle["perspective_supersessions"],
-            columns,
-        )
+            columns = _table_columns(conn, "supersession_relations")
+            restored["perspective_supersessions"] = _insert_rows(
+                conn,
+                "supersession_relations",
+                bundle["perspective_supersessions"],
+                columns,
+            )
+            _validate_restored_perspective_graph(conn)
 
-        investigation = bundle["investigation"]
-        if investigation is not None:
-            _restore_investigation(conn, investigation)
-            restored["workspace_investigation"] = 1
-        conn.commit()
+            investigation = bundle["investigation"]
+            if investigation is not None:
+                _restore_investigation(conn, investigation)
+                restored["workspace_investigation"] = 1
+            conn.commit()
+        except sqlite3.Error as exc:
+            conn.rollback()
+            raise RestoreError(str(exc)) from exc
+        except Exception:
+            conn.rollback()
+            raise
     finally:
+        try:
+            conn.execute("PRAGMA foreign_keys=ON")
+        except sqlite3.Error:
+            pass
         conn.close()
 
     _restore_uploads(db_path, bundle["uploads"])
@@ -226,6 +240,72 @@ def _insert_rows(
         )
         count += 1
     return count
+
+
+def _validate_restored_perspective_graph(conn: sqlite3.Connection) -> None:
+    rows = [
+        dict(row)
+        for row in conn.execute("SELECT * FROM perspectives WHERE identity_scheme = ?", (FRAME_V2_SCHEME,))
+    ]
+    for row in rows:
+        incoming = [
+            dict(item)
+            for item in conn.execute(
+                """
+                SELECT sr.*
+                FROM supersession_relations sr
+                JOIN perspectives old_p ON old_p.id = sr.old_id
+                WHERE sr.new_id = ?
+                ORDER BY sr.ratified_at, sr.old_id
+                """,
+                (row["id"],),
+            )
+        ]
+        if len(incoming) > 1:
+            raise RestoreError("frame-v2 Perspective has more than one predecessor")
+        predecessor_id = incoming[0]["old_id"] if incoming else None
+        try:
+            validate_frame_v2_row_identity(row, predecessor_perspective_id=predecessor_id)
+        except ValueError as exc:
+            raise RestoreError(str(exc)) from exc
+    for row in rows:
+        if _perspective_path_exists(conn, row["id"], row["id"], allow_zero_length=False):
+            raise RestoreError("Perspective supersession cycle rejected")
+
+
+def _perspective_path_exists(
+    conn: sqlite3.Connection,
+    start_id: str,
+    target_id: str,
+    *,
+    allow_zero_length: bool = True,
+) -> bool:
+    if allow_zero_length and start_id == target_id:
+        return True
+    row = conn.execute(
+        """
+        WITH RECURSIVE chain(new_id, path) AS (
+            SELECT sr.new_id, '|' || sr.old_id || '|' || sr.new_id || '|'
+            FROM supersession_relations sr
+            WHERE sr.old_id = ?
+              AND sr.old_id IN (SELECT id FROM perspectives)
+              AND sr.new_id IN (SELECT id FROM perspectives)
+            UNION ALL
+            SELECT sr.new_id, chain.path || sr.new_id || '|'
+            FROM supersession_relations sr
+            JOIN chain ON sr.old_id = chain.new_id
+            WHERE sr.old_id IN (SELECT id FROM perspectives)
+              AND sr.new_id IN (SELECT id FROM perspectives)
+              AND (
+                    sr.new_id = ?
+                    OR instr(chain.path, '|' || sr.new_id || '|') = 0
+                  )
+        )
+        SELECT 1 FROM chain WHERE new_id = ? LIMIT 1
+        """,
+        (start_id, target_id, target_id),
+    ).fetchone()
+    return row is not None
 
 
 def _restore_investigation(conn: sqlite3.Connection, investigation: dict) -> None:
