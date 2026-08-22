@@ -3080,6 +3080,63 @@ def test_perspective_run_ui_separates_scope_perspective_question_and_model():
     assert "Not in interpretation record" in index_html
 
 
+def test_perspective_run_ui_renders_completed_scope_receipt_from_response():
+    index_html = (
+        Path(__file__).parent.parent
+        / "hermeneia"
+        / "web"
+        / "static"
+        / "index.html"
+    ).read_text()
+    perspective_js = index_html.split("// ── Perspective Run", 1)[1].split("// ── Thesis", 1)[0]
+    receipt_renderer = perspective_js.split(
+        "function _crRenderPerspectiveScopeReceipt(scopeReceipt)",
+        1,
+    )[1].split("async function _crPostPerspectiveRoom", 1)[0]
+    room_renderer = perspective_js.split(
+        "function _crRenderPerspectiveRoom(receipt, model)",
+        1,
+    )[1].split("async function _crRunPerspective", 1)[0]
+    run_renderer = perspective_js.split(
+        "async function _crRunPerspective()",
+        1,
+    )[1].split("window._crPerspectiveFromSelection", 1)[0]
+
+    assert "Scope used: Selected passage" not in perspective_js
+    assert "function _crRenderPerspectiveScopeReceipt(scopeReceipt)" in perspective_js
+    assert "_crRenderPerspectiveScopeReceipt(receipt.scope_receipt)" in room_renderer
+    assert "_crRenderPerspectiveScopeReceipt(receipt.scope_receipt)" in run_renderer
+    assert "receipt.scope_receipt?.primary" not in run_renderer
+    assert "Scope locator:" not in perspective_js
+
+    assert "Scope Receipt" in receipt_renderer
+    assert "Primary" in receipt_renderer
+    assert "Selected passage" in receipt_renderer
+    assert "source evidence" in receipt_renderer
+    assert "Locator:" in receipt_renderer
+    assert "Supporting" in receipt_renderer
+    assert "None included." in receipt_renderer
+    assert "Governing question not included" in receipt_renderer
+    assert "Current page not included" in receipt_renderer
+    assert "entire corpus" in receipt_renderer
+    assert "all notes" in receipt_renderer
+    assert "accepted interpretations" in receipt_renderer
+    assert "other documents" in receipt_renderer
+
+    assert "Governing question" in receipt_renderer
+    assert "Supporting investigation context" in receipt_renderer
+    assert "Current page" in receipt_renderer
+    assert "Supporting source context" in receipt_renderer
+    assert "source locator" in receipt_renderer
+    assert "extraction ID" in receipt_renderer
+    assert "Reader/client metadata" in receipt_renderer
+
+    assert "invLoad()" not in receipt_renderer
+    assert "_crPage" not in receipt_renderer
+    assert "cr-perspective-include-governing" not in receipt_renderer
+    assert "cr-perspective-include-page" not in receipt_renderer
+
+
 def test_perspective_room_ui_is_contextual_without_permanent_tab():
     index_html = (
         Path(__file__).parent.parent
@@ -3101,6 +3158,7 @@ def test_perspective_room_ui_is_contextual_without_permanent_tab():
     assert "function _crRenderPerspectiveRoomPlan()" in perspective_js
     assert "_crPerspectiveRoomDefinitions.map((p, idx)" in perspective_js
     assert "/api/perspective/room" in perspective_js
+    assert "_crRenderPerspectiveScopeReceipt(receipt.scope_receipt)" in perspective_js
     assert "Final answer" not in perspective_js
     assert "Consensus" not in perspective_js
     assert "q.value = 'What tension" not in perspective_js
@@ -3126,3 +3184,4 @@ def test_perspective_room_ui_renders_participant_status_truthfully():
     assert "Planned model:" in perspective_js
     assert "row.execution?.provider_id || receipt.model?.provider_id" not in perspective_js
     assert "row.execution?.model_id || receipt.model?.model_id" not in perspective_js
+    assert "e10-scope-receipt" not in perspective_js

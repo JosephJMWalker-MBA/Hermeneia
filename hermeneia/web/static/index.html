@@ -9326,6 +9326,90 @@ async function _crPerspectiveFromSelection() {
   document.getElementById('cr-perspective-question')?.focus();
 }
 
+function _crScopeReceiptPreview(value, limit = 140) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  return `${x(text.slice(0, limit))}${text.length > limit ? '…' : ''}`;
+}
+
+function _crCountLabel(count, singular, plural) {
+  const n = Number(count || 0);
+  return `${n} ${n === 1 ? singular : plural}`;
+}
+
+function _crRenderPerspectiveScopeReceipt(scopeReceipt) {
+  const receipt = scopeReceipt || {};
+  const primary = receipt.primary || {};
+  const supporting = Array.isArray(receipt.supporting) ? receipt.supporting : [];
+  const included = receipt.included || {};
+  const excluded = receipt.excluded || {};
+  const primaryMeta = [
+    'Selected passage',
+    primary.role === 'primary' ? 'primary' : '',
+    primary.evidence_status === 'source_evidence' ? 'source evidence' : '',
+    primary.page ? `p.${x(primary.page)}` : '',
+  ].filter(Boolean).join(' · ');
+  const primaryLocator = primary.locator ? `<div>Locator: ${x(primary.locator)}</div>` : '';
+  const primaryPreview = _crScopeReceiptPreview(primary.text)
+    ? `<div style="color:var(--fg2)">"${_crScopeReceiptPreview(primary.text)}"</div>`
+    : '';
+  const supportRows = supporting.map(item => {
+    const kind = String(item.kind || '');
+    if (kind === 'governing_question') {
+      return `
+        <div style="margin-top:7px">
+          <strong style="color:var(--fg2)">Governing question</strong> · Supporting investigation context
+          <div style="color:var(--fg2)">"${_crScopeReceiptPreview(item.text)}"</div>
+        </div>`;
+    }
+    if (kind === 'current_page') {
+      const locatorCount = Array.isArray(item.source_locators) ? item.source_locators.length : 0;
+      const extractionCount = Array.isArray(item.extraction_ids) ? item.extraction_ids.length : 0;
+      const provenance = [
+        item.page ? `p.${x(item.page)}` : '',
+        _crCountLabel(locatorCount, 'source locator', 'source locators'),
+        _crCountLabel(extractionCount, 'extraction ID', 'extraction IDs'),
+        item.source_metadata_origin === 'reader_client' ? 'Reader/client metadata' : '',
+      ].filter(Boolean).join(' · ');
+      return `
+        <div style="margin-top:7px">
+          <strong style="color:var(--fg2)">Current page</strong> · Supporting source context
+          <div>${provenance}</div>
+          <div style="color:var(--fg2)">"${_crScopeReceiptPreview(item.text)}"</div>
+        </div>`;
+    }
+    return '';
+  }).filter(Boolean).join('');
+  const optionalExclusions = [
+    included.governing_question ? '' : 'Governing question not included',
+    included.current_page ? '' : 'Current page not included',
+  ].filter(Boolean);
+  const broaderExclusions = [
+    excluded.entire_corpus ? 'entire corpus' : '',
+    excluded.all_notes ? 'all notes' : '',
+    excluded.accepted_interpretations ? 'accepted interpretations' : '',
+    excluded.other_documents ? 'other documents' : '',
+  ].filter(Boolean);
+  return `
+    <div class="e10-scope-receipt" style="font-size:11px;color:var(--dim2);line-height:1.6;margin-top:10px">
+      <strong style="color:var(--fg2)">Scope Receipt</strong>
+      <div style="margin-top:6px">
+        <strong style="color:var(--fg2)">Primary</strong><br>
+        ${x(primaryMeta || 'Selected passage · primary source evidence')}
+        ${primaryLocator}
+        ${primaryPreview}
+      </div>
+      <div style="margin-top:7px">
+        <strong style="color:var(--fg2)">Supporting</strong>
+        ${supportRows || '<div>None included.</div>'}
+      </div>
+      <div style="margin-top:7px">
+        <strong style="color:var(--fg2)">Excluded</strong><br>
+        ${x([...optionalExclusions, ...broaderExclusions].join(' · ') || 'None recorded')}
+      </div>
+    </div>`;
+}
+
 async function _crPostPerspectiveRoom(payload) {
   const response = await runtimeApiFetch('/api/perspective/room', {
     method: 'POST',
@@ -9381,9 +9465,9 @@ function _crRenderPerspectiveRoom(receipt, model) {
     <div class="e10-card">
       <div class="e10-meta">Ask the Room · via ${x(receipt.model?.provider_id || 'ollama-local')} / ${x(receipt.model?.model_id || model)}</div>
       <div class="e10-badges">
-        <span class="e10-badge">Scope used: Selected passage</span>
         <span class="e10-badge">Proposed readings · not in interpretation record</span>
       </div>
+      ${_crRenderPerspectiveScopeReceipt(receipt.scope_receipt)}
       <div style="font-size:12px;color:var(--dim2);line-height:1.6;margin-top:10px">
         <strong style="color:var(--fg2)">You</strong><br>${x(receipt.question || '')}
       </div>
@@ -9437,18 +9521,16 @@ async function _crRunPerspective() {
     }
     const p = receipt.perspective || {};
     const ex = receipt.execution || {};
-    const scope = receipt.scope_receipt?.primary || {};
     if (out) out.innerHTML = `
       <div class="e10-card">
         <div class="e10-meta">${x(p.label || 'Perspective')} · via ${x(ex.provider_id || 'ollama-local')} / ${x(ex.model_id || model)}</div>
         <div class="e10-text" style="white-space:pre-wrap">${x(receipt.response || '')}</div>
         <div class="e10-badges">
           <span class="e10-badge">Perspective ${x(p.id || '')} v${x(p.version || '')}</span>
-          <span class="e10-badge">Scope used: Selected passage</span>
           <span class="e10-badge">Not in interpretation record</span>
         </div>
+        ${_crRenderPerspectiveScopeReceipt(receipt.scope_receipt)}
         <div style="font-size:11px;color:var(--dim2);line-height:1.6;margin-top:10px">
-          Scope locator: ${x(scope.locator || 'unknown')}<br>
           Runtime host: ${x(ex.runtime_host || '')}<br>
           This is a proposed reading. Nothing has entered the canonical interpretation record.
         </div>
