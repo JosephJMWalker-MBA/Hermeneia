@@ -138,7 +138,8 @@ This is the proposed decision.
 
 ## Proposed Decision
 
-A durable Perspective is one exact immutable interpretive frame definition.
+A durable Perspective is one exact immutable human-declared revision
+occurrence carrying one exact immutable interpretive frame definition.
 
 Human-facing language may describe a saved successor as a "revision" of an
 earlier Perspective. Ontologically, each durable revision is itself a
@@ -166,9 +167,9 @@ These fields define the declared interpretive frame: from where the material is
 being examined, what the frame tends to ask, what it challenges, and what limits
 the steward acknowledges.
 
-Canonical storage may include additional required provenance/identity fields
-such as creator, declared timestamp, identity scheme, and lineage metadata.
-Those fields do not replace semantic frame identity.
+`declared_by` and `declared_date` remain required immutable declaration
+provenance. Canonical storage may include additional identity-scheme and
+lineage metadata. Those fields do not replace semantic frame identity.
 
 ---
 
@@ -210,7 +211,7 @@ other authorized records. They must not be baked into Perspective identity.
 
 ## Identity Rules
 
-The proposed rich identity scheme is:
+The proposed rich semantic fingerprint is:
 
 ```text
 semantic_definition = {
@@ -222,12 +223,28 @@ semantic_definition = {
 }
 
 definition_fingerprint = sha256(canonical_json(semantic_definition))
-perspective_id = deterministic_id(identity_scheme, definition_fingerprint)
 ```
 
-The exact prefix and ID string format are implementation details, but they must
-be deterministic and must distinguish the rich-frame scheme from legacy
-label-derived identity.
+`definition_fingerprint` is exact semantic-content identity. It is not the
+canonical object identity by itself.
+
+`perspective_id` identifies one immutable human-declared Perspective
+occurrence/revision. The preferred conceptual deterministic identity is:
+
+```text
+root perspective_id =
+  H(identity_scheme, definition_fingerprint, declared_by, ROOT)
+
+revision perspective_id =
+  H(identity_scheme, predecessor_perspective_id, definition_fingerprint, declared_by)
+```
+
+The exact prefix, hash function label, and string representation remain
+implementation details, but the identity must be deterministic and must
+distinguish frame-v2 from legacy label-derived identity.
+
+`declared_date` must not participate in `perspective_id`; retries of the same
+declaration operation should remain idempotent.
 
 The system must distinguish:
 
@@ -238,25 +255,86 @@ The system must distinguish:
 
 The ordinal is never sufficient identity.
 
+Idempotency is bounded:
+
+```text
+same normalized definition
++ same declaration context
+-> same Perspective object
+```
+
+Hermeneia must not claim that every identical semantic frame everywhere is the
+same canonical Perspective object. Semantic equivalence across distinct
+Perspective objects is represented by equal `definition_fingerprint`.
+
 ---
 
 ## Normalization And Serialization Rules
 
-The canonical definition serialization should reuse the transient Perspective
-Builder's semantics wherever possible:
+Frame-v2 canonicalization is fixed as follows.
 
-- normalize fields according to the existing builder rules;
-- include only frame semantic fields;
-- encode canonical JSON with stable separators and deterministic key ordering;
-- encode bytes as UTF-8;
-- compute SHA-256 over those bytes.
+Semantic keys are exactly:
+
+```text
+label
+purpose
+questions
+challenges
+limitations
+```
+
+`label` and `purpose`:
+
+- trim leading/trailing whitespace;
+- preserve case;
+- preserve internal whitespace.
+
+List fields:
+
+- trim leading/trailing whitespace on each item;
+- discard empty items;
+- preserve duplicate non-empty items;
+- preserve order.
+
+`questions` must contain at least one item.
+
+`challenges` and `limitations` may be empty.
+
+List order is semantically significant under `perspective-frame-v2`.
+
+The canonical serialization is equivalent to:
+
+```python
+json.dumps(
+    semantic_definition,
+    sort_keys=True,
+    ensure_ascii=True,
+    separators=(",", ":"),
+)
+```
+
+The JSON string is UTF-8 encoded and hashed with SHA-256.
+
+The durable fingerprint representation is:
+
+```text
+sha256:<lowercase-hex>
+```
+
+This matches the current transient #171 representation.
+
+No Unicode normalization such as NFC or NFKC is applied in frame-v2. This is
+intentional: preserving exact compatibility with #171 takes precedence over
+introducing new normalization in this proposed amendment.
 
 If a transient frame is saved without semantic change, its transient
 definition fingerprint should equal the saved canonical definition fingerprint.
 
-Saving the same normalized rich frame twice converges to the same canonical
-Perspective identity. Saving a semantically changed frame creates a different
-Perspective identity.
+Saving the same normalized rich frame twice in the same declaration context
+converges to the same canonical Perspective identity. Saving a semantically
+changed frame creates a different `definition_fingerprint`. Saving an
+identical semantic frame in a different declaration context may create a
+different canonical Perspective object with the same `definition_fingerprint`.
 
 ---
 
@@ -305,6 +383,22 @@ P1 -> P2 -> P3
 In that lineage, P3 is the current leaf for ordinary UI purposes. P1 and P2
 remain inspectable and executable by exact identity where allowed.
 
+For Perspective revision, a future operation must validate:
+
+- `old_id` is a Perspective;
+- `new_id` is a Perspective;
+- `old_id != new_id`;
+- adding the edge does not create a cycle;
+- ordinary revision starts from a current leaf;
+- hidden branching is prohibited.
+
+The existing generic SupersessionRelation remains the relation. No
+Perspective-specific canonical relation is introduced.
+
+For this use, `ratified_at` means the timestamp of the explicit human "Save
+new revision" action. That action is the steward's declaration of the successor
+Perspective and of the supersession edge.
+
 ---
 
 ## Same-Label Revisions
@@ -352,6 +446,53 @@ P1
 
 This ADR does not design a fork UI. It requires that branching never be hidden
 or silently collapsed.
+
+---
+
+## Reversion Rule
+
+Reverting to an earlier semantic frame creates a later Perspective occurrence.
+
+Example:
+
+```text
+P1 = frame A / fingerprint X
+P2 = frame B / fingerprint Y
+P3 = frame A / fingerprint X
+
+P1 -> P2 -> P3
+```
+
+P3 must have:
+
+```text
+P3.definition_fingerprint == P1.definition_fingerprint
+P3.perspective_id != P1.perspective_id
+```
+
+P3 is a later declaration/revision occurrence. Reusing P1's Perspective ID
+would produce a cycle-prone lineage such as:
+
+```text
+P1 -> P2 -> P1
+```
+
+That is prohibited.
+
+---
+
+## ADR-0015 Field Compatibility
+
+| ADR-0015 field | rich-frame v2 rule |
+|---|---|
+| `id` | New declared-object identity. Root IDs derive from identity scheme, definition fingerprint, `declared_by`, and root marker. Revision IDs derive from identity scheme, predecessor Perspective ID, definition fingerprint, and `declared_by`. |
+| `canonical_label` | Becomes `label`; no longer unique by itself under frame-v2. |
+| `tradition` | Legacy-only/deferred for rich v2. It is not in #171 and is not part of the v2 fingerprint. Future support requires an explicit append-only mechanism. |
+| `description` | `purpose` is the v2 semantic successor. |
+| `declared_by` | Required and immutable. |
+| `declared_date` | Required and immutable; excluded from object identity for retry idempotency. |
+| `superseded_by` | Replaced by append-only SupersessionRelation edges. |
+| `active` | Replaced by graph-derived projection over SupersessionRelation leaves. |
 
 ---
 
@@ -408,7 +549,8 @@ A saved object qualifies as a rich canonical Perspective when:
 - a human explicitly declares/saves it;
 - it contains the required semantic frame fields;
 - it excludes execution and expression controls from semantic identity;
-- it receives deterministic identity from the normalized semantic frame;
+- it receives deterministic declared-object identity from the normalized
+  semantic frame plus declaration context;
 - it preserves creator/declaration provenance required by storage authority;
 - any revision relationship is appended as SupersessionRelation.
 
@@ -474,10 +616,11 @@ P1 is not updated.
 
 ### Example 3: Idempotent Duplicate Save
 
-The user saves the exact same normalized rich frame twice.
+The user saves the exact same normalized rich frame twice in the same
+declaration context.
 
-Both saves resolve to the same canonical Perspective identity. No duplicate
-semantic object is created.
+Both saves resolve to the same canonical Perspective object identity. No
+duplicate declared Perspective object is created.
 
 ### Example 4: Historical Revision Execution
 
@@ -493,6 +636,21 @@ model.
 
 The Perspective ID and definition fingerprint remain unchanged. The execution
 receipt records the different provider/model/configuration identity.
+
+### Example 6: Reversion Preserves Occurrence Identity
+
+P1 uses frame A with fingerprint X. P2 revises it to frame B with fingerprint
+Y. P3 later intentionally reverts to frame A, producing fingerprint X again.
+
+P3 has the same `definition_fingerprint` as P1, but P3 has a different
+`perspective_id` because it is a later declaration occurrence.
+
+### Example 7: Multiple Declarers
+
+Two stewards independently declare the same normalized root frame. The two
+declarations may produce distinct Perspective objects if their declaration
+contexts differ, while equal `definition_fingerprint` records semantic
+equivalence.
 
 ---
 
@@ -531,6 +689,68 @@ A model proposes a useful new frame and the system saves it automatically.
 
 Rejected. Canonical Perspective declaration requires explicit human action.
 
+### Counterexample 5: Ordinal As Identity
+
+```text
+Institutional Trust Reader v2
+```
+
+Rejected as sufficient identity. Display ordinals are projections over exact
+Perspective IDs and supersession lineage.
+
+### Counterexample 6: Scope As Revision
+
+The same Perspective is run over a broader evidence Scope and the system calls
+that a Perspective revision.
+
+Rejected. Scope belongs to the operation boundary and receipt, not Perspective
+semantic identity.
+
+### Counterexample 7: Question As Revision
+
+The same Perspective is run with a different user Question and the system calls
+that a Perspective revision.
+
+Rejected. Question belongs to the operation input, not Perspective semantic
+identity.
+
+### Counterexample 8: Re-Identifying Legacy Perspective
+
+A legacy `perspective-label-v1` row is recomputed under `perspective-frame-v2`
+and assigned a new canonical ID.
+
+Rejected. Legacy Perspective identities remain valid and must not be rewritten
+or re-identified.
+
+### Counterexample 9: Automatic Built-In Canonicalization
+
+The code-defined `close-reader` PerspectiveDefinition is automatically inserted
+into canonical Perspective storage at startup.
+
+Rejected. Built-ins are implementation-provided execution frames unless a
+human explicitly adopts/saves one as canonical.
+
+### Counterexample 10: Collapse Distinct Declarations By Fingerprint
+
+Two different stewards declare the same semantic frame and Hermeneia erases
+one declaration because the fingerprints match.
+
+Rejected. Equal `definition_fingerprint` marks semantic equivalence; it does
+not erase distinct declaration provenance.
+
+### Counterexample 11: Reuse Ancestor ID For Reversion
+
+```text
+P1 -> P2 -> P1
+```
+
+Rejected. A later reversion to frame A must create a later Perspective
+occurrence with a distinct `perspective_id`.
+
+### Counterexample 12: Supersession Cycle
+
+Any Perspective supersession edge that creates a cycle is rejected.
+
 ---
 
 ## Edge Cases
@@ -543,10 +763,8 @@ SupersessionRelation if the steward declares it as revision.
 
 ### Reordered Lists
 
-The implementation must decide whether list order is semantically significant.
-Until otherwise ratified, questions, challenges, and limitations should be
-treated as ordered lists because ordering is part of how the steward expresses
-the frame.
+List order is semantically significant under `perspective-frame-v2`. Reordering
+questions, challenges, or limitations changes the definition fingerprint.
 
 ### Empty Optional Lists
 
@@ -576,6 +794,7 @@ Future implementation should:
 5. Preserve old `.herm` bundles as readable and meaningful.
 6. Avoid UPDATE/DELETE of canonical Perspective rows, Interpretation
    references, SupersessionRelation rows, or forensic evidence.
+7. Never re-identify a legacy Perspective under frame-v2.
 
 If additive schema is required, it must be reviewed in a later implementation
 PR. This ADR does not implement storage.
@@ -692,13 +911,20 @@ Future implementation should add tests proving:
 
 - legacy label-derived Perspective IDs remain valid;
 - rich-frame Perspectives derive identity from semantic frame fields;
+- rich-frame Perspective IDs also include declaration context;
 - provider/model/configuration changes do not change Perspective identity;
 - Scope/Question changes do not change Perspective identity;
 - tone/audience/language/style are rejected as Perspective semantic fields;
 - same normalized rich frame saves idempotently;
+- identical semantic frames in distinct declaration contexts can remain
+  distinct Perspective objects with equal fingerprints;
 - same label with changed semantic definition creates a distinct Perspective;
+- reversion creates a new Perspective occurrence with equal fingerprint and
+  different ID from the ancestor;
 - explicit revision appends SupersessionRelation and does not update the prior
   Perspective;
+- Perspective supersession rejects non-Perspective endpoints, self-edges,
+  cycles, hidden branches, and ordinary revisions from non-leaf nodes;
 - historical revisions remain inspectable and executable by exact identity
   where allowed;
 - built-in PerspectiveDefinitions are not automatically canonical rows;
@@ -734,6 +960,11 @@ rich-frame Perspectives:
 - Perspective identity is only a deterministic hash of `canonical_label`.
 - No two Perspectives may share the same `canonical_label`.
 - Label uniqueness alone is sufficient to identify a durable Perspective.
+- `description` remains the only rich semantic successor field.
+- `tradition` carries forward automatically into rich-frame v2 semantics or
+  identity.
+- `declared_by` and `declared_date` may be treated as incidental storage
+  metadata rather than required immutable declaration provenance.
 - `superseded_by` and `active` fields on the old Perspective are the preferred
   revision mechanism.
 - A mutable or label-only "Perspective + version" notion is sufficient for
