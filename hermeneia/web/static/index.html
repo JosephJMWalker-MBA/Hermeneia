@@ -2804,6 +2804,20 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
             <div id="cr-perspective-scope-chip" style="font-size:12px;color:var(--dim2);line-height:1.5">No Reader selection.</div>
           </div>
         </div>
+        <div id="cr-perspective-scope-controls" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-bottom:10px;font-size:12px;color:var(--dim2);line-height:1.5">
+          <label style="display:flex;gap:7px;align-items:flex-start">
+            <input type="checkbox" checked disabled>
+            <span><strong style="color:var(--fg2)">Selected passage</strong><br>Primary source attention</span>
+          </label>
+          <label style="display:flex;gap:7px;align-items:flex-start">
+            <input type="checkbox" id="cr-perspective-include-governing" onchange="_crPerspectiveRefreshScope()">
+            <span><strong style="color:var(--fg2)">Include governing question</strong><br><span id="cr-perspective-governing-state">Supporting investigation context</span></span>
+          </label>
+          <label style="display:flex;gap:7px;align-items:flex-start">
+            <input type="checkbox" id="cr-perspective-include-page" onchange="_crPerspectiveRefreshScope()">
+            <span><strong style="color:var(--fg2)">Include current page</strong><br><span id="cr-perspective-page-state">Supporting source context</span></span>
+          </label>
+        </div>
         <div id="cr-perspective-room-plan" hidden style="font-size:12px;color:var(--dim2);line-height:1.6;margin-bottom:10px"></div>
         <label class="cr-form-label" for="cr-perspective-question">Question</label>
         <textarea id="cr-perspective-question" rows="2" placeholder="What tension in this passage deserves more attention?" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;line-height:1.5;padding:7px 9px;resize:vertical"></textarea>
@@ -9122,9 +9136,36 @@ let _crPerspectiveScope = null;
 let _crPerspectiveLastReceipt = null;
 let _crPerspectiveMode = 'single';
 
+function _crPerspectiveCurrentPageScope() {
+  const blocks = (_crCurrentExtractions || [])
+    .map((ex, idx) => {
+      const text = (ex?.text || '').trim();
+      if (!text) return null;
+      return {
+        text,
+        context: _crReaderBlockContext(ex, idx, _crPage),
+      };
+    })
+    .filter(Boolean);
+  if (!blocks.length) return null;
+  return {
+    include: true,
+    kind: 'current_page',
+    text: blocks.map(block => block.text).join('\n\n'),
+    source_document_id: _crDocId || '',
+    page: _crPage || null,
+    source_locators: _crUniqueStringList(blocks.flatMap(block => block.context.source_locators || [])),
+    extraction_ids: _crUniqueStringList(blocks.flatMap(block => block.context.extraction_ids || [])),
+  };
+}
+
 function _crPerspectiveScopeFromSelection(selection = null) {
   const resolved = selection || _crGetReaderSelection({ refresh: false, fallback: true });
   if (!resolved?.valid || !resolved.text) return null;
+  const includeGoverning = !!document.getElementById('cr-perspective-include-governing')?.checked;
+  const includePage = !!document.getElementById('cr-perspective-include-page')?.checked;
+  const governingQuestion = (invLoad()?.thesis || '').trim();
+  const currentPage = _crPerspectiveCurrentPageScope();
   return {
     primary: {
       kind: 'reader_selection',
@@ -9135,13 +9176,51 @@ function _crPerspectiveScopeFromSelection(selection = null) {
       source_locators: resolved.source_locators || [],
       extraction_ids: resolved.extraction_ids || [],
     },
+    supporting: {
+      governing_question: {
+        include: includeGoverning && !!governingQuestion,
+        text: governingQuestion,
+      },
+      current_page: includePage && currentPage
+        ? currentPage
+        : { include: false },
+    },
     included: {
-      governing_question: false,
+      governing_question: includeGoverning && !!governingQuestion,
+      current_page: includePage && !!currentPage,
     },
   };
 }
 
+function _crPerspectiveSyncScopeControls() {
+  const governingInput = document.getElementById('cr-perspective-include-governing');
+  const governingState = document.getElementById('cr-perspective-governing-state');
+  const governingQuestion = (invLoad()?.thesis || '').trim();
+  if (governingInput) {
+    governingInput.disabled = !governingQuestion;
+    if (!governingQuestion) governingInput.checked = false;
+  }
+  if (governingState) {
+    governingState.textContent = governingQuestion
+      ? `Supporting investigation context · ${governingQuestion.slice(0, 72)}${governingQuestion.length > 72 ? '…' : ''}`
+      : 'Unavailable: no governing question set';
+  }
+  const pageInput = document.getElementById('cr-perspective-include-page');
+  const pageState = document.getElementById('cr-perspective-page-state');
+  const currentPage = _crPerspectiveCurrentPageScope();
+  if (pageInput) {
+    pageInput.disabled = !currentPage;
+    if (!currentPage) pageInput.checked = false;
+  }
+  if (pageState) {
+    pageState.textContent = currentPage
+      ? `Supporting source context · page ${currentPage.page || '?'} · ${currentPage.extraction_ids.length} source blocks`
+      : 'Unavailable: current page source text not resolved';
+  }
+}
+
 function _crPerspectiveRenderScope() {
+  _crPerspectiveSyncScopeControls();
   const chip = document.getElementById('cr-perspective-scope-chip');
   if (!chip) return;
   const text = _crPerspectiveScope?.primary?.text || '';
@@ -9150,7 +9229,12 @@ function _crPerspectiveRenderScope() {
     return;
   }
   const loc = _crPerspectiveScope.primary.locator || `page ${_crPerspectiveScope.primary.page || '?'}`;
-  chip.innerHTML = `<strong>Selected passage</strong> · ${x(loc)}<br><span style="color:var(--fg2)">"${x(text.slice(0, 140))}${text.length > 140 ? '…' : ''}"</span>`;
+  const supporting = _crPerspectiveScope?.included || {};
+  const extras = [
+    supporting.governing_question ? 'governing question' : '',
+    supporting.current_page ? 'current page' : '',
+  ].filter(Boolean);
+  chip.innerHTML = `<strong>Selected passage · Primary</strong> · ${x(loc)}<br><span style="color:var(--fg2)">"${x(text.slice(0, 140))}${text.length > 140 ? '…' : ''}"</span><br><span>Supporting included: ${extras.length ? x(extras.join(', ')) : 'none'}</span>`;
 }
 
 function _crRenderPerspectiveRoomPlan() {
