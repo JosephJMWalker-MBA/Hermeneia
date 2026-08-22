@@ -123,6 +123,7 @@ The Architecture Decision Record index is
 | [`adr/ADR-0024-canonical-object-list.md`](adr/ADR-0024-canonical-object-list.md) | SUPERSEDED IN PART | CA-0001, CA-0002 | Canonical list omitting SourceDocument, SourceExtraction, and the complete epistemic stack | Constitutional evidence and epistemic classes now govern | 2026-06-19 |
 | [`adr/ADR-0036-narrative-blueprint.md`](adr/ADR-0036-narrative-blueprint.md) | SUPERSEDED IN PART | CA-0003 | NarrativeBlueprint as the direct Artist contract | ArchitectPlan is the canonical compiled semantic contract | 2026-06-19 |
 | [`adr/ADR-0040-architect-artist-interaction.md`](adr/ADR-0040-architect-artist-interaction.md) | SUPERSEDED IN PART | CA-0003 | Direct NarrativeBlueprint-to-Artist interface | Artist consumes ArchitectPlan under ExpressionProfile constraints | 2026-06-19 |
+| [`adr/ADR-0015-interpretation-vs-perspective.md`](adr/ADR-0015-interpretation-vs-perspective.md) | SUPERSEDED IN PART | [`adr/ADR-0045-perspective-definition-revisions.md`](adr/ADR-0045-perspective-definition-revisions.md) | frame-v2 Perspective identity, canonical-label uniqueness boundary, rich frame semantics, deferred tradition, revision state | Rich immutable Perspective definitions require semantic fingerprints, declaration-occurrence identity, and append-only SupersessionRelation lineage | 2026-08-22 |
 
 The original files remain immutable historical records. The notices placed in
 those files are index annotations, not rewrites of their decisions.
