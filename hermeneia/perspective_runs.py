@@ -47,6 +47,9 @@ class RoomParticipantResolution:
     receipt_metadata: dict[str, object] | None = None
 
 
+_ROOM_PARTICIPANTS_OMITTED = object()
+
+
 PERSPECTIVE_DEFINITIONS: tuple[PerspectiveDefinition, ...] = (
     PerspectiveDefinition(
         id="close-reader",
@@ -542,11 +545,11 @@ def room_participant_perspective_payload(
 
 
 def resolve_room_participants(
-    participants: Any = None,
+    participants: Any = _ROOM_PARTICIPANTS_OMITTED,
     *,
     saved_resolver: Any = None,
 ) -> tuple[str, list[RoomParticipantResolution]]:
-    if participants is None:
+    if participants is _ROOM_PARTICIPANTS_OMITTED:
         return "default", [
             RoomParticipantResolution(
                 ordinal=order,

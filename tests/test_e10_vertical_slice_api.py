@@ -3363,6 +3363,10 @@ def test_perspective_room_custom_roster_validation_fails_before_model_call(
         "scope": _reader_selection_scope(),
     }
     cases = (
+        (None, "participants must be a list"),
+        (False, "participants must be a list"),
+        ({}, "participants must be a list"),
+        ("", "participants must be a list"),
         ([], "at least 2"),
         ([{"kind": "built_in", "perspective_id": "close-reader"}], "at least 2"),
         (

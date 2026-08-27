@@ -335,6 +335,10 @@ def test_room_participants_default_and_custom_built_in_resolution() -> None:
 
 def test_room_participant_validation_rejects_malformed_rosters() -> None:
     cases = (
+        (None, "participants must be a list"),
+        (False, "participants must be a list"),
+        ({}, "participants must be a list"),
+        ("", "participants must be a list"),
         ("not-list", "participants must be a list"),
         ([], "at least 2"),
         ([{"kind": "built_in", "perspective_id": "close-reader"}], "at least 2"),

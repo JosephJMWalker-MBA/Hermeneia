@@ -4176,10 +4176,15 @@ def create_app(
         except ValueError as exc:
             return jsonify({"error": str(exc), "configuration_valid": False}), 400
         try:
-            roster_source, room_participants = resolve_room_participants(
-                payload.get("participants") if "participants" in payload else None,
-                saved_resolver=_saved_perspective_resolution,
-            )
+            if "participants" in payload:
+                roster_source, room_participants = resolve_room_participants(
+                    payload.get("participants"),
+                    saved_resolver=_saved_perspective_resolution,
+                )
+            else:
+                roster_source, room_participants = resolve_room_participants(
+                    saved_resolver=_saved_perspective_resolution,
+                )
         except ValueError as exc:
             return jsonify({"error": str(exc), "configuration_valid": False}), 400
         context, error = _local_perspective_execution_context(raw_model)

@@ -4101,8 +4101,12 @@ function _wsApplyRuntimePayload(data) {
 
 function _wsApplyCurrentWorkspace(workspace) {
   if (!workspace) return;
+  const workspaceChanged = !!_wsCurrentWorkspace && !_wsWorkspaceMatches(_wsCurrentWorkspace, workspace);
   _runtimeApplyWorkspaceDraftScope(workspace);
   _wsCurrentWorkspace = workspace;
+  if (workspaceChanged && typeof _crResetPerspectiveRoomStateForWorkspaceChange === 'function') {
+    _crResetPerspectiveRoomStateForWorkspaceChange();
+  }
   const chip = document.getElementById('runtime-workspace-chip');
   const name = document.getElementById('runtime-workspace-name');
   if (name) name.textContent = workspace.name || 'Workspace';
@@ -9278,11 +9282,19 @@ function _crRenderSavedPerspectiveDetail() {
 function _crPopulateSavedPerspectiveSelect() {
   const select = document.getElementById('cr-perspective-saved-select');
   if (!select) return;
+  _crReconcilePerspectiveRoomRosterMetadata();
   select.innerHTML = (_crPerspectiveSavedDefinitions || []).map(p =>
     `<option value="${x(p.id)}">${x(p.label)} · ${p.is_current_leaf ? 'current' : 'historical'}</option>`
   ).join('') || '<option value="" disabled>No saved Perspectives</option>';
   _crRenderSavedPerspectiveDetail();
   _crRenderRoomAddChoices();
+}
+
+function _crResetPerspectiveRoomStateForWorkspaceChange() {
+  _crPerspectiveRoomRoster = [];
+  _crPerspectiveRoomRosterDirty = false;
+  const roomPlan = document.getElementById('cr-perspective-room-plan');
+  if (roomPlan && !roomPlan.hidden) _crRenderPerspectiveRoomPlan();
 }
 
 function _crRoomParticipantId(item) {
@@ -9316,6 +9328,20 @@ function _crRoomDefaultRoster() {
 function _crRoomResetDefaultRoster() {
   _crPerspectiveRoomRoster = _crRoomDefaultRoster();
   _crPerspectiveRoomRosterDirty = false;
+}
+
+function _crReconcilePerspectiveRoomRosterMetadata() {
+  if (!_crPerspectiveRoomRoster.length) return;
+  _crPerspectiveRoomRoster = _crPerspectiveRoomRoster.map(item => {
+    const id = _crRoomParticipantId(item);
+    if (item.kind === 'built_in') {
+      return _crRoomBuiltInChoice(id) || item;
+    }
+    if (item.kind === 'saved') {
+      return _crRoomSavedChoice(id) || item;
+    }
+    return item;
+  });
 }
 
 function _crRoomSavedChoices() {
@@ -9662,6 +9688,7 @@ function _crPerspectiveRenderScope() {
 function _crRenderPerspectiveRoomPlan() {
   const roomPlan = document.getElementById('cr-perspective-room-plan');
   if (!roomPlan) return;
+  const showHistorical = !!document.getElementById('cr-perspective-room-show-historical')?.checked;
   if (!_crPerspectiveRoomRoster.length) {
     _crRoomResetDefaultRoster();
   }
@@ -9708,7 +9735,7 @@ function _crRenderPerspectiveRoomPlan() {
       </select>
       <select class="ob-extract-provider" id="cr-perspective-room-add-select" style="min-width:220px"></select>
       <label style="display:flex;gap:5px;align-items:center">
-        <input type="checkbox" id="cr-perspective-room-show-historical" onchange="_crRenderRoomAddChoices()">
+        <input type="checkbox" id="cr-perspective-room-show-historical" onchange="_crRenderRoomAddChoices()" ${showHistorical ? 'checked' : ''}>
         <span>Show historical saved Perspectives</span>
       </label>
       <button class="cr-bottom-workstation-tab" type="button" onclick="_crAddPerspectiveRoomParticipant()" ${roster.length >= 4 ? 'disabled' : ''}>+ Add Perspective</button>
@@ -9751,9 +9778,11 @@ async function _crLoadPerspectiveRun() {
     _crPerspectiveDefinitions = defs.perspectives || [];
     _crPerspectiveRoomDefinitions = defs.default_room || [];
     if (!_crPerspectiveRoomRosterDirty) _crRoomResetDefaultRoster();
+    _crReconcilePerspectiveRoomRosterMetadata();
     try {
       const saved = await get('/api/perspective/saved');
       _crPerspectiveSavedDefinitions = saved.perspectives || [];
+      _crReconcilePerspectiveRoomRosterMetadata();
     } catch {
       _crPerspectiveSavedDefinitions = [];
     }
