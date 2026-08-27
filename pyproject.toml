@@ -17,6 +17,7 @@ dependencies = [
     "markdown",
     "python-dotenv",
     "regex",
+    "PyYAML",
 ]
 
 [project.optional-dependencies]
