@@ -74,6 +74,20 @@ def test_loopback_socket_communication_remains_allowed() -> None:
     assert received == [b"hello"]
 
 
+def test_live_provider_flag_does_not_open_network_for_unmarked_tests(
+    request: pytest.FixtureRequest,
+) -> None:
+    """Even an opted-in run keeps ordinary unmarked tests hermetic."""
+    if not request.config.getoption("--live-providers"):
+        pytest.skip("requires --live-providers to exercise the opt-in isolation boundary")
+
+    assert request.node.get_closest_marker("live_provider") is None
+    with pytest.raises(RuntimeError) as exc:
+        socket.create_connection(("example.com", 443), timeout=0.01)
+
+    assert str(exc.value) == EXTERNAL_NETWORK_DISABLED_MESSAGE
+
+
 @pytest.mark.live_provider
 def test_live_provider_marker_requires_explicit_opt_in() -> None:
     """Marker policy test; no paid provider call is made even when opted in."""
