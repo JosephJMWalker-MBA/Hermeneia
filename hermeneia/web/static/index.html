@@ -2795,10 +2795,15 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
             <label class="cr-form-label" for="cr-perspective-select">Perspective</label>
             <div style="display:flex;gap:6px;align-items:center;margin-bottom:7px;flex-wrap:wrap">
               <button class="cr-bottom-workstation-tab active" id="cr-perspective-kind-built-in" type="button" onclick="_crSetPerspectiveKind('built-in')">Built-in</button>
+              <button class="cr-bottom-workstation-tab" id="cr-perspective-kind-saved" type="button" onclick="_crSetPerspectiveKind('saved')">Saved</button>
               <button class="cr-bottom-workstation-tab" id="cr-perspective-kind-custom" type="button" onclick="_crSetPerspectiveKind('custom')">Custom</button>
             </div>
             <div id="cr-perspective-built-in-panel">
               <select class="ob-extract-provider" id="cr-perspective-select" style="width:100%"></select>
+            </div>
+            <div id="cr-perspective-saved-panel" hidden style="font-size:12px;color:var(--dim2);line-height:1.5">
+              <select class="ob-extract-provider" id="cr-perspective-saved-select" onchange="_crRenderSavedPerspectiveDetail()" style="width:100%"></select>
+              <div id="cr-perspective-saved-detail" style="margin-top:7px"></div>
             </div>
             <div id="cr-perspective-custom-panel" hidden style="font-size:12px;color:var(--dim2);line-height:1.5">
               <div style="margin-bottom:7px"><strong style="color:var(--fg2)">Custom Perspective · Draft · Not saved</strong><br>Custom Perspectives can be used in Single Perspective runs in this version.</div>
@@ -2815,7 +2820,15 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
               <div style="display:flex;gap:7px;align-items:center;margin-top:7px;flex-wrap:wrap">
                 <button class="cr-bottom-workstation-tab" type="button" onclick="_crPreviewPerspectiveDraft()">Preview frame</button>
                 <button class="cr-bottom-workstation-tab" type="button" onclick="_crUsePerspectiveDraft()">Use for this inquiry</button>
+                <button class="cr-bottom-workstation-tab" type="button" onclick="_crSavePerspectiveDraft()">Save Perspective</button>
+                <button class="cr-bottom-workstation-tab" id="cr-perspective-save-revision-btn" type="button" onclick="_crSavePerspectiveRevision()" hidden>Save new revision</button>
                 <span id="cr-perspective-draft-state">Draft not applied.</span>
+              </div>
+              <div id="cr-perspective-declaration-panel" hidden style="margin-top:7px">
+                <label class="cr-form-label" for="cr-perspective-declared-by">Declared by</label>
+                <input id="cr-perspective-declared-by" value="Primary Human Steward" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;padding:7px 9px">
+                <label class="cr-form-label" for="cr-perspective-revision-reason" style="margin-top:7px">Revision reason</label>
+                <input id="cr-perspective-revision-reason" placeholder="What changed in this frame?" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);font:inherit;font-size:13px;padding:7px 9px">
               </div>
               <div id="cr-perspective-draft-preview" style="margin-top:7px"></div>
             </div>
@@ -9157,12 +9170,14 @@ function _crCloseBottomWorkstation() {
 // Interpretation or alter the selected Connection default model.
 let _crPerspectiveDefinitions = [];
 let _crPerspectiveRoomDefinitions = [];
+let _crPerspectiveSavedDefinitions = [];
 let _crPerspectiveScope = null;
 let _crPerspectiveLastReceipt = null;
 let _crPerspectiveMode = 'single';
 let _crPerspectiveKind = 'built-in';
 let _crPerspectiveDraftActive = null;
 let _crPerspectiveDraftDirty = false;
+let _crPerspectiveRevisionBaseId = '';
 
 function _crPerspectiveDraftLines(value) {
   return String(value || '').split(/\r?\n/).map(item => item.trim()).filter(Boolean);
@@ -9211,6 +9226,62 @@ function _crRenderPerspectiveDraftFrame(draft) {
     </div>`;
 }
 
+function _crSetDraftFields(draft) {
+  document.getElementById('cr-perspective-draft-label').value = draft?.label || '';
+  document.getElementById('cr-perspective-draft-purpose').value = draft?.purpose || '';
+  document.getElementById('cr-perspective-draft-questions').value = (draft?.questions || []).join('\n');
+  document.getElementById('cr-perspective-draft-challenges').value = (draft?.challenges || []).join('\n');
+  document.getElementById('cr-perspective-draft-limitations').value = (draft?.limitations || []).join('\n');
+}
+
+function _crSavedPerspectiveById(id) {
+  return (_crPerspectiveSavedDefinitions || []).find(p => p.id === id) || null;
+}
+
+function _crRenderSavedPerspectiveDetail() {
+  const select = document.getElementById('cr-perspective-saved-select');
+  const detail = document.getElementById('cr-perspective-saved-detail');
+  if (!detail) return;
+  const saved = _crSavedPerspectiveById(select?.value || '');
+  if (!saved) {
+    detail.innerHTML = '<div class="e10-empty">No saved frame-v2 Perspectives yet.</div>';
+    return;
+  }
+  const section = (title, items) => `
+    <div style="margin-top:7px">
+      <strong style="color:var(--fg2)">${x(title)}</strong><br>
+      ${(items || []).length ? items.map(item => `• ${x(item)}`).join('<br>') : '<span>None.</span>'}
+    </div>`;
+  detail.innerHTML = `
+    <div class="e10-card" style="margin-top:0">
+      <div class="e10-meta">${x(saved.label)} · ${saved.is_current_leaf ? 'Current leaf' : 'Historical'}</div>
+      <div><strong style="color:var(--fg2)">Purpose</strong><br>${x(saved.purpose || '')}</div>
+      ${section('Questions', saved.questions || [])}
+      ${section('Challenges', saved.challenges || [])}
+      ${section('Limitations', saved.limitations || [])}
+      <div style="margin-top:7px"><strong style="color:var(--fg2)">Declared</strong><br>${x(saved.declared_by || '')} · ${x(saved.declared_date || '')}</div>
+      <div style="margin-top:7px"><strong style="color:var(--fg2)">Definition fingerprint</strong><br>${x(saved.definition_fingerprint || '')}</div>
+      <div style="margin-top:7px"><strong style="color:var(--fg2)">Canonical ID</strong><br>${x(saved.id || '')}</div>
+      <div class="e10-badges" style="margin-top:8px">
+        <span class="e10-badge">Saved canonical Perspective</span>
+        <span class="e10-badge">${saved.is_current_leaf ? 'Revision allowed' : 'Historical · ordinary revision blocked'}</span>
+      </div>
+      <div style="display:flex;gap:7px;align-items:center;margin-top:8px;flex-wrap:wrap">
+        <button class="cr-bottom-workstation-tab" type="button" onclick="_crUseSavedPerspective()">Use for this inquiry</button>
+        <button class="cr-bottom-workstation-tab" type="button" onclick="_crEditSavedPerspectiveDraft()">Edit as draft</button>
+      </div>
+    </div>`;
+}
+
+function _crPopulateSavedPerspectiveSelect() {
+  const select = document.getElementById('cr-perspective-saved-select');
+  if (!select) return;
+  select.innerHTML = (_crPerspectiveSavedDefinitions || []).map(p =>
+    `<option value="${x(p.id)}">${x(p.label)} · ${p.is_current_leaf ? 'current' : 'historical'}</option>`
+  ).join('') || '<option value="" disabled>No saved Perspectives</option>';
+  _crRenderSavedPerspectiveDetail();
+}
+
 function _crPerspectiveDraftChanged() {
   if (_crPerspectiveDraftActive) {
     _crPerspectiveDraftDirty = true;
@@ -9242,19 +9313,116 @@ function _crUsePerspectiveDraft() {
   if (state) state.textContent = `${draft.label} · Draft applied for this inquiry`;
 }
 
+async function _crSavePerspectiveDraft() {
+  const draft = _crPreviewPerspectiveDraft();
+  const declaredBy = document.getElementById('cr-perspective-declared-by')?.value?.trim() || '';
+  const state = document.getElementById('cr-perspective-draft-state');
+  if (!draft) return;
+  const declarationPanel = document.getElementById('cr-perspective-declaration-panel');
+  if (declarationPanel?.hidden) {
+    declarationPanel.hidden = false;
+    if (state) state.textContent = 'Review declaration identity, then save.';
+    return;
+  }
+  if (!declaredBy) {
+    if (state) state.textContent = 'Declared by is required to save.';
+    return;
+  }
+  try {
+    const saved = await post('/api/perspective/saved', {
+      perspective_draft: draft,
+      declared_by: declaredBy,
+    });
+    _crPerspectiveSavedDefinitions = [saved, ...(_crPerspectiveSavedDefinitions || []).filter(p => p.id !== saved.id)];
+    _crPopulateSavedPerspectiveSelect();
+    const savedSelect = document.getElementById('cr-perspective-saved-select');
+    if (savedSelect) savedSelect.value = saved.id;
+    _crPerspectiveRevisionBaseId = '';
+    if (state) state.textContent = `${saved.label} · Saved canonical Perspective`;
+    _crSetPerspectiveKind('saved');
+  } catch (e) {
+    if (state) state.textContent = e.message;
+  }
+}
+
+async function _crSavePerspectiveRevision() {
+  const draft = _crPreviewPerspectiveDraft();
+  const declaredBy = document.getElementById('cr-perspective-declared-by')?.value?.trim() || '';
+  const reason = document.getElementById('cr-perspective-revision-reason')?.value?.trim() || '';
+  const state = document.getElementById('cr-perspective-draft-state');
+  document.getElementById('cr-perspective-declaration-panel').hidden = false;
+  if (!draft) return;
+  if (!_crPerspectiveRevisionBaseId) {
+    if (state) state.textContent = 'No current saved Perspective selected for revision.';
+    return;
+  }
+  if (!declaredBy || !reason) {
+    if (state) state.textContent = 'Declared by and revision reason are required.';
+    return;
+  }
+  try {
+    const result = await post(`/api/perspective/saved/${encodeURIComponent(_crPerspectiveRevisionBaseId)}/revisions`, {
+      perspective_draft: draft,
+      declared_by: declaredBy,
+      reason,
+    });
+    const saved = result.perspective;
+    _crPerspectiveSavedDefinitions = [
+      saved,
+      ...(_crPerspectiveSavedDefinitions || []).map(p =>
+        p.id === _crPerspectiveRevisionBaseId ? { ...p, is_current_leaf: false } : p
+      ).filter(p => p.id !== saved.id),
+    ];
+    _crPopulateSavedPerspectiveSelect();
+    const savedSelect = document.getElementById('cr-perspective-saved-select');
+    if (savedSelect) savedSelect.value = saved.id;
+    _crPerspectiveRevisionBaseId = '';
+    if (state) state.textContent = `${saved.label} · New revision saved`;
+    _crSetPerspectiveKind('saved');
+  } catch (e) {
+    if (state) state.textContent = e.message;
+  }
+}
+
+function _crUseSavedPerspective() {
+  const saved = _crSavedPerspectiveById(document.getElementById('cr-perspective-saved-select')?.value || '');
+  const status = document.getElementById('cr-perspective-status');
+  if (status && saved) status.textContent = `${saved.label} · saved Perspective selected`;
+}
+
+function _crEditSavedPerspectiveDraft() {
+  const saved = _crSavedPerspectiveById(document.getElementById('cr-perspective-saved-select')?.value || '');
+  if (!saved) return;
+  _crSetDraftFields(saved);
+  _crPerspectiveDraftActive = null;
+  _crPerspectiveDraftDirty = false;
+  _crPerspectiveRevisionBaseId = saved.is_current_leaf ? saved.id : '';
+  document.getElementById('cr-perspective-declaration-panel').hidden = false;
+  document.getElementById('cr-perspective-save-revision-btn').hidden = !saved.is_current_leaf;
+  const state = document.getElementById('cr-perspective-draft-state');
+  if (state) state.textContent = saved.is_current_leaf
+    ? 'Saved Perspective copied into draft. Save new revision is available.'
+    : 'Historical Perspective copied into draft. Ordinary revision is blocked.';
+  _crSetPerspectiveKind('custom');
+  _crPreviewPerspectiveDraft();
+}
+
 function _crSetPerspectiveKind(kind) {
-  _crPerspectiveKind = kind === 'custom' ? 'custom' : 'built-in';
+  _crPerspectiveKind = kind === 'custom' || kind === 'saved' ? kind : 'built-in';
   document.getElementById('cr-perspective-kind-built-in')?.classList.toggle('active', _crPerspectiveKind === 'built-in');
+  document.getElementById('cr-perspective-kind-saved')?.classList.toggle('active', _crPerspectiveKind === 'saved');
   document.getElementById('cr-perspective-kind-custom')?.classList.toggle('active', _crPerspectiveKind === 'custom');
   const builtIn = document.getElementById('cr-perspective-built-in-panel');
+  const saved = document.getElementById('cr-perspective-saved-panel');
   const custom = document.getElementById('cr-perspective-custom-panel');
   if (builtIn) builtIn.hidden = _crPerspectiveKind !== 'built-in';
+  if (saved) saved.hidden = _crPerspectiveKind !== 'saved';
   if (custom) custom.hidden = _crPerspectiveKind !== 'custom';
   const status = document.getElementById('cr-perspective-status');
   if (status && _crPerspectiveMode === 'single') {
     status.textContent = _crPerspectiveKind === 'custom'
       ? 'Scope + Custom Draft Perspective + Question + Model'
-      : 'Scope + Perspective + Question + Model';
+      : (_crPerspectiveKind === 'saved' ? 'Scope + Saved Perspective + Question + Model' : 'Scope + Perspective + Question + Model');
   }
 }
 
@@ -9387,7 +9555,7 @@ function _crSetPerspectiveMode(mode) {
   const status = document.getElementById('cr-perspective-status');
   if (status) status.textContent = _crPerspectiveMode === 'room'
     ? 'Scope + Question + Model + Room'
-    : (_crPerspectiveKind === 'custom' ? 'Scope + Custom Draft Perspective + Question + Model' : 'Scope + Perspective + Question + Model');
+    : (_crPerspectiveKind === 'custom' ? 'Scope + Custom Draft Perspective + Question + Model' : (_crPerspectiveKind === 'saved' ? 'Scope + Saved Perspective + Question + Model' : 'Scope + Perspective + Question + Model'));
 }
 
 async function _crLoadPerspectiveRun() {
@@ -9406,12 +9574,19 @@ async function _crLoadPerspectiveRun() {
     ]);
     _crPerspectiveDefinitions = defs.perspectives || [];
     _crPerspectiveRoomDefinitions = defs.default_room || [];
+    try {
+      const saved = await get('/api/perspective/saved');
+      _crPerspectiveSavedDefinitions = saved.perspectives || [];
+    } catch {
+      _crPerspectiveSavedDefinitions = [];
+    }
     if (pSel) {
       pSel.innerHTML = _crPerspectiveDefinitions.map(p =>
         `<option value="${x(p.id)}">${x(p.label)} · v${x(p.version)}</option>`
       ).join('');
       if (!pSel.value && _crPerspectiveDefinitions.length) pSel.value = _crPerspectiveDefinitions[0].id;
     }
+    _crPopulateSavedPerspectiveSelect();
     const local = (providers.providers || []).find(p => p.provider_id === 'ollama-local') || null;
     const installed = Array.isArray(local?.installed_models) ? local.installed_models : [];
     const selected = local?.selected_model || local?.default_model || '';
@@ -9628,6 +9803,7 @@ async function _crRunPerspective() {
   const out = document.getElementById('cr-perspective-output');
   const status = document.getElementById('cr-perspective-status');
   const perspectiveId = document.getElementById('cr-perspective-select')?.value || '';
+  const savedPerspectiveId = document.getElementById('cr-perspective-saved-select')?.value || '';
   const model = document.getElementById('cr-perspective-model')?.value || '';
   const question = document.getElementById('cr-perspective-question')?.value?.trim() || '';
   _crPerspectiveScope = _crPerspectiveScope || _crPerspectiveScopeFromSelection();
@@ -9654,6 +9830,10 @@ async function _crRunPerspective() {
       return;
     }
   }
+  if (_crPerspectiveMode === 'single' && _crPerspectiveKind === 'saved' && !savedPerspectiveId) {
+    showAppError('Choose a saved Perspective before running.');
+    return;
+  }
   if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
   if (status) status.textContent = _crPerspectiveMode === 'room' ? 'Asking the local Room' : 'Running local Perspective';
   if (out) out.innerHTML = '<div class="e10-empty">Asking the selected local model…</div>';
@@ -9667,12 +9847,17 @@ async function _crRunPerspective() {
       question,
       model,
       scope: _crPerspectiveScope,
+    } : (_crPerspectiveKind === 'saved' ? {
+      saved_perspective_id: savedPerspectiveId,
+      question,
+      model,
+      scope: _crPerspectiveScope,
     } : {
       perspective_id: perspectiveId,
       question,
       model,
       scope: _crPerspectiveScope,
-    });
+    }));
     const receipt = _crPerspectiveMode === 'room'
       ? await _crPostPerspectiveRoom(payload)
       : await post('/api/perspective/run', payload);
@@ -9712,6 +9897,9 @@ window._crPerspectiveFromSelection = _crPerspectiveFromSelection;
 window._crLoadPerspectiveRun = _crLoadPerspectiveRun;
 window._crRunPerspective = _crRunPerspective;
 window._crSetPerspectiveMode = _crSetPerspectiveMode;
+window._crSetPerspectiveKind = _crSetPerspectiveKind;
+window._crSavePerspectiveDraft = _crSavePerspectiveDraft;
+window._crSavePerspectiveRevision = _crSavePerspectiveRevision;
 // ── Thesis → Blueprint (bottom workstation "Blueprint" tab) ──────────────
 // Forward path: turn the governing question + what the reader has captured into
 // a proposed Intent Hypothesis. Reuses POST /api/pipeline/extract-blueprint —

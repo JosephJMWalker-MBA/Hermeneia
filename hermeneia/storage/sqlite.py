@@ -3,12 +3,17 @@
 Evidence tables are append-only and database-enforced immutable.
 Derived tables are disposable/regenerable.
 """
+import json
 import sqlite3
 from pathlib import Path
 
+from ..perspective_identity import (
+    FRAME_V2_SCHEME,
+    validate_frame_v2_row_identity,
+)
 from .hashing import make_semantic_hash
 
-SCHEMA_VERSION = 16  # bumped from 15: critic_reports operational artifact (Sprint E9)
+SCHEMA_VERSION = 17  # bumped from 16: governed Perspective frame-v2 revisions
 
 # Supersession triggers must be dropped and recreated whenever the canonical object
 # list grows. SQLite has no ALTER TRIGGER.
@@ -161,10 +166,34 @@ CREATE TABLE IF NOT EXISTS observation_terms (
 
 -- Perspective registry: named interpretive lenses (append-only)
 CREATE TABLE IF NOT EXISTS perspectives (
-    id          TEXT PRIMARY KEY,   -- sha256(lower(name))
-    name        TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL DEFAULT '',
-    created_at  TEXT NOT NULL
+    id                     TEXT PRIMARY KEY,
+    name                   TEXT NOT NULL,
+    description            TEXT NOT NULL DEFAULT '',
+    created_at             TEXT NOT NULL,
+    identity_scheme        TEXT NOT NULL DEFAULT 'perspective-label-v1'
+        CHECK(identity_scheme IN ('perspective-label-v1','perspective-frame-v2')),
+    definition_fingerprint TEXT,
+    purpose                TEXT,
+    questions_json         TEXT,
+    challenges_json        TEXT,
+    limitations_json       TEXT,
+    declared_by            TEXT,
+    declared_date          TEXT,
+    CHECK (
+        identity_scheme = 'perspective-label-v1'
+        OR (
+            definition_fingerprint IS NOT NULL
+            AND length(trim(definition_fingerprint)) > 0
+            AND purpose IS NOT NULL
+            AND questions_json IS NOT NULL
+            AND challenges_json IS NOT NULL
+            AND limitations_json IS NOT NULL
+            AND declared_by IS NOT NULL
+            AND length(trim(declared_by)) > 0
+            AND declared_date IS NOT NULL
+            AND length(trim(declared_date)) > 0
+        )
+    )
 );
 
 -- Layer 1: perspective-scoped interpretations (append-only, immutable).
@@ -1246,6 +1275,7 @@ class SQLiteStore:
         CREATE TABLE IF NOT EXISTS handles new databases.
         These ALTER TABLE statements handle existing databases that predate a column.
         """
+        self._apply_perspective_schema_migration()
         cols = {row[1] for row in self._conn.execute("PRAGMA table_info(interpretations)")}
         if "ai_provenance_id" not in cols:
             self._conn.execute(
@@ -1255,6 +1285,198 @@ class SQLiteStore:
         if "steward_note" not in cols:
             self._conn.execute("ALTER TABLE interpretations ADD COLUMN steward_note TEXT")
             self._conn.commit()
+
+    def _apply_perspective_schema_migration(self) -> None:
+        """Evolve the single canonical perspectives table for ADR-0045.
+
+        Legacy rows keep their exact id/name/description/created_at values and
+        gain scheme metadata only. The global UNIQUE(name) constraint is removed
+        so frame-v2 revisions can reuse a human-facing label.
+        """
+        table = self._conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='perspectives'"
+        ).fetchone()
+        if not table:
+            return
+        columns = {row[1] for row in self._conn.execute("PRAGMA table_info(perspectives)")}
+        table_sql = table["sql"] or ""
+        needs_rebuild = (
+            "identity_scheme" not in columns
+            or "definition_fingerprint" not in columns
+            or "UNIQUE" in table_sql.upper()
+        )
+        if not needs_rebuild:
+            self._ensure_perspective_indexes_and_triggers()
+            return
+
+        legacy_rows = [
+            dict(row)
+            for row in self._conn.execute(
+                "SELECT id, name, description, created_at FROM perspectives ORDER BY id"
+            )
+        ]
+        self._conn.commit()
+        self._conn.execute("PRAGMA foreign_keys=OFF")
+        try:
+            self._conn.execute("BEGIN IMMEDIATE")
+            self._conn.execute("DROP TRIGGER IF EXISTS supersession_relations_old_exists")
+            self._conn.execute("DROP TRIGGER IF EXISTS supersession_relations_new_exists")
+            self._conn.execute("DROP TRIGGER IF EXISTS perspectives_no_update")
+            self._conn.execute("DROP TRIGGER IF EXISTS perspectives_no_delete")
+            self._conn.execute("DROP INDEX IF EXISTS idx_perspectives_legacy_name")
+            self._conn.execute("DROP INDEX IF EXISTS idx_perspectives_frame_fingerprint")
+            self._conn.execute("""
+                CREATE TABLE perspectives_new (
+                    id                     TEXT PRIMARY KEY,
+                    name                   TEXT NOT NULL,
+                    description            TEXT NOT NULL DEFAULT '',
+                    created_at             TEXT NOT NULL,
+                    identity_scheme        TEXT NOT NULL DEFAULT 'perspective-label-v1'
+                        CHECK(identity_scheme IN ('perspective-label-v1','perspective-frame-v2')),
+                    definition_fingerprint TEXT,
+                    purpose                TEXT,
+                    questions_json         TEXT,
+                    challenges_json        TEXT,
+                    limitations_json       TEXT,
+                    declared_by            TEXT,
+                    declared_date          TEXT,
+                    CHECK (
+                        identity_scheme = 'perspective-label-v1'
+                        OR (
+                            definition_fingerprint IS NOT NULL
+                            AND length(trim(definition_fingerprint)) > 0
+                            AND purpose IS NOT NULL
+                            AND questions_json IS NOT NULL
+                            AND challenges_json IS NOT NULL
+                            AND limitations_json IS NOT NULL
+                            AND declared_by IS NOT NULL
+                            AND length(trim(declared_by)) > 0
+                            AND declared_date IS NOT NULL
+                            AND length(trim(declared_date)) > 0
+                        )
+                    )
+                )
+            """)
+            self._conn.executemany(
+                """
+                INSERT INTO perspectives_new
+                    (id, name, description, created_at, identity_scheme)
+                VALUES
+                    (:id, :name, :description, :created_at, 'perspective-label-v1')
+                """,
+                legacy_rows,
+            )
+            self._conn.execute("DROP TABLE perspectives")
+            self._conn.execute("ALTER TABLE perspectives_new RENAME TO perspectives")
+            self._create_perspective_indexes_and_triggers()
+            self._create_supersession_existence_triggers()
+            migrated_rows = [
+                dict(row)
+                for row in self._conn.execute(
+                    "SELECT id, name, description, created_at FROM perspectives ORDER BY id"
+                )
+            ]
+            if migrated_rows != legacy_rows:
+                raise sqlite3.IntegrityError("Perspective migration did not preserve legacy rows.")
+            violations = self._conn.execute("PRAGMA foreign_key_check").fetchall()
+            if violations:
+                raise sqlite3.IntegrityError(f"foreign_key_check failed after Perspective migration: {violations}")
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            self._conn.execute("PRAGMA foreign_keys=ON")
+
+    def _ensure_perspective_indexes_and_triggers(self) -> None:
+        self._create_perspective_indexes_and_triggers()
+        self._conn.commit()
+
+    def _create_perspective_indexes_and_triggers(self) -> None:
+        self._conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_perspectives_legacy_name
+                ON perspectives(lower(name))
+                WHERE identity_scheme = 'perspective-label-v1'
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_perspectives_frame_fingerprint
+                ON perspectives(definition_fingerprint)
+                WHERE identity_scheme = 'perspective-frame-v2'
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TRIGGER IF NOT EXISTS perspectives_no_update
+            BEFORE UPDATE ON perspectives
+            BEGIN
+                SELECT RAISE(ABORT, 'Perspective immutable');
+            END
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TRIGGER IF NOT EXISTS perspectives_no_delete
+            BEFORE DELETE ON perspectives
+            BEGIN
+                SELECT RAISE(ABORT, 'Perspective immutable');
+            END
+            """
+        )
+
+    def _create_supersession_existence_triggers(self) -> None:
+        self._conn.execute(
+            """
+            CREATE TRIGGER supersession_relations_old_exists
+            BEFORE INSERT ON supersession_relations
+            BEGIN
+                SELECT RAISE(ABORT, 'Supersession old object missing')
+                WHERE NOT (
+                    EXISTS (SELECT 1 FROM source_documents    WHERE id = NEW.old_id)
+                    OR EXISTS (SELECT 1 FROM source_extractions WHERE id = NEW.old_id)
+                    OR EXISTS (SELECT 1 FROM observations       WHERE id = NEW.old_id)
+                    OR EXISTS (SELECT 1 FROM perspectives       WHERE id = NEW.old_id)
+                    OR EXISTS (SELECT 1 FROM interpretations    WHERE id = NEW.old_id)
+                    OR EXISTS (SELECT 1 FROM narrative_blueprints WHERE id = NEW.old_id)
+                    OR EXISTS (SELECT 1 FROM architect_plans    WHERE id = NEW.old_id)
+                    OR EXISTS (SELECT 1 FROM expression_profiles WHERE id = NEW.old_id)
+                    OR EXISTS (SELECT 1 FROM rendered_narratives WHERE id = NEW.old_id)
+                    OR EXISTS (SELECT 1 FROM validation_reports  WHERE id = NEW.old_id)
+                    OR EXISTS (SELECT 1 FROM findings            WHERE id = NEW.old_id)
+                    OR EXISTS (SELECT 1 FROM steward_decisions   WHERE id = NEW.old_id)
+                    OR EXISTS (SELECT 1 FROM witness_sessions      WHERE id = NEW.old_id)
+                    OR EXISTS (SELECT 1 FROM ratification_records  WHERE id = NEW.old_id)
+                );
+            END
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TRIGGER supersession_relations_new_exists
+            BEFORE INSERT ON supersession_relations
+            BEGIN
+                SELECT RAISE(ABORT, 'Supersession new object missing')
+                WHERE NOT (
+                    EXISTS (SELECT 1 FROM source_documents    WHERE id = NEW.new_id)
+                    OR EXISTS (SELECT 1 FROM source_extractions WHERE id = NEW.new_id)
+                    OR EXISTS (SELECT 1 FROM observations       WHERE id = NEW.new_id)
+                    OR EXISTS (SELECT 1 FROM perspectives       WHERE id = NEW.new_id)
+                    OR EXISTS (SELECT 1 FROM interpretations    WHERE id = NEW.new_id)
+                    OR EXISTS (SELECT 1 FROM narrative_blueprints WHERE id = NEW.new_id)
+                    OR EXISTS (SELECT 1 FROM architect_plans    WHERE id = NEW.new_id)
+                    OR EXISTS (SELECT 1 FROM expression_profiles WHERE id = NEW.new_id)
+                    OR EXISTS (SELECT 1 FROM rendered_narratives WHERE id = NEW.new_id)
+                    OR EXISTS (SELECT 1 FROM validation_reports  WHERE id = NEW.new_id)
+                    OR EXISTS (SELECT 1 FROM findings            WHERE id = NEW.new_id)
+                    OR EXISTS (SELECT 1 FROM steward_decisions   WHERE id = NEW.new_id)
+                    OR EXISTS (SELECT 1 FROM witness_sessions    WHERE id = NEW.new_id)
+                    OR EXISTS (SELECT 1 FROM ratification_records WHERE id = NEW.new_id)
+                );
+            END
+            """
+        )
 
     # --- source_documents ---
 
@@ -1407,23 +1629,193 @@ class SQLiteStore:
         """INSERT OR IGNORE — same name always yields the same ID."""
         self._conn.execute(
             """
-            INSERT OR IGNORE INTO perspectives (id, name, description, created_at)
-            VALUES (:id, :name, :description, :created_at)
+            INSERT OR IGNORE INTO perspectives
+                (id, name, description, created_at, identity_scheme)
+            VALUES
+                (:id, :name, :description, :created_at, 'perspective-label-v1')
             """,
             row,
         )
         self._conn.commit()
 
+    def insert_frame_perspective(self, row: dict, *, predecessor_perspective_id: str | None = None) -> dict:
+        """Insert a frame-v2 Perspective, or verify an idempotent repeat."""
+        prepared = dict(row)
+        outer_transaction = self._conn.in_transaction
+        for key in ("questions_json", "challenges_json", "limitations_json"):
+            if not isinstance(prepared.get(key), str):
+                prepared[key] = json.dumps(prepared.get(key) or [], sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+        validate_frame_v2_row_identity(
+            prepared,
+            predecessor_perspective_id=predecessor_perspective_id,
+        )
+        existing = self.get_perspective_by_id(str(prepared["id"]))
+        if existing is not None:
+            comparable = {
+                key: existing.get(key)
+                for key in (
+                    "id", "name", "description", "identity_scheme",
+                    "definition_fingerprint", "purpose", "questions_json",
+                    "challenges_json", "limitations_json", "declared_by",
+                )
+            }
+            requested = {key: prepared.get(key) for key in comparable}
+            if comparable != requested:
+                raise ValueError("Perspective ID already exists with different immutable content.")
+            return existing
+        self._conn.execute(
+            """
+            INSERT INTO perspectives
+                (id, name, description, created_at, identity_scheme,
+                 definition_fingerprint, purpose, questions_json, challenges_json,
+                 limitations_json, declared_by, declared_date)
+            VALUES
+                (:id, :name, :description, :created_at, :identity_scheme,
+                 :definition_fingerprint, :purpose, :questions_json, :challenges_json,
+                 :limitations_json, :declared_by, :declared_date)
+            """,
+            prepared,
+        )
+        if not outer_transaction:
+            self._conn.commit()
+        return self.get_perspective_by_id(str(prepared["id"])) or prepared
+
+    def get_perspective_by_id(self, perspective_id: str) -> dict | None:
+        cur = self._conn.execute(
+            "SELECT * FROM perspectives WHERE id = ?", (perspective_id,)
+        )
+        row = cur.fetchone()
+        return dict(row) if row else None
+
     def get_perspective_by_name(self, name: str) -> dict | None:
         cur = self._conn.execute(
-            "SELECT * FROM perspectives WHERE lower(name) = lower(?)", (name,)
+            """
+            SELECT * FROM perspectives
+            WHERE identity_scheme = 'perspective-label-v1'
+              AND lower(name) = lower(?)
+            """,
+            (name,),
         )
         row = cur.fetchone()
         return dict(row) if row else None
 
     def all_perspectives(self) -> list[dict]:
-        cur = self._conn.execute("SELECT * FROM perspectives ORDER BY name")
+        cur = self._conn.execute("SELECT * FROM perspectives ORDER BY name, created_at, id")
         return [dict(r) for r in cur.fetchall()]
+
+    def all_frame_perspectives(self) -> list[dict]:
+        cur = self._conn.execute(
+            """
+            SELECT p.*,
+                   CASE WHEN outgoing.old_id IS NULL THEN 1 ELSE 0 END AS is_current_leaf
+            FROM perspectives p
+            LEFT JOIN (
+                SELECT DISTINCT old_id
+                FROM supersession_relations
+                WHERE old_id IN (SELECT id FROM perspectives)
+                  AND new_id IN (SELECT id FROM perspectives)
+            ) outgoing ON outgoing.old_id = p.id
+            WHERE p.identity_scheme = 'perspective-frame-v2'
+            ORDER BY is_current_leaf DESC, p.name, p.declared_date, p.id
+            """
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+    def perspective_is_current_leaf(self, perspective_id: str) -> bool:
+        row = self._conn.execute(
+            """
+            SELECT 1 FROM supersession_relations
+            WHERE old_id = ?
+              AND new_id IN (SELECT id FROM perspectives)
+            LIMIT 1
+            """,
+            (perspective_id,),
+        ).fetchone()
+        return row is None
+
+    def insert_perspective_revision(self, predecessor_id: str, successor: dict, reason: str, ratified_at: str) -> dict:
+        reason = str(reason or "").strip()
+        if not reason:
+            raise ValueError("revision reason is required")
+        successor_id = str(successor.get("id") or "")
+        if predecessor_id == successor_id:
+            raise ValueError("Perspective cannot supersede itself")
+        prepared = dict(successor)
+        for key in ("questions_json", "challenges_json", "limitations_json"):
+            if not isinstance(prepared.get(key), str):
+                prepared[key] = json.dumps(prepared.get(key) or [], sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+        validate_frame_v2_row_identity(prepared, predecessor_perspective_id=predecessor_id)
+        self._conn.commit()
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            predecessor = self.get_perspective_by_id(predecessor_id)
+            if predecessor is None:
+                raise ValueError("unknown predecessor Perspective")
+            if predecessor.get("identity_scheme") != FRAME_V2_SCHEME:
+                raise ValueError("Only frame-v2 Perspectives can be revised.")
+            existing = self.get_perspective_by_id(successor_id)
+            edge = self._conn.execute(
+                """
+                SELECT * FROM supersession_relations
+                WHERE old_id = ? AND new_id = ? AND reason = ?
+                """,
+                (predecessor_id, successor_id, reason),
+            ).fetchone()
+            if existing is not None and edge is not None:
+                validate_frame_v2_row_identity(
+                    dict(existing),
+                    predecessor_perspective_id=predecessor_id,
+                )
+                self._conn.commit()
+                return dict(existing)
+            if not self.perspective_is_current_leaf(predecessor_id):
+                raise ValueError("Only the current Perspective leaf can be revised.")
+            if self._perspective_path_exists(successor_id, predecessor_id):
+                raise ValueError("Perspective supersession cycle rejected.")
+            row = self.insert_frame_perspective(
+                prepared,
+                predecessor_perspective_id=predecessor_id,
+            )
+            self._conn.execute(
+                """
+                INSERT INTO supersession_relations
+                    (old_id, new_id, reason, ratified_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (predecessor_id, successor_id, reason, ratified_at),
+            )
+            self._conn.commit()
+            return row
+        except Exception:
+            self._conn.rollback()
+            raise
+
+    def _perspective_path_exists(self, start_id: str, target_id: str) -> bool:
+        if start_id == target_id:
+            return True
+        row = self._conn.execute(
+            """
+            WITH RECURSIVE chain(new_id, path) AS (
+                SELECT new_id, '|' || old_id || '|' || new_id || '|'
+                FROM supersession_relations
+                WHERE old_id = ?
+                  AND new_id IN (SELECT id FROM perspectives)
+                UNION ALL
+                SELECT sr.new_id, chain.path || sr.new_id || '|'
+                FROM supersession_relations sr
+                JOIN chain ON sr.old_id = chain.new_id
+                WHERE sr.new_id IN (SELECT id FROM perspectives)
+                  AND sr.old_id IN (SELECT id FROM perspectives)
+                  AND (
+                        sr.new_id = ?
+                        OR instr(chain.path, '|' || sr.new_id || '|') = 0
+                      )
+            )
+            SELECT 1 FROM chain WHERE new_id = ? LIMIT 1
+            """,
+            (start_id, target_id, target_id),
+        ).fetchone()
+        return row is not None
 
     def perspective_count(self) -> int:
         return self._conn.execute("SELECT COUNT(*) FROM perspectives").fetchone()[0]

@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from hermeneia.storage.sqlite import SQLiteStore
+from hermeneia.perspective_identity import frame_v2_row_from_draft
 from hermeneia.workspace import (
     WBS_VERSION,
     build_bundle_files,
@@ -74,6 +75,39 @@ def _seed(tmp_path: Path) -> Path:
     conn.commit()
     conn.close()
 
+    store = SQLiteStore(db_path)
+    root, _ = frame_v2_row_from_draft(
+        {
+            "label": "Institutional Trust Reader",
+            "purpose": "Examine trust.",
+            "questions": ["Who trusts whom?"],
+            "challenges": ["Challenge unsupported legitimacy."],
+            "limitations": ["May overemphasize institutions."],
+        },
+        declared_by="Primary Human Steward",
+        declared_date="2026-08-22T12:00:00+00:00",
+    )
+    successor, _ = frame_v2_row_from_draft(
+        {
+            "label": "Institutional Trust Reader",
+            "purpose": "Examine institutional trust with refined attention.",
+            "questions": ["Who trusts whom?"],
+            "challenges": ["Challenge unsupported legitimacy."],
+            "limitations": ["May overemphasize institutions."],
+        },
+        declared_by="Primary Human Steward",
+        declared_date="2026-08-22T12:05:00+00:00",
+        predecessor_perspective_id=root["id"],
+    )
+    store.insert_frame_perspective(root)
+    store.insert_perspective_revision(
+        root["id"],
+        successor,
+        "Refined semantic scope.",
+        "2026-08-22T12:05:00+00:00",
+    )
+    store.close()
+
     uploads = db_path.parent / "uploads"
     uploads.mkdir(parents=True, exist_ok=True)
     (uploads / "gatsby_abc.pdf").write_bytes(b"%PDF-1.7 fake gatsby bytes")
@@ -103,6 +137,8 @@ def test_export_produces_the_v1_bundle_layout(tmp_path: Path):
         "corpus/extractions.json",
         "corpus/observations.json",
         "study/highlights.json",
+        "study/perspectives.json",
+        "study/perspective_supersessions.json",
         "study/field_notes.json",
         "study/questions.json",
         "study/buckets.json",
@@ -116,6 +152,8 @@ def test_export_produces_the_v1_bundle_layout(tmp_path: Path):
     assert manifest["wbs_version"] == WBS_VERSION
     assert manifest["counts"]["documents"] == 1
     assert manifest["counts"]["highlights"] == 1
+    assert manifest["counts"]["perspectives"] == 2
+    assert manifest["counts"]["perspective_supersessions"] == 1
 
 
 def test_no_workspace_db_or_secrets_or_localstorage_in_bundle(tmp_path: Path):
@@ -155,6 +193,8 @@ def test_derived_files_are_marked_derived_in_manifest(tmp_path: Path):
     assert role["corpus/extractions.json"] == "canonical"
     assert role["investigation.json"] == "authored"
     assert role["study/highlights.json"] == "authored"
+    assert role["study/perspectives.json"] == "authored"
+    assert role["study/perspective_supersessions.json"] == "authored"
     assert role["synthesis/packet-study.json"] == "derived"
     assert role["lineage/lineage.json"] == "derived"
     assert role["evaluation/report.json"] == "derived"
@@ -237,3 +277,20 @@ def test_empty_workspace_exports_a_valid_bundle(tmp_path: Path):
     manifest = _export(db_path, out)
     assert manifest["counts"]["documents"] == 0
     assert json.loads((out / "investigation.json").read_text()) is None
+
+
+def test_wbs_11_exports_perspective_revisions_deterministically(tmp_path: Path):
+    db_path = _seed(tmp_path)
+    out = tmp_path / "bundle"
+    _export(db_path, out)
+
+    perspectives = json.loads((out / "study/perspectives.json").read_text())
+    edges = json.loads((out / "study/perspective_supersessions.json").read_text())
+    assert [p["identity_scheme"] for p in perspectives] == [
+        "perspective-frame-v2",
+        "perspective-frame-v2",
+    ]
+    assert all(p["id"].startswith("perspective-frame-v2:") for p in perspectives)
+    assert edges[0]["old_id"] == perspectives[0]["id"]
+    assert edges[0]["new_id"] == perspectives[1]["id"]
+    assert edges[0]["reason"] == "Refined semantic scope."

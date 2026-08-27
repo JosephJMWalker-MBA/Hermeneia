@@ -259,16 +259,23 @@ def resolve_perspective_request(
     *,
     perspective_id: Any = None,
     perspective_draft: Any = None,
+    saved_perspective_id: Any = None,
+    saved_resolver: Any = None,
 ) -> PerspectiveResolution:
     has_id = bool(_clean_text(perspective_id))
     has_draft = isinstance(perspective_draft, dict)
-    if has_id == has_draft:
-        raise ValueError("Provide exactly one of perspective_id or perspective_draft.")
+    has_saved = bool(_clean_text(saved_perspective_id))
+    if sum(1 for item in (has_id, has_draft, has_saved) if item) != 1:
+        raise ValueError("Provide exactly one of perspective_id, perspective_draft, or saved_perspective_id.")
     if has_id:
         definition = perspective_definition(_clean_text(perspective_id))
         if definition is None:
             raise ValueError("unknown Perspective")
         return PerspectiveResolution(definition=definition)
+    if has_saved:
+        if saved_resolver is None:
+            raise ValueError("saved Perspective resolver is unavailable")
+        return saved_resolver(_clean_text(saved_perspective_id))
     return normalize_transient_perspective_draft(perspective_draft)
 
 
@@ -385,7 +392,6 @@ def build_perspective_prompt(
         "",
         f"Perspective: {definition.label}",
         f"Perspective ID: {definition.id}",
-        f"Perspective version: {definition.version}",
         f"Purpose: {definition.purpose}",
         "",
         "This Perspective tends to ask:",
@@ -410,6 +416,8 @@ def build_perspective_prompt(
         "The following selected Reader passage is the center of the Question.",
         selected_text,
     ]
+    if definition.version:
+        lines.insert(11, f"Perspective version: {definition.version}")
     current_pages = [item for item in supporting if item.get("kind") == "current_page"]
     if current_pages:
         lines.extend([
@@ -470,9 +478,10 @@ def build_perspective_receipt(
 ) -> dict[str, object]:
     perspective = {
         "id": definition.id,
-        "version": definition.version,
         "label": definition.label,
     }
+    if definition.version:
+        perspective["version"] = definition.version
     if perspective_metadata:
         perspective.update(perspective_metadata)
     return {

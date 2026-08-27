@@ -4,6 +4,7 @@ from hermeneia.perspective_runs import (
     DEFAULT_ROOM_PERSPECTIVES,
     PERSPECTIVE_DEFINITIONS,
     build_perspective_prompt,
+    build_perspective_receipt,
     normalize_reader_selection_scope,
     normalize_transient_perspective_draft,
     perspective_definition,
@@ -183,6 +184,51 @@ def test_resolve_perspective_request_requires_exactly_one_builtin_or_draft() -> 
             assert "exactly one" in str(exc)
         else:
             raise AssertionError("invalid Perspective request shape was accepted")
+
+
+def test_prompt_and_receipt_omit_empty_saved_version_but_keep_builtin_and_draft_versions() -> None:
+    built_in = perspective_definition("close-reader")
+    assert built_in is not None
+    draft = resolve_perspective_request(perspective_draft={
+        "label": "Institutional Trust Reader",
+        "purpose": "Examine trust.",
+        "questions": ["Who trusts whom?"],
+    }).definition
+    saved_like = type(built_in)(
+        id="perspective-frame-v2:abc",
+        version="",
+        label="Saved Reader",
+        purpose="Saved purpose.",
+        questions=("What changed?",),
+        challenges=(),
+        limitations=(),
+    )
+    scope = normalize_reader_selection_scope({"primary": {"text": "Selected text."}})
+
+    built_in_prompt = build_perspective_prompt(built_in, question="Q?", scope_receipt=scope)
+    draft_prompt = build_perspective_prompt(draft, question="Q?", scope_receipt=scope)
+    saved_prompt = build_perspective_prompt(saved_like, question="Q?", scope_receipt=scope)
+    assert "Perspective version: 1" in built_in_prompt
+    assert "Perspective version: draft" in draft_prompt
+    assert "Perspective version:" not in saved_prompt
+
+    built_in_receipt = build_perspective_receipt(
+        built_in,
+        question="Q?",
+        scope_receipt=scope,
+        execution={},
+        response="R",
+    )
+    saved_receipt = build_perspective_receipt(
+        saved_like,
+        question="Q?",
+        scope_receipt=scope,
+        execution={},
+        response="R",
+        perspective_metadata={"origin": "canonical_saved"},
+    )
+    assert built_in_receipt["perspective"]["version"] == "1"
+    assert "version" not in saved_receipt["perspective"]
 
 
 def test_perspective_identity_is_stable_across_execution_models() -> None:

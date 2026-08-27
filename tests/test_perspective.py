@@ -22,6 +22,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from hermeneia.compiler.compiler import Compiler
+from hermeneia.perspective_identity import FRAME_V2_SCHEME, LEGACY_SCHEME, frame_v2_row_from_draft
 from hermeneia.cli.comparer import _analyze
 from hermeneia.storage.hashing import make_perspective_id, make_interpretation_id
 from hermeneia.storage.sqlite import SQLiteStore
@@ -175,6 +176,163 @@ def test_perspective_model_fields_present():
     assert p.id == make_perspective_id("Historical")
     assert p.name == "Historical"
     assert p.description == ""
+
+
+def test_perspective_model_legacy_construction_defaults_to_label_v1():
+    from hermeneia.ontology.perspective import Perspective
+
+    created_at = datetime.now(timezone.utc)
+    p = Perspective(
+        id=make_perspective_id("Literary"),
+        name="Literary",
+        description="Attends to narrative form.",
+        created_at=created_at,
+    )
+
+    assert p.identity_scheme == LEGACY_SCHEME
+    assert p.definition_fingerprint is None
+    assert p.purpose is None
+    assert p.questions is None
+    assert p.challenges is None
+    assert p.limitations is None
+    assert p.declared_by is None
+    assert p.declared_date is None
+
+
+def test_perspective_model_represents_frame_v2_semantics_and_declaration():
+    from hermeneia.ontology.perspective import Perspective
+
+    declared_date = datetime(2026, 8, 22, 12, 0, tzinfo=timezone.utc)
+    p = Perspective(
+        id="perspective-frame-v2:abc123",
+        name="Institutional Trust Reader",
+        description="Read for institutional trust.",
+        created_at=declared_date,
+        identity_scheme=FRAME_V2_SCHEME,
+        definition_fingerprint="sha256:definition",
+        purpose="Read for institutional trust.",
+        questions=("Who is expected to trust whom?",),
+        challenges=("Challenge unsupported legitimacy claims.",),
+        limitations=("May overemphasize institutions.",),
+        declared_by="Primary Human Steward",
+        declared_date=declared_date,
+    )
+
+    assert p.identity_scheme == FRAME_V2_SCHEME
+    assert p.definition_fingerprint == "sha256:definition"
+    assert p.purpose == "Read for institutional trust."
+    assert p.questions == ("Who is expected to trust whom?",)
+    assert p.challenges == ("Challenge unsupported legitimacy claims.",)
+    assert p.limitations == ("May overemphasize institutions.",)
+    assert p.declared_by == "Primary Human Steward"
+    assert p.declared_date == declared_date
+
+
+def test_perspective_model_distinguishes_v1_and_v2_by_identity_scheme():
+    from hermeneia.ontology.perspective import Perspective
+
+    created_at = datetime.now(timezone.utc)
+    v1 = Perspective(
+        id=make_perspective_id("Literary"),
+        name="Literary",
+        description="Legacy label-derived frame.",
+        created_at=created_at,
+    )
+    v2 = Perspective(
+        id="perspective-frame-v2:def456",
+        name="Literary",
+        description="Rich declared frame.",
+        created_at=created_at,
+        identity_scheme=FRAME_V2_SCHEME,
+        definition_fingerprint="sha256:rich",
+        purpose="Rich declared frame.",
+        questions=("What changes?",),
+        challenges=(),
+        limitations=(),
+        declared_by="Primary Human Steward",
+        declared_date=created_at,
+    )
+
+    assert v1.identity_scheme == LEGACY_SCHEME
+    assert v2.identity_scheme == FRAME_V2_SCHEME
+
+
+def test_perspective_model_can_represent_persisted_frame_v2_row():
+    from hermeneia.ontology.perspective import Perspective
+
+    row = frame_v2_row_from_draft(
+        {
+            "label": "Institutional Trust Reader",
+            "purpose": "Examine how institutions gain, lose, or borrow legitimacy.",
+            "questions": ["Who is expected to trust whom?"],
+            "challenges": ["Challenge unsupported legitimacy claims."],
+            "limitations": ["May overemphasize institutions."],
+        },
+        declared_by="Primary Human Steward",
+        declared_date="2026-08-22T12:00:00+00:00",
+    )[0]
+    p = Perspective(
+        id=str(row["id"]),
+        name=str(row["name"]),
+        description=str(row["description"]),
+        created_at=datetime.fromisoformat(str(row["created_at"])),
+        identity_scheme=FRAME_V2_SCHEME,
+        definition_fingerprint=str(row["definition_fingerprint"]),
+        purpose=str(row["purpose"]),
+        questions=("Who is expected to trust whom?",),
+        challenges=("Challenge unsupported legitimacy claims.",),
+        limitations=("May overemphasize institutions.",),
+        declared_by=str(row["declared_by"]),
+        declared_date=datetime.fromisoformat(str(row["declared_date"])),
+    )
+
+    assert p.id == row["id"]
+    assert p.definition_fingerprint == row["definition_fingerprint"]
+    assert p.declared_by == row["declared_by"]
+
+
+def test_perspective_model_excludes_execution_scope_question_and_expression_axes():
+    from pydantic import ValidationError
+
+    from hermeneia.ontology.perspective import Perspective
+
+    base = {
+        "id": make_perspective_id("Literary"),
+        "name": "Literary",
+        "description": "",
+        "created_at": datetime.now(timezone.utc),
+    }
+    forbidden_fields = (
+        "provider",
+        "model",
+        "model_version",
+        "inference_configuration",
+        "scope",
+        "question",
+        "audience",
+        "tone",
+        "voice",
+        "style",
+        "language",
+        "rhetorical_constraints",
+        "output_format",
+        "expression_profile",
+    )
+
+    for field in forbidden_fields:
+        with pytest.raises(ValidationError):
+            Perspective(**base, **{field: "not Perspective semantics"})
+
+    assert not (set(forbidden_fields) & set(Perspective.model_fields))
+
+
+def test_perspective_ontology_documentation_distinguishes_identity_schemes():
+    source = (Path(__file__).parent.parent / "hermeneia" / "ontology" / "perspective.py").read_text()
+
+    assert "perspective-label-v1" in source
+    assert "perspective-frame-v2" in source
+    assert "sha256(lower(name))" not in source
+    assert "all Perspective IDs" not in source
 
 
 # ── Contradiction analysis (pure unit tests, no DB needed) ───────────────────
