@@ -25,6 +25,7 @@ from hermeneia.narrative.artist_providers import (
     GeminiArtistProvider,
     OpenAIArtistProvider,
 )
+from hermeneia.perspective_identity import frame_v2_row_from_draft
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.web.app import create_app
 from hermeneia.credentials import CredentialStoreError, KeyringCredentialStore, default_credential_store
@@ -3138,6 +3139,8 @@ def test_perspective_room_sequences_three_perspectives_with_one_scope_question_a
     assert response.status_code == 201
     body = response.get_json()
     assert body["operation"] == "perspective_room"
+    assert body["roster_source"] == "default"
+    assert body["participant_count"] == 3
     assert body["canonical_status"] == "not_persisted"
     assert body["status"] == "succeeded"
     assert body["question"] == "What is this passage asking us to notice?"
@@ -3190,6 +3193,297 @@ def test_perspective_room_sequences_three_perspectives_with_one_scope_question_a
     providers = client.get("/api/e10/providers").get_json()["providers"]
     local = next(row for row in providers if row["participant"] == "local")
     assert local["selected_model"] == "qwen3:4b"
+
+
+def _frame_v2_row(
+    draft: dict,
+    *,
+    declared_by: str = "Primary Human Steward",
+    predecessor: str | None = None,
+) -> dict:
+    return frame_v2_row_from_draft(
+        draft,
+        declared_by=declared_by,
+        declared_date="2026-08-27T12:00:00+00:00",
+        predecessor_perspective_id=predecessor,
+    )[0]
+
+
+def _room_canonical_counts(db_path: Path) -> dict[str, int]:
+    counts = _canonical_counts(db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        counts["perspectives"] = conn.execute("SELECT COUNT(*) FROM perspectives").fetchone()[0]
+        counts["supersession_relations"] = conn.execute(
+            "SELECT COUNT(*) FROM supersession_relations"
+        ).fetchone()[0]
+        return counts
+    finally:
+        conn.close()
+
+
+def test_perspective_room_custom_roster_mixes_builtin_saved_and_historical_exact_ids(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("OPENAI_API_KEY", "ambient-openai-key-that-must-not-be-used")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "ambient-anthropic-key-that-must-not-be-used")
+    _install_fake_ollama(monkeypatch, ["qwen3:4b", "qwen2.5:0.5b"])
+    _CapturingProvider.render_responses = [
+        "Built-in close response.",
+        "Historical saved response.",
+        "Current saved response.",
+    ]
+    db_path = tmp_path / "custom-room.db"
+    store = SQLiteStore(db_path)
+    _seed_full_chain(store)
+    historical = store.insert_frame_perspective(_frame_v2_row({
+        "label": "Institutional Trust Reader",
+        "purpose": "Read for how institutions borrow trust.",
+        "questions": ["Who is expected to trust whom?"],
+        "challenges": ["Challenge borrowed legitimacy."],
+        "limitations": ["May overemphasize institutions."],
+    }))
+    current = store.insert_perspective_revision(
+        historical["id"],
+        _frame_v2_row(
+            {
+                "label": "Institutional Trust Reader",
+                "purpose": "Read for how institutions spend and lose trust.",
+                "questions": ["Where does trust become costly?"],
+                "challenges": ["Challenge institutional self-description."],
+                "limitations": ["May understate personal agency."],
+            },
+            predecessor=historical["id"],
+        ),
+        "Refine the trust frame.",
+        "2026-08-27T12:30:00+00:00",
+    )
+    same_label_other = store.insert_frame_perspective(_frame_v2_row(
+        {
+            "label": "Institutional Trust Reader",
+            "purpose": "Read for external legitimacy signals.",
+            "questions": ["Who certifies trust?"],
+            "challenges": [],
+            "limitations": [],
+        },
+        declared_by="Another Steward",
+    ))
+    store.close()
+    before = _room_canonical_counts(db_path)
+
+    client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
+    scope = _reader_selection_scope(
+        "Custom Room source text.",
+        supporting={
+            "current_page": {
+                "include": True,
+                "text": "Same supporting source context.",
+                "source_document_id": "doc-selected",
+                "page": 3,
+                "source_locators": ["page:3:block:1"],
+                "extraction_ids": ["ex-page-1"],
+            },
+        },
+    )
+    response = client.post(
+        "/api/perspective/room",
+        json={
+            "question": "How does trust move here?",
+            "model": "qwen2.5:0.5b",
+            "scope": scope,
+            "participants": [
+                {"kind": "built_in", "perspective_id": "close-reader"},
+                {"kind": "saved", "perspective_id": historical["id"]},
+                {"kind": "saved", "perspective_id": current["id"]},
+            ],
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.get_json()
+    assert body["roster_source"] == "user_selected"
+    assert body["participant_count"] == 3
+    assert body["canonical_status"] == "not_persisted"
+    assert [row["order"] for row in body["participants"]] == [1, 2, 3]
+    assert [row["ordinal"] for row in body["participants"]] == [1, 2, 3]
+    assert [row["participant_kind"] for row in body["participants"]] == ["built_in", "saved", "saved"]
+    assert [row["perspective"]["id"] for row in body["participants"]] == [
+        "close-reader",
+        historical["id"],
+        current["id"],
+    ]
+    assert body["participants"][1]["perspective"]["id"] == historical["id"]
+    assert body["participants"][1]["perspective"]["perspective_id"] == historical["id"]
+    assert body["participants"][1]["perspective"]["definition_fingerprint"] == historical["definition_fingerprint"]
+    assert body["participants"][1]["perspective"]["declared_by"] == historical["declared_by"]
+    assert body["participants"][2]["perspective"]["id"] == current["id"]
+    assert body["participants"][2]["perspective"]["definition_fingerprint"] == current["definition_fingerprint"]
+    assert body["participants"][1]["perspective"]["label"] == body["participants"][2]["perspective"]["label"]
+    assert body["participants"][1]["perspective"]["id"] != body["participants"][2]["perspective"]["id"]
+    assert same_label_other["name"] == historical["name"]
+    assert same_label_other["id"] not in [row["perspective"]["id"] for row in body["participants"]]
+    assert [row["prior_participant_ids"] for row in body["participants"]] == [
+        [],
+        ["close-reader"],
+        ["close-reader", historical["id"]],
+    ]
+    assert all(row["execution"]["model_id"] == "qwen2.5:0.5b" for row in body["participants"])
+    assert "Built-in close response." in _CapturingProvider.render_prompts[1]
+    assert "Historical saved response." in _CapturingProvider.render_prompts[2]
+    assert "PRIOR PROPOSED READINGS" in _CapturingProvider.render_prompts[1]
+    assert "DELIBERATION CONTEXT, NOT SOURCE EVIDENCE" in _CapturingProvider.render_prompts[1]
+    assert "Historical saved response." not in str(body["scope_receipt"])
+    assert "Built-in close response." not in str(body["scope_receipt"])
+    assert body["scope_receipt"]["primary"]["text"] == "Custom Room source text."
+    assert len(_CapturingProvider.calls) == 3
+    assert {call["model"] for call in _CapturingProvider.calls} == {"qwen2.5:0.5b"}
+    assert _room_canonical_counts(db_path) == before
+
+
+def test_perspective_room_custom_roster_validation_fails_before_model_call(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    db_path = tmp_path / "custom-room-validation.db"
+    store = SQLiteStore(db_path)
+    legacy = {
+        "id": "legacy-perspective",
+        "name": "Legacy",
+        "description": "",
+        "created_at": "2026-08-27T12:00:00+00:00",
+    }
+    store.register_perspective(legacy)
+    store.close()
+    client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
+    base = {
+        "question": "What matters?",
+        "model": "qwen2.5:0.5b",
+        "scope": _reader_selection_scope(),
+    }
+    cases = (
+        ([], "at least 2"),
+        ([{"kind": "built_in", "perspective_id": "close-reader"}], "at least 2"),
+        (
+            [
+                {"kind": "built_in", "perspective_id": "close-reader"},
+                {"kind": "built_in", "perspective_id": "contextual-reader"},
+                {"kind": "built_in", "perspective_id": "skeptical-reader"},
+                {"kind": "built_in", "perspective_id": "missing-a"},
+                {"kind": "built_in", "perspective_id": "missing-b"},
+            ],
+            "at most 4",
+        ),
+        ("not-list", "participants must be a list"),
+        (
+            [
+                {"kind": "built_in", "perspective_id": "missing-reader"},
+                {"kind": "built_in", "perspective_id": "close-reader"},
+            ],
+            "unknown built-in",
+        ),
+        (
+            [
+                {"kind": "saved", "perspective_id": "missing-saved"},
+                {"kind": "built_in", "perspective_id": "close-reader"},
+            ],
+            "unknown saved Perspective",
+        ),
+        (
+            [
+                {"kind": "saved", "perspective_id": "legacy-perspective"},
+                {"kind": "built_in", "perspective_id": "close-reader"},
+            ],
+            "frame-v2",
+        ),
+        (
+            [
+                {"kind": "saved", "perspective_id": "transient:abc"},
+                {"kind": "built_in", "perspective_id": "close-reader"},
+            ],
+            "transient Perspective drafts",
+        ),
+        (
+            [
+                {"kind": "built_in", "perspective_id": "close-reader"},
+                {"kind": "built_in", "perspective_id": "close-reader"},
+            ],
+            "duplicate",
+        ),
+        (
+            [
+                {"kind": "built_in", "perspective_id": "close-reader", "model": "qwen3:4b"},
+                {"kind": "built_in", "perspective_id": "contextual-reader"},
+            ],
+            "unsupported participant field",
+        ),
+        (
+            [
+                {"kind": "built_in", "perspective_id": "close-reader", "scope": {"primary": {}}},
+                {"kind": "built_in", "perspective_id": "contextual-reader"},
+            ],
+            "unsupported participant field",
+        ),
+        (
+            [
+                {"kind": "built_in", "perspective_id": "close-reader", "question": "different"},
+                {"kind": "built_in", "perspective_id": "contextual-reader"},
+            ],
+            "unsupported participant field",
+        ),
+    )
+
+    for participants, expected in cases:
+        _CapturingProvider.calls = []
+        response = client.post("/api/perspective/room", json={**base, "participants": participants})
+        assert response.status_code == 400
+        assert expected in response.get_json()["error"]
+        assert _CapturingProvider.calls == []
+
+
+def test_perspective_room_custom_roster_accepts_two_three_and_four_participants(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    client = create_app(
+        db_path=tmp_path / "custom-room-sizes.db",
+        provider_registry=_ollama_registry(),
+    ).test_client()
+
+    for size in (2, 3, 4):
+        _CapturingProvider.calls = []
+        saved_size_id = ""
+        if size == 4:
+            store = SQLiteStore(tmp_path / "custom-room-sizes.db")
+            saved = store.insert_frame_perspective(_frame_v2_row({
+                "label": "Size Test Reader",
+                "purpose": "Support a four-chair custom Room.",
+                "questions": ["What changes at four chairs?"],
+                "challenges": [],
+                "limitations": [],
+            }))
+            store.close()
+            saved_size_id = saved["id"]
+        participants = [
+            {"kind": "built_in", "perspective_id": perspective_id}
+            for perspective_id in ["close-reader", "contextual-reader", "skeptical-reader"][:size]
+        ]
+        if size == 4:
+            participants.append({"kind": "saved", "perspective_id": saved_size_id})
+        response = client.post(
+            "/api/perspective/room",
+            json={
+                "question": f"What about {size} chairs?",
+                "model": "qwen2.5:0.5b",
+                "scope": _reader_selection_scope(),
+                "participants": participants,
+            },
+        )
+        assert response.status_code == 201
+        assert response.get_json()["participant_count"] == size
+        assert len(_CapturingProvider.calls) == size
 
 
 def test_perspective_room_missing_or_offline_local_model_fails_before_execution(
@@ -3497,8 +3791,24 @@ def test_perspective_room_ui_is_contextual_without_permanent_tab():
     assert "2 Contextual Reader" not in index_html
     assert "3 Skeptical Reader" not in index_html
     assert "_crPerspectiveRoomDefinitions = defs.default_room || []" in perspective_js
+    assert "if (!_crPerspectiveRoomRosterDirty) _crRoomResetDefaultRoster()" in perspective_js
     assert "function _crRenderPerspectiveRoomPlan()" in perspective_js
-    assert "_crPerspectiveRoomDefinitions.map((p, idx)" in perspective_js
+    assert "data-room-participant-id" in perspective_js
+    assert "Move up" in perspective_js
+    assert "Move down" in perspective_js
+    assert "Remove" in perspective_js
+    assert "Restore default Room" in perspective_js
+    assert "cr-perspective-room-add-kind" in perspective_js
+    assert "cr-perspective-room-add-select" in perspective_js
+    assert "cr-perspective-room-show-historical" in perspective_js
+    assert "Show historical saved Perspectives" in perspective_js
+    assert "identity_scheme === 'perspective-frame-v2'" in perspective_js
+    assert "Minimum 2 chairs" in perspective_js
+    assert "maximum 4 chairs" in perspective_js
+    assert "duplicate exact Perspective IDs are blocked" in perspective_js
+    assert "function _crRoomParticipantsPayload()" in perspective_js
+    assert "if (!_crPerspectiveRoomRosterDirty) return null" in perspective_js
+    assert "payload.participants = participants" in perspective_js
     assert "/api/perspective/room" in perspective_js
     assert "_crRenderPerspectiveScopeReceipt(receipt.scope_receipt)" in perspective_js
     room_payload = perspective_js.split("const payload = _crPerspectiveMode === 'room' ?", 1)[1].split(

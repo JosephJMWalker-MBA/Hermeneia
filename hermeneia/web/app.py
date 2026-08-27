@@ -91,8 +91,9 @@ from ..perspective_runs import (
     normalize_reader_selection_scope,
     perspective_definitions_payload,
     resolve_perspective_request,
+    resolve_room_participants,
     room_definitions_payload,
-    room_perspective_definitions,
+    room_participant_perspective_payload,
 )
 from ..perspective_identity import (
     FRAME_V2_SCHEME,
@@ -4174,25 +4175,32 @@ def create_app(
             scope_receipt = normalize_reader_selection_scope(scope_payload)
         except ValueError as exc:
             return jsonify({"error": str(exc), "configuration_valid": False}), 400
+        try:
+            roster_source, room_participants = resolve_room_participants(
+                payload.get("participants") if "participants" in payload else None,
+                saved_resolver=_saved_perspective_resolution,
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc), "configuration_valid": False}), 400
         context, error = _local_perspective_execution_context(raw_model)
         if error is not None:
             body, status = error
             return jsonify(body), status
 
-        definitions = room_perspective_definitions()
         participants: list[dict[str, object]] = []
         prior_readings: list[dict[str, object]] = []
         failed = False
-        for index, definition in enumerate(definitions, start=1):
+        for chair in room_participants:
+            index = chair.ordinal
+            definition = chair.definition
+            perspective_payload = room_participant_perspective_payload(chair)
             prior_ids = [str(item["perspective"]["id"]) for item in prior_readings]
             if failed:
                 participants.append({
                     "order": index,
-                    "perspective": {
-                        "id": definition.id,
-                        "version": definition.version,
-                        "label": definition.label,
-                    },
+                    "ordinal": index,
+                    "participant_kind": chair.participant_kind,
+                    "perspective": perspective_payload,
                     "prior_participant_ids": prior_ids,
                     "status": "not_run",
                     "canonical_status": "not_persisted",
@@ -4209,11 +4217,9 @@ def create_app(
                 failed = True
                 participants.append({
                     "order": index,
-                    "perspective": {
-                        "id": definition.id,
-                        "version": definition.version,
-                        "label": definition.label,
-                    },
+                    "ordinal": index,
+                    "participant_kind": chair.participant_kind,
+                    "perspective": perspective_payload,
                     "prior_participant_ids": prior_ids,
                     "status": "failed",
                     "canonical_status": "not_persisted",
@@ -4228,11 +4234,9 @@ def create_app(
                 continue
             participant = {
                 "order": index,
-                "perspective": {
-                    "id": definition.id,
-                    "version": definition.version,
-                    "label": definition.label,
-                },
+                "ordinal": index,
+                "participant_kind": chair.participant_kind,
+                "perspective": perspective_payload,
                 "prior_participant_ids": prior_ids,
                 "response": result["response"],
                 "execution": result["execution"],
@@ -4253,6 +4257,7 @@ def create_app(
             },
             participants=participants,
             status="failed" if failed else "succeeded",
+            roster_source=roster_source,
         )
         return jsonify(receipt), 502 if failed else 201
 
