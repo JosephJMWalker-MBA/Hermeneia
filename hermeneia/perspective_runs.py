@@ -39,6 +39,17 @@ class PerspectiveResolution:
     receipt_metadata: dict[str, object] | None = None
 
 
+@dataclass(frozen=True)
+class RoomParticipantResolution:
+    ordinal: int
+    participant_kind: str
+    definition: PerspectiveDefinition
+    receipt_metadata: dict[str, object] | None = None
+
+
+_ROOM_PARTICIPANTS_OMITTED = object()
+
+
 PERSPECTIVE_DEFINITIONS: tuple[PerspectiveDefinition, ...] = (
     PerspectiveDefinition(
         id="close-reader",
@@ -446,7 +457,7 @@ def build_perspective_prompt(
     if prior_readings:
         lines.extend([
             "",
-            "Prior Proposed Readings (Deliberation Context):",
+            "PRIOR PROPOSED READINGS — DELIBERATION CONTEXT, NOT SOURCE EVIDENCE",
             "These are non-canonical model-generated deliberation material.",
             "They are not source evidence and may be wrong.",
             "You may build on, challenge, distinguish, or reject prior proposed readings.",
@@ -457,8 +468,12 @@ def build_perspective_prompt(
             perspective = item.get("perspective") if isinstance(item.get("perspective"), dict) else {}
             label = str(perspective.get("label") or perspective.get("id") or "Prior Perspective")
             version = str(perspective.get("version") or "")
+            perspective_id = str(perspective.get("perspective_id") or perspective.get("id") or "")
             response = str(item.get("response") or "")
-            lines.extend(["", f"{label} v{version}:".rstrip(), response])
+            identity = f"{label} v{version}".rstrip() if version else label
+            if perspective_id:
+                identity = f"{identity} ({perspective_id})"
+            lines.extend(["", f"{identity}:", response])
     lines.extend([
         "",
         "Return a concise proposed reading that answers the Question through the selected Perspective.",
@@ -508,6 +523,105 @@ def room_perspective_definitions(
     return definitions
 
 
+def _room_perspective_payload(
+    definition: PerspectiveDefinition,
+    metadata: dict[str, object] | None,
+) -> dict[str, object]:
+    perspective: dict[str, object] = {
+        "id": definition.id,
+        "label": definition.label,
+    }
+    if definition.version:
+        perspective["version"] = definition.version
+    if metadata:
+        perspective.update(metadata)
+    return perspective
+
+
+def room_participant_perspective_payload(
+    participant: RoomParticipantResolution,
+) -> dict[str, object]:
+    return _room_perspective_payload(participant.definition, participant.receipt_metadata)
+
+
+def resolve_room_participants(
+    participants: Any = _ROOM_PARTICIPANTS_OMITTED,
+    *,
+    saved_resolver: Any = None,
+) -> tuple[str, list[RoomParticipantResolution]]:
+    if participants is _ROOM_PARTICIPANTS_OMITTED:
+        return "default", [
+            RoomParticipantResolution(
+                ordinal=order,
+                participant_kind="built_in",
+                definition=definition,
+                receipt_metadata={"origin": "built_in"},
+            )
+            for order, definition in enumerate(room_perspective_definitions(), start=1)
+        ]
+    if not isinstance(participants, list):
+        raise ValueError("participants must be a list when supplied")
+    if len(participants) < 2:
+        raise ValueError("Ask the Room requires at least 2 participants")
+    if len(participants) > 4:
+        raise ValueError("Ask the Room supports at most 4 participants")
+
+    allowed_fields = {"kind", "perspective_id"}
+    seen_ids: set[str] = set()
+    resolved: list[RoomParticipantResolution] = []
+    for index, item in enumerate(participants, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"participant {index} must be an object")
+        unsupported = [
+            key for key, value in item.items()
+            if key not in allowed_fields and value not in (None, "", [], {})
+        ]
+        if unsupported:
+            raise ValueError(f"unsupported participant field: {unsupported[0]}")
+        kind = _clean_text(item.get("kind"))
+        perspective_id = _clean_text(item.get("perspective_id"))
+        if not kind:
+            raise ValueError(f"participant {index} kind is required")
+        if not perspective_id:
+            raise ValueError(f"participant {index} perspective_id is required")
+        if perspective_id in seen_ids:
+            raise ValueError("duplicate Room participant Perspective ID")
+        seen_ids.add(perspective_id)
+
+        if kind == "built_in":
+            definition = perspective_definition(perspective_id)
+            if definition is None:
+                raise ValueError("unknown built-in Perspective")
+            resolved.append(RoomParticipantResolution(
+                ordinal=index,
+                participant_kind=kind,
+                definition=definition,
+                receipt_metadata={"origin": "built_in"},
+            ))
+            continue
+
+        if kind == "saved":
+            if perspective_id.startswith("transient:"):
+                raise ValueError("transient Perspective drafts cannot be Room participants")
+            if saved_resolver is None:
+                raise ValueError("saved Perspective resolver is unavailable")
+            saved = saved_resolver(perspective_id)
+            metadata = dict(saved.receipt_metadata or {})
+            if metadata.get("identity_scheme") != "perspective-frame-v2":
+                raise ValueError("saved Room participants must be frame-v2 Perspectives")
+            resolved.append(RoomParticipantResolution(
+                ordinal=index,
+                participant_kind=kind,
+                definition=saved.definition,
+                receipt_metadata=metadata,
+            ))
+            continue
+
+        raise ValueError(f"unknown participant kind: {kind}")
+
+    return "user_selected", resolved
+
+
 def room_definitions_payload() -> list[dict[str, object]]:
     return [
         {"order": order, **definition.to_dict()}
@@ -522,9 +636,12 @@ def build_perspective_room_receipt(
     model: dict[str, object],
     participants: list[dict[str, object]],
     status: str,
+    roster_source: str = "default",
 ) -> dict[str, object]:
     return {
         "operation": "perspective_room",
+        "roster_source": roster_source,
+        "participant_count": len(participants),
         "question": question.strip(),
         "scope_receipt": scope_receipt,
         "model": model,

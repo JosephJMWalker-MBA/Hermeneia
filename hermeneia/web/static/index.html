@@ -4101,8 +4101,12 @@ function _wsApplyRuntimePayload(data) {
 
 function _wsApplyCurrentWorkspace(workspace) {
   if (!workspace) return;
+  const workspaceChanged = !!_wsCurrentWorkspace && !_wsWorkspaceMatches(_wsCurrentWorkspace, workspace);
   _runtimeApplyWorkspaceDraftScope(workspace);
   _wsCurrentWorkspace = workspace;
+  if (workspaceChanged && typeof _crResetPerspectiveRoomStateForWorkspaceChange === 'function') {
+    _crResetPerspectiveRoomStateForWorkspaceChange();
+  }
   const chip = document.getElementById('runtime-workspace-chip');
   const name = document.getElementById('runtime-workspace-name');
   if (name) name.textContent = workspace.name || 'Workspace';
@@ -9170,6 +9174,8 @@ function _crCloseBottomWorkstation() {
 // Interpretation or alter the selected Connection default model.
 let _crPerspectiveDefinitions = [];
 let _crPerspectiveRoomDefinitions = [];
+let _crPerspectiveRoomRoster = [];
+let _crPerspectiveRoomRosterDirty = false;
 let _crPerspectiveSavedDefinitions = [];
 let _crPerspectiveScope = null;
 let _crPerspectiveLastReceipt = null;
@@ -9276,10 +9282,162 @@ function _crRenderSavedPerspectiveDetail() {
 function _crPopulateSavedPerspectiveSelect() {
   const select = document.getElementById('cr-perspective-saved-select');
   if (!select) return;
+  _crReconcilePerspectiveRoomRosterMetadata();
   select.innerHTML = (_crPerspectiveSavedDefinitions || []).map(p =>
     `<option value="${x(p.id)}">${x(p.label)} · ${p.is_current_leaf ? 'current' : 'historical'}</option>`
   ).join('') || '<option value="" disabled>No saved Perspectives</option>';
   _crRenderSavedPerspectiveDetail();
+  _crRenderRoomAddChoices();
+}
+
+function _crResetPerspectiveRoomStateForWorkspaceChange() {
+  _crPerspectiveRoomRoster = [];
+  _crPerspectiveRoomRosterDirty = false;
+  const roomPlan = document.getElementById('cr-perspective-room-plan');
+  if (roomPlan && !roomPlan.hidden) _crRenderPerspectiveRoomPlan();
+}
+
+function _crRoomParticipantId(item) {
+  return item?.perspective_id || item?.id || '';
+}
+
+function _crRoomParticipantLabel(item) {
+  return item?.label || item?.name || item?.perspective_id || item?.id || 'Perspective';
+}
+
+function _crRoomParticipantTitle(item) {
+  const parts = [
+    _crRoomParticipantLabel(item),
+    _crRoomParticipantId(item),
+    item?.definition_fingerprint || '',
+    item?.declared_by || '',
+    item?.declared_date || '',
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
+function _crRoomDefaultRoster() {
+  return (_crPerspectiveRoomDefinitions || []).map(p => ({
+    kind: 'built_in',
+    perspective_id: p.id,
+    label: p.label,
+    version: p.version,
+  }));
+}
+
+function _crRoomResetDefaultRoster() {
+  _crPerspectiveRoomRoster = _crRoomDefaultRoster();
+  _crPerspectiveRoomRosterDirty = false;
+}
+
+function _crReconcilePerspectiveRoomRosterMetadata() {
+  if (!_crPerspectiveRoomRoster.length) return;
+  _crPerspectiveRoomRoster = _crPerspectiveRoomRoster.map(item => {
+    const id = _crRoomParticipantId(item);
+    if (item.kind === 'built_in') {
+      return _crRoomBuiltInChoice(id) || item;
+    }
+    if (item.kind === 'saved') {
+      return _crRoomSavedChoice(id) || item;
+    }
+    return item;
+  });
+}
+
+function _crRoomSavedChoices() {
+  const showHistorical = !!document.getElementById('cr-perspective-room-show-historical')?.checked;
+  return (_crPerspectiveSavedDefinitions || [])
+    .filter(p => p.identity_scheme === 'perspective-frame-v2')
+    .filter(p => showHistorical || p.is_current_leaf);
+}
+
+function _crRoomBuiltInChoice(id) {
+  const p = (_crPerspectiveDefinitions || []).find(item => item.id === id);
+  return p ? {
+    kind: 'built_in',
+    perspective_id: p.id,
+    label: p.label,
+    version: p.version,
+  } : null;
+}
+
+function _crRoomSavedChoice(id) {
+  const p = (_crPerspectiveSavedDefinitions || []).find(item =>
+    item.id === id && item.identity_scheme === 'perspective-frame-v2'
+  );
+  return p ? {
+    kind: 'saved',
+    perspective_id: p.id,
+    label: p.label,
+    is_current_leaf: !!p.is_current_leaf,
+    definition_fingerprint: p.definition_fingerprint || '',
+    declared_by: p.declared_by || '',
+    declared_date: p.declared_date || '',
+  } : null;
+}
+
+function _crRenderRoomAddChoices() {
+  const kind = document.getElementById('cr-perspective-room-add-kind')?.value || 'built_in';
+  const select = document.getElementById('cr-perspective-room-add-select');
+  if (!select) return;
+  const existing = new Set((_crPerspectiveRoomRoster || []).map(_crRoomParticipantId));
+  const choices = kind === 'saved'
+    ? _crRoomSavedChoices().map(p => ({
+        id: p.id,
+        label: `${p.label} · ${p.is_current_leaf ? 'Current' : 'Historical'} · ${String(p.id || '').slice(0, 28)}…`,
+        title: _crRoomParticipantTitle(p),
+      }))
+    : (_crPerspectiveDefinitions || []).map(p => ({
+        id: p.id,
+        label: `${p.label} · Built-in`,
+        title: `${p.label} · ${p.id} · v${p.version}`,
+      }));
+  const available = choices.filter(p => !existing.has(p.id));
+  select.innerHTML = available.map(p =>
+    `<option value="${x(p.id)}" title="${x(p.title)}">${x(p.label)}</option>`
+  ).join('') || '<option value="" disabled>No available Perspective</option>';
+}
+
+function _crMovePerspectiveRoomParticipant(index, delta) {
+  const next = index + delta;
+  if (next < 0 || next >= _crPerspectiveRoomRoster.length) return;
+  const roster = [..._crPerspectiveRoomRoster];
+  [roster[index], roster[next]] = [roster[next], roster[index]];
+  _crPerspectiveRoomRoster = roster;
+  _crPerspectiveRoomRosterDirty = true;
+  _crRenderPerspectiveRoomPlan();
+}
+
+function _crRemovePerspectiveRoomParticipant(index) {
+  if (_crPerspectiveRoomRoster.length <= 2) {
+    showAppError('Ask the Room requires at least 2 participants.');
+    return;
+  }
+  _crPerspectiveRoomRoster = _crPerspectiveRoomRoster.filter((_, idx) => idx !== index);
+  _crPerspectiveRoomRosterDirty = true;
+  _crRenderPerspectiveRoomPlan();
+}
+
+function _crAddPerspectiveRoomParticipant() {
+  if (_crPerspectiveRoomRoster.length >= 4) {
+    showAppError('Ask the Room supports at most 4 participants.');
+    return;
+  }
+  const kind = document.getElementById('cr-perspective-room-add-kind')?.value || 'built_in';
+  const id = document.getElementById('cr-perspective-room-add-select')?.value || '';
+  if (!id) return;
+  if ((_crPerspectiveRoomRoster || []).some(item => _crRoomParticipantId(item) === id)) {
+    showAppError('That exact Perspective is already in the Room.');
+    return;
+  }
+  const participant = kind === 'saved' ? _crRoomSavedChoice(id) : _crRoomBuiltInChoice(id);
+  if (!participant) {
+    showAppError('Selected Perspective is unavailable.');
+    return;
+  }
+  _crPerspectiveRoomRoster = [..._crPerspectiveRoomRoster, participant];
+  _crPerspectiveRoomRosterDirty = true;
+  _crRenderPerspectiveRoomPlan();
 }
 
 function _crPerspectiveDraftChanged() {
@@ -9530,15 +9688,60 @@ function _crPerspectiveRenderScope() {
 function _crRenderPerspectiveRoomPlan() {
   const roomPlan = document.getElementById('cr-perspective-room-plan');
   if (!roomPlan) return;
-  if (!_crPerspectiveRoomDefinitions.length) {
+  const showHistorical = !!document.getElementById('cr-perspective-room-show-historical')?.checked;
+  if (!_crPerspectiveRoomRoster.length) {
+    _crRoomResetDefaultRoster();
+  }
+  if (!_crPerspectiveRoomRoster.length) {
     roomPlan.innerHTML = '<strong style="color:var(--fg2)">Room</strong><br><span style="color:var(--yellow)">Room definition unavailable.</span>';
     return;
   }
-  roomPlan.innerHTML = `<strong style="color:var(--fg2)">Room</strong><br>${
-    _crPerspectiveRoomDefinitions.map((p, idx) =>
-      `${x(p.order || idx + 1)} ${x(p.label || p.id || 'Perspective')}`
-    ).join('<br>')
-  }`;
+  const roster = _crPerspectiveRoomRoster || [];
+  const rows = roster.map((p, idx) => {
+    const id = _crRoomParticipantId(p);
+    const current = p.kind === 'saved' ? (p.is_current_leaf ? 'Current' : 'Historical') : 'Built-in';
+    const detail = p.kind === 'saved'
+      ? `${current} · ${x(p.definition_fingerprint || '')}<br>${x(id)}`
+      : `${current} · ${x(id)}${p.version ? ` · v${x(p.version)}` : ''}`;
+    return `
+      <div class="e10-card" style="margin:7px 0 0;padding:8px" data-room-participant-id="${x(id)}" title="${x(_crRoomParticipantTitle(p))}">
+        <div style="display:flex;gap:7px;align-items:flex-start;justify-content:space-between">
+          <div>
+            <strong style="color:var(--fg2)">${idx + 1}. ${x(_crRoomParticipantLabel(p))}</strong><br>
+            <span>${detail}</span>
+          </div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
+            <button class="cr-bottom-workstation-tab" type="button" onclick="_crMovePerspectiveRoomParticipant(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}>Move up</button>
+            <button class="cr-bottom-workstation-tab" type="button" onclick="_crMovePerspectiveRoomParticipant(${idx}, 1)" ${idx === roster.length - 1 ? 'disabled' : ''}>Move down</button>
+            <button class="cr-bottom-workstation-tab" type="button" onclick="_crRemovePerspectiveRoomParticipant(${idx})" ${roster.length <= 2 ? 'disabled' : ''}>Remove</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+  const rosterState = _crPerspectiveRoomRosterDirty
+    ? 'Custom Room roster · exact submitted order'
+    : 'Default Room roster · request omits participants';
+  roomPlan.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+      <div><strong style="color:var(--fg2)">Participants</strong><br><span>${rosterState} · ${roster.length}/4 chairs</span></div>
+      <button class="cr-bottom-workstation-tab" type="button" onclick="_crRoomResetDefaultRoster();_crRenderPerspectiveRoomPlan()" ${_crPerspectiveRoomRosterDirty ? '' : 'disabled'}>Restore default Room</button>
+    </div>
+    ${rows}
+    <div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">
+      <strong style="color:var(--fg2)">Add Perspective</strong>
+      <select class="ob-extract-provider" id="cr-perspective-room-add-kind" onchange="_crRenderRoomAddChoices()">
+        <option value="built_in">Built-in</option>
+        <option value="saved">Saved</option>
+      </select>
+      <select class="ob-extract-provider" id="cr-perspective-room-add-select" style="min-width:220px"></select>
+      <label style="display:flex;gap:5px;align-items:center">
+        <input type="checkbox" id="cr-perspective-room-show-historical" onchange="_crRenderRoomAddChoices()" ${showHistorical ? 'checked' : ''}>
+        <span>Show historical saved Perspectives</span>
+      </label>
+      <button class="cr-bottom-workstation-tab" type="button" onclick="_crAddPerspectiveRoomParticipant()" ${roster.length >= 4 ? 'disabled' : ''}>+ Add Perspective</button>
+    </div>
+    <div style="margin-top:6px">Minimum 2 chairs · maximum 4 chairs · duplicate exact Perspective IDs are blocked.</div>`;
+  _crRenderRoomAddChoices();
 }
 
 function _crSetPerspectiveMode(mode) {
@@ -9574,9 +9777,12 @@ async function _crLoadPerspectiveRun() {
     ]);
     _crPerspectiveDefinitions = defs.perspectives || [];
     _crPerspectiveRoomDefinitions = defs.default_room || [];
+    if (!_crPerspectiveRoomRosterDirty) _crRoomResetDefaultRoster();
+    _crReconcilePerspectiveRoomRosterMetadata();
     try {
       const saved = await get('/api/perspective/saved');
       _crPerspectiveSavedDefinitions = saved.perspectives || [];
+      _crReconcilePerspectiveRoomRosterMetadata();
     } catch {
       _crPerspectiveSavedDefinitions = [];
     }
@@ -9628,6 +9834,24 @@ function _crScopeReceiptPreview(value, limit = 140) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
   if (!text) return '';
   return `${x(text.slice(0, limit))}${text.length > limit ? '…' : ''}`;
+}
+
+function _crRoomParticipantsPayload() {
+  if (!_crPerspectiveRoomRosterDirty) return null;
+  const roster = _crPerspectiveRoomRoster || [];
+  if (roster.length < 2) throw new Error('Ask the Room requires at least 2 participants.');
+  if (roster.length > 4) throw new Error('Ask the Room supports at most 4 participants.');
+  const seen = new Set();
+  return roster.map(item => {
+    const id = _crRoomParticipantId(item);
+    if (!id) throw new Error('Every Room participant needs an exact Perspective ID.');
+    if (seen.has(id)) throw new Error('Duplicate exact Perspective IDs are not allowed in the Room.');
+    seen.add(id);
+    if (item.kind !== 'built_in' && item.kind !== 'saved') {
+      throw new Error('Room participants must be built-in or saved Perspectives.');
+    }
+    return { kind: item.kind, perspective_id: id };
+  });
 }
 
 function _crCountLabel(count, singular, plural) {
@@ -9858,6 +10082,10 @@ async function _crRunPerspective() {
       model,
       scope: _crPerspectiveScope,
     }));
+    if (_crPerspectiveMode === 'room') {
+      const participants = _crRoomParticipantsPayload();
+      if (participants) payload.participants = participants;
+    }
     const receipt = _crPerspectiveMode === 'room'
       ? await _crPostPerspectiveRoom(payload)
       : await post('/api/perspective/run', payload);
@@ -9898,6 +10126,10 @@ window._crLoadPerspectiveRun = _crLoadPerspectiveRun;
 window._crRunPerspective = _crRunPerspective;
 window._crSetPerspectiveMode = _crSetPerspectiveMode;
 window._crSetPerspectiveKind = _crSetPerspectiveKind;
+window._crMovePerspectiveRoomParticipant = _crMovePerspectiveRoomParticipant;
+window._crRemovePerspectiveRoomParticipant = _crRemovePerspectiveRoomParticipant;
+window._crAddPerspectiveRoomParticipant = _crAddPerspectiveRoomParticipant;
+window._crRenderRoomAddChoices = _crRenderRoomAddChoices;
 window._crSavePerspectiveDraft = _crSavePerspectiveDraft;
 window._crSavePerspectiveRevision = _crSavePerspectiveRevision;
 // ── Thesis → Blueprint (bottom workstation "Blueprint" tab) ──────────────

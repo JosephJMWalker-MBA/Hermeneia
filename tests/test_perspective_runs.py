@@ -10,6 +10,8 @@ from hermeneia.perspective_runs import (
     perspective_definition,
     perspective_definitions_payload,
     resolve_perspective_request,
+    resolve_room_participants,
+    room_participant_perspective_payload,
     room_perspective_definitions,
     transient_perspective_fingerprint,
 )
@@ -303,11 +305,163 @@ def test_prior_room_responses_are_deliberation_context_not_scope() -> None:
 
     assert "PRIMARY SOURCE ATTENTION:" in prompt
     assert "Only selected source text." in prompt
-    assert "Prior Proposed Readings (Deliberation Context):" in prompt
+    assert "PRIOR PROPOSED READINGS — DELIBERATION CONTEXT, NOT SOURCE EVIDENCE" in prompt
     assert "not source evidence" in prompt
     assert "may be wrong" in prompt
+    assert "close-reader" in prompt
     assert "Prior proposed reading A." in prompt
     assert "Prior proposed reading A." not in str(scope_receipt)
+
+
+def test_room_participants_default_and_custom_built_in_resolution() -> None:
+    source, default = resolve_room_participants()
+    assert source == "default"
+    assert [chair.definition.id for chair in default] == list(DEFAULT_ROOM_PERSPECTIVES)
+    assert [chair.ordinal for chair in default] == [1, 2, 3]
+    assert [chair.participant_kind for chair in default] == ["built_in", "built_in", "built_in"]
+    assert all(chair.receipt_metadata == {"origin": "built_in"} for chair in default)
+
+    source, custom = resolve_room_participants([
+        {"kind": "built_in", "perspective_id": "skeptical-reader"},
+        {"kind": "built_in", "perspective_id": "close-reader"},
+    ])
+    assert source == "user_selected"
+    assert [chair.definition.id for chair in custom] == ["skeptical-reader", "close-reader"]
+    assert [room_participant_perspective_payload(chair)["origin"] for chair in custom] == [
+        "built_in",
+        "built_in",
+    ]
+
+
+def test_room_participant_validation_rejects_malformed_rosters() -> None:
+    cases = (
+        (None, "participants must be a list"),
+        (False, "participants must be a list"),
+        ({}, "participants must be a list"),
+        ("", "participants must be a list"),
+        ("not-list", "participants must be a list"),
+        ([], "at least 2"),
+        ([{"kind": "built_in", "perspective_id": "close-reader"}], "at least 2"),
+        (
+            [
+                {"kind": "built_in", "perspective_id": "close-reader"},
+                {"kind": "built_in", "perspective_id": "contextual-reader"},
+                {"kind": "built_in", "perspective_id": "skeptical-reader"},
+                {"kind": "built_in", "perspective_id": "extra-a"},
+                {"kind": "built_in", "perspective_id": "extra-b"},
+            ],
+            "at most 4",
+        ),
+        ([None, {"kind": "built_in", "perspective_id": "close-reader"}], "must be an object"),
+        (
+            [
+                {"kind": "unknown", "perspective_id": "close-reader"},
+                {"kind": "built_in", "perspective_id": "contextual-reader"},
+            ],
+            "unknown participant kind",
+        ),
+        (
+            [
+                {"kind": "built_in", "perspective_id": "missing-reader"},
+                {"kind": "built_in", "perspective_id": "contextual-reader"},
+            ],
+            "unknown built-in Perspective",
+        ),
+        (
+            [
+                {"kind": "built_in", "perspective_id": "close-reader"},
+                {"kind": "built_in", "perspective_id": "close-reader"},
+            ],
+            "duplicate",
+        ),
+        (
+            [
+                {"kind": "built_in", "perspective_id": "close-reader", "model": "qwen"},
+                {"kind": "built_in", "perspective_id": "contextual-reader"},
+            ],
+            "unsupported participant field",
+        ),
+        (
+            [
+                {"kind": "built_in", "perspective_id": "close-reader", "scope": {"primary": {}}},
+                {"kind": "built_in", "perspective_id": "contextual-reader"},
+            ],
+            "unsupported participant field",
+        ),
+        (
+            [
+                {"kind": "built_in", "perspective_id": "close-reader", "question": "Q?"},
+                {"kind": "built_in", "perspective_id": "contextual-reader"},
+            ],
+            "unsupported participant field",
+        ),
+        (
+            [
+                {"kind": "saved", "perspective_id": "transient:abc"},
+                {"kind": "built_in", "perspective_id": "contextual-reader"},
+            ],
+            "transient Perspective drafts cannot be Room participants",
+        ),
+    )
+
+    for participants, expected in cases:
+        try:
+            resolve_room_participants(participants)
+        except ValueError as exc:
+            assert expected in str(exc)
+        else:
+            raise AssertionError(f"invalid roster was accepted: {participants!r}")
+
+
+def test_room_participants_resolve_saved_frame_v2_without_identity_reimplementation() -> None:
+    built_in = perspective_definition("close-reader")
+    assert built_in is not None
+    saved_definition = type(built_in)(
+        id="perspective-frame-v2:abc",
+        version="",
+        label="Institutional Trust Reader",
+        purpose="Read institutional trust.",
+        questions=("Who is expected to trust whom?",),
+        challenges=(),
+        limitations=(),
+    )
+
+    def saved_resolver(perspective_id: str):
+        assert perspective_id == "perspective-frame-v2:abc"
+        return type(resolve_perspective_request(perspective_id="close-reader"))(
+            definition=saved_definition,
+            receipt_metadata={
+                "origin": "canonical_saved",
+                "perspective_id": perspective_id,
+                "identity_scheme": "perspective-frame-v2",
+                "definition_fingerprint": "sha256:frame",
+                "definition": {
+                    "label": "Institutional Trust Reader",
+                    "purpose": "Read institutional trust.",
+                    "questions": ["Who is expected to trust whom?"],
+                    "challenges": [],
+                    "limitations": [],
+                },
+                "declared_by": "Primary Human Steward",
+                "declared_date": "2026-08-22T12:00:00+00:00",
+            },
+        )
+
+    source, chairs = resolve_room_participants(
+        [
+            {"kind": "built_in", "perspective_id": "close-reader"},
+            {"kind": "saved", "perspective_id": "perspective-frame-v2:abc"},
+        ],
+        saved_resolver=saved_resolver,
+    )
+
+    assert source == "user_selected"
+    assert [chair.participant_kind for chair in chairs] == ["built_in", "saved"]
+    saved_payload = room_participant_perspective_payload(chairs[1])
+    assert saved_payload["id"] == "perspective-frame-v2:abc"
+    assert saved_payload["origin"] == "canonical_saved"
+    assert saved_payload["definition_fingerprint"] == "sha256:frame"
+    assert saved_payload["declared_by"] == "Primary Human Steward"
 
 
 def test_reader_selection_scope_receipt_is_explicit_primary_and_defaults_supporting_off() -> None:
@@ -421,7 +575,7 @@ def test_perspective_prompt_separates_primary_supporting_and_deliberation_contex
     assert "This is investigation context, not source evidence" in prompt
     assert "Governing Question:" in prompt
     assert "How does aspiration distort perception?" in prompt
-    assert "Prior Proposed Readings (Deliberation Context):" in prompt
+    assert "PRIOR PROPOSED READINGS — DELIBERATION CONTEXT, NOT SOURCE EVIDENCE" in prompt
     assert "Prior model response." in prompt
     assert "Prior model response." not in str(receipt)
 
