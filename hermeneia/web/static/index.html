@@ -1211,6 +1211,8 @@ body.reader-active .cr-tool-drawer { max-width: none; }
 .cr-role-notes     { background: #2a1e2a; color: #cf6fcf; }
 .cr-role-exploratory { background: #2a1e1e; color: #cf8f6f; }
 .cr-page-view {
+  --reader-prose-size: 1rem;
+  --reader-prose-leading: 1.85;
   border: 1px solid var(--border); border-radius: var(--r);
   background: var(--surface); padding: 34px 44px;
   min-height: 400px; user-select: text; cursor: text;
@@ -1558,7 +1560,7 @@ body.has-workflow-rail { padding-bottom: 40px; }
   user-select: none;
 }
 .cr-page-text {
-  font-size: 16px; line-height: 1.85; color: var(--fg);
+  font-size: var(--reader-prose-size); line-height: var(--reader-prose-leading); color: var(--fg);
   white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 20px;
 }
 .cr-text-block {
@@ -1651,6 +1653,8 @@ body.has-workflow-rail { padding-bottom: 40px; }
    zone; surrounding text recedes. Not decoration: the page teaches the
    reader to attend here and move one meaningful segment at a time. */
 .cr-page-view.focus-scroll {
+  --reader-prose-size: clamp(1.05rem, 1.6vw, 1.35rem);
+  --reader-prose-leading: 1.85;
   background: #050706;
   border-color: rgba(90, 255, 205, 0.10);
   font-family: ui-serif, Georgia, "Times New Roman", serif;
@@ -1660,8 +1664,6 @@ body.has-workflow-rail { padding-bottom: 40px; }
 }
 .cr-page-view.focus-scroll .cr-page-text {
   --focus: 0;
-  font-size: clamp(1.05rem, 1.6vw, 1.35rem);
-  line-height: 1.85;
   margin-bottom: 1.75rem;
   color: color-mix(
     in srgb,
@@ -2597,8 +2599,16 @@ body.a11y-focus-mode #a11y-dock { opacity: 1 !important; pointer-events: auto !i
 
 /* Text size override — targets the reading surfaces (source text,
    selected passages, saved highlights, observation/report text), not the
-   admin UI. Magnitudes are relative to the 18px body base. */
-body.a11y-text-lg .cr-page-text { font-size: 21px !important; line-height: 1.9 !important; }
+   admin UI. Reader source prose uses variables so normal and Focus Scroll
+   compose without competing font-size overrides. */
+body.a11y-text-lg .cr-page-view {
+  --reader-prose-size: 1.25rem;
+  --reader-prose-leading: 1.9;
+}
+body.a11y-text-lg .cr-page-view.focus-scroll {
+  --reader-prose-size: clamp(1.32rem, 2.05vw, 1.7rem);
+  --reader-prose-leading: 1.9;
+}
 body.a11y-text-lg .cr-saved-passage { font-size: 18px !important; line-height: 1.8 !important; }
 body.a11y-text-lg .cr-highlight-list { font-size: 15px !important; line-height: 1.8 !important; }
 body.a11y-text-lg .e10-text,
