@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -202,6 +203,57 @@ async function fetch(url){
         "highlighted": True,
         "scrolled": True,
         "pending": False,
+    }
+
+
+def test_back_to_start_control_routes_to_first_run_surface() -> None:
+    html = _index()
+    match = re.search(
+        r'<button class="btn-trace" onclick="([^"]+)">Back to start</button>',
+        html,
+    )
+    assert match
+    back_handler = match.group(1)
+    script = (
+        _dom_harness()
+        + """
+let _obUploadFocusPending=false;
+let goCalls=[];
+let pendingFirstRun=null;
+const buttonHandler=__BACK_HANDLER__;
+elements['firstrun-panel']=makeEl('firstrun-panel');
+function e10Go(id){goCalls.push(id);if(id==='firstrun')pendingFirstRun=e10LoadFirstRun();}
+async function get(url){
+  if(url==='/api/setup/state')return {
+    database_exists:true,
+    document_count:0,
+    demo_available:false,
+    db_path:'/tmp/hermeneia.db',
+    runtime:{workspace:{runtime_scope:'managed:test'}},
+  };
+  throw new Error(url);
+}
+function _runtimeApplyWorkspaceDraftScope(){}
+function _cmpOnboardingHtml(){return '';}
+""".replace("__BACK_HANDLER__", json.dumps(back_handler))
+        + _extract_function(html, "async function e10LoadFirstRun(")
+        + """
+(async()=>{
+  eval(buttonHandler);
+  await pendingFirstRun;
+  process.stdout.write(JSON.stringify({
+    backHandler: buttonHandler,
+    goCalls,
+    firstRunRendered: !!elements['firstrun-panel'].innerHTML.includes('Bring a source worth investigating'),
+  }));
+})();
+"""
+    )
+
+    assert _run_node(script) == {
+        "backHandler": "e10Go('firstrun')",
+        "goCalls": ["firstrun"],
+        "firstRunRendered": True,
     }
 
 

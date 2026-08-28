@@ -5474,7 +5474,7 @@ async function e10LoadOnboarding() {
           <div class="ob-upload-wayfinding-title">Add document to this workspace</div>
           <div class="ob-upload-wayfinding-note">Upload a PDF into the currently served Hermeneia workspace.</div>
         </div>
-        <button class="btn-trace" onclick="e10LoadOnboarding()">Back to start</button>
+        <button class="btn-trace" onclick="e10Go('firstrun')">Back to start</button>
       </div>
       <input type="file" id="ob-file-input" accept=".pdf" style="display:none" onchange="obHandleFileSelect(this)">
       <div class="ob-upload-zone" id="ob-upload-zone"
