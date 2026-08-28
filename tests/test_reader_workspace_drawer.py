@@ -99,7 +99,8 @@ def test_workspace_create_flow_does_not_reframe_current_upload_or_navigation():
     create_fn = _extract_function(index, "async function _wsCreateWorkspace(")
     assert "Open workspace" not in drawer
     assert "Switch" not in drawer
-    assert "obOpenUploadArea" not in drawer
+    assert "Add document" in drawer
+    assert "obOpenUploadArea" in drawer
     assert "obOpenUploadArea" not in create_fn
     assert "e10Go(" not in create_fn
 
