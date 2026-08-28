@@ -18,6 +18,12 @@ def _extract_fn(html: str, name: str) -> str:
     return match.group(0)
 
 
+def _css_block(html: str, selector: str) -> str:
+    match = re.search(re.escape(selector) + r"\s*\{(?P<body>.*?)\n\}", html, re.S)
+    assert match, f"could not extract CSS block {selector}"
+    return match.group("body")
+
+
 def test_reading_tools_read_current_structural_reader_selection():
     node = shutil.which("node")
     if not node:
@@ -485,3 +491,62 @@ def test_reading_tools_can_use_central_reader_selection_state():
         "dock": "Exact Reader source text",
         "centralCalls": 2,
     }
+
+
+def test_large_text_state_still_controls_body_class_and_labels():
+    html = INDEX.read_text()
+    sync = _extract_fn(html, "_a11ySync")
+
+    assert "document.body.classList.toggle('a11y-text-lg', _a11y.textLg)" in sync
+    assert "textState.textContent = _a11y.textLg ? 'Large' : 'Normal'" in sync
+    assert "a11yToggle('textLg')" in html
+    assert 'id="a11y-text-state">Normal</span>' in html
+
+
+def test_reader_source_prose_uses_shared_typography_tokens():
+    html = INDEX.read_text()
+
+    page_view = _css_block(html, ".cr-page-view")
+    page_text = _css_block(html, ".cr-page-text")
+    large_view = _css_block(html, "body.a11y-text-lg .cr-page-view")
+
+    assert "--reader-prose-size: 1rem;" in page_view
+    assert "--reader-prose-leading: 1.85;" in page_view
+    assert "font-size: var(--reader-prose-size)" in page_text
+    assert "line-height: var(--reader-prose-leading)" in page_text
+    assert "--reader-prose-size: 1.25rem;" in large_view
+    assert "--reader-prose-leading: 1.9;" in large_view
+    assert "body.a11y-text-lg .cr-page-text { font-size: 21px !important" not in html
+
+
+def test_large_text_composes_with_focus_scroll_typography():
+    html = INDEX.read_text()
+
+    focus_view = _css_block(html, ".cr-page-view.focus-scroll")
+    focus_text = _css_block(html, ".cr-page-view.focus-scroll .cr-page-text")
+    large_focus_view = _css_block(html, "body.a11y-text-lg .cr-page-view.focus-scroll")
+
+    assert "--reader-prose-size: clamp(1.05rem, 1.6vw, 1.35rem);" in focus_view
+    assert "--reader-prose-size: clamp(1.32rem, 2.05vw, 1.7rem);" in large_focus_view
+    assert "font-size:" not in focus_text
+    assert "line-height:" not in focus_text
+    assert "opacity: calc(0.38 + (var(--focus) * 0.62));" in focus_text
+    assert "transform: translateY(calc((1 - var(--focus)) * 5px));" in focus_text
+
+    normal_focus_max_rem = 1.35
+    large_focus_max_rem = 1.7
+    assert large_focus_max_rem / normal_focus_max_rem >= 1.20
+
+
+def test_large_text_uses_reflow_not_transform_or_zoom():
+    html = INDEX.read_text()
+
+    large_view = _css_block(html, "body.a11y-text-lg .cr-page-view")
+    large_focus_view = _css_block(html, "body.a11y-text-lg .cr-page-view.focus-scroll")
+    page_text = _css_block(html, ".cr-page-text")
+
+    combined = "\n".join([large_view, large_focus_view])
+    assert "transform" not in combined
+    assert "zoom" not in combined
+    assert "white-space: pre-wrap" in page_text
+    assert "overflow-wrap: anywhere" in page_text
