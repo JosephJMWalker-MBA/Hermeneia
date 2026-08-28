@@ -137,6 +137,17 @@ def test_corpus_search_panel_markup_and_trigger_present():
     assert "Number(data.occurrence_count)" in index
     assert "Expanded cards are limited; use backend concordance totals" in index
     assert "_concordanceDocuments(concordance)" in index
+    assert "suppressPatternView" in index
+    assert "bookmarked_subset" in index
+    assert "Pattern View is unavailable for bookmarked subsets" in index
+    assert "Switch to All or another corpus filter for complete concordance" in index
+    assert "first 100 matching passages" in index
+    assert "complete bookmarked concordance unavailable" in index
+    assert "bookmarked passage${count === 1 ? '' : 's'}" in index
+    assert "filter=all&limit=100" in index
+    assert "filter=all&limit=5000`" not in index
+    assert "results_truncated: Boolean(data.results_truncated)" in index
+    assert "renderResults(query, {\n      count: filtered.length" in index
 
 
 def test_result_click_navigates_the_book_not_a_page_away():

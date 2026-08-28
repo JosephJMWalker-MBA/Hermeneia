@@ -6072,6 +6072,14 @@ function _pagesFromDocStats(docStats, rows) {
 }
 
 function _searchSummaryText(data) {
+  if (data?.bookmarked_subset) {
+    const count = Number(data.count) || 0;
+    const base = `${fmt(count)} bookmarked passage${count === 1 ? '' : 's'}`;
+    if (data.results_truncated) {
+      return `${base} found among the first 100 matching passages · complete bookmarked concordance unavailable`;
+    }
+    return `${base} · Pattern View unavailable for bookmarked subset`;
+  }
   if (_hasConcordanceCounts(data)) {
     const occurrenceCount = Number(data.occurrence_count) || 0;
     const passageCount = Number(data.passage_count) || 0;
@@ -6095,7 +6103,12 @@ function renderResults(q, data) {
   // ── Motif Panel: show when search has 2+ results ──────
   const motifHost = document.getElementById('motif-panel');
   const patternCount = _hasConcordanceCounts(data) ? Number(data.occurrence_count) : count;
-  if (q && patternCount >= 2 && motifHost) {
+  if (data?.suppressPatternView && motifHost) {
+    motifHost.innerHTML = q
+      ? `<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;background:var(--surface);font-size:12px;color:var(--dim2)">Pattern View is unavailable for bookmarked subsets. Switch to All or another corpus filter for complete concordance.</div>`
+      : '';
+    _motifViewActive = false;
+  } else if (q && patternCount >= 2 && motifHost) {
     renderMotifPanel(q, observations, motifHost, null, data);
   } else if (motifHost) {
     motifHost.innerHTML = '';
@@ -7471,10 +7484,17 @@ async function e10LoadObservations(q = null) {
       document.getElementById('qmeta').textContent = 'No bookmarked observations';
       return;
     }
-    // Fetch all, client-side filter to bookmarked IDs
-    const data = await get(`/api/e10/observations?q=${encodeURIComponent(query)}&filter=all&limit=5000`);
+    // Bookmarks are a client-side subset. The server cannot compute complete
+    // bookmark-wide concordance, so Pattern View must stay suppressed here.
+    const data = await get(`/api/e10/observations?q=${encodeURIComponent(query)}&filter=all&limit=100`);
     const filtered = (data.observations || []).filter(o => bm.has(o.id));
-    renderResults(query, { count: filtered.length, observations: filtered });
+    renderResults(query, {
+      count: filtered.length,
+      observations: filtered,
+      bookmarked_subset: true,
+      results_truncated: Boolean(data.results_truncated),
+      suppressPatternView: true,
+    });
     return;
   }
 
