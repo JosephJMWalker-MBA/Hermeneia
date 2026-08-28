@@ -640,6 +640,346 @@ def test_inline_read_uses_central_reader_selection_not_raw_window_selection():
     assert behavior == {"spoken": "Canonical Reader passage", "status": ""}
 
 
+def test_current_page_speech_text_uses_structural_extractions_not_dom():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let domConsulted=false;\n"
+        "const document={querySelectorAll(){domConsulted=true;return [{textContent:'CAPTURE BUTTON CHROME'}];}};\n"
+        "let _crCurrentExtractions=[\n"
+        "  {text:'First source block.'},\n"
+        "  {text:''},\n"
+        "  {text:'  Second source block.  '},\n"
+        "];\n"
+        + _extract_fn(html, "_crCurrentPageSpeechText")
+        + "process.stdout.write(JSON.stringify({text:_crCurrentPageSpeechText(),domConsulted}));\n"
+    )
+
+    assert behavior == {
+        "text": "First source block.\n\nSecond source block.",
+        "domConsulted": False,
+    }
+
+
+def test_read_page_button_is_rendered_in_page_header_with_accessible_label():
+    html = INDEX.read_text()
+    render_page = _extract_fn(html, "_crRenderPage")
+
+    assert 'class="cr-read-page-btn"' in render_page
+    assert 'type="button"' in render_page
+    assert 'onclick="_crReadCurrentPage()"' in render_page
+    assert 'aria-label="Read page ${x(_crPage)} aloud"' in render_page
+    assert "▶ Read page" in render_page
+
+
+def test_read_current_page_enabled_speaks_structural_page_without_selection():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let _crDocId='doc-1';\n"
+        "let _crPage=4;\n"
+        "let _crCurrentExtractions=[{text:'Alpha.'},{text:'Beta.'}];\n"
+        "const _a11y={read:true};\n"
+        "let status='';\n"
+        "let requests=[];\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _requestReadingToolsSpeech(text, options){requests.push({text,options});return true;}\n"
+        + _extract_fn(html, "_crCurrentPageSpeechText")
+        + _extract_fn(html, "_crReadCurrentPage")
+        + "_crReadCurrentPage();\n"
+        "process.stdout.write(JSON.stringify({status,requests}));\n"
+    )
+
+    assert behavior["status"] == ""
+    assert len(behavior["requests"]) == 1
+    assert behavior["requests"][0]["text"] == "Alpha.\n\nBeta."
+    assert "Read page 4 aloud?" in behavior["requests"][0]["options"]["prompt"]
+
+
+def test_read_current_page_disabled_confirm_reuses_reading_tools_contract():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let _crDocId='doc-1';\n"
+        "let _crPage=4;\n"
+        "let _crCurrentExtractions=[{text:'Alpha.'},{text:'Beta.'}];\n"
+        "let events=[];\n"
+        "const window={confirm(message){events.push(['confirm',message]);return true;}};\n"
+        "const speechSynthesis={};\n"
+        "function SpeechSynthesisUtterance(){}\n"
+        "const _a11y={read:false};\n"
+        "let _a11yHintShown=true;\n"
+        "let status='';\n"
+        "let spoken=[];\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _a11ySync(){events.push(['sync',_a11y.read]);}\n"
+        "function a11ySpeak(text){events.push(['speak',text]);spoken.push(text);}\n"
+        "function setTimeout(){}\n"
+        + _extract_fn(html, "_a11ySetReadEnabled")
+        + _extract_fn(html, "_a11ySpeechSupported")
+        + _extract_fn(html, "_requestReadingToolsSpeech")
+        + _extract_fn(html, "_crCurrentPageSpeechText")
+        + _extract_fn(html, "_crReadCurrentPage")
+        + "_crReadCurrentPage();\n"
+        "process.stdout.write(JSON.stringify({read:_a11y.read,status,spoken,events}));\n"
+    )
+
+    assert behavior["read"] is True
+    assert behavior["status"] == ""
+    assert behavior["spoken"] == ["Alpha.\n\nBeta."]
+    assert behavior["events"][0][0] == "confirm"
+    assert "Read page 4 aloud?" in behavior["events"][0][1]
+    assert behavior["events"][1:] == [["sync", True], ["speak", "Alpha.\n\nBeta."]]
+
+
+def test_read_current_page_disabled_cancel_does_not_speak_or_change_page():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let _crDocId='doc-1';\n"
+        "let _crPage=4;\n"
+        "let _crCurrentExtractions=[{text:'Alpha.'},{text:'Beta.'}];\n"
+        "let confirmCalls=0;\n"
+        "const window={confirm(){confirmCalls+=1;return false;}};\n"
+        "const speechSynthesis={};\n"
+        "function SpeechSynthesisUtterance(){}\n"
+        "const _a11y={read:false};\n"
+        "let _a11yHintShown=true;\n"
+        "let status='';\n"
+        "let spoken=[];\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _a11ySync(){}\n"
+        "function a11ySpeak(text){spoken.push(text);}\n"
+        "function setTimeout(){}\n"
+        + _extract_fn(html, "_a11ySetReadEnabled")
+        + _extract_fn(html, "_a11ySpeechSupported")
+        + _extract_fn(html, "_requestReadingToolsSpeech")
+        + _extract_fn(html, "_crCurrentPageSpeechText")
+        + _extract_fn(html, "_crReadCurrentPage")
+        + "_crReadCurrentPage();\n"
+        "process.stdout.write(JSON.stringify({read:_a11y.read,status,spoken,confirmCalls,page:_crPage,text:_crCurrentPageSpeechText()}));\n"
+    )
+
+    assert behavior == {
+        "read": False,
+        "status": "",
+        "spoken": [],
+        "confirmCalls": 1,
+        "page": 4,
+        "text": "Alpha.\n\nBeta.",
+    }
+
+
+def test_read_current_page_unsupported_reuses_147_feedback_without_activation():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let _crDocId='doc-1';\n"
+        "let _crPage=4;\n"
+        "let _crCurrentExtractions=[{text:'Alpha.'}];\n"
+        "let confirmCalls=0;\n"
+        "const window={confirm(){confirmCalls+=1;return true;}};\n"
+        "const _a11y={read:false};\n"
+        "let _a11yHintShown=true;\n"
+        "let status='';\n"
+        "let spoken=[];\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _a11ySync(){}\n"
+        "function a11ySpeak(text){spoken.push(text);}\n"
+        "function setTimeout(){}\n"
+        + _extract_fn(html, "_a11ySetReadEnabled")
+        + _extract_fn(html, "_a11ySpeechSupported")
+        + _extract_fn(html, "_requestReadingToolsSpeech")
+        + _extract_fn(html, "_crCurrentPageSpeechText")
+        + _extract_fn(html, "_crReadCurrentPage")
+        + "_crReadCurrentPage();\n"
+        "process.stdout.write(JSON.stringify({read:_a11y.read,status,spoken,confirmCalls}));\n"
+    )
+
+    assert behavior == {
+        "read": False,
+        "status": "Read aloud is not supported in this browser.",
+        "spoken": [],
+        "confirmCalls": 0,
+    }
+
+
+def test_read_current_page_empty_page_reports_page_specific_status():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let _crDocId='doc-1';\n"
+        "let _crPage=4;\n"
+        "let _crCurrentExtractions=[{text:'   '},{text:''}];\n"
+        "let status='';\n"
+        "let requests=0;\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _requestReadingToolsSpeech(){requests+=1;}\n"
+        + _extract_fn(html, "_crCurrentPageSpeechText")
+        + _extract_fn(html, "_crReadCurrentPage")
+        + "_crReadCurrentPage();\n"
+        "process.stdout.write(JSON.stringify({status,requests}));\n"
+    )
+
+    assert behavior == {
+        "status": "No readable source text on this page.",
+        "requests": 0,
+    }
+
+
+def test_page_read_and_inline_read_use_distinct_source_authorities():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let _crDocId='doc-1';\n"
+        "let _crPage=4;\n"
+        "let _crSelText='';\n"
+        "let _crCurrentExtractions=[{text:'Complete page source text.'}];\n"
+        "let currentReaderSelection={text:'Only this selected sentence.'};\n"
+        "function _crGetReaderSelection(){return currentReaderSelection;}\n"
+        "const window={getSelection(){return {toString(){return 'Read page Page 4 Capture this passage';}};}};\n"
+        "let requests=[];\n"
+        "function _a11ySetStatus(){}\n"
+        "function _requestReadingToolsSpeech(text, options){requests.push({text,prompt:options?.prompt || ''});return true;}\n"
+        + _extract_fn(html, "_crCurrentPageSpeechText")
+        + _extract_fn(html, "_crReadCurrentPage")
+        + _extract_fn(html, "_crReadResolvedSelection")
+        + "_crReadCurrentPage();\n"
+        "_crReadResolvedSelection();\n"
+        "process.stdout.write(JSON.stringify({requests}));\n"
+    )
+
+    assert behavior["requests"] == [
+        {
+            "text": "Complete page source text.",
+            "prompt": "Read page 4 aloud?\n\nEnable Reading Tools for this session.",
+        },
+        {"text": "Only this selected sentence.", "prompt": ""},
+    ]
+
+
+def test_page_speech_excludes_rendered_ui_chrome():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let _crCurrentExtractions=[{text:'SOURCE BLOCK A'},{text:'SOURCE BLOCK B'}];\n"
+        "const document={querySelectorAll(){return [{textContent:'CAPTURE BUTTON CHROME MACHINE OBSERVATION CHROME COMPANION CHROME FIELD NOTES CHROME READ PAGE BUTTON CHROME'}];}};\n"
+        + _extract_fn(html, "_crCurrentPageSpeechText")
+        + "process.stdout.write(JSON.stringify({text:_crCurrentPageSpeechText()}));\n"
+    )
+
+    assert behavior == {"text": "SOURCE BLOCK A\n\nSOURCE BLOCK B"}
+
+
+def test_read_page_navigation_uses_invocation_time_page_snapshot():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let _crDocId='doc-1';\n"
+        "let _crPage=1;\n"
+        "let _crCurrentExtractions=[{text:'Alpha page.'}];\n"
+        "let requests=[];\n"
+        "function _a11ySetStatus(){}\n"
+        "function _requestReadingToolsSpeech(text, options){requests.push({text,page:options.page});return true;}\n"
+        + _extract_fn(html, "_crCurrentPageSpeechText")
+        + _extract_fn(html, "_crReadCurrentPage")
+        + "_crReadCurrentPage();\n"
+        "_crPage=2;\n"
+        "_crCurrentExtractions=[{text:'Beta page.'}];\n"
+        "_crReadCurrentPage();\n"
+        "process.stdout.write(JSON.stringify({requests}));\n"
+    )
+
+    assert behavior["requests"] == [
+        {"text": "Alpha page.", "page": 1},
+        {"text": "Beta page.", "page": 2},
+    ]
+
+
+def test_reader_context_reset_clears_stale_page_speech_source():
+    html = INDEX.read_text()
+
+    open_start = html.index("async function _crOpenDoc(docId)")
+    page_clear_at = html.index("_crCurrentExtractions = [];", open_start)
+    reset_at = html.index("_crResetReaderTransientSelectionForContext();", open_start)
+    loading_at = html.index("view.innerHTML = '<div class=\"e10-empty\">Loading pages", open_start)
+    assert page_clear_at < reset_at < loading_at
+
+    render_start = html.index("function _crRenderPage()")
+    render_clear_at = html.index("_crCurrentExtractions = [];", render_start)
+    page_data_at = html.index("const pageData =", render_start)
+    no_page_dom_at = html.index("view.innerHTML = `<div class=\"e10-empty\">No extracted text", render_start)
+    set_extractions_at = html.index("_crCurrentExtractions = pageData.extractions || [];", render_start)
+    assert render_clear_at < page_data_at < no_page_dom_at < set_extractions_at
+
+
+def test_failed_or_missing_page_cannot_speak_prior_page_source():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let _crDocId='doc-1';\n"
+        "let _crPage=2;\n"
+        "let _crTotalPages=2;\n"
+        "let _crPages=[];\n"
+        "let _crHighlights=[];\n"
+        "let _crCurrentExtractions=[{text:'Old document page.'}];\n"
+        "let _register='simple';\n"
+        "let _crLensOn=false;\n"
+        "let status='';\n"
+        "let requests=0;\n"
+        "const view={innerHTML:'',classList:{toggle(){}}};\n"
+        "const document={getElementById(id){return id==='cr-page-view'?view:null;}};\n"
+        "function _crResetReaderTransientSelectionForContext(){}\n"
+        "function _fsApply(){}\n"
+        "function _flnActivityTick(){}\n"
+        "function _crLoadRelated(){}\n"
+        "function runtimeApiFetch(){return Promise.resolve({});}\n"
+        "function x(value){return String(value ?? '');}\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _requestReadingToolsSpeech(){requests+=1;}\n"
+        + _extract_fn(html, "_crCurrentPageSpeechText")
+        + _extract_fn(html, "_crReadCurrentPage")
+        + _extract_fn(html, "_crRenderPage")
+        + "_crRenderPage();\n"
+        "_crReadCurrentPage();\n"
+        "process.stdout.write(JSON.stringify({current:_crCurrentExtractions,text:_crCurrentPageSpeechText(),status,requests,html:view.innerHTML}));\n"
+    )
+
+    assert behavior["current"] == []
+    assert behavior["text"] == ""
+    assert behavior["status"] == "No readable source text on this page."
+    assert behavior["requests"] == 0
+    assert "Old document page." not in behavior["html"]
+
+
+def test_read_page_uses_existing_stop_path():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let _crDocId='doc-1';\n"
+        "let _crPage=4;\n"
+        "let _crCurrentExtractions=[{text:'Alpha.'}];\n"
+        "const window={confirm(){return true;}};\n"
+        "const speechSynthesis={cancel(){cancelCalls+=1;},speak(utt){spoken.push(utt.text);utt.onstart?.();}};\n"
+        "function SpeechSynthesisUtterance(text){this.text=text;}\n"
+        "const _a11y={read:true,speaking:false};\n"
+        "let _a11yHintShown=true;\n"
+        "let spoken=[];\n"
+        "let cancelCalls=0;\n"
+        "let statuses=[];\n"
+        "function _a11ySetStatus(message){statuses.push(message);}\n"
+        "function _a11ySync(){statuses.push(_a11y.speaking ? 'sync-speaking' : 'sync-idle');}\n"
+        "function a11yDismissTip(){}\n"
+        "function setTimeout(fn){fn();}\n"
+        + _extract_fn(html, "_a11ySetReadEnabled")
+        + _extract_fn(html, "_a11ySpeechSupported")
+        + _extract_fn(html, "_requestReadingToolsSpeech")
+        + _extract_fn(html, "a11ySpeak")
+        + _extract_fn(html, "a11yStop")
+        + _extract_fn(html, "_crCurrentPageSpeechText")
+        + _extract_fn(html, "_crReadCurrentPage")
+        + "_crReadCurrentPage();\n"
+        "const speakingAfterRead=_a11y.speaking;\n"
+        "a11yStop();\n"
+        "process.stdout.write(JSON.stringify({spoken,cancelCalls,speakingAfterRead,speakingAfterStop:_a11y.speaking,statuses}));\n"
+    )
+
+    assert behavior["spoken"] == ["Alpha."]
+    assert behavior["speakingAfterRead"] is True
+    assert behavior["speakingAfterStop"] is False
+    assert behavior["cancelCalls"] >= 2
+    assert "Stopped — select text to read again" in behavior["statuses"]
+
+
 def test_passage_read_action_still_uses_reader_passage_text():
     html = INDEX.read_text()
 

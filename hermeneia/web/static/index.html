@@ -1553,7 +1553,24 @@ body.has-workflow-rail { padding-bottom: 40px; }
 .cr-page-header {
   font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
   color: var(--dim2); margin-bottom: 18px; display: flex; align-items: center; gap: 12px;
+  justify-content: space-between;
 }
+.cr-read-page-btn {
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  background: var(--bg);
+  color: var(--fg2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0;
+  padding: 4px 10px;
+  text-transform: none;
+}
+.cr-read-page-btn:hover { border-color: var(--accent); color: var(--accent); }
+.cr-read-page-btn:disabled { opacity: .45; cursor: default; }
+.cr-read-page-btn:disabled:hover { border-color: var(--border2); color: var(--fg2); }
+.cr-page-count { flex: 1; }
 .cr-page-region {
   font-size: 10px; color: var(--dim2); font-family: var(--mono);
   text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px;
@@ -11459,6 +11476,7 @@ function _attnOpen(docId, page) {
 async function _crOpenDoc(docId) {
   _crDocId = docId;
   _crPage  = 1;
+  _crCurrentExtractions = [];
   _crResetReaderTransientSelectionForContext();
 
   // Highlight active picker button
@@ -11878,6 +11896,7 @@ function _crToggleLens() {
 
 function _crRenderPage() {
   const view = document.getElementById('cr-page-view');
+  _crCurrentExtractions = [];
   const pageData = _crPages.find(p => p.page === _crPage) || _crPages[_crPage - 1];
   _crResetReaderTransientSelectionForContext();
 
@@ -11895,7 +11914,8 @@ function _crRenderPage() {
     ).join('');
     view.innerHTML = `
       <div class="cr-page-header">
-        <span>Page ${_crPage} of ${_crTotalPages}</span>
+        <span class="cr-page-count">Page ${_crPage} of ${_crTotalPages}</span>
+        <button class="cr-read-page-btn" type="button" onclick="_crReadCurrentPage()" aria-label="Read page ${x(_crPage)} aloud">▶ Read page</button>
       </div>
       ${blocks || '<div class="e10-empty">No text extracted for this page.</div>'}`;
   }
@@ -12700,6 +12720,28 @@ function _crCancelHighlight() {
     prompt.style.display = '';
     prompt.innerHTML = 'Select any passage in the text to highlight it, write a note, ask a question, or create an observation candidate.';
   }
+}
+
+function _crCurrentPageSpeechText() {
+  return (_crCurrentExtractions || [])
+    .map(ex => String(ex?.text || '').trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function _crReadCurrentPage() {
+  const documentId = _crDocId;
+  const page = _crPage;
+  const text = _crCurrentPageSpeechText();
+  if (!text) {
+    _a11ySetStatus('No readable source text on this page.', 'status-ready');
+    return false;
+  }
+  return _requestReadingToolsSpeech(text, {
+    prompt: `Read page ${page || ''} aloud?\n\nEnable Reading Tools for this session.`,
+    source_document_id: documentId,
+    page,
+  });
 }
 
 function _crPageReadingText() {
