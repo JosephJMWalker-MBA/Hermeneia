@@ -24,6 +24,21 @@ def _css_block(html: str, selector: str) -> str:
     return match.group("body")
 
 
+def _run_accessibility_node(script: str) -> dict:
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available for Reader accessibility UI test")
+
+    result = subprocess.run(
+        [node, "-e", script],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
 def test_reading_tools_read_current_structural_reader_selection():
     node = shutil.which("node")
     if not node:
@@ -48,6 +63,7 @@ def test_reading_tools_read_current_structural_reader_selection():
         + _extract_fn(html, "_a11yGetSelectedText")
         + _extract_fn(html, "_a11yCacheReaderSelection")
         + _extract_fn(html, "_a11yGetDockReadText")
+        + _extract_fn(html, "_a11ySetReadEnabled")
         + _extract_fn(html, "a11yClickRead")
         + "a11yClickRead();\n"
         "process.stdout.write(JSON.stringify({spoken,status,cached:_a11yLastReaderSelection}));\n"
@@ -92,6 +108,7 @@ def test_reading_tools_use_cached_reader_selection_after_native_selection_collap
         + _extract_fn(html, "_a11yGetSelectedText")
         + _extract_fn(html, "_a11yCacheReaderSelection")
         + _extract_fn(html, "_a11yGetDockReadText")
+        + _extract_fn(html, "_a11ySetReadEnabled")
         + _extract_fn(html, "a11yClickRead")
         + "_a11yCacheReaderSelection();\n"
         "currentReaderSelection=null;\n"
@@ -139,6 +156,7 @@ def test_reading_tools_cache_excludes_ui_chrome_and_unrelated_selection():
         + _extract_fn(html, "_a11yGetSelectedText")
         + _extract_fn(html, "_a11yCacheReaderSelection")
         + _extract_fn(html, "_a11yGetDockReadText")
+        + _extract_fn(html, "_a11ySetReadEnabled")
         + _extract_fn(html, "a11yClickRead")
         + "_a11yCacheReaderSelection();\n"
         "currentReaderSelection=null;\n"
@@ -187,6 +205,7 @@ def test_new_reader_selection_replaces_prior_reading_tools_cache():
         + _extract_fn(html, "_a11yGetSelectedText")
         + _extract_fn(html, "_a11yCacheReaderSelection")
         + _extract_fn(html, "_a11yGetDockReadText")
+        + _extract_fn(html, "_a11ySetReadEnabled")
         + _extract_fn(html, "a11yClickRead")
         + "_a11yCacheReaderSelection();\n"
         "currentReaderSelection={text:'Second Reader passage'};\n"
@@ -235,6 +254,7 @@ def test_reading_tools_do_not_resurrect_cleared_reader_selection():
         + _extract_fn(html, "_a11yGetSelectedText")
         + _extract_fn(html, "_a11yCacheReaderSelection")
         + _extract_fn(html, "_a11yGetDockReadText")
+        + _extract_fn(html, "_a11ySetReadEnabled")
         + _extract_fn(html, "a11yClickRead")
         + "_a11yCacheReaderSelection();\n"
         "_a11yClearReaderSelectionCache();\n"
@@ -291,6 +311,7 @@ def test_reader_page_context_reset_invalidates_cached_reading_tools_passage():
         + _extract_fn(html, "_a11yGetSelectedText")
         + _extract_fn(html, "_a11yCacheReaderSelection")
         + _extract_fn(html, "_a11yGetDockReadText")
+        + _extract_fn(html, "_a11ySetReadEnabled")
         + _extract_fn(html, "a11yClickRead")
         + _extract_fn(html, "_crClearReaderSelectionState")
         + _extract_fn(html, "_crResetReaderTransientSelectionForContext")
@@ -420,6 +441,7 @@ def test_new_reader_selection_after_context_reset_establishes_new_reading_tools_
         + _extract_fn(html, "_a11yGetSelectedText")
         + _extract_fn(html, "_a11yCacheReaderSelection")
         + _extract_fn(html, "_a11yGetDockReadText")
+        + _extract_fn(html, "_a11ySetReadEnabled")
         + _extract_fn(html, "a11yClickRead")
         + _extract_fn(html, "_crClearReaderSelectionState")
         + _extract_fn(html, "_crResetReaderTransientSelectionForContext")
@@ -447,11 +469,183 @@ def test_new_reader_selection_after_context_reset_establishes_new_reading_tools_
     }
 
 
+def test_inline_read_enabled_speaks_exact_reader_selection_without_prompt():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let currentReaderSelection={text:'The sea never asked permission.'};\n"
+        "function _crGetReaderSelection(opts){return currentReaderSelection;}\n"
+        "let _crSelText='';\n"
+        "let confirmCalls=0;\n"
+        "const window={confirm(){confirmCalls+=1;return true;},getSelection(){return {toString(){return 'Toolbar Read Highlight Note Ask';}};}};\n"
+        "const speechSynthesis={};\n"
+        "function SpeechSynthesisUtterance(){}\n"
+        "const _a11y={read:true};\n"
+        "let _a11yHintShown=true;\n"
+        "let spoken=[];\n"
+        "let status='';\n"
+        "let syncCalls=0;\n"
+        "function a11ySpeak(text){spoken.push(text);}\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _a11ySync(){syncCalls+=1;}\n"
+        "function setTimeout(){}\n"
+        + _extract_fn(html, "_a11ySetReadEnabled")
+        + _extract_fn(html, "_a11ySpeechSupported")
+        + _extract_fn(html, "_requestReadingToolsSpeech")
+        + _extract_fn(html, "_crReadResolvedSelection")
+        + "_crReadResolvedSelection();\n"
+        "process.stdout.write(JSON.stringify({spoken,status,read:_a11y.read,confirmCalls,syncCalls}));\n"
+    )
+
+    assert behavior == {
+        "spoken": ["The sea never asked permission."],
+        "status": "",
+        "read": True,
+        "confirmCalls": 0,
+        "syncCalls": 0,
+    }
+
+
+def test_inline_read_disabled_confirm_enables_reading_tools_and_speaks_once():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let currentReaderSelection={text:'The sea never asked permission.'};\n"
+        "function _crGetReaderSelection(opts){return currentReaderSelection;}\n"
+        "let _crSelText='';\n"
+        "let events=[];\n"
+        "const window={confirm(message){events.push(['confirm',message]);return true;}};\n"
+        "const speechSynthesis={};\n"
+        "function SpeechSynthesisUtterance(){}\n"
+        "const _a11y={read:false};\n"
+        "let _a11yHintShown=true;\n"
+        "let spoken=[];\n"
+        "let status='';\n"
+        "let syncCalls=0;\n"
+        "function a11ySpeak(text){events.push(['speak',text]);spoken.push(text);}\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _a11ySync(){events.push(['sync',_a11y.read]);syncCalls+=1;}\n"
+        "function setTimeout(){}\n"
+        + _extract_fn(html, "_a11ySetReadEnabled")
+        + _extract_fn(html, "_a11ySpeechSupported")
+        + _extract_fn(html, "_requestReadingToolsSpeech")
+        + _extract_fn(html, "_crReadResolvedSelection")
+        + "_crReadResolvedSelection();\n"
+        "process.stdout.write(JSON.stringify({spoken,status,read:_a11y.read,syncCalls,events}));\n"
+    )
+
+    assert behavior["spoken"] == ["The sea never asked permission."]
+    assert behavior["status"] == ""
+    assert behavior["read"] is True
+    assert behavior["syncCalls"] == 1
+    assert behavior["events"][0][0] == "confirm"
+    assert "Enable Reading Tools for this session." in behavior["events"][0][1]
+    assert behavior["events"][1:] == [["sync", True], ["speak", "The sea never asked permission."]]
+
+
+def test_inline_read_disabled_cancel_preserves_selection_and_does_not_speak():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let central={text:'The sea never asked permission.'};\n"
+        "function _crGetReaderSelection(opts){return central;}\n"
+        "let _crSelText='';\n"
+        "let confirmCalls=0;\n"
+        "const window={confirm(){confirmCalls+=1;return false;}};\n"
+        "const speechSynthesis={};\n"
+        "function SpeechSynthesisUtterance(){}\n"
+        "const _a11y={read:false};\n"
+        "let _a11yHintShown=true;\n"
+        "let spoken=[];\n"
+        "let status='';\n"
+        "let syncCalls=0;\n"
+        "function a11ySpeak(text){spoken.push(text);}\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _a11ySync(){syncCalls+=1;}\n"
+        "function setTimeout(){}\n"
+        + _extract_fn(html, "_a11ySetReadEnabled")
+        + _extract_fn(html, "_a11ySpeechSupported")
+        + _extract_fn(html, "_requestReadingToolsSpeech")
+        + _extract_fn(html, "_crReadResolvedSelection")
+        + "_crReadResolvedSelection();\n"
+        "process.stdout.write(JSON.stringify({spoken,status,read:_a11y.read,confirmCalls,syncCalls,selection:central.text}));\n"
+    )
+
+    assert behavior == {
+        "spoken": [],
+        "status": "",
+        "read": False,
+        "confirmCalls": 1,
+        "syncCalls": 0,
+        "selection": "The sea never asked permission.",
+    }
+
+
+def test_inline_read_unsupported_browser_reports_without_activation():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let currentReaderSelection={text:'The sea never asked permission.'};\n"
+        "function _crGetReaderSelection(opts){return currentReaderSelection;}\n"
+        "let _crSelText='';\n"
+        "let confirmCalls=0;\n"
+        "const window={confirm(){confirmCalls+=1;return true;}};\n"
+        "const _a11y={read:false};\n"
+        "let _a11yHintShown=true;\n"
+        "let spoken=[];\n"
+        "let status='';\n"
+        "let syncCalls=0;\n"
+        "function a11ySpeak(text){spoken.push(text);}\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _a11ySync(){syncCalls+=1;}\n"
+        "function setTimeout(){}\n"
+        + _extract_fn(html, "_a11ySetReadEnabled")
+        + _extract_fn(html, "_a11ySpeechSupported")
+        + _extract_fn(html, "_requestReadingToolsSpeech")
+        + _extract_fn(html, "_crReadResolvedSelection")
+        + "_crReadResolvedSelection();\n"
+        "process.stdout.write(JSON.stringify({spoken,status,read:_a11y.read,confirmCalls,syncCalls}));\n"
+    )
+
+    assert behavior == {
+        "spoken": [],
+        "status": "Read aloud is not supported in this browser.",
+        "read": False,
+        "confirmCalls": 0,
+        "syncCalls": 0,
+    }
+
+
+def test_inline_read_uses_central_reader_selection_not_raw_window_selection():
+    html = INDEX.read_text()
+    behavior = _run_accessibility_node(
+        "let currentReaderSelection={text:'Canonical Reader passage'};\n"
+        "function _crGetReaderSelection(opts){return currentReaderSelection;}\n"
+        "let _crSelText='';\n"
+        "const window={confirm(){return true;},getSelection(){return {rangeCount:1,isCollapsed:false,toString(){return 'Toolbar Read Highlight Note Ask';}};}};\n"
+        "const speechSynthesis={};\n"
+        "function SpeechSynthesisUtterance(){}\n"
+        "const _a11y={read:true};\n"
+        "let _a11yHintShown=true;\n"
+        "let spoken='';\n"
+        "let status='';\n"
+        "function a11ySpeak(text){spoken=text;}\n"
+        "function _a11ySetStatus(message){status=message;}\n"
+        "function _a11ySync(){}\n"
+        "function setTimeout(){}\n"
+        + _extract_fn(html, "_a11ySetReadEnabled")
+        + _extract_fn(html, "_a11ySpeechSupported")
+        + _extract_fn(html, "_requestReadingToolsSpeech")
+        + _extract_fn(html, "_crReadResolvedSelection")
+        + "_crReadResolvedSelection();\n"
+        "process.stdout.write(JSON.stringify({spoken,status}));\n"
+    )
+
+    assert behavior == {"spoken": "Canonical Reader passage", "status": ""}
+
+
 def test_passage_read_action_still_uses_reader_passage_text():
     html = INDEX.read_text()
 
     assert 'onclick="_crReadResolvedSelection()" title="Read aloud"' in html
     assert "function _crReadResolvedSelection()" in html
+    assert "_requestReadingToolsSpeech(text)" in _extract_fn(html, "_crReadResolvedSelection")
     # a11yReadSelection reads the same current-or-cached Reader selection path;
     # it still auto-enables read mode so the popup's Read button works without
     # pre-toggling (item 7).

@@ -3930,21 +3930,54 @@ function a11yToggle(cap) {
   _a11ySync();
 }
 
+function _a11ySetReadEnabled(enabled, options = {}) {
+  const shouldEnable = !!enabled;
+  if (_a11y.read === shouldEnable) return;
+  _a11y.read = shouldEnable;
+  if (!shouldEnable) a11yStop();
+  _a11ySync();
+  if (shouldEnable && options.showHint && !_a11yHintShown) {
+    _a11yHintShown = true;
+    const hint = document.getElementById('a11y-hint');
+    if (hint) {
+      hint.classList.add('hint-visible');
+      clearTimeout(_a11yHintTimer);
+      _a11yHintTimer = setTimeout(() => hint.classList.remove('hint-visible'), 4000);
+    }
+  }
+}
+
+function _a11ySpeechSupported() {
+  return typeof speechSynthesis !== 'undefined' && typeof SpeechSynthesisUtterance !== 'undefined';
+}
+
+function _requestReadingToolsSpeech(text, options = {}) {
+  const passage = String(text || '').trim();
+  if (!passage) {
+    _a11ySetStatus('Select text first.', 'status-ready');
+    setTimeout(() => _a11y.read && _a11ySetStatus('Select text to read', 'status-ready'), 1800);
+    return false;
+  }
+  if (!_a11ySpeechSupported()) {
+    _a11ySetStatus('Read aloud is not supported in this browser.');
+    return false;
+  }
+  if (!_a11y.read) {
+    const message = options.prompt || 'Read this passage aloud?\n\nEnable Reading Tools for this session.';
+    const confirmed = typeof window !== 'undefined' && typeof window.confirm === 'function'
+      ? window.confirm(message)
+      : false;
+    if (!confirmed) return false;
+    _a11ySetReadEnabled(true, { showHint: true });
+  }
+  a11ySpeak(passage);
+  return true;
+}
+
 // Read button: enable the mode, then read the current or last valid Reader selection
 function a11yClickRead() {
   if (!_a11y.read) {
-    _a11y.read = true;
-    _a11ySync();
-    // Show first-use hint
-    if (!_a11yHintShown) {
-      _a11yHintShown = true;
-      const hint = document.getElementById('a11y-hint');
-      if (hint) {
-        hint.classList.add('hint-visible');
-        clearTimeout(_a11yHintTimer);
-        _a11yHintTimer = setTimeout(() => hint.classList.remove('hint-visible'), 4000);
-      }
-    }
+    _a11ySetReadEnabled(true, { showHint: true });
   }
   const text = _a11yGetDockReadText();
   if (text) {
@@ -3956,7 +3989,7 @@ function a11yClickRead() {
 }
 
 function a11ySpeak(text) {
-  if (typeof speechSynthesis === 'undefined') {
+  if (!_a11ySpeechSupported()) {
     _a11ySetStatus('Speech not supported in this browser');
     return;
   }
@@ -12493,7 +12526,7 @@ function _crHideToolbar(force = false) {
 function _crReadResolvedSelection() {
   const selection = _crGetReaderSelection({ refresh: false, fallback: true });
   const text = selection?.text || _crSelText || '';
-  if (text) ttsSpeak(text);
+  _requestReadingToolsSpeech(text);
 }
 
 function _crHighlightSelected(focus) {

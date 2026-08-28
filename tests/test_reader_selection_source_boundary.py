@@ -47,6 +47,7 @@ let spokenText = '';
 let a11yCacheCleared = false;
 function x(value){ return String(value ?? ''); }
 function ttsSpeak(text){ spokenText = text; }
+function _requestReadingToolsSpeech(text){ spokenText = text; }
 function _a11yClearReaderSelectionCache(){ a11yCacheCleared = true; }
 function _dockOpenPanel(){}
 function _crHideToolbar(){}
