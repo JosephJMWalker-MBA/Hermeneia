@@ -4593,7 +4593,7 @@ function mount(h) {
       <button class="tts-btn" id="tts-btn-corpus-explainer" onclick="ttsReadEl('corpus-explainer','corpus-explainer')" title="Read aloud">▶</button>
     </div>
     <p>The Corpus is the evidence base — every sentence and passage extracted from your document, preserved exactly as written. These are called <strong>observations</strong>. They are immutable: the machine never rewrites them, summarizes them, or loses them.</p>
-    <p>Use the search box to find passages by keyword. When a search returns multiple results, a <strong>Pattern View</strong> appears at the top — showing all occurrences simultaneously with a distribution timeline. This is how recurring concepts (symbols, phrases, contested terms) become visible across the full document.</p>
+    <p>Use the search box to find passages by keyword. When a search returns multiple results, a <strong>Pattern View</strong> appears at the top — separating literal occurrences from matching passages with a distribution timeline. This is how recurring concepts (symbols, phrases, contested terms) become visible across the full document.</p>
     <p><strong>How to use it:</strong> Search for a term you want to investigate. Review the Pattern View if multiple passages appear. Click any observation to select it, then go to the Lab to generate an interpretation.</p>
     <div style="margin-top:16px"><button class="btn-primary" onclick="e10Go('lab')" style="padding:8px 20px">Next: Interpretation Lab →</button></div>
   </div>
@@ -6052,6 +6052,25 @@ function _hasConcordanceCounts(data) {
   return data && Number.isFinite(Number(data.occurrence_count)) && Number.isFinite(Number(data.passage_count));
 }
 
+function _concordanceDocuments(concordance) {
+  return concordance?.distribution?.documents || [];
+}
+
+function _docStatsForRows(rows, concordance) {
+  const docId = rows[0]?.source_document_id;
+  const docName = rows[0]?.document_name || '';
+  return _concordanceDocuments(concordance).find(d => d.source_document_id === docId)
+    || _concordanceDocuments(concordance).find(d => d.document_name === docName)
+    || null;
+}
+
+function _pagesFromDocStats(docStats, rows) {
+  if (docStats?.pages?.length) {
+    return docStats.pages.flatMap(p => Array(Number(p.occurrence_count) || 0).fill(Number(p.page) || 1));
+  }
+  return rows.flatMap(r => Array(_rowOccurrenceCount(r)).fill(r.page));
+}
+
 function _searchSummaryText(data) {
   if (_hasConcordanceCounts(data)) {
     const occurrenceCount = Number(data.occurrence_count) || 0;
@@ -6075,14 +6094,9 @@ function renderResults(q, data) {
 
   // ── Motif Panel: show when search has 2+ results ──────
   const motifHost = document.getElementById('motif-panel');
-  if (q && count >= 2 && motifHost) {
-    if (count <= observations.length) {
-      renderMotifPanel(q, observations, motifHost, null, data);
-    } else {
-      // Result set is capped: never present truncated counts or
-      // distributions as complete. The uncapped fetch renders instead.
-      motifHost.innerHTML = '';
-    }
+  const patternCount = _hasConcordanceCounts(data) ? Number(data.occurrence_count) : count;
+  if (q && patternCount >= 2 && motifHost) {
+    renderMotifPanel(q, observations, motifHost, null, data);
   } else if (motifHost) {
     motifHost.innerHTML = '';
     _motifViewActive = false;
@@ -6139,24 +6153,31 @@ function _makeDistBar(pages, totalPages, BAR = 52) {
   return { bar: bar.join(''), note, totalPages };
 }
 
-function renderMotifPanel(q, observations, host, totalCount = null) {
-  const concordanceMode = observations.some(r => Object.prototype.hasOwnProperty.call(r, 'occurrence_count'));
-  const passageTotal = totalCount == null ? observations.length : totalCount;
-  const occurrenceTotal = concordanceMode ? _sumOccurrenceCount(observations) : null;
+function renderMotifPanel(q, observations, host, totalCount = null, concordance = null) {
+  const concordanceMode = _hasConcordanceCounts(concordance)
+    || observations.some(r => Object.prototype.hasOwnProperty.call(r, 'occurrence_count'));
+  const passageTotal = concordanceMode
+    ? Number(concordance?.passage_count ?? observations.length)
+    : (totalCount == null ? observations.length : totalCount);
+  const occurrenceTotal = concordanceMode
+    ? Number(concordance?.occurrence_count ?? _sumOccurrenceCount(observations))
+    : null;
   const groups = _groupByDoc(observations);
   const multiDoc = groups.length > 1;
   const truncated = passageTotal != null && passageTotal > observations.length;
 
   // Exactly one passage is sent to the AI, so exactly one is selectable.
-  // Default to the first primary-corpus occurrence: grounding starts primary.
+  // Default to the first primary-corpus passage: grounding starts primary.
   const defaultPick = (observations.find(r => !r.source_role || r.source_role === 'primary') || observations[0])?.id;
 
   const docSections = groups.map(({ docName, rows }) => {
     const role = rows[0]?.source_role || 'primary';
     const label = docName ? docName.replace(/\.pdf$/i, '') : 'Untitled';
-    const pages = rows.flatMap(r => Array(_rowOccurrenceCount(r)).fill(r.page)).sort((a,b) => a - b);
+    const docStats = _docStatsForRows(rows, concordance);
+    const pages = _pagesFromDocStats(docStats, rows).sort((a,b) => a - b);
     const uniquePages = [...new Set(pages)];
-    const docOccurrenceCount = _sumOccurrenceCount(rows);
+    const docOccurrenceCount = Number(docStats?.occurrence_count ?? _sumOccurrenceCount(rows));
+    const docPassageCount = Number(docStats?.passage_count ?? rows.length);
     // Use per-doc page range; fall back to global if single doc
     const docMax = multiDoc
       ? Math.max(...pages)
@@ -6185,7 +6206,7 @@ function renderMotifPanel(q, observations, host, totalCount = null) {
     const docHeader = multiDoc
       ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
            <span class="obs-provenance role-${role}" style="font-size:11px">${x(label)} · ${role}</span>
-           <span style="font-size:11px;color:var(--dim2)">${concordanceMode ? `${docOccurrenceCount} literal occurrence${docOccurrenceCount !== 1 ? 's' : ''} · ` : ''}${rows.length} passage${rows.length !== 1 ? 's' : ''}</span>
+           <span style="font-size:11px;color:var(--dim2)">${concordanceMode ? `${docOccurrenceCount} literal occurrence${docOccurrenceCount !== 1 ? 's' : ''} · ` : ''}${docPassageCount} passage${docPassageCount !== 1 ? 's' : ''}</span>
          </div>`
       : '';
 
@@ -6194,7 +6215,7 @@ function renderMotifPanel(q, observations, host, totalCount = null) {
         ${docHeader}
         <div style="display:flex;gap:20px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
           ${!multiDoc && concordanceMode ? `<div><div style="font-size:10px;color:var(--dim2);margin-bottom:2px;letter-spacing:.06em">LITERAL OCCURRENCES</div><div style="font-size:20px;font-weight:700;color:var(--fg)">${docOccurrenceCount}</div></div>` : ''}
-          ${!multiDoc ? `<div><div style="font-size:10px;color:var(--dim2);margin-bottom:2px;letter-spacing:.06em">PASSAGES</div><div style="font-size:20px;font-weight:700;color:var(--fg)">${rows.length}</div></div>` : ''}
+          ${!multiDoc ? `<div><div style="font-size:10px;color:var(--dim2);margin-bottom:2px;letter-spacing:.06em">PASSAGES</div><div style="font-size:20px;font-weight:700;color:var(--fg)">${docPassageCount}</div></div>` : ''}
           <div>
             <div style="font-size:10px;color:var(--dim2);margin-bottom:2px;letter-spacing:.06em">PAGES</div>
             <div style="font-size:12px;color:var(--fg2);font-family:var(--mono)">${uniquePages.join(', ')}</div>
@@ -6215,30 +6236,57 @@ function renderMotifPanel(q, observations, host, totalCount = null) {
   // ── Corpus distribution comparison (primary vs. commentary) ──────────────────
   const primaryRows = observations.filter(r => !r.source_role || r.source_role === 'primary');
   const commentaryRows = observations.filter(r => r.source_role && r.source_role !== 'primary');
-  const hasCrossCorpus = primaryRows.length > 0 && commentaryRows.length > 0;
+  const primaryDocs = _concordanceDocuments(concordance).filter(d => !d.source_role || d.source_role === 'primary');
+  const commentaryDocs = _concordanceDocuments(concordance).filter(d => d.source_role && d.source_role !== 'primary');
+  const hasCrossCorpus = concordanceMode && _concordanceDocuments(concordance).length
+    ? primaryDocs.length > 0 && commentaryDocs.length > 0
+    : primaryRows.length > 0 && commentaryRows.length > 0;
 
   let corpusComparisonHtml = '';
   if (hasCrossCorpus) {
-    const pCount = _sumOccurrenceCount(primaryRows);
-    const cCount = _sumOccurrenceCount(commentaryRows);
+    const pCount = primaryDocs.length
+      ? primaryDocs.reduce((sum, doc) => sum + (Number(doc.occurrence_count) || 0), 0)
+      : _sumOccurrenceCount(primaryRows);
+    const cCount = commentaryDocs.length
+      ? commentaryDocs.reduce((sum, doc) => sum + (Number(doc.occurrence_count) || 0), 0)
+      : _sumOccurrenceCount(commentaryRows);
+    const pPassageCount = primaryDocs.length
+      ? primaryDocs.reduce((sum, doc) => sum + (Number(doc.passage_count) || 0), 0)
+      : primaryRows.length;
+    const cPassageCount = commentaryDocs.length
+      ? commentaryDocs.reduce((sum, doc) => sum + (Number(doc.passage_count) || 0), 0)
+      : commentaryRows.length;
     const ratio = pCount > 0 ? (cCount / pCount).toFixed(1) : '—';
     const ratioNum = pCount > 0 ? cCount / pCount : 0;
 
     // Primary distribution bar
-    const pPages = primaryRows.flatMap(r => Array(_rowOccurrenceCount(r)).fill(r.page)).sort((a,b) => a - b);
+    const pPages = primaryDocs.length
+      ? primaryDocs.flatMap(d => (d.pages || []).flatMap(p => Array(Number(p.occurrence_count) || 0).fill(Number(p.page) || 1))).sort((a,b) => a - b)
+      : primaryRows.flatMap(r => Array(_rowOccurrenceCount(r)).fill(r.page)).sort((a,b) => a - b);
     const pMax = _corpusTotalPages || Math.max(...pPages, 1);
     const { bar: pBar, note: pNote } = _makeDistBar(pPages, pMax);
     const pUniquePages = [...new Set(pPages)];
 
     // Commentary distribution — per role
     const byRole = {};
-    commentaryRows.forEach(r => {
+    if (commentaryDocs.length) {
+      commentaryDocs.forEach(d => {
+        const role = d.source_role;
+        if (!byRole[role]) byRole[role] = { occurrence_count: 0, passage_count: 0 };
+        byRole[role].occurrence_count += Number(d.occurrence_count) || 0;
+        byRole[role].passage_count += Number(d.passage_count) || 0;
+      });
+    } else commentaryRows.forEach(r => {
       const role = r.source_role;
       if (!byRole[role]) byRole[role] = [];
       byRole[role].push(r);
     });
     const roleSummary = Object.entries(byRole)
-      .map(([role, rows]) => `<span class="obs-provenance role-${x(role)}" style="font-size:10px">${role}: ${_sumOccurrenceCount(rows)} literal / ${rows.length} passages</span>`)
+      .map(([role, rows]) => {
+        const occurrenceCount = Array.isArray(rows) ? _sumOccurrenceCount(rows) : rows.occurrence_count;
+        const passageCount = Array.isArray(rows) ? rows.length : rows.passage_count;
+        return `<span class="obs-provenance role-${x(role)}" style="font-size:10px">${role}: ${occurrenceCount} literal / ${passageCount} passages</span>`;
+      })
       .join(' ');
 
     // Signal: is commentary emphasis significantly higher than primary?
@@ -6259,7 +6307,7 @@ function renderMotifPanel(q, observations, host, totalCount = null) {
           <div>
             <div style="font-size:10px;color:var(--dim2);letter-spacing:.06em;margin-bottom:6px">PRIMARY CORPUS</div>
             <div style="font-size:24px;font-weight:700;color:var(--fg);line-height:1">${pCount}</div>
-            <div style="font-size:11px;color:var(--dim2);margin-top:2px">literal occurrence${pCount !== 1 ? 's' : ''} · ${primaryRows.length} passage${primaryRows.length !== 1 ? 's' : ''} · p.${pUniquePages.join(', ')}</div>
+            <div style="font-size:11px;color:var(--dim2);margin-top:2px">literal occurrence${pCount !== 1 ? 's' : ''} · ${pPassageCount} passage${pPassageCount !== 1 ? 's' : ''} · p.${pUniquePages.join(', ')}</div>
             <div style="margin-top:8px;font-size:10px;font-family:var(--mono);color:var(--dim2);letter-spacing:1px">${pBar}</div>
             <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--dim2);margin-top:1px;font-family:var(--mono)"><span>p.1</span><span>p.${pMax}</span></div>
             <div style="font-size:10px;color:var(--dim2);margin-top:4px">${pNote}</div>
@@ -6267,7 +6315,7 @@ function renderMotifPanel(q, observations, host, totalCount = null) {
           <div>
             <div style="font-size:10px;color:var(--dim2);letter-spacing:.06em;margin-bottom:6px">COMMENTARY CORPUS</div>
             <div style="font-size:24px;font-weight:700;color:var(--fg);line-height:1">${cCount}</div>
-            <div style="font-size:11px;color:var(--dim2);margin-top:2px">literal occurrence${cCount !== 1 ? 's' : ''} · ${commentaryRows.length} passage${commentaryRows.length !== 1 ? 's' : ''}</div>
+            <div style="font-size:11px;color:var(--dim2);margin-top:2px">literal occurrence${cCount !== 1 ? 's' : ''} · ${cPassageCount} passage${cPassageCount !== 1 ? 's' : ''}</div>
             <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${roleSummary}</div>
             <div style="font-size:12px;font-weight:600;color:var(--fg2);margin-top:10px">literal-occurrence ratio ×${ratio} relative to primary</div>
           </div>
@@ -6282,9 +6330,10 @@ function renderMotifPanel(q, observations, host, totalCount = null) {
         <div>
           <span style="font-size:10px;letter-spacing:.1em;color:var(--dim2);font-weight:600;text-transform:uppercase">Pattern View</span>
           <span style="font-size:16px;font-weight:600;color:var(--fg);margin-left:10px">"${x(q)}"</span>
-          ${concordanceMode && !truncated ? `<span style="font-size:12px;color:var(--dim2);margin-left:8px">· ${occurrenceTotal} literal occurrence${occurrenceTotal !== 1 ? 's' : ''} across ${observations.length} passage${observations.length !== 1 ? 's' : ''}</span>` : ''}
+          ${concordanceMode && !truncated ? `<span style="font-size:12px;color:var(--dim2);margin-left:8px">· ${occurrenceTotal} literal occurrence${occurrenceTotal !== 1 ? 's' : ''} across ${passageTotal} passage${passageTotal !== 1 ? 's' : ''}</span>` : ''}
+          ${concordanceMode && truncated ? `<span style="font-size:12px;color:var(--dim2);margin-left:8px">· ${occurrenceTotal} literal occurrence${occurrenceTotal !== 1 ? 's' : ''} across ${passageTotal.toLocaleString()} passages</span>` : ''}
           ${!concordanceMode && multiDoc && !truncated ? `<span style="font-size:12px;color:var(--dim2);margin-left:8px">· ${observations.length} passages across ${groups.length} corpora</span>` : ''}
-          ${truncated ? `<span style="font-size:12px;color:var(--dim2);margin-left:8px">· showing the first ${observations.length} of ${passageTotal.toLocaleString()} passages</span>` : ''}
+          ${truncated ? `<span style="font-size:12px;color:var(--dim2);margin-left:8px">· showing first ${observations.length} passages</span>` : ''}
           ${truncated ? `<div style="font-size:12px;color:var(--yellow,#f4c542);margin-top:4px">Expanded cards are limited; use backend concordance totals for full literal frequency and distribution.</div>` : ''}
           <div style="font-size:12px;color:var(--dim2);margin-top:4px">Choose the passage to interpret first — the rest stay here for comparison.</div>
         </div>
@@ -6317,7 +6366,7 @@ async function sendPatternToLab(q) {
   labHost.innerHTML = `
     <div style="border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:12px;background:var(--surface)">
       <div style="font-size:10px;letter-spacing:.1em;color:var(--dim2);font-weight:600;margin-bottom:10px;text-transform:uppercase">Pattern View — "${x(q)}"</div>
-      <div style="font-size:12px;color:var(--dim2);margin-bottom:14px">The passage below will be sent as evidence.${others > 0 ? ` The other ${others} occurrence${others !== 1 ? 's' : ''} remain in the Pattern View for comparison.` : ''}</div>
+      <div style="font-size:12px;color:var(--dim2);margin-bottom:14px">The passage below will be sent as evidence.${others > 0 ? ` The other ${others} passage${others !== 1 ? 's' : ''} remain in the Pattern View for comparison.` : ''}</div>
       <div id="pattern-obs-list" style="display:flex;flex-direction:column;gap:6px"></div>
     </div>`;
 
@@ -7430,27 +7479,6 @@ async function e10LoadObservations(q = null) {
   }
 
   const data = await get(`/api/e10/observations?q=${encodeURIComponent(query)}&filter=${encodeURIComponent(filter)}&limit=60`);
-
-  // For the motif/pattern panel, fetch the full result set separately so
-  // distribution counts are accurate (display list stays capped at 60).
-  if (query) {
-    const stillCurrent = () => (document.getElementById('q')?.value || '').trim() === query;
-    get(`/api/e10/observations?q=${encodeURIComponent(query)}&filter=${encodeURIComponent(filter)}&limit=5000`)
-      .then(full => {
-        if (!stillCurrent()) return; // a slow response must not overwrite a newer search
-        const motifHost = document.getElementById('motif-panel');
-        if (motifHost && (full.observations || []).length >= 2) {
-          // The server clamps limit to 100; pass the true total so the
-          // panel can disclose truncation instead of presenting it as complete.
-          renderMotifPanel(query, full.observations, motifHost, data.count);
-        }
-      }).catch(() => {
-        // Never leave a truncated panel standing as if it were complete
-        if (!stillCurrent()) return;
-        const motifHost = document.getElementById('motif-panel');
-        if (motifHost) motifHost.innerHTML = '';
-      });
-  }
 
   renderResults(query, data);
 }

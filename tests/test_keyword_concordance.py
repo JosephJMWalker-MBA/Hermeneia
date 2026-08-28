@@ -136,6 +136,21 @@ def _search(db_path: Path, query: str, *, limit: int | None = None) -> dict:
     ).get_json()
 
 
+def _e10_search(
+    db_path: Path,
+    query: str,
+    *,
+    filter_name: str = "all",
+    limit: int | None = None,
+) -> dict:
+    params = {"q": query, "filter": filter_name}
+    if limit is not None:
+        params["limit"] = str(limit)
+    return create_app(db_path=db_path).test_client().get(
+        f"/api/e10/observations?{urlencode(params)}"
+    ).get_json()
+
+
 def _assert_distribution_invariants(body: dict) -> None:
     assert body["occurrence_count"] == len(body["occurrences"])
     result_occurrences = sum(row["occurrence_count"] for row in body["results"])
@@ -187,6 +202,28 @@ def test_repeated_phrase_twice_in_one_passage_counts_two_occurrences(tmp_path: P
     _assert_distribution_invariants(body)
 
 
+def test_e10_repeated_phrase_twice_in_one_passage_counts_two_occurrences(tmp_path: Path) -> None:
+    db = _seed(tmp_path, [{
+        "obs_id": "obs-1",
+        "doc_id": "doc-a",
+        "extraction_id": "ext-1",
+        "text": "green light and another green light",
+        "page": 2,
+        "paragraph": 1,
+        "sentence": 1,
+    }])
+
+    body = _e10_search(db, "green light")
+
+    assert body["matching"]["mode"] == MATCHING_MODE
+    assert body["count"] == body["passage_count"] == 1
+    assert body["occurrence_count"] == 2
+    assert body["observations"][0]["occurrence_count"] == 2
+    assert len(body["observations"][0]["occurrences"]) == 2
+    assert len(body["occurrences"]) == 2
+    _assert_distribution_invariants({**body, "results": body["observations"]})
+
+
 def test_repeated_phrase_across_passages_counts_passages_and_occurrences(tmp_path: Path) -> None:
     db = _seed(tmp_path, [
         {
@@ -215,6 +252,55 @@ def test_repeated_phrase_across_passages_counts_passages_and_occurrences(tmp_pat
     assert body["occurrence_count"] == 2
     assert body["page_count"] == 2
     _assert_distribution_invariants(body)
+
+
+def test_search_and_e10_share_literal_concordance_truth(tmp_path: Path) -> None:
+    db = _seed(tmp_path, [
+        {
+            "obs_id": "obs-1",
+            "doc_id": "doc-a",
+            "extraction_id": "ext-1",
+            "text": "green light then green light",
+            "page": 1,
+            "paragraph": 1,
+            "sentence": 1,
+        },
+        {
+            "obs_id": "obs-2",
+            "doc_id": "doc-a",
+            "extraction_id": "ext-2",
+            "text": "another green light",
+            "page": 2,
+            "paragraph": 1,
+            "sentence": 1,
+        },
+        {
+            "obs_id": "obs-3",
+            "doc_id": "doc-a",
+            "extraction_id": "ext-3",
+            "text": "no motif here",
+            "page": 3,
+            "paragraph": 1,
+            "sentence": 1,
+        },
+    ])
+
+    search = _search(db, "green light")
+    e10 = _e10_search(db, "green light")
+
+    assert search["matching"] == e10["matching"]
+    assert search["occurrence_count"] == e10["occurrence_count"] == 3
+    assert search["passage_count"] == e10["passage_count"] == 2
+    assert search["page_count"] == e10["page_count"] == 2
+    assert search["document_count"] == e10["document_count"] == 1
+    assert search["distribution"] == e10["distribution"]
+    assert {
+        row["id"]: row["occurrence_count"]
+        for row in search["results"]
+    } == {
+        row["id"]: row["occurrence_count"]
+        for row in e10["observations"]
+    }
 
 
 def test_twice_in_one_passage_plus_once_in_another(tmp_path: Path) -> None:
@@ -285,6 +371,12 @@ def test_unicode_behavior_follows_current_normalized_search_representation(tmp_p
     assert body["results"][0]["text"] == 'He said "don\'t stop."'
     assert body["results"][0]["canonical_text"] == "He said “don’t stop.”"
     assert body["occurrences"][0]["matched_text"] == "don't"
+
+    e10 = _e10_search(db, "don't")
+    assert e10["matching"]["search_text_source"] == SEARCH_TEXT_SOURCE
+    assert e10["occurrence_count"] == 1
+    assert e10["observations"][0]["text"] == 'He said "don\'t stop."'
+    assert e10["observations"][0]["canonical_text"] == "He said “don’t stop.”"
 
 
 def test_cross_observation_phrase_is_not_concatenated(tmp_path: Path) -> None:
@@ -420,6 +512,120 @@ def test_result_limit_truncates_passages_not_global_occurrence_evidence(tmp_path
     assert sum(doc["occurrence_count"] for doc in body["distribution"]["documents"]) == 5
 
 
+def test_e10_filter_concordance_describes_filtered_population(tmp_path: Path) -> None:
+    db = _seed(tmp_path, [
+        {
+            "obs_id": "obs-1",
+            "doc_id": "doc-a",
+            "extraction_id": "ext-1",
+            "text": "green light green light",
+            "page": 1,
+            "paragraph": 1,
+            "sentence": 1,
+        },
+        {
+            "obs_id": "obs-2",
+            "doc_id": "doc-a",
+            "extraction_id": "ext-2",
+            "text": "green light",
+            "page": 2,
+            "paragraph": 1,
+            "sentence": 1,
+        },
+    ])
+    conn = sqlite3.connect(db)
+    conn.execute(
+        """INSERT INTO interpretations
+           (id, observation_id, perspective, text, evidential_status,
+            evidence_observation_ids, confidence, source, created_at)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        (
+            "interp-1",
+            "obs-1",
+            "Literary",
+            "A reading.",
+            "speculative",
+            "[]",
+            "human",
+            "steward-authored",
+            _now(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    interpreted = _e10_search(db, "green light", filter_name="interpreted")
+    uninterpreted = _e10_search(db, "green light", filter_name="uninterpreted")
+
+    assert interpreted["passage_count"] == 1
+    assert interpreted["occurrence_count"] == 2
+    assert interpreted["observations"][0]["id"] == "obs-1"
+    assert uninterpreted["passage_count"] == 1
+    assert uninterpreted["occurrence_count"] == 1
+    assert uninterpreted["observations"][0]["id"] == "obs-2"
+
+
+def test_e10_truncated_rows_keep_complete_concordance_and_distribution(tmp_path: Path) -> None:
+    db = _seed(tmp_path, [
+        {
+            "obs_id": f"obs-{idx}",
+            "doc_id": "doc-a",
+            "extraction_id": f"ext-{idx}",
+            "text": "green light green light" if idx == 1 else "green light",
+            "page": idx,
+            "paragraph": 1,
+            "sentence": 1,
+        }
+        for idx in range(1, 5)
+    ])
+
+    body = _e10_search(db, "green light", limit=2)
+
+    assert len(body["observations"]) == 2
+    assert body["results_truncated"] is True
+    assert body["passage_count"] == 4
+    assert body["occurrence_count"] == 5
+    assert len(body["occurrences"]) == 5
+    assert sum(doc["occurrence_count"] for doc in body["distribution"]["documents"]) == 5
+
+
+def test_search_obs_index_matches_trace_order_across_documents(tmp_path: Path) -> None:
+    db = _seed(
+        tmp_path,
+        [
+            {
+                "obs_id": "obs-b",
+                "doc_id": "doc-b",
+                "extraction_id": "ext-b",
+                "text": "green light from b",
+                "page": 1,
+                "paragraph": 1,
+                "sentence": 1,
+            },
+            {
+                "obs_id": "obs-a",
+                "doc_id": "doc-a",
+                "extraction_id": "ext-a",
+                "text": "green light from a",
+                "page": 2,
+                "paragraph": 1,
+                "sentence": 1,
+            },
+        ],
+        docs=[
+            {"doc_id": "doc-b", "filename": "b.pdf"},
+            {"doc_id": "doc-a", "filename": "a.pdf"},
+        ],
+    )
+    client = create_app(db_path=db).test_client()
+    body = client.get("/api/search?q=green+light").get_json()
+
+    for result in body["results"]:
+        trace = client.get(f"/api/trace/{result['obs_index']}").get_json()
+        observation_layer = trace["layers"][0]["content"]
+        assert observation_layer["id"] == result["id"]
+
+
 def test_every_occurrence_is_addressable_to_source_provenance(tmp_path: Path) -> None:
     db = _seed(tmp_path, [{
         "obs_id": "obs-1",
@@ -512,5 +718,6 @@ def test_gatsby_green_light_matches_mechanical_searchable_representation_oracle(
     })
     assert len(body["occurrences"]) == body["occurrence_count"]
     assert body["results_truncated"] is True
-    assert source_occurrence_count >= body["occurrence_count"]
+    assert source_occurrence_count == body["occurrence_count"]
+    assert body["occurrence_count"] == 4
     _assert_distribution_invariants(body)

@@ -601,6 +601,146 @@ def create_app(
             "overlapping": False,
         }
 
+    def _empty_literal_concordance_response(q: str) -> dict:
+        return {
+            "query": q,
+            "count": 0,
+            "passage_count": 0,
+            "occurrence_count": 0,
+            "page_count": 0,
+            "document_count": 0,
+            "section_count": None,
+            "section_count_available": False,
+            "matching": _literal_search_contract(),
+            "results_truncated": False,
+            "occurrences": [],
+            "distribution": {"documents": []},
+        }
+
+    def _literal_concordance_for_rows(
+        rows: list[sqlite3.Row],
+        *,
+        query: str,
+        id_to_index: dict[str, int],
+        limit: int,
+        result_text_field: str,
+        extra_fields: dict[str, dict] | None = None,
+    ) -> dict:
+        matches = []
+        compact_occurrences = []
+        doc_distribution: dict[str, dict] = {}
+        page_hits: set[tuple[str, int]] = set()
+        doc_hits: set[str] = set()
+        extra_fields = extra_fields or {}
+
+        for r in rows:
+            text = r["searchable_text"] or ""
+            occurrences = literal_occurrence_spans(text, query)
+            if not occurrences:
+                continue
+            doc_id = r["source_document_id"]
+            page = r["page"]
+            source_role = r["source_role"] or "primary"
+            document_name = r["original_filename"]
+            doc_hits.add(doc_id)
+            page_hits.add((doc_id, page))
+            passage_occurrences = [
+                {
+                    "start": occ.start,
+                    "end": occ.end,
+                    "matched_text": occ.matched_text,
+                }
+                for occ in occurrences
+            ]
+            base_occurrence = {
+                "source_document_id": doc_id,
+                "observation_id": r["id"],
+                "source_extraction_id": r["source_extraction_id"],
+                "source_locator": r["source_locator"],
+                "document_name": document_name,
+                "source_role": source_role,
+                "page": page,
+                "paragraph": r["paragraph"],
+                "sentence": r["sentence"],
+            }
+            for occ in occurrences:
+                compact_occurrences.append({
+                    **base_occurrence,
+                    "start": occ.start,
+                    "end": occ.end,
+                    "matched_text": occ.matched_text,
+                })
+
+            match = {
+                "obs_index": id_to_index[r["id"]],
+                "page": page,
+                "paragraph": r["paragraph"],
+                "sentence": r["sentence"],
+                "id": r["id"],
+                "source_document_id": doc_id,
+                "source_extraction_id": r["source_extraction_id"],
+                "source_locator": r["source_locator"],
+                "document_name": document_name,
+                "source_role": source_role,
+                "canonical_text": r["raw_text"],
+                "raw_text": r["raw_text"],
+                "occurrence_count": len(occurrences),
+                "occurrences": passage_occurrences,
+            }
+            match[result_text_field] = text
+            match.update(extra_fields.get(r["id"], {}))
+            matches.append(match)
+
+            doc_entry = doc_distribution.setdefault(doc_id, {
+                "source_document_id": doc_id,
+                "document_name": document_name,
+                "source_role": source_role,
+                "occurrence_count": 0,
+                "passage_count": 0,
+                "_pages": {},
+            })
+            doc_entry["occurrence_count"] += len(occurrences)
+            doc_entry["passage_count"] += 1
+            page_entry = doc_entry["_pages"].setdefault(page, {
+                "page": page,
+                "occurrence_count": 0,
+                "passage_count": 0,
+            })
+            page_entry["occurrence_count"] += len(occurrences)
+            page_entry["passage_count"] += 1
+
+        distribution_documents = []
+        for doc in doc_distribution.values():
+            pages = [
+                doc["_pages"][page]
+                for page in sorted(doc["_pages"])
+            ]
+            public_doc = {
+                key: value
+                for key, value in doc.items()
+                if key != "_pages"
+            }
+            public_doc["pages"] = pages
+            distribution_documents.append(public_doc)
+
+        passage_count = len(matches)
+        occurrence_count = len(compact_occurrences)
+        return {
+            "count": passage_count,  # Backward compatible: count remains result rows.
+            "passage_count": passage_count,
+            "occurrence_count": occurrence_count,
+            "page_count": len(page_hits),
+            "document_count": len(doc_hits),
+            "section_count": None,
+            "section_count_available": False,
+            "matching": _literal_search_contract(),
+            "results_truncated": passage_count > limit,
+            "occurrences": compact_occurrences,
+            "distribution": {"documents": distribution_documents},
+            "all_results": matches,
+            "limited_results": matches[:limit],
+        }
+
     def _canonical_path(path: Path) -> Path:
         return path.expanduser().resolve()
 
@@ -2853,27 +2993,13 @@ def create_app(
         limit = min(int(request.args.get("limit", 15)), 50)
 
         if not q or not db_path.exists():
-            return jsonify({
-                "query": q,
-                "count": 0,
-                "passage_count": 0,
-                "occurrence_count": 0,
-                "page_count": 0,
-                "document_count": 0,
-                "section_count": None,
-                "section_count_available": False,
-                "matching": _literal_search_contract(),
-                "results_truncated": False,
-                "occurrences": [],
-                "distribution": {"documents": []},
-                "results": [],
-            })
+            return jsonify({**_empty_literal_concordance_response(q), "results": []})
 
         conn = _conn()
         all_rows = conn.execute(
             """
             SELECT o.id, o.page, o.paragraph, o.sentence, o.raw_text,
-                   COALESCE(od.normalized_text, o.raw_text) AS normalized_text,
+                   COALESCE(od.normalized_text, o.raw_text) AS searchable_text,
                    o.source_document_id, o.source_extraction_id, o.source_locator,
                    sd.original_filename, sd.source_role
             FROM observations o
@@ -2884,120 +3010,26 @@ def create_app(
             """
         ).fetchall()
 
-        id_to_index = {r["id"]: i + 1 for i, r in enumerate(all_rows)}
-
-        matches = []
-        compact_occurrences = []
-        doc_distribution: dict[str, dict] = {}
-        page_hits: set[tuple[str, int]] = set()
-        doc_hits: set[str] = set()
-
-        for r in all_rows:
-            text = r["normalized_text"] or ""
-            occurrences = literal_occurrence_spans(text, q)
-            if not occurrences:
-                continue
-            doc_id = r["source_document_id"]
-            page = r["page"]
-            source_role = r["source_role"] or "primary"
-            document_name = r["original_filename"]
-            doc_hits.add(doc_id)
-            page_hits.add((doc_id, page))
-            passage_occurrences = [
-                {
-                    "start": occ.start,
-                    "end": occ.end,
-                    "matched_text": occ.matched_text,
-                }
-                for occ in occurrences
-            ]
-            base_occurrence = {
-                "source_document_id": doc_id,
-                "observation_id": r["id"],
-                "source_extraction_id": r["source_extraction_id"],
-                "source_locator": r["source_locator"],
-                "document_name": document_name,
-                "source_role": source_role,
-                "page": page,
-                "paragraph": r["paragraph"],
-                "sentence": r["sentence"],
-            }
-            for occ in occurrences:
-                compact_occurrences.append({
-                    **base_occurrence,
-                    "start": occ.start,
-                    "end": occ.end,
-                    "matched_text": occ.matched_text,
-                })
-
-            matches.append({
-                "obs_index": id_to_index[r["id"]],
-                "page": page,
-                "paragraph": r["paragraph"],
-                "sentence": r["sentence"],
-                "text": text,
-                "canonical_text": r["raw_text"],
-                "raw_text": r["raw_text"],
-                "id": r["id"],
-                "source_document_id": doc_id,
-                "source_extraction_id": r["source_extraction_id"],
-                "source_locator": r["source_locator"],
-                "document_name": document_name,
-                "source_role": source_role,
-                "occurrence_count": len(occurrences),
-                "occurrences": passage_occurrences,
-            })
-
-            doc_entry = doc_distribution.setdefault(doc_id, {
-                "source_document_id": doc_id,
-                "document_name": document_name,
-                "source_role": source_role,
-                "occurrence_count": 0,
-                "passage_count": 0,
-                "_pages": {},
-            })
-            doc_entry["occurrence_count"] += len(occurrences)
-            doc_entry["passage_count"] += 1
-            page_entry = doc_entry["_pages"].setdefault(page, {
-                "page": page,
-                "occurrence_count": 0,
-                "passage_count": 0,
-            })
-            page_entry["occurrence_count"] += len(occurrences)
-            page_entry["passage_count"] += 1
-
+        active_ids = active_observation_ids(conn)
+        id_to_index = {obs_id: index + 1 for index, obs_id in enumerate(active_ids)}
+        concordance = _literal_concordance_for_rows(
+            all_rows,
+            query=q,
+            id_to_index=id_to_index,
+            limit=limit,
+            result_text_field="text",
+        )
         conn.close()
 
-        distribution_documents = []
-        for doc in doc_distribution.values():
-            pages = [
-                doc["_pages"][page]
-                for page in sorted(doc["_pages"])
-            ]
-            public_doc = {
-                key: value
-                for key, value in doc.items()
-                if key != "_pages"
-            }
-            public_doc["pages"] = pages
-            distribution_documents.append(public_doc)
-
-        passage_count = len(matches)
-        occurrence_count = len(compact_occurrences)
+        concordance.pop("all_results", None)
         return jsonify({
             "query": q,
-            "count": passage_count,  # Backward compatible: count remains result rows.
-            "passage_count": passage_count,
-            "occurrence_count": occurrence_count,
-            "page_count": len(page_hits),
-            "document_count": len(doc_hits),
-            "section_count": None,
-            "section_count_available": False,
-            "matching": _literal_search_contract(),
-            "results_truncated": passage_count > limit,
-            "occurrences": compact_occurrences,
-            "distribution": {"documents": distribution_documents},
-            "results": matches[:limit],
+            **{
+                key: value
+                for key, value in concordance.items()
+                if key != "limited_results"
+            },
+            "results": concordance["limited_results"],
         })
 
     # ── /api/trace/<obs_index> ────────────────────────────────────────────────
@@ -3940,7 +3972,7 @@ def create_app(
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        q = request.args.get("q", "").strip().lower()
+        q = request.args.get("q", "").strip()
         filter_name = request.args.get("filter", "all").strip().lower()
         limit = min(max(int(request.args.get("limit", 40)), 1), 100)
 
@@ -3948,9 +3980,11 @@ def create_app(
         rows = conn.execute(
             """
             SELECT o.id, o.page, o.paragraph, o.sentence, o.raw_text,
-                   o.source_locator, o.source_document_id,
+                   COALESCE(od.normalized_text, o.raw_text) AS searchable_text,
+                   o.source_locator, o.source_document_id, o.source_extraction_id,
                    sd.original_filename, sd.source_role
             FROM observations o
+            LEFT JOIN observation_derived od ON od.observation_id = o.id
             LEFT JOIN source_documents sd ON sd.id = o.source_document_id
             WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
             ORDER BY o.page, o.paragraph, o.sentence
@@ -3976,14 +4010,13 @@ def create_app(
             ).fetchall()
         } if _table_exists(conn, "critic_reports") else {}
 
-        results = []
+        eligible_rows = []
+        extra_fields = {}
         for row in rows:
             text = row["raw_text"]
             interpretation_count = interp_counts.get(row["id"], 0)
             proposal_count = proposal_counts.get(row["id"], 0)
             critic_report_count = critic_counts.get(row["id"], 0)
-            if q and q not in text.lower():
-                continue
             if filter_name == "uninterpreted" and interpretation_count > 0:
                 continue
             if filter_name == "interpreted" and interpretation_count == 0:
@@ -3992,6 +4025,33 @@ def create_app(
                 continue
             if filter_name == "critic" and critic_report_count == 0:
                 continue
+            eligible_rows.append(row)
+            extra_fields[row["id"]] = {
+                "interpretation_count": interpretation_count,
+                "proposal_count": proposal_count,
+                "critic_report_count": critic_report_count,
+            }
+        if q:
+            concordance = _literal_concordance_for_rows(
+                eligible_rows,
+                query=q,
+                id_to_index=id_to_index,
+                limit=limit,
+                result_text_field="text",
+                extra_fields=extra_fields,
+            )
+            observations = concordance.pop("limited_results")
+            concordance.pop("all_results", None)
+            conn.close()
+            return jsonify({
+                "query": q,
+                "filter": filter_name,
+                "observations": observations,
+                **concordance,
+            })
+
+        results = []
+        for row in eligible_rows:
             results.append({
                 "obs_index": id_to_index[row["id"]],
                 "id": row["id"],
@@ -4000,12 +4060,11 @@ def create_app(
                 "sentence": row["sentence"],
                 "source_locator": row["source_locator"],
                 "source_document_id": row["source_document_id"],
+                "source_extraction_id": row["source_extraction_id"],
                 "document_name": row["original_filename"],
                 "source_role": row["source_role"] or "primary",
-                "raw_text": text,
-                "interpretation_count": interpretation_count,
-                "proposal_count": proposal_count,
-                "critic_report_count": critic_report_count,
+                "raw_text": row["raw_text"],
+                **extra_fields[row["id"]],
             })
         conn.close()
         return jsonify({

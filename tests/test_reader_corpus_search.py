@@ -122,6 +122,7 @@ def test_corpus_search_panel_markup_and_trigger_present():
     assert "cr-rail-search" in index
     assert 'class="corpus-search"' in index
     assert "Search Corpus" in index
+    assert "separating literal occurrences from matching passages" in index
     assert "literal occurrence" in index
     assert "passageCount" in index
     assert "results_truncated" in index
@@ -129,6 +130,13 @@ def test_corpus_search_panel_markup_and_trigger_present():
     assert "Expanded cards are limited; use backend concordance totals" in index
     assert "literal-occurrence ratio" in index
     assert "literal occurrences in this passage" in index
+    assert "renderMotifPanel(q, observations, motifHost, null, data)" in index
+    assert "renderMotifPanel(query, full.observations" not in index
+    assert "The other ${others} passage" in index
+    assert "The other ${others} occurrence" not in index
+    assert "Number(data.occurrence_count)" in index
+    assert "Expanded cards are limited; use backend concordance totals" in index
+    assert "_concordanceDocuments(concordance)" in index
 
 
 def test_result_click_navigates_the_book_not_a_page_away():
