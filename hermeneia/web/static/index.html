@@ -12452,6 +12452,14 @@ function _crPlaceToolbar(tb, rect, fallbackX, fallbackY) {
   tb.style.top = `${desiredTop}px`;
 }
 
+function _crShouldPreserveSelectionMouseDown(event) {
+  const target = _crNodeElement(event?.target);
+  if (target?.closest?.('input, textarea, select, option, label, [contenteditable="true"]')) {
+    return false;
+  }
+  return true;
+}
+
 function _crShowToolbar(rect, fallbackX, fallbackY) {
   _crHideToolbar(true);
   _crCaptureOpen = false;
@@ -12470,7 +12478,9 @@ function _crShowToolbar(rect, fallbackX, fallbackY) {
       <button class="cr-sel-btn" onclick="_crReadResolvedSelection()" title="Read aloud">▶ Read</button>
     </div>`;
   document.body.appendChild(tb);
-  tb.addEventListener?.('mousedown', e => e.preventDefault?.());
+  tb.addEventListener?.('mousedown', e => {
+    if (_crShouldPreserveSelectionMouseDown(e)) e.preventDefault?.();
+  });
   _crSelToolbar = tb;
   _crPlaceToolbar(tb, rect, fallbackX, fallbackY);
 }
