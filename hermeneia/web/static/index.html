@@ -2607,10 +2607,70 @@ body.has-workflow-rail { padding-bottom: 40px; }
 .a11y-tip-stop:hover { background: var(--bg2); }
 
 /* Focus mode */
+body.a11y-focus-mode {
+  --reader-focus-muted-opacity: 0.26;
+}
 body.a11y-focus-mode .e10-screen:not(.active),
 body.a11y-focus-mode .section.xo { opacity: 0.12; pointer-events: none; transition: opacity .2s; }
-body.a11y-focus-mode .nav { opacity: 0.35; transition: opacity .2s; }
-body.a11y-focus-mode #a11y-dock { opacity: 1 !important; pointer-events: auto !important; }
+body.a11y-focus-mode .nav,
+body.a11y-focus-mode .page-head,
+body.a11y-focus-mode #reader .cr-doc-picker,
+body.a11y-focus-mode #reader .cr-question-compass,
+body.a11y-focus-mode #reader .cr-tool-rail,
+body.a11y-focus-mode #reader .cr-page-brief[data-open="0"],
+body.a11y-focus-mode #reader .cr-side,
+body.a11y-focus-mode .workflow-rail {
+  opacity: var(--reader-focus-muted-opacity);
+  transition: opacity .18s ease;
+}
+body.a11y-focus-mode .nav:hover,
+body.a11y-focus-mode .nav:focus-within,
+body.a11y-focus-mode .page-head:hover,
+body.a11y-focus-mode .page-head:focus-within,
+body.a11y-focus-mode #reader .cr-doc-picker:hover,
+body.a11y-focus-mode #reader .cr-doc-picker:focus-within,
+body.a11y-focus-mode #reader .cr-question-compass:hover,
+body.a11y-focus-mode #reader .cr-question-compass:focus-within,
+body.a11y-focus-mode #reader .cr-tool-rail:hover,
+body.a11y-focus-mode #reader .cr-tool-rail:focus-within,
+body.a11y-focus-mode #reader .cr-page-brief:hover,
+body.a11y-focus-mode #reader .cr-page-brief:focus-within,
+body.a11y-focus-mode #reader .cr-side:hover,
+body.a11y-focus-mode #reader .cr-side:focus-within,
+body.a11y-focus-mode .workflow-rail:hover,
+body.a11y-focus-mode .workflow-rail:focus-within {
+  opacity: 1;
+}
+body.a11y-focus-mode #reader .cr-page-brief[data-open="1"],
+body.a11y-focus-mode .cr-bottom-workstation,
+body.a11y-focus-mode #a11y-dock .dock-panel,
+body.a11y-focus-mode #a11y-selection-tip,
+body.a11y-focus-mode .cr-sel-toolbar {
+  opacity: 1;
+}
+body.a11y-focus-mode #a11y-dock { pointer-events: auto !important; }
+body.a11y-focus-mode #a11y-dock .dock-rail-btn:not(.active):not([data-panel="tools"]) {
+  opacity: var(--reader-focus-muted-opacity);
+}
+body.a11y-focus-mode #a11y-dock .dock-rail-btn[data-panel="tools"],
+body.a11y-focus-mode #a11y-dock .dock-rail-btn.active,
+body.a11y-focus-mode #a11y-dock .dock-rail-btn:hover,
+body.a11y-focus-mode #a11y-dock .dock-rail-btn:focus-visible {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  body.a11y-focus-mode .nav,
+  body.a11y-focus-mode .page-head,
+  body.a11y-focus-mode #reader .cr-doc-picker,
+  body.a11y-focus-mode #reader .cr-question-compass,
+  body.a11y-focus-mode #reader .cr-tool-rail,
+  body.a11y-focus-mode #reader .cr-page-brief[data-open="0"],
+  body.a11y-focus-mode #reader .cr-side,
+  body.a11y-focus-mode .workflow-rail,
+  body.a11y-focus-mode #a11y-dock .dock-rail-btn {
+    transition: none;
+  }
+}
 @media (max-width: 980px) {
   #a11y-dock {
     top: auto;

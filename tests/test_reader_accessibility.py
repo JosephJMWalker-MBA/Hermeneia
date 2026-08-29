@@ -1037,6 +1037,102 @@ def test_large_text_state_still_controls_body_class_and_labels():
     assert 'id="a11y-text-state">Normal</span>' in html
 
 
+def test_focus_mode_state_still_controls_body_class_and_labels():
+    html = INDEX.read_text()
+    sync = _extract_fn(html, "_a11ySync")
+
+    assert "document.body.classList.toggle('a11y-focus-mode', _a11y.focus)" in sync
+    assert "focusState.textContent = _a11y.focus ? 'On' : 'Off'" in sync
+    assert "a11yToggle('focus')" in html
+    assert 'id="a11y-focus-state">Off</span>' in html
+
+
+def test_focus_mode_does_not_mute_reader_source_surfaces():
+    html = INDEX.read_text()
+    focus_rules = "\n".join(re.findall(r"body\.a11y-focus-mode[^{]+\{[^}]+\}", html, re.S))
+
+    assert "body.a11y-focus-mode #reader {" not in focus_rules
+    assert "body.a11y-focus-mode .cr-page-view" not in focus_rules
+    assert "body.a11y-focus-mode .cr-page-text" not in focus_rules
+    assert "body.a11y-focus-mode .cr-text-block" not in focus_rules
+
+
+def test_focus_mode_mutes_persistent_reader_chrome_without_locking_it():
+    html = INDEX.read_text()
+
+    assert "--reader-focus-muted-opacity: 0.26;" in html
+    assert "body.a11y-focus-mode #reader .cr-doc-picker" in html
+    assert "body.a11y-focus-mode #reader .cr-question-compass" in html
+    assert "body.a11y-focus-mode #reader .cr-tool-rail" in html
+    assert 'body.a11y-focus-mode #reader .cr-page-brief[data-open="0"]' in html
+    assert "body.a11y-focus-mode #reader .cr-side" in html
+    assert "body.a11y-focus-mode .workflow-rail" in html
+    assert "body.a11y-focus-mode .nav" in html
+    assert "pointer-events: none" not in _css_block(html, "body.a11y-focus-mode .nav,\nbody.a11y-focus-mode .page-head,\nbody.a11y-focus-mode #reader .cr-doc-picker,\nbody.a11y-focus-mode #reader .cr-question-compass,\nbody.a11y-focus-mode #reader .cr-tool-rail,\nbody.a11y-focus-mode #reader .cr-page-brief[data-open=\"0\"],\nbody.a11y-focus-mode #reader .cr-side,\nbody.a11y-focus-mode .workflow-rail")
+
+
+def test_focus_mode_restores_reader_chrome_on_hover_and_focus():
+    html = INDEX.read_text()
+
+    for selector in [
+        "body.a11y-focus-mode #reader .cr-doc-picker:hover",
+        "body.a11y-focus-mode #reader .cr-doc-picker:focus-within",
+        "body.a11y-focus-mode #reader .cr-question-compass:hover",
+        "body.a11y-focus-mode #reader .cr-question-compass:focus-within",
+        "body.a11y-focus-mode #reader .cr-tool-rail:hover",
+        "body.a11y-focus-mode #reader .cr-tool-rail:focus-within",
+        "body.a11y-focus-mode #reader .cr-page-brief:hover",
+        "body.a11y-focus-mode #reader .cr-page-brief:focus-within",
+        "body.a11y-focus-mode #reader .cr-side:hover",
+        "body.a11y-focus-mode #reader .cr-side:focus-within",
+        "body.a11y-focus-mode .workflow-rail:hover",
+        "body.a11y-focus-mode .workflow-rail:focus-within",
+    ]:
+        assert selector in html
+
+
+def test_focus_mode_keeps_foreground_reader_surfaces_full_contrast():
+    html = INDEX.read_text()
+
+    assert 'body.a11y-focus-mode #reader .cr-page-brief[data-open="1"]' in html
+    assert "body.a11y-focus-mode .cr-bottom-workstation" in html
+    assert "body.a11y-focus-mode #a11y-dock .dock-panel" in html
+    assert "body.a11y-focus-mode #a11y-selection-tip" in html
+    assert "body.a11y-focus-mode .cr-sel-toolbar" in html
+
+    muted_rule = _css_block(html, "body.a11y-focus-mode .nav,\nbody.a11y-focus-mode .page-head,\nbody.a11y-focus-mode #reader .cr-doc-picker,\nbody.a11y-focus-mode #reader .cr-question-compass,\nbody.a11y-focus-mode #reader .cr-tool-rail,\nbody.a11y-focus-mode #reader .cr-page-brief[data-open=\"0\"],\nbody.a11y-focus-mode #reader .cr-side,\nbody.a11y-focus-mode .workflow-rail")
+    assert ".cr-bottom-workstation" not in muted_rule
+    assert ".cr-sel-toolbar" not in muted_rule
+    assert ".dock-panel" not in muted_rule
+    assert 'data-open="1"' not in muted_rule
+
+
+def test_focus_mode_keeps_reading_tools_and_active_dock_discoverable():
+    html = INDEX.read_text()
+
+    assert 'body.a11y-focus-mode #a11y-dock .dock-rail-btn:not(.active):not([data-panel="tools"])' in html
+    assert 'body.a11y-focus-mode #a11y-dock .dock-rail-btn[data-panel="tools"]' in html
+    assert "body.a11y-focus-mode #a11y-dock .dock-rail-btn.active" in html
+    assert "body.a11y-focus-mode #a11y-dock .dock-rail-btn:focus-visible" in html
+
+
+def test_focus_mode_respects_reduced_motion():
+    html = INDEX.read_text()
+
+    assert "@media (prefers-reduced-motion: reduce)" in html
+    assert "body.a11y-focus-mode #reader .cr-question-compass" in html
+    assert "body.a11y-focus-mode #reader .cr-tool-rail" in html
+    assert "body.a11y-focus-mode #reader .cr-side" in html
+    assert "body.a11y-focus-mode #a11y-dock .dock-rail-btn" in html
+    assert re.search(
+        r"@media \(prefers-reduced-motion: reduce\) \{.*?"
+        r"body\.a11y-focus-mode #reader \.cr-question-compass.*?"
+        r"transition: none;",
+        html,
+        re.S,
+    )
+
+
 def test_reader_source_prose_uses_shared_typography_tokens():
     html = INDEX.read_text()
 
