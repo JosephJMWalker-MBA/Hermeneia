@@ -12942,7 +12942,7 @@ function _crHighlightSelected(focus) {
 
   const thesis = invLoad()?.thesis || '';
   const layout = _crCaptureLayout(mode);
-  const preview = `${x(text.slice(0, 260))}${text.length > 260 ? '…' : ''}`;
+  const preview = x(text);
   const secondaryCandidate = mode.id === 'candidate'
     ? ''
     : `<button class="cr-capture-secondary-btn" type="button" onclick="_crSaveHighlight(true)">Also save as observation candidate</button>`;

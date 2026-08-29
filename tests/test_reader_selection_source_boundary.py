@@ -873,6 +873,60 @@ process.stdout.write(JSON.stringify({
     }
 
 
+def test_concept_capture_evidence_anchor_renders_complete_long_selection() -> None:
+    result = _run_node(
+        r"""
+(async () => {
+  const longText = [
+    'Opening canonical source sentence with punctuation.',
+    'Middle source material that deliberately pushes the rendered evidence block beyond the older truncation boundary.',
+    'Additional source-only prose repeated for length, with Unicode “quoted” words and an em dash — still source.',
+    'More canonical selection content that must remain inspectable in the read-only evidence anchor.',
+    'Final source line with sentinel END_OF_CANONICAL_SELECTION',
+  ].join(' ');
+  _crReaderSelectionState = {
+    valid: true,
+    text: longText,
+    source_locators: ['p1:block0', 'p1:block1', 'p1:block2'],
+    blocks: [{ block_index: 0 }, { block_index: 1 }, { block_index: 2 }],
+    page: 1,
+  };
+  _crSelText = longText;
+  _crHighlightSelected('concept');
+  const html = _crSelToolbar.innerHTML;
+  const blockquote = html.match(/<blockquote class="cr-selection-preview">([\s\S]*?)<\/blockquote>/);
+  const evidenceMarkup = blockquote ? blockquote[0] : '';
+  elements['cr-concept-input'].value = 'Reader attention';
+  elements['cr-note-input'].value = 'Working definition stays separate.';
+  await _crSaveHighlight(false);
+  process.stdout.write(JSON.stringify({
+    selectedLabel: html.includes('Selected passage'),
+    openingPresent: evidenceMarkup.includes('Opening canonical source sentence'),
+    sentinelPresent: evidenceMarkup.includes('END_OF_CANONICAL_SELECTION'),
+    evidenceTag: evidenceMarkup.startsWith('<blockquote'),
+    sourceNotEditable: !/<(?:input|textarea)[^>]*class="cr-selection-preview"/.test(evidenceMarkup) && !/contenteditable/.test(evidenceMarkup),
+    conceptValue: elements['cr-concept-input'].value,
+    evidenceAfterConceptEdit: evidenceMarkup.includes('END_OF_CANONICAL_SELECTION'),
+    savedFullText: savedPayload.selected_text === longText,
+    savedSentinel: savedPayload.selected_text.includes('END_OF_CANONICAL_SELECTION'),
+  }));
+})();
+"""
+    )
+
+    assert result == {
+        "selectedLabel": True,
+        "openingPresent": True,
+        "sentinelPresent": True,
+        "evidenceTag": True,
+        "sourceNotEditable": True,
+        "conceptValue": "Reader attention",
+        "evidenceAfterConceptEdit": True,
+        "savedFullText": True,
+        "savedSentinel": True,
+    }
+
+
 def test_capture_toolbar_uses_scrollable_shell_with_fixed_actions() -> None:
     html = INDEX.read_text()
 
