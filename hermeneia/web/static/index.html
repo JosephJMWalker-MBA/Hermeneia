@@ -2181,6 +2181,9 @@ body.has-workflow-rail { padding-bottom: 40px; }
 .guide-stage-detail {
   font-size: 13px; color: var(--fg2); line-height: 1.65; margin-bottom: 10px;
 }
+.guide-stage-action {
+  font-size: 11px; color: var(--accent); margin: -2px 0 10px;
+}
 .guide-stage-artifacts {
   display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px;
 }
@@ -4856,7 +4859,7 @@ function mount(h) {
     <p>The <strong>semantic fidelity score</strong> measures what percentage of required concepts survived into the final prose. A score below 100% means some evidence was lost in translation. The Critic identifies exactly what was dropped, what was unsupported, and what warnings apply.</p>
     <p><strong>How to use it:</strong> After running the Artist, return here to run the Critic. Select a report, click Run Critic from the Review tab, then come back here to review the findings.</p>
     <div style="margin-top:16px;display:flex;gap:10px">
-      <button onclick="e10Go('reports')" style="padding:8px 16px;background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);cursor:pointer">← Read</button>
+      <button onclick="e10Go('reports')" style="padding:8px 16px;background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);cursor:pointer">← Render</button>
       <button onclick="e10Go('lineage')" style="padding:8px 16px;background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);cursor:pointer">Lineage →</button>
     </div>
   </div>
@@ -15136,101 +15139,153 @@ function e10LoadGuide() {
 
   const stages = [
     {
-      num: '01', label: 'Observe',
-      tagline: 'Extract immutable evidence from source documents.',
-      detail: 'The compiler parses every sentence of a PDF into Observations — atomic, immutable records that never change after creation. Each Observation carries its exact source location: page, paragraph, sentence. This layer makes no claims about meaning. It only records what is there.',
-      artifacts: ['SourceDocument', 'SourceExtraction', 'Observation'],
-      invariant: 'Evidence is permanent. Nothing is deleted or overwritten.',
-      nav: 'corpus',
+      num: '01', label: 'Question',
+      tagline: 'Name the inquiry before asking tools to help.',
+      detail: 'Hermeneia begins with a governing question and a reader. The Question Compass gives the work direction without deciding the answer. The corpus may support the question, complicate it, challenge it, or force you to revise it.',
+      artifacts: ['Governing question', 'Question Compass'],
+      invariant: 'A question guides inquiry. It is not a conclusion to prove.',
+      nav: 'setup',
+      action: 'Sharpen the question',
       why: {
-        rationale: 'Interpretation needs stable evidence. If the record of what a text actually says can be changed later, any conclusion built on it becomes unverifiable. By preserving observations separately from conclusions, you can revise your understanding as many times as you like without losing the original ground truth.',
-        boundary: 'Observations cannot be edited or deleted after creation. The system never asks AI to decide what a passage means at this stage — only to record what is there.',
-        avoids: 'Prevents interpretations from drifting away from the source text over time.',
-        tech: 'Each observation is assigned a hash ID derived from its content and source coordinates. Storage enforces immutability — there is no update or delete path in the application layer.',
+        rationale: 'A declared question keeps the investigation accountable. It tells you what you are trying to understand while leaving the text free to resist your first assumptions.',
+        boundary: 'Hermeneia does not treat the thesis as already true. The question can be refined as reading changes what the evidence requires.',
+        avoids: 'Prevents the system from turning the first prompt into the final answer.',
+        tech: 'The current question is rendered as orientation in the Reader and supporting screens; it is product guidance for attention, not a schema change in this Guide.',
       },
     },
     {
-      num: '02', label: 'Interpret',
-      tagline: 'Assign meaning to observations under human stewardship.',
-      detail: 'AI providers propose interpretations of selected observations. Proposals enter a staging area — they are not canonical until a steward explicitly accepts them. Every acceptance records who decided, when, and why. No machine-generated claim enters the permanent record without a human decision.',
-      artifacts: ['ProposedInterpretation', 'Interpretation', 'Perspective'],
-      invariant: 'Meaning requires stewardship. AI proposes; humans canonize.',
-      nav: 'lab',
-      why: {
-        rationale: 'Patterns often appear before conclusions do. The Lab helps you notice recurring details across observations without forcing a thesis too early. AI proposals are fast to generate and easy to discard — the cost of exploring an interpretation before committing to it is low.',
-        boundary: 'AI cannot promote its own proposals. Interpretations only become canonical when a human steward explicitly accepts them. Every acceptance is recorded with who decided and when.',
-        avoids: 'Prevents AI-generated claims from entering the record unchallenged.',
-        tech: 'Proposed and accepted interpretations are stored in separate states in the database. The stewardship action is a required step, not an optional one.',
-      },
-    },
-    {
-      num: '03', label: 'Organize',
-      tagline: 'Synthesize accepted interpretations into a coherent argument.',
-      detail: 'Stewards select accepted interpretations and arrange them into a Narrative Blueprint — a structured argument with a thesis and supporting claims. Each claim links back to the observations and interpretations that support it. The Blueprint is the intellectual architecture of the final report.',
-      artifacts: ['NarrativeBlueprint', 'BlueprintInterpretationLink'],
-      invariant: 'Structure is explicit. Every claim has a traceable source.',
-      nav: 'architect',
-      why: {
-        rationale: 'Early interpretations should be compared, not immediately accepted as final. The Blueprint stage is where you decide which interpretations are strong enough to build an argument from — and which ones conflict, overlap, or remain unresolved. Multiple possibilities can coexist until the evidence strengthens or weakens them.',
-        boundary: 'Every claim in the Blueprint must link to a specific accepted interpretation. You cannot include a claim that has no interpretive support.',
-        avoids: 'Prevents conclusions from appearing in the final report without traceable support.',
-        tech: 'Links between blueprint sections and interpretations are stored as explicit database records, not as prose references that could drift.',
-      },
-    },
-    {
-      num: '04', label: 'Plan',
-      tagline: 'Produce a deterministic semantic contract for the report.',
-      detail: 'The Architect compiles the Blueprint into an ArchitectPlan — a precise specification of required terms, required concepts, forbidden claims, and paragraph structure. This plan is provider-neutral: any AI can be asked to fulfil it. The plan is what binds the report to its evidence.',
-      artifacts: ['ArchitectPlan'],
-      invariant: 'The contract is deterministic. The same Blueprint always produces the same plan.',
-      nav: 'architect',
-      why: {
-        rationale: 'Meaning needs a contract before expression begins. Without a fixed specification, the Artist is free to invent a thesis from style rather than derive one from evidence. The Plan defines exactly what must remain true in the final report — required terms, forbidden claims, required structure — before any writing happens.',
-        boundary: 'The Artist cannot change the Plan. It can only fulfil it. The same Plan can be sent to different AI providers and the output evaluated against identical criteria.',
-        avoids: 'Prevents the writing stage from drifting away from the evidence base.',
-        tech: 'The Plan is derived deterministically from the Blueprint — the same Blueprint always produces the same Plan, making it independently reproducible.',
-      },
-    },
-    {
-      num: '05', label: 'Read',
-      tagline: 'Render the plan into natural language via any provider.',
-      detail: 'The Artist sends the ArchitectPlan to a configured AI provider and receives a rendered narrative. Multiple providers and expression profiles can fulfil the same plan — producing a Literary edition, an Executive summary, or a Children\'s version, all from the same evidence.',
-      artifacts: ['RenderedNarrative', 'ExpressionProfile'],
-      invariant: 'Reports are disposable. The plan and evidence that produced them are not.',
+      num: '02', label: 'Read',
+      tagline: 'Open the source and spend most of the work in the Reader.',
+      detail: 'The Reader is the primary workspace. Read the corpus directly, with Focus Scroll, Large Text, Focus mode, Read Page, selected-passage speech, Companion, and nearby tools available when they help. The book stays at the center.',
+      artifacts: ['SourceDocument', 'SourceExtraction', 'Reader projection'],
+      invariant: 'The source remains the ground. Tools unfold around it.',
       nav: 'reader',
+      action: 'Open Reader',
       why: {
-        rationale: 'Audience adaptation should change presentation, not meaning. The Artist changes how the report is written — its tone, vocabulary, structure — but the required terms and forbidden claims remain fixed by the Plan. The same body of evidence can reach executives, children, or academics without the meaning shifting between them.',
-        boundary: 'Expression Profiles tell the AI how to write, not what to say. The Architect Plan defines what must be said. The Artist cannot override the Plan.',
-        avoids: 'Prevents audience-specific rendering from introducing or removing meaning.',
-        tech: 'The Artist prompt is constructed from the Plan + Profile at render time. The Plan is never modified by the Artist — only consumed.',
+        rationale: 'The visible experience starts with close reading, not with operating a machine pipeline. Hermeneia makes the act of reading produce an inspectable trail without pulling you away from the text.',
+        boundary: 'Reader projection is not canonical mutation. It presents source text and provenance for investigation while preserving the underlying extraction record.',
+        avoids: 'Prevents report generation from becoming the first or main user journey.',
+        tech: 'Reader pages are generated from source extractions with provenance preserved; accessibility tools read structurally resolved Reader text rather than interface chrome.',
       },
     },
     {
-      num: '06', label: 'Audit',
-      tagline: 'Measure how faithfully the report preserved the evidence.',
-      detail: 'The Critic runs deterministic checks against the rendered narrative: required terms, forbidden claims, paragraph structure, and expression contract compliance. Each check produces a transparent result. A semantic fidelity score measures how much of the required meaning survived into the prose.',
+      num: '03', label: 'Mark',
+      tagline: 'When something matters, preserve your attention.',
+      detail: 'Select a passage, highlight it, add a note, attach a question, mark a concept, or create an observation candidate. These are investigative acts over passages; they do not create a new canonical object called Segment.',
+      artifacts: ['Reader highlight', 'Field Note', 'Question', 'Concept', 'Observation candidate'],
+      invariant: 'Human attention is evidence of the inquiry, not decoration.',
+      nav: 'reader',
+      action: 'Mark in Reader',
+      why: {
+        rationale: 'Close reading advances when a phrase, paragraph, image, tension, or repeated term becomes worth preserving. Marking lets you keep that moment attached to the source location where it arose.',
+        boundary: 'Saving a highlight or draft note does not rewrite the source. Observation candidates remain candidates until governed paths make them part of the record.',
+        avoids: 'Prevents insights from becoming loose notes detached from the text that caused them.',
+        tech: 'Reader highlights carry durable IDs and source locators. Multi-block spans render from deterministic Reader provenance instead of fuzzy text matching.',
+      },
+    },
+    {
+      num: '04', label: 'Ask',
+      tagline: 'Let questions accumulate beside the passage.',
+      detail: 'A passage can raise a question before it supports a claim. Use passage questions, Field Notes, and Companion when you need to ask what this moment reveals, what would challenge it, or where else the corpus might connect.',
+      artifacts: ['Passage question', 'Field Note', 'Companion thread'],
+      invariant: 'Questions remain part of the investigation trail.',
+      nav: 'reader',
+      action: 'Return to Reader',
+      why: {
+        rationale: 'A good investigation often deepens by asking better questions, not by rushing into conclusions. Hermeneia keeps those questions near the passages that generated them.',
+        boundary: 'Companion and local model responses are aids. They do not become canonical merely because they were generated.',
+        avoids: 'Prevents the interface from treating uncertainty as a failure state.',
+        tech: 'Reader tools and the docked Companion are transient or authored support surfaces around the Reader; canonical promotion remains explicit.',
+      },
+    },
+    {
+      num: '05', label: 'Compare',
+      tagline: 'Use machine observations and Perspectives as comparison material.',
+      detail: 'Machine observations can point to passages worth considering, but they are not automatic meaning. Perspectives and Ask the Room can propose readings from explicit frames over the selected scope. Treat those outputs as candidates for comparison, not authority.',
+      artifacts: ['Machine Observation', 'Perspective run', 'Ask the Room receipt'],
+      invariant: 'AI proposes. Human authority governs what survives.',
+      nav: 'lab',
+      action: 'Open Lab',
+      why: {
+        rationale: 'Machine output is useful when it helps you notice a pattern, test an alternate frame, or hear a skeptical reading. It is strongest as a partner in comparison, not as a replacement for close reading.',
+        boundary: 'Provider output remains proposed or transient until the human steward accepts, revises, contests, or ignores it through governed surfaces.',
+        avoids: 'Prevents model-generated prose from silently entering the investigation record as meaning.',
+        tech: 'Current Perspective and Room execution records preserve explicit model/configuration identity and canonical_status; Reader page briefs expose machine observations as comparison material.',
+      },
+    },
+    {
+      num: '06', label: 'Steward',
+      tagline: 'Decide what belongs in the governed record.',
+      detail: 'Steward Review is where proposed interpretations are accepted, contested, marked uncertain, or left behind. This is the human authority boundary: the machine can produce candidates, but the record changes only through explicit stewardship.',
+      artifacts: ['ProposedInterpretation', 'Interpretation', 'Steward note'],
+      invariant: 'Nothing becomes canonical without a human decision.',
+      nav: 'review',
+      action: 'Review proposals',
+      why: {
+        rationale: 'Not every plausible reading deserves authority. Stewardship records the judgment that separates a useful prompt from an accepted interpretation.',
+        boundary: 'Canonical interpretation is not inferred from generation, confidence, or provider identity. It requires an explicit steward action.',
+        avoids: 'Prevents attractive but unsupported AI output from becoming part of the permanent record.',
+        tech: 'Proposed and accepted interpretations are represented separately, with status and provenance preserved for audit.',
+      },
+    },
+    {
+      num: '07', label: 'Build',
+      tagline: 'Organize what survived reading and stewardship.',
+      detail: 'Blueprint work happens after evidence, questions, and interpretations have been sufficiently stewarded. A Narrative Blueprint organizes the accountable structure; the Architect Plan turns that structure into a semantic contract for later expression.',
+      artifacts: ['NarrativeBlueprint', 'ArchitectPlan'],
+      invariant: 'Structure is explicit. Claims must keep their support.',
+      nav: 'architect',
+      action: 'Open Architect',
+      why: {
+        rationale: 'A governed structure should be built from what the investigation has made accountable, not from raw upload or first-pass extraction alone.',
+        boundary: 'Blueprint and Architect surfaces organize accepted material and declared obligations; they do not license unsupported claims.',
+        avoids: 'Prevents upload-to-report automation from bypassing reading and stewardship.',
+        tech: 'Blueprints and plans retain links to the interpretive and evidentiary objects they organize, making later rendering and audit possible.',
+      },
+    },
+    {
+      num: '08', label: 'Render',
+      tagline: 'Express governed structure without changing its authority.',
+      detail: 'Rendering produces a report, draft, or other expression from governed structure and a declared expression profile. Presentation can change for an audience; the evidence authority and semantic obligations do not.',
+      artifacts: ['RenderedNarrative', 'ExpressionProfile', 'RatificationRecord'],
+      invariant: 'Expression is disposable. Evidence authority is not.',
+      nav: 'reports',
+      action: 'Open Render',
+      why: {
+        rationale: 'The Artist can change tone, register, and format, but it should not change what the governed structure requires. Render is expression after understanding, not the replacement for understanding.',
+        boundary: 'Expression profiles tell the renderer how to write, not what evidence may be ignored. Ratification preserves the exact previewed bytes when a human chooses to record them.',
+        avoids: 'Prevents a polished report from becoming a substitute for traceable interpretation.',
+        tech: 'Rendered narratives are derived from plans and profiles; the saved record preserves provenance and can be audited without mutating the source.',
+      },
+    },
+    {
+      num: '09', label: 'Audit',
+      tagline: 'Check whether expression preserved the governed structure.',
+      detail: 'The Critic checks rendered work against the obligations it was supposed to preserve, including required terms, forbidden claims, profile expectations, and missing uncertainty or tensions where the current checks expose them.',
       artifacts: ['ValidationReport', 'Finding'],
-      invariant: 'Evaluation is bounded and auditable. No black-box scores.',
+      invariant: 'Evaluation is bounded and inspectable.',
       nav: 'critic',
+      action: 'Open Critic',
       why: {
-        rationale: 'Generated writing must be tested against its source commitments. The Critic does not grade beauty or writing quality — it checks whether the output stayed faithful to the evidence and the Plan. A report that reads well but dropped required terms is not a faithful report.',
-        boundary: 'The Critic never asks an AI to evaluate an AI\'s output. All checks are deterministic — the same check on the same text always produces the same result. Every finding includes the evidence behind it.',
-        avoids: 'Prevents high-quality prose from masking low semantic fidelity.',
-        tech: 'Semantic fidelity uses string-level checks (term presence, forbidden claim detection). Profile fidelity uses regex and word lists. No language model is involved in evaluation.',
+        rationale: 'Generated writing can sound coherent while dropping evidence, flattening tension, or adding unsupported claims. Audit makes those failures visible.',
+        boundary: 'The Critic is an evaluation surface, not a second authorial authority. Its findings expose checks for human review.',
+        avoids: 'Prevents fluent output from masking low fidelity to the governed record.',
+        tech: 'Critic checks are structured and traceable to the rendered narrative, plan, and profile expectations they evaluate.',
       },
     },
     {
-      num: '07', label: 'Trace',
-      tagline: 'Inspect the full provenance chain from report back to source.',
-      detail: 'Every object in Hermeneia carries a permanent lineage record. From any rendered narrative you can follow the chain backwards: Report → Plan → Blueprint → Interpretation → Observation → Source. The Lineage Explorer makes this chain navigable and visual.',
+      num: '10', label: 'Trace',
+      tagline: 'Walk backward from output or claim toward source evidence.',
+      detail: 'Lineage lets you inspect how a rendered narrative or governed claim connects back through plans, blueprints, interpretations, observations, and source text. It answers: how did this get here?',
       artifacts: ['LineageGraph', 'ProvenanceRecord'],
-      invariant: 'Every conclusion can be traced to its source. The chain is permanent.',
+      invariant: 'Claims require ancestry. The chain must remain visible.',
       nav: 'lineage',
+      action: 'Inspect Lineage',
       why: {
-        rationale: 'Every output keeps a trail back to the observations, plans, profiles, and validations that produced it. This means a conclusion is not just a statement — it is a claim with an inspectable history. You can ask where any part of a report came from and follow the chain all the way back to the source text.',
-        boundary: 'Lineage is structural, not documentary. The chain is enforced by database relationships, not by notes or summaries that could be added after the fact.',
-        avoids: 'Prevents conclusions from accumulating without the ability to audit their origin.',
-        tech: 'Each object ID is a hash derived from content and parent IDs. If any ancestor changes, the chain breaks visibly — making silent drift impossible.',
+        rationale: 'Traceability keeps interpretation accountable after the report exists. You can move from expression back toward the evidence and decisions that made it possible.',
+        boundary: 'Lineage describes preserved relationships that exist in the record; it is not a retroactive explanation pasted onto prose.',
+        avoids: 'Prevents conclusions from accumulating without a path back to the corpus.',
+        tech: 'Lineage surfaces database relationships among rendered narratives, plans, blueprints, interpretations, observations, and source documents.',
       },
     },
   ];
@@ -15242,9 +15297,15 @@ function e10LoadGuide() {
       <div style="margin-bottom:40px">
         <div style="font-size:20px;font-weight:700;color:var(--fg);margin-bottom:8px">How Hermeneia Works</div>
         <div style="font-size:14px;color:var(--fg2);line-height:1.65;max-width:620px">
-          Hermeneia is not a document summariser. It is a constitutional substrate for durable understanding —
-          a pipeline that preserves the chain between source evidence and final report so every conclusion
-          can be traced, every transformation audited, and every AI-generated narrative measured for fidelity.
+          Hermeneia begins with a question and a reader, not with a report.
+          You bring a corpus, read the source directly, mark what matters, ask better questions,
+          compare your reading with machine observations and Perspectives, decide what survives,
+          then build, render, audit, and trace the understanding you have made accountable.
+        </div>
+        <div style="font-size:12px;color:var(--dim2);line-height:1.6;max-width:620px;margin-top:10px">
+          The constitutional machinery still matters. It sits underneath the visible work:
+          source evidence is preserved, provenance is required, human authority is explicit,
+          and generated expression stays answerable to the record.
         </div>
         <div style="margin-top:10px">
           <button class="btn-trace" onclick="e10Go('constitution')" style="font-size:12px">Read the Constitution →</button>
@@ -15252,69 +15313,66 @@ function e10LoadGuide() {
       </div>
 
       <div style="margin-bottom:40px;padding:24px 28px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2)">
-        <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim2);margin-bottom:14px">What category is this?</div>
+        <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim2);margin-bottom:14px">What the user experiences</div>
         <div style="font-size:17px;font-weight:700;color:var(--fg);margin-bottom:6px">
-          Hermeneia is a constitutional architecture for accountable interpretation.
+          A reading-first investigation workbench.
         </div>
         <div style="font-size:13px;color:var(--fg2);line-height:1.7;max-width:600px;margin-bottom:14px">
-          Hermeneia is not the invention of interpretation. It is a formalization of an ancient
-          human practice: the disciplined work of drawing meaning out of words, events, symbols,
-          testimony, and evidence. The name comes from <em>hermeneia</em> — interpretation,
-          explanation, the act of making meaning understandable. Hermeneia honors that older
-          tradition by giving it a modern constitutional architecture: observations are preserved,
-          interpretations are tested, human judgment remains essential, and every conclusion can
-          be traced back to its source.
+          Start by choosing or creating a workspace, bringing in a source, and setting or refining
+          the governing question. Then open the Reader and read. Use highlights, notes, questions,
+          concepts, observation candidates, Companion, Focus Scroll, Large Text, Read Page, and
+          selected-passage speech when the text gives you a reason to use them.
         </div>
         <div style="font-size:13px;color:var(--fg2);line-height:1.7;max-width:600px;margin-bottom:20px">
-          Hermeneia is not a language model — it is an architecture for governing how language,
-          evidence, models, and human judgment participate together.
-          Language models are <em>participants inside</em> Hermeneia, not the system itself.
-          It does not replace the reader, scholar, teacher, theologian, lawyer, researcher, or
-          student — it gives their interpretive work structure, memory, accountability, and lineage.
-          <strong>People have always interpreted. Hermeneia makes the process visible.</strong>
+          The machine can surface observations, propose readings, or answer through an explicit
+          Perspective, but those outputs are comparison material. They become part of governed
+          understanding only when a human steward accepts, revises, contests, or records them.
+          <strong>The Reader remains the center of gravity.</strong>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;max-width:560px">
           <div style="padding:14px 16px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg2)">
-            <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim2);margin-bottom:8px">LLM</div>
-            <div style="font-family:var(--mono);font-size:12px;color:var(--dim2);line-height:1.8">Text<br>↓<br>Text</div>
+            <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim2);margin-bottom:8px">Visible workflow</div>
+            <div style="font-family:var(--mono);font-size:12px;color:var(--dim2);line-height:1.8">Question<br>↓<br>Read<br>↓<br>Mark<br>↓<br>Steward</div>
           </div>
           <div style="padding:14px 16px;border:1px solid var(--accent);border-radius:var(--r);background:var(--accent2)">
-            <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px">Constitutional Architecture</div>
-            <div style="font-family:var(--mono);font-size:12px;color:var(--fg2);line-height:1.8">Corpus<br>↓<br>Interpretation<br>↓<br>Lineage</div>
+            <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px">Underneath</div>
+            <div style="font-family:var(--mono);font-size:12px;color:var(--fg2);line-height:1.8">Immutable evidence<br>↓<br>Human authority<br>↓<br>Audit<br>↓<br>Lineage</div>
           </div>
         </div>
 
         <div style="font-size:13px;color:var(--fg2);line-height:1.7;max-width:600px;margin-bottom:16px">
-          A 33rd-edition textbook is not valuable because it is longer —
-          it is valuable because the interpretations inside it have been
-          challenged, corrected, and refined across many generations of scrutiny.
-          Hermeneia makes that process explicit, accountable, and reproducible.
+          Hermeneia is not a language model and not a shortcut around reading. It is an
+          architecture for governing how sources, human judgment, machine proposals, expression,
+          audit, and lineage participate in one accountable investigation.
         </div>
 
         <div style="font-size:13px;color:var(--fg2);line-height:1.7;max-width:600px;margin-bottom:6px">
-          Interpretations have attributes that text alone does not:
+          Hermeneia preserves what text alone does not:
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px">
-          ${['Evidence','Critique','Revision','Ratification','Competing Readings','Lineage','Editions'].map(a =>
+          ${['Source evidence','Questions','Highlights','Field notes','Competing readings','Stewardship','Lineage','Audits'].map(a =>
             `<span style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--border);color:var(--fg2);background:var(--bg2)">${a}</span>`
           ).join('')}
         </div>
 
         <div style="padding:14px 16px;border-left:3px solid var(--accent);background:var(--bg2);border-radius:0 var(--r) var(--r) 0;font-size:13px;color:var(--fg2);line-height:1.65;max-width:580px">
-          Hermeneia treats interpretations as first-class objects and tracks their maturation
-          through evidence, critique, revision, and ratification — recording what each interpretation
-          withstood to get there.
+          The working rhythm is simple: read with a question, preserve what matters,
+          compare possible readings, decide what survives, then build and render only from
+          governed understanding.
         </div>
 
         <div style="margin-top:16px;padding:12px 16px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg2);font-size:12px;color:var(--dim2);line-height:1.6;max-width:580px">
-          <strong style="color:var(--fg2)">Lineage:</strong> Hermeneia descends from the LILM concept — a Large Interpretation Language Model that models the lifecycle of interpretation rather than raw language. An LLM sees more text. A LILM sees more survived criticism. That lineage remains accurate as a description of what Hermeneia does; "constitutional architecture" names how it does it.
+          <strong style="color:var(--fg2)">Constitutional substrate:</strong> underneath the Reader,
+          Hermeneia still preserves immutable observations, append-only governed artifacts,
+          explicit provenance, deterministic structure where applicable, audits, and lineage.
+          The machinery supports inquiry; it is not the first thing a reader has to operate.
         </div>
       </div>
 
       <div class="guide-pipeline">
         ${stages.map((s, i) => `
-          <div class="guide-stage" onclick="e10Go('${s.nav}')">
+          <div class="guide-stage" data-guide-label="${x(s.label)}" data-guide-nav="${x(s.nav)}" onclick="e10Go('${s.nav}')">
             <div class="guide-stage-left">
               <div class="guide-stage-num">${s.num}</div>
               ${i < stages.length - 1 ? '<div class="guide-connector"></div>' : ''}
@@ -15325,6 +15383,7 @@ function e10LoadGuide() {
                 <span class="guide-stage-tagline">${x(s.tagline)}</span>
               </div>
               <div class="guide-stage-detail">${x(s.detail)}</div>
+              <div class="guide-stage-action">Opens: ${x(s.action)}</div>
               <div class="guide-stage-artifacts">
                 ${s.artifacts.map(a => `<span class="guide-artifact">${x(a)}</span>`).join('')}
               </div>
@@ -15358,13 +15417,14 @@ function e10LoadGuide() {
           "Truth is constitutionally protected. Communication is continuously perfected."
         </div>
         <div style="font-size:13px;color:var(--fg2);margin-top:8px;line-height:1.6">
-          Evidence is immutable. Meaning requires stewardship. Reports are disposable. Lineage is permanent.
-          These are not design choices — they are constitutional invariants enforced by the architecture.
+          Evidence is immutable. Meaning requires stewardship. Rendered expression is derived.
+          Lineage is permanent. These are not design choices — they are constitutional invariants
+          enforced by the architecture beneath the reading experience.
         </div>
         <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn-primary" onclick="e10Go('constitution')">Read the Constitution</button>
-          <button class="btn-trace"   onclick="e10Go('corpus')">Open Corpus</button>
-          <button class="btn-trace"   onclick="e10Go('reports')">Read Report</button>
+          <button class="btn-trace"   onclick="e10Go('reader')">Open Reader</button>
+          <button class="btn-trace"   onclick="e10Go('reports')">Open Render</button>
           <button class="btn-trace"   onclick="e10Go('lineage')">Inspect Lineage</button>
         </div>
       </div>
