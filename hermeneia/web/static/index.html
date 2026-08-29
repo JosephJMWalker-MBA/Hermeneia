@@ -2945,11 +2945,11 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
         <button class="corpus-search-close" onclick="closeCorpusSearch()" aria-label="Close search">✕</button>
       </div>
       <input type="text" id="corpus-search-input" class="corpus-search-input"
-             placeholder="Where else does this idea appear?" autocomplete="off"
+             placeholder="Where else does this appear in relation to your question?" autocomplete="off"
              oninput="_corpusSearchInput()" spellcheck="false">
       <div class="corpus-search-meta" id="corpus-search-meta"></div>
       <div class="corpus-search-results" id="corpus-search-results">
-        <div class="corpus-search-hint">Search any word or phrase across the corpus. Results appear in the workstation below the book — click one to open that passage.</div>
+        <div class="corpus-search-hint">Search words or phrases that may bear on your governing question. Results appear in the workstation below the book — click one to open that passage.</div>
       </div>
     </aside>
 
@@ -4865,7 +4865,7 @@ function mount(h) {
     </div>
     <p>The Corpus is the evidence base — every sentence and passage extracted from your document, preserved exactly as written. These are called <strong>observations</strong>. They are immutable: the machine never rewrites them, summarizes them, or loses them.</p>
     <p>Use the search box to find passages by keyword. When a search returns multiple results, a <strong>Pattern View</strong> appears at the top — separating literal occurrences from matching passages with a distribution timeline. This is how recurring concepts (symbols, phrases, contested terms) become visible across the full document.</p>
-    <p><strong>How to use it:</strong> Search for a term you want to investigate. Review the Pattern View if multiple passages appear. Click any observation to select it, then go to the Lab to generate an interpretation.</p>
+    <p><strong>How to use it:</strong> Search for terms or passages that may bear on your governing question. Look for what informs it, supports it, complicates it, challenges it, or suggests something else the investigation should consider. Pattern View helps you see where a recurring term or idea appears across the corpus. Selecting a passage does not decide what it means; you can carry it into Lab as material for comparison and interpretation.</p>
     <div style="margin-top:16px"><button class="btn-primary" onclick="e10Go('lab')" style="padding:8px 20px">Next: Interpretation Lab →</button></div>
   </div>
 </section>
@@ -4880,11 +4880,11 @@ function mount(h) {
     <div style="display:flex;flex-direction:column;gap:4px">
       <div style="font-size:11px;color:var(--dim2);letter-spacing:.06em;text-transform:uppercase">Response mode</div>
       <div style="display:flex;gap:0" id="lab-mode-selector">
-        <button class="lab-mode-btn lab-mode-active" data-mode="interpretive" onclick="labSetMode('interpretive')" title="Full paragraph interpretation — explores meaning in depth">Interpretive</button>
+        <button class="lab-mode-btn lab-mode-active" data-mode="interpretive" onclick="labSetMode('interpretive')" title="Full paragraph interpretation — examines how the observation may bear on the governing question">Interpretive</button>
         <button class="lab-mode-btn" data-mode="triage" onclick="labSetMode('triage')" title="Three-line summary: confidence, pattern type, reason — for moving quickly through observations">Triage</button>
         <button class="lab-mode-btn" data-mode="skeptical" onclick="labSetMode('skeptical')" title="Challenges the observation — what would make this wrong?">Skeptical</button>
       </div>
-      <div id="lab-mode-desc" style="font-size:11px;color:var(--dim2);max-width:340px;margin-top:2px">Explores meaning in depth. One paragraph per observation.</div>
+      <div id="lab-mode-desc" style="font-size:11px;color:var(--dim2);max-width:340px;margin-top:2px">Examines how this observation may inform, complicate, or challenge the governing question. One paragraph per observation.</div>
     </div>
     <button class="btn-trace" style="align-self:flex-end" onclick="e10GenerateInterpretations()">Generate</button>
   </div>
@@ -4893,7 +4893,7 @@ function mount(h) {
     <div class="screen-explainer-title">What is the Interpretation Lab?
       <button class="tts-btn" id="tts-btn-lab-explainer" onclick="ttsReadEl('lab-explainer','lab-explainer')" title="Read aloud">▶</button>
     </div>
-    <p>This is where AI providers propose what each observation <em>means</em>. Select an observation from the Corpus, choose one or more providers, and click Generate. Each provider produces a proposal — a candidate interpretation anchored to the observed text.</p>
+    <p>This is where AI providers propose how each observation may bear on your governing question. Select an observation from the Corpus, choose one or more providers, and click Generate. Each provider produces a proposal — a candidate interpretation anchored to the observed text.</p>
     <p>Proposals are not canonical. They are drafts. Nothing enters the permanent record here. The next step — Steward Review — is where a human decides which proposals to accept.</p>
     <p><strong>How to use it:</strong> Select an observation from the Corpus tab. The observation text appears above. Check the providers you want to hear from. Click Generate. Review the proposals on the next screen.</p>
     <div style="margin-top:16px;display:flex;gap:10px">
@@ -7909,7 +7909,7 @@ let _e10PerfData = {};
 let _labResponseMode = 'interpretive';
 
 const _LAB_MODE_DESCS = {
-  interpretive: 'Explores meaning in depth. One paragraph per observation.',
+  interpretive: 'Examines how this observation may inform, complicate, or challenge the governing question. One paragraph per observation.',
   triage:       'Three lines: confidence level, pattern type, one-sentence reason. Move fast.',
   skeptical:    'Challenges the observation. What evidence would make this wrong?',
 };
@@ -11559,7 +11559,7 @@ function _crToggleToolDrawer() {
 }
 
 // ── Reader-side Corpus Search (PR 2) ───────────────────
-// "Where else does this idea appear?" — now a tab in the shared bottom
+// "Where else does this appear in relation to your question?" — now a tab in the shared bottom
 // workstation. Reuses /api/search over observations; the Reader never leaves.
 // Clicking a result navigates the book to that passage while search stays open.
 let _corpusSearchTimer = null;
@@ -11588,7 +11588,7 @@ async function _corpusRunSearch(q) {
   if (!results || !meta) return;
   if (!q) {
     meta.textContent = '';
-    results.innerHTML = '<div class="corpus-search-hint">Search any word or phrase across the corpus. Results appear in the workstation below the book — click one to open that passage.</div>';
+    results.innerHTML = '<div class="corpus-search-hint">Search words or phrases that may bear on your governing question. Results appear in the workstation below the book — click one to open that passage.</div>';
     return;
   }
   meta.textContent = 'Searching…';

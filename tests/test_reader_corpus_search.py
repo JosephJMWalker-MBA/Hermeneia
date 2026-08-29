@@ -1,10 +1,10 @@
 """Reader-side Corpus Search (PR 2).
 
-"Where else does this idea appear?" — a slide-in panel beside the book that
-searches the corpus without leaving the Reader. Reuses the existing /api/search
-endpoint over observations; clicking a result navigates the book to that passage
-while the panel stays open. These tests cover the search API contract the panel
-depends on and the panel's UI wiring.
+"Where else does this appear in relation to your question?" — a slide-in panel
+beside the book that searches the corpus without leaving the Reader. Reuses the
+existing /api/search endpoint over observations; clicking a result navigates the
+book to that passage while the panel stays open. These tests cover the search API
+contract the panel depends on and the panel's UI wiring.
 """
 from __future__ import annotations
 
@@ -148,6 +148,49 @@ def test_corpus_search_panel_markup_and_trigger_present():
     assert "filter=all&limit=5000`" not in index
     assert "results_truncated: Boolean(data.results_truncated)" in index
     assert "renderResults(query, {\n      count: filtered.length" in index
+
+
+def test_reader_corpus_search_copy_is_question_relative():
+    index = INDEX.read_text()
+
+    assert "Where else does this appear in relation to your question?" in index
+    assert "may bear on your governing question" in index
+    assert "Search any word or phrase across the corpus" not in index
+    assert "Search the corpus" in index
+
+
+def test_corpus_explainer_binds_search_to_governing_question():
+    index = INDEX.read_text()
+    start = index.index('id="corpus-explainer"')
+    end = index.index("</section>", start)
+    explainer = index[start:end]
+
+    assert "Search for terms or passages that may bear on your governing question." in explainer
+    assert "informs it" in explainer
+    assert "supports it" in explainer
+    assert "complicates it" in explainer
+    assert "challenges it" in explainer
+    assert "Pattern View helps you see where a recurring term or idea appears" in explainer
+    assert "Selecting a passage does not decide what it means" in explainer
+    assert "ttsReadEl('corpus-explainer','corpus-explainer')" in explainer
+    assert "Search for a term you want to investigate." not in index
+    assert "Click any observation to select it, then go to the Lab to generate an interpretation." not in index
+
+
+def test_lab_interpretive_mode_copy_is_question_relative():
+    index = INDEX.read_text()
+
+    assert (
+        "Full paragraph interpretation — examines how the observation may bear on the governing question"
+        in index
+    )
+    assert (
+        "Examines how this observation may inform, complicate, or challenge the governing question. One paragraph per observation."
+        in index
+    )
+    assert "how each observation may bear on your governing question" in index
+    assert "Explores meaning in depth. One paragraph per observation." not in index
+    assert "Full paragraph interpretation — explores meaning in depth" not in index
 
 
 def test_result_click_navigates_the_book_not_a_page_away():
