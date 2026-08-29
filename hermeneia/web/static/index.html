@@ -3244,6 +3244,35 @@ let _e10ProviderNotices = {};
 let _e10OllamaInstallJobs = {};
 let _obUploadFocusPending = false;
 let _obCanUploadDocuments = true;
+let _workspaceDatabaseAvailable = null;
+const _WORKSPACE_REQUIRED_ROUTES = new Set([
+  'setup',
+  'onboarding',
+  'corpus',
+  'lab',
+  'review',
+  'reports',
+  'reader',
+  'critic',
+  'lineage',
+  'architect',
+]);
+function _setWorkspaceDatabaseAvailable(available) {
+  _workspaceDatabaseAvailable = available === true ? true : available === false ? false : null;
+  _obCanUploadDocuments = _workspaceDatabaseAvailable !== false;
+}
+
+function _e10RouteRequiresWorkspace(id) {
+  return _WORKSPACE_REQUIRED_ROUTES.has(id);
+}
+
+function _e10ShouldRecoverMissingWorkspace(id) {
+  return _workspaceDatabaseAvailable === false && _e10RouteRequiresWorkspace(id);
+}
+
+function _e10ShouldRefreshCycleStatuses() {
+  return _workspaceDatabaseAvailable !== false;
+}
 
 // ── Runtime connectivity and local authored drafts ────
 const _RUNTIME_HEALTH_URL = '/api/health';
@@ -4610,7 +4639,7 @@ function mount(h) {
   const title = fn.replace(/\.pdf$/i,'').replace(/[_-]/g,' ')
                   .replace(/\b\w/g, c => c.toUpperCase()) || 'Hermeneia';
   _runtimeApplyWorkspaceDraftScope(h.runtime?.workspace, { hydrate: false });
-  _obCanUploadDocuments = !h._noDatabase;
+  _setWorkspaceDatabaseAvailable(!h._noDatabase);
 
   document.getElementById('root').innerHTML = `
 <header class="page-head">
@@ -4881,7 +4910,7 @@ async function e10LoadFirstRun() {
     host.innerHTML = '<div class="e10-empty" style="color:var(--red)">The server is not reachable.</div>';
     return;
   }
-  _obCanUploadDocuments = !!s.database_exists;
+  _setWorkspaceDatabaseAvailable(!!s.database_exists);
   _runtimeApplyWorkspaceDraftScope(s.runtime?.workspace);
 
   const step = (n, title, body, done) => `
@@ -4956,7 +4985,7 @@ async function _frInit(btn) {
     const resp = await fetch('/api/setup/init', { method: 'POST' });
     const d = await resp.json();
     if (!resp.ok) throw new Error(d.error || 'init failed');
-    _obCanUploadDocuments = true;
+    _setWorkspaceDatabaseAvailable(true);
     e10LoadFirstRun();
   } catch (e) {
     showAppError(e.message);
@@ -7546,9 +7575,8 @@ function _updateReaderReturnUI(activeId) {
   if (fab) fab.classList.toggle('hidden', onReader);
 }
 
-function e10Go(id, scrollTarget) {
-  _expert = false;
-  document.body.classList.remove('x');
+function _e10ApplyRouteChrome(id, scrollTarget, opts) {
+  opts = opts || {};
   document.querySelectorAll('.e10-screen').forEach(screen => {
     screen.classList.toggle('active', screen.id === id);
   });
@@ -7561,7 +7589,9 @@ function e10Go(id, scrollTarget) {
     btn.classList.toggle('active', stepId === id);
   });
   updateNavCycle(id);
-  refreshNavCycleStatuses().then(() => updateNavCycle(id));
+  if (opts.refreshCycleStatuses !== false && _e10ShouldRefreshCycleStatuses()) {
+    refreshNavCycleStatuses().then(() => updateNavCycle(id));
+  }
   _updateStageNavBar(id);
   _updateReaderReturnUI(id);
   if (scrollTarget) {
@@ -7572,6 +7602,21 @@ function e10Go(id, scrollTarget) {
   } else {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+}
+
+function _e10RenderMissingWorkspaceRecovery(id, scrollTarget) {
+  _e10ApplyRouteChrome('firstrun', scrollTarget, { refreshCycleStatuses: false });
+  e10LoadFirstRun();
+}
+
+function e10Go(id, scrollTarget) {
+  _expert = false;
+  document.body.classList.remove('x');
+  if (_e10ShouldRecoverMissingWorkspace(id)) {
+    _e10RenderMissingWorkspaceRecovery(id, scrollTarget);
+    return;
+  }
+  _e10ApplyRouteChrome(id, scrollTarget);
   if (id === 'firstrun')   e10LoadFirstRun();
   if (id === 'setup')      e10LoadSetup();
   if (id === 'onboarding') e10LoadOnboarding();
