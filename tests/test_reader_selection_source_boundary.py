@@ -734,10 +734,156 @@ process.stdout.write(JSON.stringify({
 
     assert result == {
         "importantChecked": True,
-        "placeholder": "Your reading note…",
+        "placeholder": "Draft the observation this passage may support…",
         "value": "",
         "containsSynthetic": False,
     }
+
+
+def test_selection_toolbar_groups_recording_actions_apart_from_use_actions() -> None:
+    result = _run_node(
+        r"""
+_crShowToolbar({left:10,top:20,bottom:40,right:80,width:70,height:20});
+const html = _crSelToolbar.innerHTML;
+process.stdout.write(JSON.stringify({
+  recordGroup: html.includes('role="group" aria-label="Record selected passage"'),
+  useGroup: html.includes('role="group" aria-label="Use selected passage"'),
+  divider: html.includes('cr-sel-action-divider'),
+  recordOrder: [
+    html.indexOf("_crHighlightSelected('highlight')"),
+    html.indexOf("_crHighlightSelected('note')"),
+    html.indexOf("_crHighlightSelected('question')"),
+    html.indexOf("_crHighlightSelected('concept')"),
+    html.indexOf("_crHighlightSelected('candidate')"),
+  ],
+  perspectiveIndex: html.indexOf('_crPerspectiveFromSelection()'),
+  askIndex: html.indexOf('_crAskCompanion()'),
+  readIndex: html.indexOf('_crReadResolvedSelection()'),
+}));
+"""
+    )
+
+    assert result["recordGroup"] is True
+    assert result["useGroup"] is True
+    assert result["divider"] is True
+    assert result["recordOrder"] == sorted(result["recordOrder"])
+    assert all(idx >= 0 for idx in result["recordOrder"])
+    assert result["perspectiveIndex"] > result["recordOrder"][-1]
+    assert result["askIndex"] > result["perspectiveIndex"]
+    assert result["readIndex"] > result["askIndex"]
+
+
+def test_capture_modes_render_mode_specific_evidence_and_primary_actions() -> None:
+    result = _run_node(
+        r"""
+const modes = ['highlight', 'note', 'question', 'concept', 'candidate'];
+const out = {};
+for (const mode of modes) {
+  _crReaderSelectionState = {
+    valid: true,
+    text: 'First projected source line.',
+    source_locators: ['p1:block0'],
+    blocks: [{ block_index: 0 }],
+    page: 1,
+  };
+  _crSelText = 'First projected source line.';
+  _crSelToolbar = null;
+  _crHighlightSelected(mode);
+  const html = _crSelToolbar.innerHTML;
+  const firstEditable = ['cr-important-input', 'cr-rank-input', 'cr-tags-input', 'cr-theme-input', 'cr-note-input', 'cr-q-input', 'cr-concept-input']
+    .map(id => [id, html.indexOf(`id="${id}"`)])
+    .filter(([, idx]) => idx >= 0)
+    .sort((a, b) => a[1] - b[1])[0][0];
+  out[mode] = {
+    mode: html.includes(`data-capture-mode="${mode}"`),
+    evidenceLabel: html.includes('Selected passage'),
+    blockquotePreview: html.includes('<blockquote class="cr-selection-preview">First projected source line.</blockquote>'),
+    previewBeforeFields: html.indexOf('cr-capture-evidence') < html.indexOf('cr-highlight-form'),
+    firstEditable,
+    primarySaveFalse: html.includes(`onclick="_crSaveHighlight(false)"`),
+    primarySaveTrue: html.includes(`onclick="_crSaveHighlight(true)"`),
+    saveHighlight: html.includes('Save highlight'),
+    saveNote: html.includes('Save note'),
+    saveQuestion: html.includes('Save question'),
+    saveConcept: html.includes('Save concept'),
+    saveCandidate: html.includes('Save observation candidate'),
+    moreDetails: html.includes('<summary>More details</summary>'),
+    purpose: html.includes('Keep this passage in your attention record.')
+      || html.includes('Attach your own thought to this passage.')
+      || html.includes('Record an open question raised by this passage.')
+      || html.includes('Name and describe a concept this passage helps define.')
+      || html.includes('Preserve this passage as a candidate for structured observation.'),
+  };
+}
+process.stdout.write(JSON.stringify(out));
+"""
+    )
+
+    for mode in ["highlight", "note", "question", "concept", "candidate"]:
+        assert result[mode]["mode"] is True
+        assert result[mode]["evidenceLabel"] is True
+        assert result[mode]["blockquotePreview"] is True
+        assert result[mode]["previewBeforeFields"] is True
+        assert result[mode]["moreDetails"] is True
+        assert result[mode]["purpose"] is True
+
+    assert result["highlight"]["firstEditable"] == "cr-important-input"
+    assert result["note"]["firstEditable"] == "cr-note-input"
+    assert result["question"]["firstEditable"] == "cr-q-input"
+    assert result["concept"]["firstEditable"] == "cr-concept-input"
+    assert result["candidate"]["firstEditable"] == "cr-note-input"
+    assert result["highlight"]["saveHighlight"] is True
+    assert result["note"]["saveNote"] is True
+    assert result["question"]["saveQuestion"] is True
+    assert result["concept"]["saveConcept"] is True
+    assert result["candidate"]["saveCandidate"] is True
+    assert result["highlight"]["primarySaveFalse"] is True
+    assert result["candidate"]["primarySaveTrue"] is True
+    assert result["candidate"]["primarySaveFalse"] is False
+    assert result["note"]["primarySaveFalse"] is True
+    assert result["note"]["primarySaveTrue"] is True
+
+
+def test_concept_capture_keeps_source_passage_out_of_concept_name() -> None:
+    result = _run_node(
+        r"""
+_crReaderSelectionState = {
+  valid: true,
+  text: 'First projected source line.',
+  source_locators: ['p1:block0'],
+  blocks: [{ block_index: 0 }],
+  page: 1,
+};
+_crSelText = 'First projected source line.';
+_crHighlightSelected('concept');
+const html = _crSelToolbar.innerHTML;
+const match = html.match(/<input id="cr-concept-input"[^>]*value="([^"]*)"[^>]*>/);
+process.stdout.write(JSON.stringify({
+  value: match && match[1],
+  previewContainsSource: html.includes('<blockquote class="cr-selection-preview">First projected source line.</blockquote>'),
+  conceptHint: html.includes('separate from the selected source passage'),
+}));
+"""
+    )
+
+    assert result == {
+        "value": "",
+        "previewContainsSource": True,
+        "conceptHint": True,
+    }
+
+
+def test_capture_toolbar_uses_scrollable_shell_with_fixed_actions() -> None:
+    html = INDEX.read_text()
+
+    assert ".cr-sel-toolbar.capture-open" in html
+    assert "max-height: calc(100vh - 24px)" in html
+    assert "max-height: calc(100dvh - 24px)" in html
+    assert "overflow: hidden" in html
+    assert ".cr-capture-scroll" in html
+    assert "overflow-y: auto" in html
+    assert ".cr-capture-actions" in html
+    assert "flex: 0 0 auto" in html
 
 
 def test_cancel_clears_transient_reader_selection_state() -> None:
