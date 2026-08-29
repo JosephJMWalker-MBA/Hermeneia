@@ -1068,7 +1068,8 @@ def test_focus_mode_mutes_persistent_reader_chrome_without_locking_it():
     assert "body.a11y-focus-mode #reader .cr-side" in html
     assert "body.a11y-focus-mode .workflow-rail" in html
     assert "body.a11y-focus-mode .nav" in html
-    assert "pointer-events: none" not in _css_block(html, "body.a11y-focus-mode .nav,\nbody.a11y-focus-mode .page-head,\nbody.a11y-focus-mode #reader .cr-doc-picker,\nbody.a11y-focus-mode #reader .cr-question-compass,\nbody.a11y-focus-mode #reader .cr-tool-rail,\nbody.a11y-focus-mode #reader .cr-page-brief[data-open=\"0\"],\nbody.a11y-focus-mode #reader .cr-side,\nbody.a11y-focus-mode .workflow-rail")
+    assert "body.a11y-focus-mode .thesis-bar" in html
+    assert "pointer-events: none" not in _css_block(html, "body.a11y-focus-mode .nav,\nbody.a11y-focus-mode .page-head,\nbody.a11y-focus-mode .thesis-bar,\nbody.a11y-focus-mode #reader .cr-doc-picker,\nbody.a11y-focus-mode #reader .cr-question-compass,\nbody.a11y-focus-mode #reader .cr-tool-rail,\nbody.a11y-focus-mode #reader .cr-page-brief[data-open=\"0\"],\nbody.a11y-focus-mode #reader .cr-side,\nbody.a11y-focus-mode .workflow-rail")
 
 
 def test_focus_mode_restores_reader_chrome_on_hover_and_focus():
@@ -1077,6 +1078,8 @@ def test_focus_mode_restores_reader_chrome_on_hover_and_focus():
     for selector in [
         "body.a11y-focus-mode #reader .cr-doc-picker:hover",
         "body.a11y-focus-mode #reader .cr-doc-picker:focus-within",
+        "body.a11y-focus-mode .thesis-bar:hover",
+        "body.a11y-focus-mode .thesis-bar:focus-within",
         "body.a11y-focus-mode #reader .cr-question-compass:hover",
         "body.a11y-focus-mode #reader .cr-question-compass:focus-within",
         "body.a11y-focus-mode #reader .cr-tool-rail:hover",
@@ -1100,7 +1103,7 @@ def test_focus_mode_keeps_foreground_reader_surfaces_full_contrast():
     assert "body.a11y-focus-mode #a11y-selection-tip" in html
     assert "body.a11y-focus-mode .cr-sel-toolbar" in html
 
-    muted_rule = _css_block(html, "body.a11y-focus-mode .nav,\nbody.a11y-focus-mode .page-head,\nbody.a11y-focus-mode #reader .cr-doc-picker,\nbody.a11y-focus-mode #reader .cr-question-compass,\nbody.a11y-focus-mode #reader .cr-tool-rail,\nbody.a11y-focus-mode #reader .cr-page-brief[data-open=\"0\"],\nbody.a11y-focus-mode #reader .cr-side,\nbody.a11y-focus-mode .workflow-rail")
+    muted_rule = _css_block(html, "body.a11y-focus-mode .nav,\nbody.a11y-focus-mode .page-head,\nbody.a11y-focus-mode .thesis-bar,\nbody.a11y-focus-mode #reader .cr-doc-picker,\nbody.a11y-focus-mode #reader .cr-question-compass,\nbody.a11y-focus-mode #reader .cr-tool-rail,\nbody.a11y-focus-mode #reader .cr-page-brief[data-open=\"0\"],\nbody.a11y-focus-mode #reader .cr-side,\nbody.a11y-focus-mode .workflow-rail")
     assert ".cr-bottom-workstation" not in muted_rule
     assert ".cr-sel-toolbar" not in muted_rule
     assert ".dock-panel" not in muted_rule

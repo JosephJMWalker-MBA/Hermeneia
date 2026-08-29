@@ -161,3 +161,210 @@ def test_find_the_x_helper_signature_is_stable():
     """The compass escapes the question via the shared x() helper; guard it
     exists so a rename does not silently drop escaping."""
     assert "function x(" in _index()
+
+
+def _run_node(harness: str) -> dict:
+    if shutil.which("node") is None:  # pragma: no cover - environment guard
+        pytest.skip("node runtime not available")
+
+    result = subprocess.run(
+        ["node", "-e", harness], capture_output=True, text=True, check=True
+    )
+    return json.loads(result.stdout)
+
+
+def _thesis_bar_harness(saved_question: dict | None) -> str:
+    src = _index()
+    inv_key_line = "const _INV_KEY = 'hermeneia_investigation_v1';"
+    escape = _extract_function(src, "function x(")
+    inv_load = _extract_function(src, "function invLoad(")
+    render = _extract_function(src, "function _renderThesisBar(")
+
+    return f"""
+    const _store = {{}};
+    const localStorage = {{
+      getItem(k) {{ return k in _store ? _store[k] : null; }},
+      setItem(k, v) {{ _store[k] = String(v); }},
+      removeItem(k) {{ delete _store[k]; }},
+    }};
+    const bar = {{
+      hidden: true,
+      className: 'thesis-bar',
+      _attrs: {{}},
+      classList: {{
+        add(c) {{
+          const parts = new Set(bar.className.split(/\\s+/).filter(Boolean));
+          parts.add(c);
+          bar.className = Array.from(parts).join(' ');
+        }},
+        remove(c) {{
+          bar.className = bar.className.split(/\\s+/).filter(Boolean).filter(x => x !== c).join(' ');
+        }},
+        contains(c) {{ return bar.className.split(/\\s+/).includes(c); }},
+      }},
+      setAttribute(k, v) {{ this._attrs[k] = String(v); }},
+      getAttribute(k) {{ return this._attrs[k]; }},
+      innerHTML: '',
+      title: '',
+    }};
+    const document = {{
+      getElementById(id) {{ return id === 'thesis-bar' ? bar : null; }},
+    }};
+    {inv_key_line}
+    {escape}
+    {inv_load}
+    {render}
+    const saved = {json.dumps(saved_question)};
+    if (saved !== null) localStorage.setItem(_INV_KEY, JSON.stringify(saved));
+    _renderThesisBar();
+    console.log(JSON.stringify({{
+      className: bar.className,
+      hidden: bar.hidden,
+      html: bar.innerHTML,
+      title: bar.title,
+      ariaLabel: bar.getAttribute('aria-label'),
+    }}));
+    """
+
+
+def test_unset_global_question_bar_has_attention_state_and_compass_copy():
+    state = _run_node(_thesis_bar_harness(saved_question=None))
+
+    assert state["hidden"] is False
+    assert "unset" in state["className"].split()
+    assert "thesis-bar-attention" in state["className"].split()
+    assert "Set a governing question to guide your reading →" in state["html"]
+    assert state["title"] == "Your question is the compass for the investigation."
+    assert "compass for the investigation" in state["ariaLabel"]
+
+
+def test_saved_global_question_bar_removes_unset_attention_state():
+    state = _run_node(
+        _thesis_bar_harness(
+            saved_question={"thesis": "How does Gatsby imagine return?"}
+        )
+    )
+
+    assert "unset" not in state["className"].split()
+    assert "thesis-bar-attention" not in state["className"].split()
+    assert "How does Gatsby imagine return?" in state["html"]
+    assert state["title"] == "How does Gatsby imagine return?"
+    assert state["ariaLabel"] == "Governing question: How does Gatsby imagine return?"
+
+
+def test_saving_reader_question_clears_unset_attention_in_session():
+    src = _index()
+    inv_key_line = "const _INV_KEY = 'hermeneia_investigation_v1';"
+    escape = _extract_function(src, "function x(")
+    inv_load = _extract_function(src, "function invLoad(")
+    inv_save = _extract_function(src, "function invSave(")
+    render_bar = _extract_function(src, "function _renderThesisBar(")
+    update_page = _extract_function(src, "function updatePageThesis(")
+    keep_question = _extract_function(src, "function _crKeepQuestion(")
+
+    harness = f"""
+    const _store = {{}};
+    const localStorage = {{
+      getItem(k) {{ return k in _store ? _store[k] : null; }},
+      setItem(k, v) {{ _store[k] = String(v); }},
+      removeItem(k) {{ delete _store[k]; }},
+    }};
+    const fetch = () => Promise.resolve({{}});
+    const input = {{ value: 'What does the green light demand?', focusCalled: false, focus() {{ this.focusCalled = true; }} }};
+    const bar = {{
+      hidden: true,
+      className: 'thesis-bar unset thesis-bar-attention',
+      _attrs: {{}},
+      classList: {{
+        add(c) {{
+          const parts = new Set(bar.className.split(/\\s+/).filter(Boolean));
+          parts.add(c);
+          bar.className = Array.from(parts).join(' ');
+        }},
+        remove(c) {{
+          bar.className = bar.className.split(/\\s+/).filter(Boolean).filter(x => x !== c).join(' ');
+        }},
+      }},
+      setAttribute(k, v) {{ this._attrs[k] = String(v); }},
+      innerHTML: '',
+      title: '',
+    }};
+    const pageThesis = {{ textContent: '', classList: {{ toggle() {{}} }}, title: '', onclick: null }};
+    const pageWrap = {{ style: {{ display: '' }} }};
+    const document = {{
+      getElementById(id) {{
+        if (id === 'cr-question-input') return input;
+        if (id === 'thesis-bar') return bar;
+        if (id === 'page-thesis') return pageThesis;
+        if (id === 'page-thesis-wrap') return pageWrap;
+        if (id === 'cr-firstrun-banner') return {{ remove() {{}} }};
+        return null;
+      }},
+    }};
+    function _crRenderQuestionCard() {{}}
+    function _crRenderQuestionCompass() {{}}
+    function cmpMarkOnboardingStep() {{}}
+    {inv_key_line}
+    {escape}
+    {inv_load}
+    {inv_save}
+    {render_bar}
+    {update_page}
+    {keep_question}
+    _crKeepQuestion();
+    console.log(JSON.stringify({{
+      className: bar.className,
+      html: bar.innerHTML,
+      saved: JSON.parse(localStorage.getItem(_INV_KEY)),
+      inputValue: input.value,
+    }}));
+    """
+    state = _run_node(harness)
+
+    assert state["saved"]["thesis"] == "What does the green light demand?"
+    assert "unset" not in state["className"].split()
+    assert "thesis-bar-attention" not in state["className"].split()
+    assert "What does the green light demand?" in state["html"]
+    assert state["inputValue"] == ""
+
+
+def test_unset_global_question_bar_click_opens_existing_question_editor():
+    src = _index()
+    click = _extract_function(src, "function _thesisBarClick(")
+    harness = f"""
+    let route = null;
+    let renderedEditing = null;
+    let focused = false;
+    function e10Go(dest) {{ route = dest; }}
+    function _crRenderQuestionCard(editing) {{ renderedEditing = editing; }}
+    const document = {{
+      getElementById(id) {{
+        if (id === 'cr-question-input') return {{ focus() {{ focused = true; }} }};
+        return null;
+      }},
+    }};
+    function setTimeout(fn) {{ fn(); }}
+    {click}
+    _thesisBarClick();
+    console.log(JSON.stringify({{ route, renderedEditing, focused }}));
+    """
+    state = _run_node(harness)
+
+    assert state == {
+        "route": "reader",
+        "renderedEditing": True,
+        "focused": True,
+    }
+
+
+def test_unset_global_question_bar_attention_has_reduced_motion_and_focus_rules():
+    index = _index()
+
+    assert "@keyframes thesis-unset-attention" in index
+    assert ".thesis-bar.unset.thesis-bar-attention" in index
+    assert "animation: thesis-unset-attention 2.8s ease-in-out infinite;" in index
+    reduced = index[index.index("@media (prefers-reduced-motion: reduce)") :]
+    assert ".thesis-bar.unset.thesis-bar-attention" in reduced
+    assert "animation: none;" in reduced
+    assert "body.a11y-focus-mode .thesis-bar.unset" in index
+    assert "body.a11y-focus-mode .thesis-bar.unset.thesis-bar-attention" in index
