@@ -181,16 +181,24 @@ def test_lab_interpretive_mode_copy_is_question_relative():
     index = INDEX.read_text()
 
     assert (
-        "Full paragraph interpretation — examines how the observation may bear on the governing question"
+        "Full paragraph candidate interpretation — develops a fuller reading of the observation"
         in index
     )
     assert (
-        "Examines how this observation may inform, complicate, or challenge the governing question. One paragraph per observation."
+        "Develops a fuller candidate interpretation for you to compare against the governing question. One paragraph per observation."
         in index
     )
-    assert "how each observation may bear on your governing question" in index
+    assert "AI providers propose candidate interpretations of each selected observation" in index
+    assert "Those proposals are not the answer to your governing question" in index
+    assert "they are not canonical" in index
+    assert "Compare them against the question yourself" in index
+    assert "what do they inform, complicate, challenge, or leave unresolved?" in index
+    assert "where a human decides which proposals survive" in index
     assert "Explores meaning in depth. One paragraph per observation." not in index
     assert "Full paragraph interpretation — explores meaning in depth" not in index
+    assert "AI providers propose how each observation may bear on your governing question" not in index
+    assert "examines how the observation may bear on the governing question" not in index
+    assert "Examines how this observation may inform, complicate, or challenge the governing question" not in index
 
 
 def test_result_click_navigates_the_book_not_a_page_away():

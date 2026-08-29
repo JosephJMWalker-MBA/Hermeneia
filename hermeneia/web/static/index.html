@@ -4880,11 +4880,11 @@ function mount(h) {
     <div style="display:flex;flex-direction:column;gap:4px">
       <div style="font-size:11px;color:var(--dim2);letter-spacing:.06em;text-transform:uppercase">Response mode</div>
       <div style="display:flex;gap:0" id="lab-mode-selector">
-        <button class="lab-mode-btn lab-mode-active" data-mode="interpretive" onclick="labSetMode('interpretive')" title="Full paragraph interpretation — examines how the observation may bear on the governing question">Interpretive</button>
+        <button class="lab-mode-btn lab-mode-active" data-mode="interpretive" onclick="labSetMode('interpretive')" title="Full paragraph candidate interpretation — develops a fuller reading of the observation">Interpretive</button>
         <button class="lab-mode-btn" data-mode="triage" onclick="labSetMode('triage')" title="Three-line summary: confidence, pattern type, reason — for moving quickly through observations">Triage</button>
         <button class="lab-mode-btn" data-mode="skeptical" onclick="labSetMode('skeptical')" title="Challenges the observation — what would make this wrong?">Skeptical</button>
       </div>
-      <div id="lab-mode-desc" style="font-size:11px;color:var(--dim2);max-width:340px;margin-top:2px">Examines how this observation may inform, complicate, or challenge the governing question. One paragraph per observation.</div>
+      <div id="lab-mode-desc" style="font-size:11px;color:var(--dim2);max-width:340px;margin-top:2px">Develops a fuller candidate interpretation for you to compare against the governing question. One paragraph per observation.</div>
     </div>
     <button class="btn-trace" style="align-self:flex-end" onclick="e10GenerateInterpretations()">Generate</button>
   </div>
@@ -4893,8 +4893,8 @@ function mount(h) {
     <div class="screen-explainer-title">What is the Interpretation Lab?
       <button class="tts-btn" id="tts-btn-lab-explainer" onclick="ttsReadEl('lab-explainer','lab-explainer')" title="Read aloud">▶</button>
     </div>
-    <p>This is where AI providers propose how each observation may bear on your governing question. Select an observation from the Corpus, choose one or more providers, and click Generate. Each provider produces a proposal — a candidate interpretation anchored to the observed text.</p>
-    <p>Proposals are not canonical. They are drafts. Nothing enters the permanent record here. The next step — Steward Review — is where a human decides which proposals to accept.</p>
+    <p>This is where AI providers propose candidate interpretations of each selected observation. Select an observation from the Corpus, choose one or more providers, and click Generate. Each provider produces a proposal anchored to the observed text.</p>
+    <p>Those proposals are not the answer to your governing question, and they are not canonical. Compare them against the question yourself: what do they inform, complicate, challenge, or leave unresolved? The next step — Steward Review — is where a human decides which proposals survive.</p>
     <p><strong>How to use it:</strong> Select an observation from the Corpus tab. The observation text appears above. Check the providers you want to hear from. Click Generate. Review the proposals on the next screen.</p>
     <div style="margin-top:16px;display:flex;gap:10px">
       <button onclick="e10Go('corpus')" style="padding:8px 16px;background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--fg2);cursor:pointer">← Corpus</button>
@@ -7909,7 +7909,7 @@ let _e10PerfData = {};
 let _labResponseMode = 'interpretive';
 
 const _LAB_MODE_DESCS = {
-  interpretive: 'Examines how this observation may inform, complicate, or challenge the governing question. One paragraph per observation.',
+  interpretive: 'Develops a fuller candidate interpretation for you to compare against the governing question. One paragraph per observation.',
   triage:       'Three lines: confidence level, pattern type, one-sentence reason. Move fast.',
   skeptical:    'Challenges the observation. What evidence would make this wrong?',
 };
