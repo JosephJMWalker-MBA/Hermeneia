@@ -252,8 +252,49 @@ body.reader-active .wrap { max-width: 1180px; padding: 0 20px; }
 .thesis-bar .thesis-bar-text {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.thesis-bar.unset { color: var(--dim2); font-style: italic; }
-.thesis-bar.unset .thesis-bar-icon { color: var(--dim2); }
+@keyframes thesis-unset-attention {
+  0%, 100% {
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  50% {
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+}
+.thesis-bar.unset {
+  color: var(--fg2);
+  font-style: italic;
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--surface) 84%, var(--accent2));
+}
+.thesis-bar.unset.thesis-bar-attention {
+  animation: thesis-unset-attention 2.8s ease-in-out infinite;
+}
+.thesis-bar.unset .thesis-bar-icon { color: var(--accent); }
+.thesis-bar.unset::after {
+  content: '';
+  width: 6px; height: 6px; border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+  flex: 0 0 auto;
+}
+body.a11y-focus-mode .thesis-bar.unset {
+  color: var(--dim2);
+  background: color-mix(in srgb, var(--surface) 92%, var(--accent2));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+body.a11y-focus-mode .thesis-bar.unset.thesis-bar-attention {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .thesis-bar.unset.thesis-bar-attention {
+    animation: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+}
 
 /* Workspace drawer — additive grouping of pipeline tools. Reader stays
    primary; this is secondary/supporting structure, hidden until requested. */
@@ -2676,6 +2717,7 @@ body.a11y-focus-mode .e10-screen:not(.active),
 body.a11y-focus-mode .section.xo { opacity: 0.12; pointer-events: none; transition: opacity .2s; }
 body.a11y-focus-mode .nav,
 body.a11y-focus-mode .page-head,
+body.a11y-focus-mode .thesis-bar,
 body.a11y-focus-mode #reader .cr-doc-picker,
 body.a11y-focus-mode #reader .cr-question-compass,
 body.a11y-focus-mode #reader .cr-tool-rail,
@@ -2689,6 +2731,8 @@ body.a11y-focus-mode .nav:hover,
 body.a11y-focus-mode .nav:focus-within,
 body.a11y-focus-mode .page-head:hover,
 body.a11y-focus-mode .page-head:focus-within,
+body.a11y-focus-mode .thesis-bar:hover,
+body.a11y-focus-mode .thesis-bar:focus-within,
 body.a11y-focus-mode #reader .cr-doc-picker:hover,
 body.a11y-focus-mode #reader .cr-doc-picker:focus-within,
 body.a11y-focus-mode #reader .cr-question-compass:hover,
@@ -2723,6 +2767,7 @@ body.a11y-focus-mode #a11y-dock .dock-rail-btn:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   body.a11y-focus-mode .nav,
   body.a11y-focus-mode .page-head,
+  body.a11y-focus-mode .thesis-bar,
   body.a11y-focus-mode #reader .cr-doc-picker,
   body.a11y-focus-mode #reader .cr-question-compass,
   body.a11y-focus-mode #reader .cr-tool-rail,
@@ -6265,14 +6310,18 @@ function _renderThesisBar() {
   bar.hidden = false;
   if (thesis) {
     bar.classList.remove('unset');
+    bar.classList.remove('thesis-bar-attention');
     bar.innerHTML = `<span class="thesis-bar-icon">◈</span>`
       + `<span class="thesis-bar-text">${x(thesis)}</span>`;
     bar.title = thesis;
+    bar.setAttribute('aria-label', `Governing question: ${thesis}`);
   } else {
     bar.classList.add('unset');
+    bar.classList.add('thesis-bar-attention');
     bar.innerHTML = `<span class="thesis-bar-icon">◇</span>`
       + `<span class="thesis-bar-text">Set a governing question to guide your reading →</span>`;
-    bar.title = 'Set your governing question';
+    bar.title = 'Your question is the compass for the investigation.';
+    bar.setAttribute('aria-label', 'Set a governing question. Your question is the compass for the investigation.');
   }
 }
 
