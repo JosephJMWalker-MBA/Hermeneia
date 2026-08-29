@@ -235,6 +235,7 @@ async function get(url){
 }
 function _runtimeApplyWorkspaceDraftScope(){}
 function _cmpOnboardingHtml(){return '';}
+function _setWorkspaceDatabaseAvailable(available){}
 """.replace("__BACK_HANDLER__", json.dumps(back_handler))
         + _extract_function(html, "async function e10LoadFirstRun(")
         + """
