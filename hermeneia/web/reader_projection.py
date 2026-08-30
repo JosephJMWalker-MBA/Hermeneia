@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 
 
 _BLOCK_REGION = re.compile(r"block:(\d+)")
+_PARAGRAPH_BREAK = re.compile(r"\n{2,}")
 
 
 class ReaderProjectionCoverageError(RuntimeError):
@@ -26,6 +27,60 @@ def _canonical_extraction(extraction: Mapping[str, object]) -> dict[str, object]
 def _block_index(extraction: Mapping[str, object]) -> int | None:
     match = _BLOCK_REGION.fullmatch(str(extraction.get("region") or ""))
     return int(match.group(1)) if match else None
+
+
+def _normalize_prose_display_text(raw_text: object) -> str:
+    """Collapse layout soft-wraps for Reader display without changing evidence."""
+    text = str(raw_text or "").replace("\r\n", "\n").replace("\r", "\n")
+    paragraphs = []
+    for paragraph in _PARAGRAPH_BREAK.split(text):
+        lines = [line.strip(" \t\f\v") for line in paragraph.split("\n")]
+        merged = lines[0] if lines else ""
+        for line in lines[1:]:
+            if merged.rstrip().endswith("-"):
+                merged = merged.rstrip() + line.lstrip()
+            else:
+                merged = merged.rstrip() + " " + line.lstrip()
+        paragraphs.append(merged.strip(" \t\f\v"))
+    return "\n\n".join(paragraphs)
+
+
+def _projection_source_metadata(
+    canonical: Sequence[Mapping[str, object]],
+) -> tuple[list[object], list[object], list[object]]:
+    source_ids = [item.get("id") for item in canonical]
+    source_locators = [item.get("source_locator") for item in canonical]
+    regions = [item.get("region") for item in canonical]
+    return source_ids, source_locators, regions
+
+
+def _is_obvious_heading_like(text: object) -> bool:
+    trimmed = str(text or "").strip()
+    if not trimmed:
+        return True
+    single_line = _normalize_prose_display_text(trimmed)
+    if "\n\n" in single_line:
+        return False
+    words = re.findall(r"[A-Za-z0-9']+", single_line)
+    if not words:
+        return True
+    if len(words) <= 6 and re.search(r"\b(CHAPTER|PART|SECTION)\b", single_line, re.I):
+        return True
+    letters = [char for char in single_line if char.isalpha()]
+    if letters and all(char.isupper() for char in letters) and len(words) <= 8:
+        return True
+    if len(words) <= 5 and single_line[-1:] not in ".?!,;:)]}”’\"'":
+        title_like = all(
+            word[:1].isupper() or word.lower() in {"a", "an", "and", "as", "for", "in", "of", "on", "or", "the", "to"}
+            for word in words
+        )
+        if title_like:
+            return True
+    return False
+
+
+def _is_ordinary_block_extraction(extraction: Mapping[str, object]) -> bool:
+    return _block_index(extraction) is not None
 
 
 def _is_safe_drop_cap_pair(
@@ -52,7 +107,56 @@ def _is_safe_drop_cap_pair(
     )
 
 
+def _is_safe_prose_continuation(
+    previous: Mapping[str, object],
+    following: Mapping[str, object],
+) -> bool:
+    previous_text = str(previous.get("raw_text") or "")
+    following_text = str(following.get("raw_text") or "")
+    previous_trimmed = _normalize_prose_display_text(previous_text).strip()
+    following_trimmed = _normalize_prose_display_text(following_text).strip()
+    first_following = following_trimmed[:1]
+    last_previous = previous_trimmed[-1:] if previous_trimmed else ""
+
+    return bool(
+        previous.get("page") == following.get("page")
+        and _is_ordinary_block_extraction(previous)
+        and _is_ordinary_block_extraction(following)
+        and previous_trimmed
+        and following_trimmed
+        and first_following
+        and first_following.isalpha()
+        and first_following.islower()
+        and last_previous not in ".?!"
+        and not _is_obvious_heading_like(previous_text)
+        and not _is_obvious_heading_like(following_text)
+    )
+
+
 def _project_single(extraction: Mapping[str, object]) -> dict[str, object]:
+    text = _normalize_prose_display_text(extraction.get("raw_text"))
+    if text != str(extraction.get("raw_text") or ""):
+        canonical = [_canonical_extraction(extraction)]
+        source_ids, source_locators, _regions = _projection_source_metadata(canonical)
+        return {
+            "region": extraction.get("region"),
+            "text": text,
+            "source_locator": extraction.get("source_locator"),
+            "reader_projection": {
+                "kind": "soft_wrap_normalization",
+                "source_extraction_ids": source_ids,
+                "source_locators": source_locators,
+                "display_source_spans": [
+                    {
+                        "source_extraction_id": source_ids[0],
+                        "source_locator": source_locators[0],
+                        "start": 0,
+                        "end": len(text),
+                    }
+                ],
+            },
+            "canonical_extractions": canonical,
+        }
     return {
         "region": extraction.get("region"),
         "text": extraction.get("raw_text"),
@@ -72,17 +176,83 @@ def _project_drop_cap_pair(
     ]
     previous_text = str(previous.get("raw_text") or "").strip()
     following_text = str(following.get("raw_text") or "").lstrip()
-    source_ids = [item["id"] for item in canonical]
-    source_locators = [item["source_locator"] for item in canonical]
-    regions = [item["region"] for item in canonical]
+    source_ids, source_locators, regions = _projection_source_metadata(canonical)
+    text = previous_text + following_text
+    previous_end = len(previous_text)
     return {
         "region": " + ".join(str(region) for region in regions),
-        "text": previous_text + following_text,
+        "text": text,
         "source_locator": " + ".join(str(locator) for locator in source_locators),
         "reader_projection": {
             "kind": "drop_cap_merge",
             "source_extraction_ids": source_ids,
             "source_locators": source_locators,
+            "display_source_spans": [
+                {
+                    "source_extraction_id": source_ids[0],
+                    "source_locator": source_locators[0],
+                    "start": 0,
+                    "end": previous_end,
+                },
+                {
+                    "source_extraction_id": source_ids[1],
+                    "source_locator": source_locators[1],
+                    "start": previous_end,
+                    "end": len(text),
+                },
+            ],
+        },
+        "canonical_extractions": canonical,
+    }
+
+
+def _join_prose_continuation(
+    parts: Sequence[str],
+) -> tuple[str, list[tuple[int, int]]]:
+    merged = parts[0].strip(" \t\f\v") if parts else ""
+    spans = [(0, len(merged))] if parts else []
+    for part in parts[1:]:
+        following = part.strip(" \t\f\v")
+        if merged.rstrip().endswith("-"):
+            merged = merged.rstrip() + following.lstrip()
+        else:
+            merged = merged.rstrip() + " " + following.lstrip()
+        spans.append((len(merged) - len(following.lstrip()), len(merged)))
+    return merged, spans
+
+
+def _project_prose_continuation_group(
+    group: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    canonical = [_canonical_extraction(extraction) for extraction in group]
+    source_ids, source_locators, regions = _projection_source_metadata(canonical)
+    text, spans = _join_prose_continuation([
+        _normalize_prose_display_text(extraction.get("raw_text"))
+        for extraction in group
+    ])
+    display_source_spans = [
+        {
+            "source_extraction_id": source_id,
+            "source_locator": source_locator,
+            "start": start,
+            "end": end,
+        }
+        for source_id, source_locator, (start, end) in zip(
+            source_ids,
+            source_locators,
+            spans,
+            strict=True,
+        )
+    ]
+    return {
+        "region": " + ".join(str(region) for region in regions),
+        "text": text,
+        "source_locator": " + ".join(str(locator) for locator in source_locators),
+        "reader_projection": {
+            "kind": "prose_continuation_merge",
+            "source_extraction_ids": source_ids,
+            "source_locators": source_locators,
+            "display_source_spans": display_source_spans,
         },
         "canonical_extractions": canonical,
     }
@@ -185,11 +355,10 @@ def project_reader_extractions(
 ) -> list[dict[str, object]]:
     """Build disposable Reader blocks without changing canonical evidence.
 
-    The only cross-block repair is a conservative PDF drop-cap case: a
-    one-letter uppercase block immediately followed, on the same page and at
-    the next block index, by lowercase continuation text. The projection keeps
-    exact contributing extraction IDs, locators, and raw text in
-    ``canonical_extractions``.
+    Cross-block repairs are conservative: the existing PDF drop-cap case, plus
+    lower-case prose continuations across adjacent projected extraction order.
+    The projection keeps exact contributing extraction IDs, locators, and raw
+    text in ``canonical_extractions``.
     """
     projected: list[dict[str, object]] = []
     index = 0
@@ -199,6 +368,18 @@ def project_reader_extractions(
         if following is not None and _is_safe_drop_cap_pair(current, following):
             projected.append(_project_drop_cap_pair(current, following))
             index += 2
+            continue
+        group = [current]
+        lookahead = index + 1
+        while lookahead < len(extractions) and _is_safe_prose_continuation(
+            group[-1],
+            extractions[lookahead],
+        ):
+            group.append(extractions[lookahead])
+            lookahead += 1
+        if len(group) > 1:
+            projected.append(_project_prose_continuation_group(group))
+            index = lookahead
             continue
         projected.append(_project_single(current))
         index += 1

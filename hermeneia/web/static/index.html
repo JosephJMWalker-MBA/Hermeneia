@@ -11813,6 +11813,9 @@ function _crProjectionSourceLocators(ex, fallbackLocator = '') {
   const canonicalLocators = Array.isArray(ex?.canonical_extractions)
     ? ex.canonical_extractions.map(item => item?.source_locator || '').filter(Boolean)
     : [];
+  if (projectionLocators.length || canonicalLocators.length) {
+    return _crUniqueStringList([...projectionLocators, ...canonicalLocators]);
+  }
   return _crUniqueStringList([...projectionLocators, ...canonicalLocators, ex?.source_locator || '', fallbackLocator]);
 }
 
@@ -11823,6 +11826,9 @@ function _crReaderBlockContext(ex, blockIndex, page = _crPage) {
     source_locator: ex?.source_locator || '',
     source_locators: _crProjectionSourceLocators(ex),
     extraction_ids: _crProjectionExtractionIds(ex),
+    display_source_spans: Array.isArray(ex?.reader_projection?.display_source_spans)
+      ? ex.reader_projection.display_source_spans
+      : [],
   };
 }
 
@@ -11973,6 +11979,31 @@ function _crBlockMatchesSpanPoint(blockCtx, point) {
   return blockIndex !== null && pointIndex !== null && blockIndex === pointIndex;
 }
 
+function _crDisplaySourceSpanForPoint(blockCtx, point) {
+  const spans = Array.isArray(blockCtx?.display_source_spans) ? blockCtx.display_source_spans : [];
+  if (!spans.length) return null;
+  const pointLocators = _crStringList(point?.source_locators);
+  const pointIds = _crStringList(point?.extraction_ids);
+  const matches = spans.filter(span => {
+    const locator = String(span?.source_locator || '');
+    const extractionId = String(span?.source_extraction_id || '');
+    return (locator && pointLocators.includes(locator)) ||
+      (extractionId && pointIds.includes(extractionId));
+  });
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function _crSpanPointOffsetInBlock(blockCtx, point, text) {
+  const offset = _crTextOffset(point?.offset, text);
+  if (offset === null) return null;
+  const sourceSpan = _crDisplaySourceSpanForPoint(blockCtx, point);
+  if (!sourceSpan) return offset;
+  const sourceStart = _crTextOffset(sourceSpan.start, text);
+  const sourceEnd = _crTextOffset(sourceSpan.end, text);
+  if (sourceStart === null || sourceEnd === null || sourceEnd < sourceStart) return null;
+  return Math.max(sourceStart, Math.min(sourceEnd, sourceStart + offset));
+}
+
 function _crSpanRangeForBlock(span, blockCtx, text) {
   if (!span || !blockCtx || !text) return null;
   const spanPage = _crFiniteNumber(span.page);
@@ -11986,11 +12017,11 @@ function _crSpanRangeForBlock(span, blockCtx, text) {
   let start = 0;
   let end = text.length;
   if (isStart) {
-    start = _crTextOffset(span.start?.offset, text);
+    start = _crSpanPointOffsetInBlock(blockCtx, span.start, text);
     if (start === null) return null;
   }
   if (isEnd) {
-    end = _crTextOffset(span.end?.offset, text);
+    end = _crSpanPointOffsetInBlock(blockCtx, span.end, text);
     if (end === null) return null;
   }
   if (end <= start) return null;
@@ -12541,7 +12572,9 @@ function _crReaderBlockInfo(el) {
   const ex = Number.isFinite(index) ? (_crCurrentExtractions || [])[index] : null;
   const domLocator = block.dataset?.crLocator || ex?.source_locator || '';
   const ctx = _crReaderBlockContext(ex, index);
-  const sourceLocators = _crUniqueStringList([domLocator, ...(ctx.source_locators || [])]);
+  const sourceLocators = ctx.source_locators?.length
+    ? _crUniqueStringList(ctx.source_locators)
+    : _crUniqueStringList([domLocator]);
   const extractionIds = _crUniqueStringList(ctx.extraction_ids || []);
   return {
     block_index: Number.isFinite(index) ? index : null,

@@ -52,6 +52,8 @@ def _renderer_harness() -> str:
         "_crBlockProvenanceWithinSpan",
         "_crBlockMatchesSpan",
         "_crBlockMatchesSpanPoint",
+        "_crDisplaySourceSpanForPoint",
+        "_crSpanPointOffsetInBlock",
         "_crSpanRangeForBlock",
         "_crPushNonOverlappingRange",
         "_crHighlightSortKey",
@@ -499,10 +501,13 @@ process.stdout.write(JSON.stringify({htmls}));
     )
 
     assert 'data-highlight-id="' + highlight_id + '"' not in render["htmls"][0]
-    assert 'data-highlight-id="' + highlight_id + '"' not in render["htmls"][4]
-    assert all(render["htmls"][i].count('data-highlight-id="' + highlight_id + '"') == 1 for i in (1, 2, 3))
+    assert 'data-highlight-id="' + highlight_id + '"' not in render["htmls"][2]
+    assert len(render["htmls"]) == 3
+    assert render["htmls"][1].count('data-highlight-id="' + highlight_id + '"') == 1
     assert render["htmls"][1].startswith("The walls displayed ")
-    assert ">titled POST-PUBLICATION CONVERSION</span> PLAN." in render["htmls"][3]
+    assert ">photographs of clients" in render["htmls"][1]
+    assert ">photographs" in render["htmls"][1]
+    assert "CONVERSION</span> PLAN." in render["htmls"][1]
 
     conn = sqlite3.connect(db_path)
     count = conn.execute("SELECT COUNT(*) FROM reader_highlights").fetchone()[0]
