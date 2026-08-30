@@ -12001,7 +12001,20 @@ function _crSpanPointOffsetInBlock(blockCtx, point, text) {
   const sourceStart = _crTextOffset(sourceSpan.start, text);
   const sourceEnd = _crTextOffset(sourceSpan.end, text);
   if (sourceStart === null || sourceEnd === null || sourceEnd < sourceStart) return null;
-  return Math.max(sourceStart, Math.min(sourceEnd, sourceStart + offset));
+  const adjustments = Array.isArray(sourceSpan.offset_adjustments)
+    ? sourceSpan.offset_adjustments
+    : [];
+  let delta = 0;
+  adjustments.forEach(adjustment => {
+    const at = _crFiniteNumber(adjustment?.source_offset);
+    const nextDelta = _crFiniteNumber(adjustment?.display_delta);
+    if (at !== null && nextDelta !== null && offset >= at) delta = nextDelta;
+  });
+  return Math.max(sourceStart, Math.min(sourceEnd, sourceStart + offset + delta));
+}
+
+function _crSpanUsesProjectedOffsets(span) {
+  return span?.coordinate_space === 'reader_projection';
 }
 
 function _crSpanRangeForBlock(span, blockCtx, text) {
@@ -12017,11 +12030,15 @@ function _crSpanRangeForBlock(span, blockCtx, text) {
   let start = 0;
   let end = text.length;
   if (isStart) {
-    start = _crSpanPointOffsetInBlock(blockCtx, span.start, text);
+    start = _crSpanUsesProjectedOffsets(span)
+      ? _crTextOffset(span.start?.offset, text)
+      : _crSpanPointOffsetInBlock(blockCtx, span.start, text);
     if (start === null) return null;
   }
   if (isEnd) {
-    end = _crSpanPointOffsetInBlock(blockCtx, span.end, text);
+    end = _crSpanUsesProjectedOffsets(span)
+      ? _crTextOffset(span.end?.offset, text)
+      : _crSpanPointOffsetInBlock(blockCtx, span.end, text);
     if (end === null) return null;
   }
   if (end <= start) return null;
@@ -12712,6 +12729,7 @@ function _crEncodeReaderSpanLocator(selection = null) {
   const source = selection || _crReaderSelectionState;
   if (source?.valid && source?.blocks?.length) {
     const span = {
+      coordinate_space: 'reader_projection',
       page: source.page || null,
       start: _crReaderSpanPoint(source.start),
       end: _crReaderSpanPoint(source.end),

@@ -40,6 +40,13 @@ def _compact_whitespace(text: object) -> str:
     return "".join(str(text or "").split())
 
 
+def _projection_source_ids(block: dict[str, object]) -> list[str]:
+    projection = block.get("reader_projection")
+    if isinstance(projection, dict):
+        return [str(item) for item in projection.get("source_extraction_ids", [])]
+    return [str(block.get("source_extraction_id"))]
+
+
 def test_drop_cap_projection_merges_display_text_and_preserves_canonical_blocks() -> None:
     canonical = [
         _extraction("ext-I", 3, 2, "I"),
@@ -127,19 +134,20 @@ def test_soft_wrap_normalization_is_reader_only_and_accounted_as_incorporated() 
     assert projected[0]["text"] == (
         "The sentence breaks across layout lines with inter-pretation intact."
     )
-    assert projected[0]["reader_projection"] == {
-        "kind": "soft_wrap_normalization",
-        "source_extraction_ids": ["ext-soft"],
-        "source_locators": ["page:12:block:4"],
-        "display_source_spans": [
-            {
-                "source_extraction_id": "ext-soft",
-                "source_locator": "page:12:block:4",
-                "start": 0,
-                "end": 68,
-            },
-        ],
-    }
+    assert projected[0]["reader_projection"]["kind"] == "soft_wrap_normalization"
+    assert projected[0]["reader_projection"]["source_extraction_ids"] == ["ext-soft"]
+    assert projected[0]["reader_projection"]["source_locators"] == ["page:12:block:4"]
+    display_span = projected[0]["reader_projection"]["display_source_spans"][0]
+    assert display_span["source_extraction_id"] == "ext-soft"
+    assert display_span["source_locator"] == "page:12:block:4"
+    assert display_span["start"] == 0
+    assert display_span["end"] == 68
+    assert display_span["offset_adjustments"] == [
+        {"source_offset": 0, "display_delta": 0},
+        {"source_offset": 19, "display_delta": 1},
+        {"source_offset": 20, "display_delta": 0},
+        {"source_offset": 52, "display_delta": -1},
+    ]
     assert projected[0]["canonical_extractions"] == canonical
     assert coverage[0]["status"] == "incorporated"
     assert coverage[0]["reason"] == "soft_wrap_normalization"
@@ -166,6 +174,60 @@ def test_soft_wrap_preserves_semantic_blank_line_boundary() -> None:
     assert projected[0]["reader_projection"]["kind"] == "soft_wrap_normalization"
 
 
+def test_prose_continuation_rejects_previous_paragraph_boundary() -> None:
+    canonical = [
+        _extraction("ext-a", 5, 1, "First paragraph without terminal punctuation\n\n"),
+        _extraction("ext-b", 5, 2, "second paragraph begins here."),
+    ]
+
+    projected = project_reader_extractions(canonical)
+
+    assert len(projected) == 2
+    assert [_projection_source_ids(block) for block in projected] == [
+        ["ext-a"],
+        ["ext-b"],
+    ]
+    assert projected[0]["text"] == "First paragraph without terminal punctuation\n\n"
+    assert projected[1]["text"] == "second paragraph begins here."
+
+
+def test_prose_continuation_rejects_following_paragraph_boundary() -> None:
+    canonical = [
+        _extraction("ext-a", 5, 1, "First paragraph without terminal punctuation"),
+        _extraction("ext-b", 5, 2, "\n\nsecond paragraph begins here."),
+    ]
+
+    projected = project_reader_extractions(canonical)
+
+    assert len(projected) == 2
+    assert [_projection_source_ids(block) for block in projected] == [
+        ["ext-a"],
+        ["ext-b"],
+    ]
+    assert projected[0]["text"] == "First paragraph without terminal punctuation"
+    assert projected[1]["text"] == "\n\nsecond paragraph begins here."
+
+
+def test_chained_prose_continuation_stops_at_later_paragraph_boundary() -> None:
+    canonical = [
+        _extraction("ext-a", 5, 1, "The sentence had not yet "),
+        _extraction("ext-b", 5, 2, "become complete\n\n"),
+        _extraction("ext-c", 5, 3, "second paragraph begins here."),
+    ]
+
+    projected = project_reader_extractions(canonical)
+
+    assert len(projected) == 2
+    assert projected[0]["reader_projection"]["kind"] == "prose_continuation_merge"
+    assert projected[0]["reader_projection"]["source_extraction_ids"] == [
+        "ext-a",
+        "ext-b",
+    ]
+    assert projected[0]["text"] == "The sentence had not yet become complete\n\n"
+    assert _projection_source_ids(projected[1]) == ["ext-c"]
+    assert projected[1]["text"] == "second paragraph begins here."
+
+
 def test_prose_continuation_merges_safe_numeric_order_without_requiring_consecutive_blocks() -> None:
     canonical = [
         _extraction(
@@ -188,35 +250,25 @@ def test_prose_continuation_merges_safe_numeric_order_without_requiring_consecut
         "Elias listened while the agency described a person whose client had not yet "
         "become a bestseller but had already begun charging as if he had."
     )
-    assert projected[0]["reader_projection"] == {
-        "kind": "prose_continuation_merge",
-        "source_extraction_ids": ["ext-08", "ext-10", "ext-11"],
-        "source_locators": [
-            "page:39:block:8",
-            "page:39:block:10",
-            "page:39:block:11",
-        ],
-        "display_source_spans": [
-            {
-                "source_extraction_id": "ext-08",
-                "source_locator": "page:39:block:8",
-                "start": 0,
-                "end": 75,
-            },
-            {
-                "source_extraction_id": "ext-10",
-                "source_locator": "page:39:block:10",
-                "start": 76,
-                "end": 126,
-            },
-            {
-                "source_extraction_id": "ext-11",
-                "source_locator": "page:39:block:11",
-                "start": 127,
-                "end": 140,
-            },
-        ],
-    }
+    assert projected[0]["reader_projection"]["kind"] == "prose_continuation_merge"
+    assert projected[0]["reader_projection"]["source_extraction_ids"] == [
+        "ext-08",
+        "ext-10",
+        "ext-11",
+    ]
+    assert projected[0]["reader_projection"]["source_locators"] == [
+        "page:39:block:8",
+        "page:39:block:10",
+        "page:39:block:11",
+    ]
+    assert [
+        (span["source_extraction_id"], span["start"], span["end"])
+        for span in projected[0]["reader_projection"]["display_source_spans"]
+    ] == [
+        ("ext-08", 0, 75),
+        ("ext-10", 76, 126),
+        ("ext-11", 127, 140),
+    ]
     assert projected[0]["canonical_extractions"] == canonical
     assert [entry["status"] for entry in coverage] == [
         "incorporated",

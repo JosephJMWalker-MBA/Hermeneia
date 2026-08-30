@@ -19,6 +19,7 @@ import pytest
 
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.web.app import create_app
+from hermeneia.web.reader_projection import project_reader_extractions
 
 
 INDEX = Path(__file__).parent.parent / "hermeneia" / "web" / "static" / "index.html"
@@ -54,6 +55,7 @@ def _renderer_harness() -> str:
         "_crBlockMatchesSpanPoint",
         "_crDisplaySourceSpanForPoint",
         "_crSpanPointOffsetInBlock",
+        "_crSpanUsesProjectedOffsets",
         "_crSpanRangeForBlock",
         "_crPushNonOverlappingRange",
         "_crHighlightSortKey",
@@ -187,6 +189,194 @@ process.stdout.write(JSON.stringify({html}));
     assert result["html"].startswith("dashboard before ")
     assert ">dashboard selected</span> dashboard after" in result["html"]
     assert result["html"].count('data-highlight-id="hl-repeat"') == 1
+
+
+def test_legacy_reader_span_offsets_map_through_soft_wrap_normalization() -> None:
+    script = _renderer_harness() + r"""
+const canonical = "This protects inter-\npretation carefully.";
+const text = "This protects inter-pretation carefully.";
+const start = canonical.indexOf("pretation");
+const end = start + "pretation".length;
+const highlight = {
+  id: "hl-legacy-softwrap",
+  page: 39,
+  status: "saved_highlight",
+  selected_text: "pretation",
+  source_locator: _CR_READER_SPAN_LOCATOR_PREFIX + encodeURIComponent(JSON.stringify({
+    page: 39,
+    start: {block_index: 0, source_locator: "page:39:block:5", source_locators: ["page:39:block:5"], extraction_ids: ["ext-5"], offset: start},
+    end: {block_index: 0, source_locator: "page:39:block:5", source_locators: ["page:39:block:5"], extraction_ids: ["ext-5"], offset: end},
+    blocks: [{block_index: 0, source_locator: "page:39:block:5", source_locators: ["page:39:block:5"], extraction_ids: ["ext-5"]}],
+    source_locators: ["page:39:block:5"],
+    extraction_ids: ["ext-5"]
+  }))
+};
+const html = _crRenderTextWithHighlights(text, [highlight], [], {
+  block_index: 0,
+  page: 39,
+  source_locator: "page:39:block:5",
+  source_locators: ["page:39:block:5"],
+  extraction_ids: ["ext-5"],
+  display_source_spans: [{
+    source_extraction_id: "ext-5",
+    source_locator: "page:39:block:5",
+    start: 0,
+    end: text.length,
+    offset_adjustments: [
+      {source_offset: 0, display_delta: 0},
+      {source_offset: canonical.indexOf("pretation"), display_delta: -1}
+    ]
+  }]
+});
+process.stdout.write(JSON.stringify({html}));
+"""
+    result = _run_node(script)
+
+    assert (
+        result["html"]
+        == 'This protects inter-<span class="cr-inline-highlight" '
+        'data-highlight-id="hl-legacy-softwrap" title="p.39">pretation</span> carefully.'
+    )
+
+
+def test_legacy_reader_span_end_offset_after_removed_soft_wrap_newline_maps_exactly() -> None:
+    script = _renderer_harness() + r"""
+const canonical = "This protects inter-\npretation carefully.";
+const text = "This protects inter-pretation carefully.";
+const start = canonical.indexOf("pretation");
+const end = canonical.indexOf(".");
+const highlight = {
+  id: "hl-legacy-end-softwrap",
+  page: 39,
+  status: "saved_highlight",
+  selected_text: "pretation carefully",
+  source_locator: _CR_READER_SPAN_LOCATOR_PREFIX + encodeURIComponent(JSON.stringify({
+    page: 39,
+    start: {block_index: 0, source_locator: "page:39:block:5", source_locators: ["page:39:block:5"], extraction_ids: ["ext-5"], offset: start},
+    end: {block_index: 0, source_locator: "page:39:block:5", source_locators: ["page:39:block:5"], extraction_ids: ["ext-5"], offset: end},
+    blocks: [{block_index: 0, source_locator: "page:39:block:5", source_locators: ["page:39:block:5"], extraction_ids: ["ext-5"]}],
+    source_locators: ["page:39:block:5"],
+    extraction_ids: ["ext-5"]
+  }))
+};
+const html = _crRenderTextWithHighlights(text, [highlight], [], {
+  block_index: 0,
+  page: 39,
+  source_locator: "page:39:block:5",
+  source_locators: ["page:39:block:5"],
+  extraction_ids: ["ext-5"],
+  display_source_spans: [{
+    source_extraction_id: "ext-5",
+    source_locator: "page:39:block:5",
+    start: 0,
+    end: text.length,
+    offset_adjustments: [
+      {source_offset: 0, display_delta: 0},
+      {source_offset: canonical.indexOf("pretation"), display_delta: -1}
+    ]
+  }]
+});
+process.stdout.write(JSON.stringify({html}));
+"""
+    result = _run_node(script)
+
+    assert (
+        result["html"]
+        == 'This protects inter-<span class="cr-inline-highlight" '
+        'data-highlight-id="hl-legacy-end-softwrap" title="p.39">pretation carefully</span>.'
+    )
+
+
+def test_legacy_reader_span_offsets_map_through_trimmed_line_whitespace() -> None:
+    canonical = "  Indented line\n  selected word remains."
+    projected = project_reader_extractions([
+        {
+            "id": "ext-indent",
+            "page": 39,
+            "region": "block:5",
+            "raw_text": canonical,
+            "source_locator": "page:39:block:5",
+        }
+    ])[0]
+    start = canonical.index("selected")
+    end = start + len("selected word")
+    script = _renderer_harness() + "\nconst projected=" + json.dumps(projected) + r""";
+const highlight = {
+  id: "hl-legacy-indent",
+  page: 39,
+  status: "saved_highlight",
+  selected_text: "selected word",
+  source_locator: _CR_READER_SPAN_LOCATOR_PREFIX + encodeURIComponent(JSON.stringify({
+    page: 39,
+    start: {block_index: 0, source_locator: "page:39:block:5", source_locators: ["page:39:block:5"], extraction_ids: ["ext-indent"], offset: inputStart},
+    end: {block_index: 0, source_locator: "page:39:block:5", source_locators: ["page:39:block:5"], extraction_ids: ["ext-indent"], offset: inputEnd},
+    blocks: [{block_index: 0, source_locator: "page:39:block:5", source_locators: ["page:39:block:5"], extraction_ids: ["ext-indent"]}],
+    source_locators: ["page:39:block:5"],
+    extraction_ids: ["ext-indent"]
+  }))
+};
+const html = _crRenderTextWithHighlights(projected.text, [highlight], [], _crReaderBlockContext(projected, 0, 39));
+process.stdout.write(JSON.stringify({text: projected.text, html}));
+""".replace("inputStart", str(start)).replace("inputEnd", str(end))
+    result = _run_node(script)
+
+    assert result["text"] == "Indented line selected word remains."
+    assert (
+        result["html"]
+        == 'Indented line <span class="cr-inline-highlight" '
+        'data-highlight-id="hl-legacy-indent" title="p.39">selected word</span> remains.'
+    )
+
+
+def test_new_reader_span_offsets_remain_projected_display_relative() -> None:
+    script = _renderer_harness() + r"""
+const canonical = "This protects inter-\npretation carefully.";
+const text = "This protects inter-pretation carefully.";
+const start = text.indexOf("pretation");
+const end = start + "pretation".length;
+const highlight = {
+  id: "hl-new-projected",
+  page: 39,
+  status: "saved_highlight",
+  selected_text: "pretation",
+  source_locator: _crEncodeReaderSpanLocator({
+    valid: true,
+    page: 39,
+    start: {block_index: 0, source_locator: "page:39:block:5", source_locators: ["page:39:block:5"], extraction_ids: ["ext-5"], offset: start},
+    end: {block_index: 0, source_locator: "page:39:block:5", source_locators: ["page:39:block:5"], extraction_ids: ["ext-5"], offset: end},
+    blocks: [{block_index: 0, source_locator: "page:39:block:5", source_locators: ["page:39:block:5"], extraction_ids: ["ext-5"]}],
+    source_locators: ["page:39:block:5"],
+    extraction_ids: ["ext-5"]
+  })
+};
+const decoded = _crDecodeReaderSpanLocator(highlight.source_locator);
+const html = _crRenderTextWithHighlights(text, [highlight], [], {
+  block_index: 0,
+  page: 39,
+  source_locator: "page:39:block:5",
+  source_locators: ["page:39:block:5"],
+  extraction_ids: ["ext-5"],
+  display_source_spans: [{
+    source_extraction_id: "ext-5",
+    source_locator: "page:39:block:5",
+    start: 0,
+    end: text.length,
+    offset_adjustments: [
+      {source_offset: 0, display_delta: 0},
+      {source_offset: canonical.indexOf("pretation"), display_delta: -1}
+    ]
+  }]
+});
+process.stdout.write(JSON.stringify({coordinateSpace: decoded.coordinate_space, html}));
+"""
+    result = _run_node(script)
+
+    assert result["coordinateSpace"] == "reader_projection"
+    assert (
+        result["html"]
+        == 'This protects inter-<span class="cr-inline-highlight" '
+        'data-highlight-id="hl-new-projected" title="p.39">pretation</span> carefully.'
+    )
 
 
 def test_reader_span_provenance_vetoes_stale_block_indexes() -> None:

@@ -53,6 +53,7 @@ def _run_node(script: str, payload: object | None = None) -> dict:
         "_crBlockMatchesSpanPoint",
         "_crDisplaySourceSpanForPoint",
         "_crSpanPointOffsetInBlock",
+        "_crSpanUsesProjectedOffsets",
         "_crSpanRangeForBlock",
         "_crPushNonOverlappingRange",
         "_crHighlightSortKey",

@@ -3,10 +3,18 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 
 _BLOCK_REGION = re.compile(r"block:(\d+)")
-_PARAGRAPH_BREAK = re.compile(r"\n{2,}")
+_PARAGRAPH_BREAK = re.compile(r"(?:[ \t\f\v]*(?:\r\n|\r|\n)){2,}[ \t\f\v]*")
+_LINE_BREAK = re.compile(r"\r\n|\r|\n")
+
+
+@dataclass(frozen=True)
+class _DisplayProjection:
+    text: str
+    offset_adjustments: list[dict[str, int]]
 
 
 class ReaderProjectionCoverageError(RuntimeError):
@@ -29,20 +37,133 @@ def _block_index(extraction: Mapping[str, object]) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def _trim_horizontal_bounds(text: str, start: int, end: int) -> tuple[int, int]:
+    while start < end and text[start] in " \t\f\v":
+        start += 1
+    while end > start and text[end - 1] in " \t\f\v":
+        end -= 1
+    return start, end
+
+
+def _append_source_slice(
+    output: list[str],
+    boundary_map: list[int | None],
+    text: str,
+    start: int,
+    end: int,
+) -> None:
+    for pos in range(start, end):
+        boundary_map[pos] = len(output)
+        output.append(text[pos])
+        boundary_map[pos + 1] = len(output)
+
+
+def _map_skipped_source(
+    boundary_map: list[int | None],
+    start: int,
+    end: int,
+    display_offset: int,
+) -> None:
+    for pos in range(start, end):
+        boundary_map[pos] = display_offset
+        boundary_map[pos + 1] = display_offset
+
+
+def _paragraph_ranges(text: str) -> list[tuple[int, int]]:
+    matches = list(_PARAGRAPH_BREAK.finditer(text))
+    ranges: list[tuple[int, int]] = []
+    start = 0
+    for match in matches:
+        ranges.append((start, match.start()))
+        start = match.end()
+    ranges.append((start, len(text)))
+    return ranges
+
+
+def _line_ranges(text: str, start: int, end: int) -> list[tuple[int, int, int, int]]:
+    ranges: list[tuple[int, int, int, int]] = []
+    cursor = start
+    preceding_break = (start, start)
+    for match in _LINE_BREAK.finditer(text, start, end):
+        ranges.append((cursor, match.start(), preceding_break[0], preceding_break[1]))
+        cursor = match.end()
+        preceding_break = (match.start(), match.end())
+    ranges.append((cursor, end, preceding_break[0], preceding_break[1]))
+    return ranges
+
+
+def _offset_adjustments(boundary_map: Sequence[int | None]) -> list[dict[str, int]]:
+    adjustments: list[dict[str, int]] = []
+    current_delta: int | None = None
+    last_display = 0
+    for source_offset, mapped in enumerate(boundary_map):
+        display_offset = last_display if mapped is None else mapped
+        last_display = display_offset
+        delta = display_offset - source_offset
+        if delta != current_delta:
+            adjustments.append({
+                "source_offset": source_offset,
+                "display_delta": delta,
+            })
+            current_delta = delta
+    return adjustments
+
+
+def _normalize_prose_display(raw_text: object) -> _DisplayProjection:
+    """Collapse layout soft-wraps and retain source-offset mapping metadata."""
+    text = str(raw_text or "")
+    output: list[str] = []
+    boundary_map: list[int | None] = [None] * (len(text) + 1)
+    boundary_map[0] = 0
+    paragraph_ranges = _paragraph_ranges(text)
+
+    for paragraph_index, (paragraph_start, paragraph_end) in enumerate(paragraph_ranges):
+        if paragraph_index > 0:
+            output.extend(["\n", "\n"])
+        line_ranges = _line_ranges(text, paragraph_start, paragraph_end)
+        appended_line = False
+        previous_ended_hyphen = False
+        for line_start, line_end, break_start, break_end in line_ranges:
+            trimmed_start, trimmed_end = _trim_horizontal_bounds(
+                text,
+                line_start,
+                line_end,
+            )
+            _map_skipped_source(boundary_map, line_start, trimmed_start, len(output))
+            if trimmed_start == trimmed_end:
+                _map_skipped_source(boundary_map, break_start, break_end, len(output))
+                _map_skipped_source(boundary_map, trimmed_end, line_end, len(output))
+                continue
+            if appended_line:
+                if not previous_ended_hyphen:
+                    output.append(" ")
+                _map_skipped_source(boundary_map, break_start, break_end, len(output))
+            _append_source_slice(output, boundary_map, text, trimmed_start, trimmed_end)
+            _map_skipped_source(boundary_map, trimmed_end, line_end, len(output))
+            previous_ended_hyphen = bool(output and output[-1] == "-")
+            appended_line = True
+        if paragraph_index < len(paragraph_ranges) - 1:
+            next_start = paragraph_ranges[paragraph_index + 1][0]
+            _map_skipped_source(boundary_map, paragraph_end, next_start, len(output) + 2)
+
+    boundary_map[-1] = len(output)
+    return _DisplayProjection(
+        text="".join(output),
+        offset_adjustments=_offset_adjustments(boundary_map),
+    )
+
+
 def _normalize_prose_display_text(raw_text: object) -> str:
     """Collapse layout soft-wraps for Reader display without changing evidence."""
-    text = str(raw_text or "").replace("\r\n", "\n").replace("\r", "\n")
-    paragraphs = []
-    for paragraph in _PARAGRAPH_BREAK.split(text):
-        lines = [line.strip(" \t\f\v") for line in paragraph.split("\n")]
-        merged = lines[0] if lines else ""
-        for line in lines[1:]:
-            if merged.rstrip().endswith("-"):
-                merged = merged.rstrip() + line.lstrip()
-            else:
-                merged = merged.rstrip() + " " + line.lstrip()
-        paragraphs.append(merged.strip(" \t\f\v"))
-    return "\n\n".join(paragraphs)
+    return _normalize_prose_display(raw_text).text
+
+
+def _ends_with_paragraph_boundary(raw_text: object) -> bool:
+    return bool(re.search(r"(?:[ \t\f\v]*(?:\r\n|\r|\n)){2,}[ \t\f\v]*$", str(raw_text or "")))
+
+
+def _begins_with_paragraph_boundary(raw_text: object) -> bool:
+    return bool(re.match(r"^[ \t\f\v]*(?:(?:\r\n|\r|\n)[ \t\f\v]*){2,}", str(raw_text or "")))
 
 
 def _projection_source_metadata(
@@ -122,6 +243,8 @@ def _is_safe_prose_continuation(
         previous.get("page") == following.get("page")
         and _is_ordinary_block_extraction(previous)
         and _is_ordinary_block_extraction(following)
+        and not _ends_with_paragraph_boundary(previous_text)
+        and not _begins_with_paragraph_boundary(following_text)
         and previous_trimmed
         and following_trimmed
         and first_following
@@ -134,7 +257,8 @@ def _is_safe_prose_continuation(
 
 
 def _project_single(extraction: Mapping[str, object]) -> dict[str, object]:
-    text = _normalize_prose_display_text(extraction.get("raw_text"))
+    display = _normalize_prose_display(extraction.get("raw_text"))
+    text = display.text
     if text != str(extraction.get("raw_text") or ""):
         canonical = [_canonical_extraction(extraction)]
         source_ids, source_locators, _regions = _projection_source_metadata(canonical)
@@ -152,6 +276,7 @@ def _project_single(extraction: Mapping[str, object]) -> dict[str, object]:
                         "source_locator": source_locators[0],
                         "start": 0,
                         "end": len(text),
+                        "offset_adjustments": display.offset_adjustments,
                     }
                 ],
             },
@@ -226,21 +351,21 @@ def _project_prose_continuation_group(
 ) -> dict[str, object]:
     canonical = [_canonical_extraction(extraction) for extraction in group]
     source_ids, source_locators, regions = _projection_source_metadata(canonical)
-    text, spans = _join_prose_continuation([
-        _normalize_prose_display_text(extraction.get("raw_text"))
-        for extraction in group
-    ])
+    displays = [_normalize_prose_display(extraction.get("raw_text")) for extraction in group]
+    text, spans = _join_prose_continuation([display.text for display in displays])
     display_source_spans = [
         {
             "source_extraction_id": source_id,
             "source_locator": source_locator,
             "start": start,
             "end": end,
+            "offset_adjustments": display.offset_adjustments,
         }
-        for source_id, source_locator, (start, end) in zip(
+        for source_id, source_locator, (start, end), display in zip(
             source_ids,
             source_locators,
             spans,
+            displays,
             strict=True,
         )
     ]
