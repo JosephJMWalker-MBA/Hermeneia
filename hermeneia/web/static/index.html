@@ -4420,6 +4420,9 @@ function _wsApplyCurrentWorkspace(workspace) {
   if (workspaceChanged && typeof _crResetPerspectiveRoomStateForWorkspaceChange === 'function') {
     _crResetPerspectiveRoomStateForWorkspaceChange();
   }
+  if (workspaceChanged && typeof _crResetBlueprintWorkingStateForWorkspaceChange === 'function') {
+    _crResetBlueprintWorkingStateForWorkspaceChange();
+  }
   const chip = document.getElementById('runtime-workspace-chip');
   const name = document.getElementById('runtime-workspace-name');
   if (name) name.textContent = workspace.name || 'Workspace';
@@ -10641,8 +10644,14 @@ async function _crLoadBlueprintDraft() {
   const btn    = document.getElementById('cr-blueprint-btn');
   const propEl = document.getElementById('cr-blueprint-proposal');
   const thesis = (invLoad()?.thesis || '').trim();
-  _crBlueprintCandidate = null;
-  if (propEl) { propEl.style.display = 'none'; propEl.innerHTML = ''; }
+  if (propEl) {
+    if (_crBlueprintCandidate) {
+      _crRenderBlueprintCandidate(_crBlueprintCandidate, 'working');
+    } else {
+      propEl.style.display = 'none';
+      propEl.innerHTML = '';
+    }
+  }
   if (qEl) {
     qEl.innerHTML = thesis
       ? `<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2);margin-bottom:4px">Governing question</div>`
@@ -10797,6 +10806,7 @@ async function _crCommitBlueprintCandidate() {
     _crBlueprintCandidate = data.committed_blueprint || _crBlueprintCandidate;
     _crActiveBlueprintId = data.blueprint_id || '';
     _crRenderBlueprintCandidate(_crBlueprintCandidate, 'committed', data);
+    _crBlueprintCandidate = null;
   } catch (err) {
     _crRenderBlueprintCandidate(_crBlueprintCandidate, 'working', null, err.message);
   } finally {
@@ -10808,11 +10818,22 @@ async function _crDraftBlueprint(save) {
   if (save) return _crCommitBlueprintCandidate();
   return _crGenerateBlueprintCandidate();
 }
+function _crResetBlueprintWorkingStateForWorkspaceChange() {
+  _crBlueprintCandidate = null;
+  const propEl = document.getElementById('cr-blueprint-proposal');
+  if (propEl) {
+    propEl.style.display = 'none';
+    propEl.innerHTML = '';
+  }
+  const btn = document.getElementById('cr-blueprint-btn');
+  if (btn) btn.textContent = 'Generate candidate';
+}
 window._crLoadBlueprintDraft = _crLoadBlueprintDraft;
 window._crDraftBlueprint = _crDraftBlueprint;
 window._crGenerateBlueprintCandidate = _crGenerateBlueprintCandidate;
 window._crCommitBlueprintCandidate = _crCommitBlueprintCandidate;
 window._crRenderBlueprintCandidate = _crRenderBlueprintCandidate;
+window._crResetBlueprintWorkingStateForWorkspaceChange = _crResetBlueprintWorkingStateForWorkspaceChange;
 
 // ── Structure Preview (Blueprint resource nested view) ───────────────────
 // A saved Blueprint shown as an evidence-backed essay skeleton: title, thesis,
