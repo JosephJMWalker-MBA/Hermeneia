@@ -1,10 +1,10 @@
 """Thesis → Blueprint workflow (PR 6).
 
 A forward path from the reader's governing question + captured evidence to a
-proposed Intent Hypothesis, living as a fourth tab in the shared bottom
-workstation (beside Search / Timeline / Field Notes). It reuses the existing
+proposed Intent Hypothesis, living under the Blueprint resource in the shared
+bottom workstation. It reuses the existing
 extract-blueprint endpoint — no new route, no schema change. These tests guard
-the markup, the workstation-mode wiring, endpoint reuse, and the seed sources.
+the markup, the resource/mode wiring, endpoint reuse, and the seed sources.
 """
 from __future__ import annotations
 
@@ -21,9 +21,11 @@ def _index() -> str:
 
 def test_blueprint_tab_and_panel_present():
     index = _index()
-    assert 'id="cr-bottom-tab-blueprint"' in index
-    assert 'data-workstation-mode="blueprint"' in index
-    assert 'aria-controls="cr-blueprint-draft"' in index
+    assert 'id="cr-bottom-resource-blueprint"' in index
+    assert 'data-workstation-resource="blueprint"' in index
+    assert 'aria-controls="cr-blueprint-draft cr-render-preview cr-critic-audit"' in index
+    assert 'id="cr-blueprint-subtab-build"' in index
+    assert 'data-workstation-submode="blueprint"' in index
     assert "_crOpenBottomWorkstation('blueprint')" in index
     # Panel exists and starts hidden.
     assert 'id="cr-blueprint-draft"' in index
@@ -33,10 +35,11 @@ def test_blueprint_tab_and_panel_present():
 def test_blueprint_is_a_workstation_mode_not_a_separate_drawer():
     index = _index()
     # Registered in the mutually-exclusive panel map, the open branch, and the
-    # tab bindings — so _crSyncBottomWorkstationState shows only one at a time.
+    # resource bindings — so _crSyncBottomWorkstationState shows only one at a time.
     assert "blueprint: document.getElementById('cr-blueprint-draft')" in index
     assert "else if (mode === 'blueprint')" in index
-    assert "['cr-bottom-tab-blueprint', () => _crOpenBottomWorkstation('blueprint')]" in index
+    assert "['cr-bottom-resource-blueprint', () => _crOpenBottomWorkstation('blueprint')]" in index
+    assert "if (mode === 'render' || mode === 'critic') return 'blueprint';" in index
 
 
 def test_blueprint_reuses_existing_endpoint_without_a_new_route():

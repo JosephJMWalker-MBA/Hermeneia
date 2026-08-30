@@ -1310,16 +1310,26 @@ body.reader-active .cr-tool-drawer { max-width: none; }
   background: color-mix(in srgb, var(--surface) 84%, var(--accent));
 }
 .cr-bottom-workstation-title {
+  flex: 0 0 auto;
   font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--dim2);
 }
-.cr-bottom-workstation-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.cr-bottom-workstation-tabs {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; gap: 6px; flex-wrap: nowrap;
+  overflow-x: auto; scrollbar-width: thin;
+}
 .cr-bottom-workstation-tab,
 .cr-bottom-workstation-close {
   font: inherit; font-size: 12px; cursor: pointer;
   border-radius: 999px; padding: 5px 12px;
 }
 .cr-bottom-workstation-tab {
+  flex: 0 0 auto;
   background: var(--surface2); border: 1px solid var(--border); color: var(--fg2);
+}
+.cr-bottom-workstation-tab:focus-visible,
+.cr-bottom-workstation-close:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
 }
 .cr-bottom-workstation-tab:hover,
 .cr-bottom-workstation-close:hover { border-color: var(--accent); color: var(--fg); }
@@ -1328,11 +1338,18 @@ body.reader-active .cr-tool-drawer { max-width: none; }
   background: var(--accent2); font-weight: 600;
 }
 .cr-bottom-workstation-close {
-  margin-left: auto;
+  flex: 0 0 auto;
   background: none; border: 1px solid var(--border); color: var(--dim2);
 }
 .cr-bottom-workstation-body { flex: 1; min-height: 0; }
-/* Render Preview — Blueprint as an evidence-backed essay skeleton. */
+.cr-workstation-subtabs {
+  display: flex; gap: 6px; align-items: center;
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 92%, var(--accent));
+  overflow-x: auto; scrollbar-width: thin;
+}
+.cr-workstation-subtabs[hidden] { display: none; }
+/* Structure Preview — Blueprint as an evidence-backed essay skeleton. */
 .cr-render-doc { max-width: 780px; }
 .cr-render-kicker { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim2); font-weight: 700; }
 .cr-render-plan-badge { text-transform: none; letter-spacing: 0; margin-left: 8px; font-size: 10px; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 20px; padding: 0 8px; }
@@ -2147,9 +2164,6 @@ body.has-workflow-rail { padding-bottom: 40px; }
 }
 @media (max-width: 900px) {
   .cr-bottom-workstation { height: min(48vh, 320px); }
-  .cr-bottom-workstation-head { flex-wrap: wrap; align-items: flex-start; }
-  .cr-bottom-workstation-title { width: 100%; }
-  .cr-bottom-workstation-close { margin-left: 0; }
   body.has-workflow-rail.has-bottom-workstation { padding-bottom: 352px; }
   body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 312px; }
 }
@@ -2919,26 +2933,32 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
   </div>
 </div>
 
-<!-- Bottom workstation: one collapsible shell for Search Corpus, Timeline,
-     and Field Notes. The Reader remains above; these tools now switch modes
-     instead of opening as separate competing panels. -->
+<!-- Bottom workstation: one collapsible shell for Reader resources. The Reader
+     remains above; these tools switch modes instead of opening as competing panels. -->
 <section class="cr-bottom-workstation" id="cr-bottom-workstation" hidden aria-label="Bottom workstation">
   <div class="cr-bottom-workstation-head">
     <span class="cr-bottom-workstation-title">Bottom workstation</span>
-    <div class="cr-bottom-workstation-tabs" role="tablist" aria-label="Reader workstation modes">
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-search" data-workstation-mode="search" type="button" role="tab" aria-controls="corpus-search" aria-selected="false" onclick="_crOpenBottomWorkstation('search')">Search Corpus</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-timeline" data-workstation-mode="timeline" type="button" role="tab" aria-controls="attn-timeline" aria-selected="false" onclick="_crOpenBottomWorkstation('timeline')">Timeline</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-fieldnotes" data-workstation-mode="fieldnotes" type="button" role="tab" aria-controls="cr-fln-tray" aria-selected="false" onclick="_crOpenBottomWorkstation('fieldnotes')">Field Notes</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-blueprint" data-workstation-mode="blueprint" type="button" role="tab" aria-controls="cr-blueprint-draft" aria-selected="false" onclick="_crOpenBottomWorkstation('blueprint')">Blueprint</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-render" data-workstation-mode="render" type="button" role="tab" aria-controls="cr-render-preview" aria-selected="false" onclick="_crOpenBottomWorkstation('render')">Render</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-critic" data-workstation-mode="critic" type="button" role="tab" aria-controls="cr-critic-audit" aria-selected="false" onclick="_crOpenBottomWorkstation('critic')">Critic</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-voice" data-workstation-mode="voice" type="button" role="tab" aria-controls="cr-voice-profile" aria-selected="false" onclick="_crOpenBottomWorkstation('voice')">Voice</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-draft" data-workstation-mode="draft" type="button" role="tab" aria-controls="cr-artist-draft" aria-selected="false" onclick="_crOpenBottomWorkstation('draft')">Draft</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-tab-record" data-workstation-mode="record" type="button" role="tab" aria-controls="cr-record-ledger" aria-selected="false" onclick="_crOpenBottomWorkstation('record')">Record</button>
+    <div class="cr-bottom-workstation-tabs" role="tablist" aria-label="Reader workstation resources">
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-search" data-workstation-resource="search" type="button" role="tab" aria-controls="corpus-search" aria-selected="false" onclick="_crOpenBottomWorkstation('search')">Search</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-timeline" data-workstation-resource="timeline" type="button" role="tab" aria-controls="attn-timeline" aria-selected="false" onclick="_crOpenBottomWorkstation('timeline')">Timeline</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-notes" data-workstation-resource="notes" type="button" role="tab" aria-controls="cr-fln-tray" aria-selected="false" onclick="_crOpenBottomWorkstation('fieldnotes')">Notes</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-perspective" data-workstation-resource="perspective" type="button" role="tab" aria-controls="cr-perspective-run" aria-selected="false" onclick="_crOpenBottomWorkstation('perspective')">Perspective</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-blueprint" data-workstation-resource="blueprint" type="button" role="tab" aria-controls="cr-blueprint-draft cr-render-preview cr-critic-audit" aria-selected="false" onclick="_crOpenBottomWorkstation('blueprint')">Blueprint</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-expression" data-workstation-resource="expression" type="button" role="tab" aria-controls="cr-voice-profile cr-artist-draft" aria-selected="false" onclick="_crOpenBottomWorkstation('voice')">Expression</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-record" data-workstation-resource="record" type="button" role="tab" aria-controls="cr-record-ledger" aria-selected="false" onclick="_crOpenBottomWorkstation('record')">Record</button>
     </div>
     <button class="cr-bottom-workstation-close" type="button" onclick="_crCloseBottomWorkstation()" aria-label="Collapse bottom workstation">Collapse</button>
   </div>
   <div class="cr-bottom-workstation-body">
+    <div class="cr-workstation-subtabs" id="cr-blueprint-subtabs" role="tablist" aria-label="Blueprint views" hidden>
+      <button class="cr-bottom-workstation-tab" id="cr-blueprint-subtab-build" data-workstation-submode="blueprint" type="button" role="tab" aria-controls="cr-blueprint-draft" aria-selected="false" onclick="_crOpenBottomWorkstation('blueprint')">Build</button>
+      <button class="cr-bottom-workstation-tab" id="cr-blueprint-subtab-structure" data-workstation-submode="render" type="button" role="tab" aria-controls="cr-render-preview" aria-selected="false" onclick="_crOpenBottomWorkstation('render')">Structure</button>
+      <button class="cr-bottom-workstation-tab" id="cr-blueprint-subtab-check" data-workstation-submode="critic" type="button" role="tab" aria-controls="cr-critic-audit" aria-selected="false" onclick="_crOpenBottomWorkstation('critic')">Check</button>
+    </div>
+    <div class="cr-workstation-subtabs" id="cr-expression-subtabs" role="tablist" aria-label="Expression views" hidden>
+      <button class="cr-bottom-workstation-tab" id="cr-expression-subtab-voice" data-workstation-submode="voice" type="button" role="tab" aria-controls="cr-voice-profile" aria-selected="false" onclick="_crOpenBottomWorkstation('voice')">Voice</button>
+      <button class="cr-bottom-workstation-tab" id="cr-expression-subtab-draft" data-workstation-submode="draft" type="button" role="tab" aria-controls="cr-artist-draft" aria-selected="false" onclick="_crOpenBottomWorkstation('draft')">Draft</button>
+    </div>
     <aside class="corpus-search" id="corpus-search" hidden aria-label="Search the corpus">
       <div class="corpus-search-head">
         <span class="corpus-search-title">Search the corpus</span>
@@ -3095,9 +3115,9 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       </div>
     </aside>
 
-    <aside class="cr-render-preview" id="cr-render-preview" hidden aria-label="Render preview — Blueprint as an essay skeleton">
+    <aside class="cr-render-preview" id="cr-render-preview" hidden aria-label="Structure preview — Blueprint as an essay skeleton">
       <div class="cr-fln-bar">
-        <span class="cr-fln-bar-label">▤ Render Preview</span>
+        <span class="cr-fln-bar-label">▤ Structure Preview</span>
         <span class="cr-fln-count" id="cr-render-audit"></span>
         <span style="flex:1"></span>
         <select class="ob-extract-provider" id="cr-render-select" style="max-width:260px" onchange="_crRenderBlueprintSkeleton(this.value)"></select>
@@ -3109,9 +3129,9 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       </div>
     </aside>
 
-    <aside class="cr-critic-audit" id="cr-critic-audit" hidden aria-label="Critic — does this skeleton preserve the thesis and evidence?">
+    <aside class="cr-critic-audit" id="cr-critic-audit" hidden aria-label="Blueprint check — does this skeleton preserve the thesis and evidence?">
       <div class="cr-fln-bar">
-        <span class="cr-fln-bar-label">⚖ Critic</span>
+        <span class="cr-fln-bar-label">✓ Blueprint Check</span>
         <span class="cr-fln-count" id="cr-critic-summary"></span>
         <span style="flex:1"></span>
         <select class="ob-extract-provider" id="cr-critic-select" style="max-width:260px" onchange="_crAuditBlueprint(this.value)"></select>
@@ -3122,9 +3142,9 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       </div>
     </aside>
 
-    <aside class="cr-voice-profile" id="cr-voice-profile" hidden aria-label="Voice — capture the witness constraints before any drafting">
+    <aside class="cr-voice-profile" id="cr-voice-profile" hidden aria-label="Expression voice — capture the witness constraints before any drafting">
       <div class="cr-fln-bar">
-        <span class="cr-fln-bar-label">◈ Voice</span>
+        <span class="cr-fln-bar-label">◈ Expression · Voice</span>
         <span class="cr-fln-count" id="cr-voice-status"></span>
         <span style="flex:1"></span>
         <button class="cr-bottom-workstation-tab" id="cr-voice-save" type="button" onclick="_crSaveVoiceProfile()" style="margin-left:8px">Save as Expression Profile</button>
@@ -3162,12 +3182,12 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       </div>
     </aside>
 
-    <aside class="cr-artist-draft" id="cr-artist-draft" hidden aria-label="Artist draft preview — skeleton and profile rendered as prose">
+    <aside class="cr-artist-draft" id="cr-artist-draft" hidden aria-label="Expression draft preview — skeleton and profile rendered as prose">
       <div class="cr-fln-bar">
-        <span class="cr-fln-bar-label">✎ Artist Draft</span>
+        <span class="cr-fln-bar-label">✎ Expression · Draft</span>
         <span class="cr-fln-count" id="cr-draft-status"></span>
         <span style="flex:1"></span>
-        <select class="ob-extract-provider" id="cr-draft-blueprint" style="max-width:200px" title="Which Render Skeleton"></select>
+        <select class="ob-extract-provider" id="cr-draft-blueprint" style="max-width:200px" title="Which Structure Preview"></select>
         <select class="ob-extract-provider" id="cr-draft-profile" style="max-width:180px" title="Which Expression Profile (voice)"></select>
         <select class="ob-extract-provider" id="cr-draft-provider" style="max-width:150px" title="Provider">
           <option value="null">Stub (no AI)</option>
@@ -9528,11 +9548,19 @@ function _crBottomPanels() {
     record: document.getElementById('cr-record-ledger'),
   };
 }
+function _crWorkstationResourceForMode(mode) {
+  if (mode === 'fieldnotes') return 'notes';
+  if (mode === 'render' || mode === 'critic') return 'blueprint';
+  if (mode === 'voice' || mode === 'draft') return 'expression';
+  return mode || '';
+}
 function _crSyncBottomWorkstationState() {
   const shell = document.getElementById('cr-bottom-workstation');
   const panels = _crBottomPanels();
   const open = !!(shell && !shell.hidden && _crBottomMode);
+  const activeResource = open ? _crWorkstationResourceForMode(_crBottomMode) : '';
   if (shell) shell.dataset.mode = _crBottomMode || '';
+  if (shell) shell.dataset.resource = activeResource;
   document.body.classList.toggle('has-bottom-workstation', open);
   Object.entries(panels).forEach(([mode, panel]) => {
     if (!panel) return;
@@ -9541,11 +9569,25 @@ function _crSyncBottomWorkstationState() {
     if (mode === 'timeline') panel.classList.toggle('open', active);
     if (mode === 'fieldnotes') panel.dataset.open = active ? '1' : '0';
   });
+  document.querySelectorAll('[data-workstation-resource]').forEach(btn => {
+    const active = open && btn.dataset.workstationResource === activeResource;
+    btn.classList.toggle('active', active);
+    if (btn.getAttribute('role') === 'tab') btn.setAttribute('aria-selected', String(active));
+  });
   document.querySelectorAll('[data-workstation-mode]').forEach(btn => {
     const active = open && btn.dataset.workstationMode === _crBottomMode;
     btn.classList.toggle('active', active);
     if (btn.getAttribute('role') === 'tab') btn.setAttribute('aria-selected', String(active));
   });
+  document.querySelectorAll('[data-workstation-submode]').forEach(btn => {
+    const active = open && btn.dataset.workstationSubmode === _crBottomMode;
+    btn.classList.toggle('active', active);
+    if (btn.getAttribute('role') === 'tab') btn.setAttribute('aria-selected', String(active));
+  });
+  const blueprintTabs = document.getElementById('cr-blueprint-subtabs');
+  const expressionTabs = document.getElementById('cr-expression-subtabs');
+  if (blueprintTabs) blueprintTabs.hidden = !(open && activeResource === 'blueprint');
+  if (expressionTabs) expressionTabs.hidden = !(open && activeResource === 'expression');
 }
 async function _crOpenBottomWorkstation(mode) {
   const shell = document.getElementById('cr-bottom-workstation');
@@ -10671,7 +10713,7 @@ async function _crDraftBlueprint(save) {
         </div>
         ${data.blueprint_id ? `
         <div class="ob-extract-actions">
-          <button class="btn-primary" onclick="_crOpenBottomWorkstation('render')">See it as a skeleton →</button>
+          <button class="btn-primary" onclick="_crOpenBottomWorkstation('render')">Review Structure →</button>
           <button class="btn-trace" onclick="e10Go('architect')">View in Architect →</button>
         </div>` : `
         <div class="ob-extract-actions">
@@ -10688,7 +10730,7 @@ async function _crDraftBlueprint(save) {
 window._crLoadBlueprintDraft = _crLoadBlueprintDraft;
 window._crDraftBlueprint = _crDraftBlueprint;
 
-// ── Render Preview (bottom workstation "Render" tab) ─────────────────────
+// ── Structure Preview (Blueprint resource nested view) ───────────────────
 // A saved Blueprint shown as an evidence-backed essay skeleton: title, thesis,
 // the claim sequence, the evidence linked under each claim, and honest warnings
 // where a claim has none. Structure + lineage + gaps — NOT generated prose, no
@@ -10728,7 +10770,7 @@ async function _crLoadRenderPreview() {
 }
 
 // Fetch a saved Blueprint and assemble it into the shared skeleton shape used by
-// both the Render Preview and the Critic audit — one source of truth. The detail
+// both the Structure Preview and the Blueprint Check — one source of truth. The detail
 // endpoint returns a flat object (title/thesis/sections/obs_texts/interp_texts/
 // architect_plan), not nested under a `blueprint` key.
 async function _crFetchSkeleton(id) {
@@ -10842,7 +10884,7 @@ window._crLoadRenderPreview = _crLoadRenderPreview;
 window._crRenderBlueprintSkeleton = _crRenderBlueprintSkeleton;
 window._crCopyRenderSkeleton = _crCopyRenderSkeleton;
 
-// ── Critic Preview (bottom workstation "Critic" tab) ─────────────────────
+// ── Blueprint Check (Blueprint resource nested view) ─────────────────────
 // Audits the current skeleton against the governing question, the Blueprint
 // thesis, and its linked evidence — BEFORE any prose exists. Deterministic and
 // client-side: every signal (grounding, drift) is a transparent structural
@@ -11121,8 +11163,8 @@ window._crVoiceDraftChanged = _crVoiceDraftChanged;
 window._crVoicePrefillFrom = _crVoicePrefillFrom;
 window._crComposeVoiceDirective = _crComposeVoiceDirective;
 
-// ── Artist Draft Preview (bottom workstation "Draft" tab) ────────────────
-// Render Skeleton + ExpressionProfile → a labeled PREVIEW of the draft. This
+// ── Expression Draft Preview (Expression resource nested view) ───────────
+// Structure Preview + ExpressionProfile → a labeled PREVIEW of the draft. This
 // is the danger point: keep it honest. It renders via the stub by default,
 // shows the structure the prose is accountable to, and NEVER saves or accepts.
 async function _crDraftRenderStructure() {
@@ -11450,15 +11492,18 @@ window._crCopyRecordText = _crCopyRecordText;
 
 function _crBindBottomWorkstationControls() {
   const bindings = [
-    ['cr-bottom-tab-search', () => _crOpenBottomWorkstation('search')],
-    ['cr-bottom-tab-timeline', () => _crOpenBottomWorkstation('timeline')],
-    ['cr-bottom-tab-fieldnotes', () => _crOpenBottomWorkstation('fieldnotes')],
-    ['cr-bottom-tab-blueprint', () => _crOpenBottomWorkstation('blueprint')],
-    ['cr-bottom-tab-render', () => _crOpenBottomWorkstation('render')],
-    ['cr-bottom-tab-critic', () => _crOpenBottomWorkstation('critic')],
-    ['cr-bottom-tab-voice', () => _crOpenBottomWorkstation('voice')],
-    ['cr-bottom-tab-draft', () => _crOpenBottomWorkstation('draft')],
-    ['cr-bottom-tab-record', () => _crOpenBottomWorkstation('record')],
+    ['cr-bottom-resource-search', () => _crOpenBottomWorkstation('search')],
+    ['cr-bottom-resource-timeline', () => _crOpenBottomWorkstation('timeline')],
+    ['cr-bottom-resource-notes', () => _crOpenBottomWorkstation('fieldnotes')],
+    ['cr-bottom-resource-perspective', () => _crOpenBottomWorkstation('perspective')],
+    ['cr-bottom-resource-blueprint', () => _crOpenBottomWorkstation('blueprint')],
+    ['cr-bottom-resource-expression', () => _crOpenBottomWorkstation('voice')],
+    ['cr-bottom-resource-record', () => _crOpenBottomWorkstation('record')],
+    ['cr-blueprint-subtab-build', () => _crOpenBottomWorkstation('blueprint')],
+    ['cr-blueprint-subtab-structure', () => _crOpenBottomWorkstation('render')],
+    ['cr-blueprint-subtab-check', () => _crOpenBottomWorkstation('critic')],
+    ['cr-expression-subtab-voice', () => _crOpenBottomWorkstation('voice')],
+    ['cr-expression-subtab-draft', () => _crOpenBottomWorkstation('draft')],
   ];
   bindings.forEach(([id, handler]) => {
     const el = document.getElementById(id);

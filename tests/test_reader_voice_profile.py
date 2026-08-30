@@ -1,6 +1,6 @@
-"""Reader "Voice" tab — capture witness constraints as an ExpressionProfile (#93).
+"""Reader Expression voice view — capture witness constraints as an ExpressionProfile (#93).
 
-A seventh tab in the Reader's bottom workstation lets the steward capture the
+A nested Expression workstation view lets the steward capture the
 witness the future draft must not erase — voice, audience, non-negotiables,
 phrases to preserve, phrases/styles to avoid, critic expectations — and save it
 as a real ExpressionProfile. Design-first: no drafting, no LLM, no voice
@@ -31,19 +31,25 @@ def _extract_fn(html: str, name: str) -> str:
 
 def test_voice_tab_and_panel_present():
     index = _index()
-    assert 'id="cr-bottom-tab-voice"' in index
-    assert 'data-workstation-mode="voice"' in index
+    assert 'id="cr-bottom-tab-voice"' not in index
+    assert 'id="cr-bottom-resource-expression"' in index
+    assert 'data-workstation-resource="expression"' in index
+    assert 'id="cr-expression-subtab-voice"' in index
+    assert 'data-workstation-submode="voice"' in index
     assert 'aria-controls="cr-voice-profile"' in index
     assert "_crOpenBottomWorkstation('voice')" in index
     assert 'id="cr-voice-profile"' in index
     assert 'id="cr-voice-profile" hidden' in index
+    assert "Expression · Voice" in index
 
 
 def test_voice_is_a_workstation_mode_not_a_separate_drawer():
     index = _index()
     assert "voice: document.getElementById('cr-voice-profile')" in index
     assert "else if (mode === 'voice')" in index
-    assert "['cr-bottom-tab-voice', () => _crOpenBottomWorkstation('voice')]" in index
+    assert "['cr-bottom-resource-expression', () => _crOpenBottomWorkstation('voice')]" in index
+    assert "['cr-expression-subtab-voice', () => _crOpenBottomWorkstation('voice')]" in index
+    assert "if (mode === 'voice' || mode === 'draft') return 'expression';" in index
 
 
 def test_voice_captures_all_witness_fields():

@@ -1,6 +1,6 @@
-"""Reader Render Preview (Blueprint → evidence-backed essay skeleton).
+"""Reader Structure Preview (Blueprint → evidence-backed essay skeleton).
 
-A fifth tab in the Reader's bottom workstation turns the saved Blueprint into a
+A nested Blueprint workstation view turns the saved Blueprint into a
 structured skeleton — title, thesis, claim sequence, the evidence linked under
 each claim, and honest warnings where a claim has none. It is NOT an essay
 generator: no Artist call, no generated prose. It reuses the read-only
@@ -23,19 +23,23 @@ def _index() -> str:
 
 def test_render_tab_and_panel_present():
     index = _index()
-    assert 'id="cr-bottom-tab-render"' in index
-    assert 'data-workstation-mode="render"' in index
+    assert 'id="cr-bottom-tab-render"' not in index
+    assert 'id="cr-blueprint-subtab-structure"' in index
+    assert 'data-workstation-submode="render"' in index
     assert 'aria-controls="cr-render-preview"' in index
     assert "_crOpenBottomWorkstation('render')" in index
     assert 'id="cr-render-preview"' in index
     assert 'id="cr-render-preview" hidden' in index
+    assert "Structure Preview" in index
+    assert "Render Preview" not in index
 
 
 def test_render_is_a_workstation_mode_not_a_separate_drawer():
     index = _index()
     assert "render: document.getElementById('cr-render-preview')" in index
     assert "else if (mode === 'render')" in index
-    assert "['cr-bottom-tab-render', () => _crOpenBottomWorkstation('render')]" in index
+    assert "['cr-blueprint-subtab-structure', () => _crOpenBottomWorkstation('render')]" in index
+    assert "if (mode === 'render' || mode === 'critic') return 'blueprint';" in index
 
 
 def test_render_reuses_existing_endpoints_without_new_routes():
