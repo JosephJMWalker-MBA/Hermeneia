@@ -221,6 +221,60 @@ def test_ratify_blueprint_exact_round_trip_and_architect_ancestry(tmp_path, monk
     assert plan_blueprint_id == body["blueprint_id"]
 
 
+def test_ratify_blueprint_persists_exact_human_edited_candidate_and_ancestry(tmp_path, monkeypatch):
+    db_path = tmp_path / "edited.db"
+    ids = _seed_evidence(db_path)
+    candidate = {
+        "title": "Edited working title",
+        "thesis": "Edited working thesis.",
+        "sections": [
+            {
+                "claim": "Claim C moved first.",
+                "supporting_observations": [ids["obs_id"]],
+                "supporting_interpretations": [],
+            },
+            {
+                "claim": "Edited claim B.",
+                "supporting_observations": [],
+                "supporting_interpretations": [ids["interp_id"]],
+            },
+            {
+                "claim": "New human claim.",
+                "supporting_observations": [],
+                "supporting_interpretations": [],
+            },
+        ],
+    }
+    monkeypatch.setattr(
+        "hermeneia.narrative.artist_providers.get_provider",
+        lambda *args, **kwargs: pytest.fail("ratify-blueprint must not instantiate a provider"),
+    )
+    client = create_app(db_path=db_path).test_client()
+
+    committed = client.post("/api/pipeline/ratify-blueprint", json={"proposed_blueprint": candidate})
+
+    assert committed.status_code == 201
+    body = committed.get_json()
+    assert body["committed_blueprint"] == candidate
+    detail = client.get(f"/api/architect/blueprints/{body['blueprint_id']}")
+    saved = detail.get_json()
+    assert saved["title"] == candidate["title"]
+    assert saved["thesis"] == candidate["thesis"]
+    assert [
+        {
+            "claim": section["claim"],
+            "supporting_observations": section["supporting_observations"],
+            "supporting_interpretations": section["supporting_interpretations"],
+        }
+        for section in saved["sections"]
+    ] == candidate["sections"]
+    assert saved["architect_plan"]["id"] == body["plan_id"]
+    assert saved["architect_plan"]["paragraphs"][0]["blueprint_section"] == 1
+    assert saved["architect_plan"]["paragraphs"][0]["required_observations"] == [ids["obs_id"]]
+    assert saved["architect_plan"]["paragraphs"][1]["blueprint_section"] == 2
+    assert saved["architect_plan"]["paragraphs"][1]["required_interpretations"] == [ids["interp_id"]]
+
+
 @pytest.mark.parametrize(
     "bad_candidate,error",
     [

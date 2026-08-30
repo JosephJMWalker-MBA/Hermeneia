@@ -53,6 +53,30 @@ def _run_node(script: str) -> dict:
     return json.loads(result.stdout)
 
 
+def _blueprint_editor_deps(html: str) -> str:
+    names = [
+        "_crBlueprintSection",
+        "_crBlueprintSections",
+        "_crBlueprintEvidenceCountText",
+        "_crBlueprintStatusBadge",
+        "_crUpdateBlueprintDirtyBadge",
+        "_crMarkBlueprintCandidateDirty",
+        "_crUpdateBlueprintTitle",
+        "_crUpdateBlueprintThesis",
+        "_crUpdateBlueprintClaim",
+        "_crMoveBlueprintClaim",
+        "_crAddBlueprintClaim",
+        "_crRemoveBlueprintClaim",
+        "_crValidateBlueprintCandidateForCommit",
+        "_crRenderBlueprintEditor",
+        "_crRenderBlueprintCandidate",
+        "_crGenerateBlueprintCandidate",
+        "_crCommitBlueprintCandidate",
+        "_crResetBlueprintWorkingStateForWorkspaceChange",
+    ]
+    return "".join(_extract_fn(html, name) for name in names)
+
+
 def test_blueprint_tab_and_panel_present():
     index = _index()
     assert 'id="cr-bottom-resource-blueprint"' in index
@@ -133,7 +157,7 @@ def test_blueprint_commit_submits_stored_candidate_not_displayed_html_or_generat
 def test_blueprint_client_flow_preserves_working_candidate_across_commit_and_failures():
     html = _index()
     script = (
-        "let _crBlueprintCandidate = null; let _crActiveBlueprintId = '';"
+        "let _crBlueprintCandidate = null; let _crBlueprintCandidateDirty = false; let _crActiveBlueprintId = '';"
         "const candidateA={title:'Reviewed A',thesis:'Thesis A.',sections:[{claim:'Claim A.',supporting_observations:['obs-1'],supporting_interpretations:[]}]};"
         "const candidateB={title:'Replacement B',thesis:'Thesis B.',sections:[{claim:'Claim B.',supporting_observations:[],supporting_interpretations:[]}]};"
         "const posts=[]; let generateFailures=0; let commitFailures=0;"
@@ -161,9 +185,7 @@ def test_blueprint_client_flow_preserves_working_candidate_across_commit_and_fai
         "}"
         "throw new Error('unexpected fetch '+url);"
         "}"
-        + _extract_fn(html, "_crRenderBlueprintCandidate")
-        + _extract_fn(html, "_crGenerateBlueprintCandidate")
-        + _extract_fn(html, "_crCommitBlueprintCandidate")
+        + _blueprint_editor_deps(html)
         + """
 (async () => {
   await _crGenerateBlueprintCandidate();
@@ -200,6 +222,7 @@ def test_blueprint_working_candidate_survives_reopening_and_resource_switches():
     html = _index()
     script = (
         "let _crBlueprintCandidate = {title:'Reviewed A',thesis:'Thesis A.',sections:[{claim:'Claim A.',supporting_observations:['obs-1'],supporting_interpretations:[]}]};"
+        "let _crBlueprintCandidateDirty = false;"
         "let _crBottomMode = ''; const loads=[]; const posts=[];"
         "function x(v){return String(v == null ? '' : v).replace(/[&<>\"']/g, c => c);}"
         "function makeEl(id){return {id,hidden:false,dataset:{},style:{display:'none'},innerHTML:'',textContent:'',disabled:false,setAttribute(){},classList:{toggle(){},remove(){}}};}"
@@ -238,8 +261,7 @@ def test_blueprint_working_candidate_survives_reopening_and_resource_switches():
         + _extract_fn(html, "_crOpenBottomWorkstation")
         + _extract_fn(html, "_crCloseBottomWorkstation")
         + _extract_fn(html, "_crLoadBlueprintDraft")
-        + _extract_fn(html, "_crRenderBlueprintCandidate")
-        + _extract_fn(html, "_crCommitBlueprintCandidate")
+        + _blueprint_editor_deps(html)
         + """
 (async () => {
   await _crOpenBottomWorkstation('blueprint');
@@ -281,6 +303,7 @@ def test_blueprint_working_candidate_survives_page_navigation():
     html = _index()
     script = (
         "let _crBlueprintCandidate = {title:'Reviewed A',thesis:'Thesis A.',sections:[{claim:'Claim A.',supporting_observations:[],supporting_interpretations:[]}]};"
+        "let _crBlueprintCandidateDirty = false;"
         "let _crPage = 1; let _crTotalPages = 2; let renders = 0;"
         "function x(v){return String(v == null ? '' : v).replace(/[&<>\"']/g, c => c);}"
         "const elements={"
@@ -297,7 +320,7 @@ def test_blueprint_working_candidate_survives_page_navigation():
         "function _crRenderPage(){renders++;}"
         "function cmpMarkOnboardingStep(){}"
         + _extract_fn(html, "_crLoadBlueprintDraft")
-        + _extract_fn(html, "_crRenderBlueprintCandidate")
+        + _blueprint_editor_deps(html)
         + _extract_fn(html, "_crNextPage")
         + _extract_fn(html, "_crPrevPage")
         + """
@@ -328,6 +351,7 @@ def test_blueprint_working_candidate_clears_only_on_confirmed_workspace_change()
     html = _index()
     script = (
         "let _crBlueprintCandidate = {title:'Reviewed A',thesis:'Thesis A.',sections:[{claim:'Claim A.',supporting_observations:[],supporting_interpretations:[]}]};"
+        "let _crBlueprintCandidateDirty = false;"
         "let _wsCurrentWorkspace = null; let resetCount = 0;"
         "function x(v){return String(v == null ? '' : v).replace(/[&<>\"']/g, c => c);}"
         "const elements={"
