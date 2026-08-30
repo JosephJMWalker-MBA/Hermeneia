@@ -1,6 +1,6 @@
-"""Reader Critic Preview (skeleton → structural audit).
+"""Reader Blueprint Check (skeleton → structural audit).
 
-A sixth tab in the Reader's bottom workstation audits the current Blueprint
+A nested Blueprint workstation view audits the current Blueprint
 skeleton BEFORE any prose exists: thesis preservation, governing-question
 alignment, evidence grounding, unsupported claims, thesis drift, and next-repair
 actions. It is deterministic and client-side — every signal is a transparent
@@ -37,19 +37,22 @@ def _extract_fn(html: str, name: str) -> str:
 
 def test_critic_tab_and_panel_present():
     index = _index()
-    assert 'id="cr-bottom-tab-critic"' in index
-    assert 'data-workstation-mode="critic"' in index
+    assert 'id="cr-bottom-tab-critic"' not in index
+    assert 'id="cr-blueprint-subtab-check"' in index
+    assert 'data-workstation-submode="critic"' in index
     assert 'aria-controls="cr-critic-audit"' in index
     assert "_crOpenBottomWorkstation('critic')" in index
     assert 'id="cr-critic-audit"' in index
     assert 'id="cr-critic-audit" hidden' in index
+    assert '<span class="cr-fln-bar-label">✓ Blueprint Check</span>' in index
 
 
 def test_critic_is_a_workstation_mode_not_a_separate_drawer():
     index = _index()
     assert "critic: document.getElementById('cr-critic-audit')" in index
     assert "else if (mode === 'critic')" in index
-    assert "['cr-bottom-tab-critic', () => _crOpenBottomWorkstation('critic')]" in index
+    assert "['cr-blueprint-subtab-check', () => _crOpenBottomWorkstation('critic')]" in index
+    assert "if (mode === 'render' || mode === 'critic') return 'blueprint';" in index
 
 
 def test_critic_reuses_existing_endpoints_without_new_routes():

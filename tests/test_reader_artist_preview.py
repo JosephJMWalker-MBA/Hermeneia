@@ -1,6 +1,6 @@
-"""Reader "Draft" tab — labeled Artist draft preview (no save, no accept).
+"""Reader Expression draft view — labeled Artist draft preview (no save, no accept).
 
-An eighth bottom-workstation tab renders Render Skeleton + ExpressionProfile
+A nested Expression workstation view renders Structure Preview + ExpressionProfile
 into a clearly-labeled draft *preview*. This is the danger point where the app
 could collapse into "AI writes essay", so these tests guard the honest framing:
 the button previews (never "generates a final essay"), the output is labeled as
@@ -26,24 +26,30 @@ def _extract_fn(html: str, name: str) -> str:
 
 def test_draft_tab_and_panel_present():
     index = _index()
-    assert 'id="cr-bottom-tab-draft"' in index
-    assert 'data-workstation-mode="draft"' in index
+    assert 'id="cr-bottom-tab-draft"' not in index
+    assert 'id="cr-bottom-resource-expression"' in index
+    assert 'data-workstation-resource="expression"' in index
+    assert 'id="cr-expression-subtab-draft"' in index
+    assert 'data-workstation-submode="draft"' in index
     assert 'aria-controls="cr-artist-draft"' in index
     assert "_crOpenBottomWorkstation('draft')" in index
     assert 'id="cr-artist-draft"' in index
     assert 'id="cr-artist-draft" hidden' in index
+    assert "Expression · Draft" in index
 
 
 def test_draft_is_a_workstation_mode_not_a_separate_drawer():
     index = _index()
     assert "draft: document.getElementById('cr-artist-draft')" in index
     assert "else if (mode === 'draft')" in index
-    assert "['cr-bottom-tab-draft', () => _crOpenBottomWorkstation('draft')]" in index
+    assert "['cr-expression-subtab-draft', () => _crOpenBottomWorkstation('draft')]" in index
+    assert "if (mode === 'voice' || mode === 'draft') return 'expression';" in index
 
 
 def test_draft_lets_the_steward_choose_skeleton_and_profile():
     index = _index()
-    assert 'id="cr-draft-blueprint"' in index      # which Render Skeleton
+    assert 'id="cr-draft-blueprint"' in index      # which Structure Preview
+    assert 'title="Which Structure Preview"' in index
     assert 'id="cr-draft-profile"' in index        # which ExpressionProfile (voice)
     assert 'id="cr-draft-provider"' in index        # provider (stub default)
     assert "'/api/profiles'" in index
