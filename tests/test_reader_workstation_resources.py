@@ -68,7 +68,7 @@ def test_blueprint_and_expression_have_nested_views_not_peer_resource_tabs():
     assert 'data-workstation-submode="draft"' in index
 
 
-def test_workstation_header_keeps_tabs_scrollable_and_collapse_separate():
+def test_workstation_header_keeps_tabs_scrollable_and_uses_center_collapse_handle():
     index = _index()
 
     tabs_css = re.search(r"\.cr-bottom-workstation-tabs \{(?P<body>.*?)\n\}", index, re.S)
@@ -79,12 +79,16 @@ def test_workstation_header_keeps_tabs_scrollable_and_collapse_separate():
     assert "min-width: 0" in tabs_css.group("body")
     assert "flex: 0 0 auto" in tab_css.group("body")
 
-    head = index.split('<div class="cr-bottom-workstation-head">', 1)[1].split("</div>\n  <div class=\"cr-bottom-workstation-body\">", 1)[0]
-    tabs_start = head.index('<div class="cr-bottom-workstation-tabs"')
-    tabs_end = head.index("</div>", tabs_start)
-    collapse_pos = head.index('class="cr-bottom-workstation-close"')
-    assert collapse_pos > tabs_end
-    assert 'aria-label="Collapse bottom workstation"' in head
+    assert 'id="cr-bottom-collapse-handle"' in index
+    assert 'aria-label="Collapse bottom workstation"' in index
+    assert 'class="cr-bottom-workstation-close"' not in index
+
+    handle_css = re.search(r"\.cr-bottom-collapse-handle \{(?P<body>.*?)\n\}", index, re.S)
+    assert handle_css
+    assert "position: fixed" in handle_css.group("body")
+    assert "left: 50%" in handle_css.group("body")
+    assert "transform: translateX(-50%)" in handle_css.group("body")
+    assert "z-index: 9702" in handle_css.group("body")
 
 
 def test_sync_maps_internal_modes_to_public_resources_and_nested_tabs():
