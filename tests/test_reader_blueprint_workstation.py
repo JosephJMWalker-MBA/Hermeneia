@@ -38,7 +38,7 @@ def test_blueprint_is_a_workstation_mode_not_a_separate_drawer():
     # resource bindings — so _crSyncBottomWorkstationState shows only one at a time.
     assert "blueprint: document.getElementById('cr-blueprint-draft')" in index
     assert "else if (mode === 'blueprint')" in index
-    assert "['cr-bottom-resource-blueprint', () => _crOpenBottomWorkstation('blueprint')]" in index
+    assert "['cr-bottom-resource-blueprint', () => _crToggleBottomWorkstationResource('blueprint')]" in index
     assert "if (mode === 'render' || mode === 'critic') return 'blueprint';" in index
 
 

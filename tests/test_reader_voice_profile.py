@@ -47,7 +47,7 @@ def test_voice_is_a_workstation_mode_not_a_separate_drawer():
     index = _index()
     assert "voice: document.getElementById('cr-voice-profile')" in index
     assert "else if (mode === 'voice')" in index
-    assert "['cr-bottom-resource-expression', () => _crOpenBottomWorkstation('voice')]" in index
+    assert "['cr-bottom-resource-expression', () => _crToggleBottomWorkstationResource('voice')]" in index
     assert "['cr-expression-subtab-voice', () => _crOpenBottomWorkstation('voice')]" in index
     assert "if (mode === 'voice' || mode === 'draft') return 'expression';" in index
 
