@@ -1,92 +1,183 @@
 # Implementation Status
 
-**Last updated:** 2026-06-26  
-**Current tag:** `sprint-005-preserve-v0.1`
+**Last updated:** 2026-08-29  
+**Status:** Validation Phase — active development  
+**Reference main commit at synchronization:** `19e1ea4d5f143d217860e42cadc9ee23af5ec5e0`
+
+> This file is an operational status summary, not constitutional authority. When a status statement conflicts with governing architecture, resolve authority through `docs/01_Authority_Index.md`.
 
 ---
 
-## Cognitive Architecture
+## Current Product Reality
 
-```
-Witness → Explorer → Architect → Artist → Critic → Steward
+Hermeneia is no longer in the original architecture-freeze implementation phase. The constitutional foundation is stable enough to support sustained product validation, real-corpus use, and bounded expansion without treating every new capability as an architectural rewrite.
+
+The current operating model is:
+
+```text
+Reader holds attention
+    ↓
+Question governs investigation
+    ↓
+Human + machine attention records accumulate
+    ↓
+Scope / Perspective / evidence organization support inquiry
+    ↓
+Blueprint records current synthesis
+    ↓
+Architect compiles semantic obligations
+    ↓
+Artist renders under explicit expression constraints
+    ↓
+Critic evaluates
+    ↓
+Human Steward ratifies, revises, rejects, or preserves uncertainty
 ```
 
-| Role | Status | Notes |
-|------|--------|-------|
-| Witness (Corpus ingestion) | Complete | PDF → Observations pipeline |
-| Explorer (Discovery) | Phase 1 validated | Ephemeral bucketing + speculative interpretations. Clean Gatsby calibration 2026-06-26. |
-| Architect (Reconstruction) | Complete | Blueprint + ArchitectPlan |
-| Artist (Communication) | Complete | Multi-profile rendering, recursive protocol |
-| Critic (Verification) | Complete | Semantic fidelity reporting |
-| Steward (Governance) | Complete | StewardDecision, proposed_interpretations promotion |
+Generated content, deterministic projections, machine suggestions, and human judgments remain distinguishable throughout the system.
 
 ---
 
-## Publication Infrastructure
+## Implemented Foundation
 
-```
-Build → Coverage → Release → Preservation
-```
+### Constitutional and provenance infrastructure
 
-| Layer | Status | Notes |
-|-------|--------|-------|
-| Build (`herm build`) | v0.1 — complete | Manifest → resolve → coverage → compile → build.json. Tag: sprint-002-build-v0.1 |
-| Coverage Engine (`herm coverage`) | v0.1 — complete | Reads build.json; measures declared section obligations. Tag: sprint-003-coverage-v0.1 |
-| Release Steward (`herm release`) | v0.1 — complete | Evaluates declared criteria; recommends or withholds; steward_signature intentionally null. Tag: sprint-004-release-v0.1 |
-| Preservation Layer (`herm preserve`) | v0.1 — complete | verify: reconstruction + continuation. export: hashed package. Tag: sprint-005-preserve-v0.1 |
+- SourceDocument → SourceExtraction → Observation evidence lineage
+- occurrence-aware observation identity and provenance
+- constitutional authority, amendments, invariants, and compliance checks
+- append-only / monotonic governance boundaries for canonical records
+- deterministic hashing and integrity utilities
+- preservation, release, and ratification artifacts
+- workspace identity and isolated runtime lifecycle
+- Workspace Bundle export, preview/import, restore, and preservation infrastructure
+
+### Reading workbench
+
+- Reader-centered application shell
+- docked Companion and Reader-side support tools
+- in-place Corpus Search and literal concordance
+- attention timeline and Field Notes
+- bottom workstation modes for synthesis and downstream work
+- durable highlights and reopenable annotations
+- explicit capture intents for highlight, note, question, concept, and observation candidate
+- governing-question / thesis compass visible in the Reader
+- Focus mode, large-text support, inline read-aloud, and page read-aloud
+- first-run PDF upload and recovery flow
+- reading-first Guide and question-relative Corpus/Lab language
+
+### Investigation and synthesis
+
+- machine observations alongside human close reading
+- questions, notes, highlights, concepts, buckets, and investigation records
+- question-relative investigation framing
+- deterministic synthesis / lineage infrastructure
+- Perspective definitions and append-only Perspective revision identity
+- governed Perspective-run infrastructure and comparison surfaces
+- NarrativeBlueprint workflows
+- deterministic ArchitectPlan compilation
+- provider-neutral Artist rendering
+- Critic evaluation and findings
+- Draft preview → Ratify → Record workflow
+- voice / ExpressionProfile capture and witness-oriented Critic checks
+
+### Provider and runtime infrastructure
+
+- provider registry and model catalogs
+- cloud and local runtime connection handling
+- explicit credential-source boundaries
+- machine-local Connections settings
+- Ollama discovery / governed local-model management foundations
+- model selection separated from Perspective identity
+
+**Not yet on `main`:** saved reusable model configurations from draft PR #165. That branch contains useful bounded work but diverged substantially from current main and should be reconciled against current code rather than merged unchanged.
 
 ---
 
-## Two-Layer Architecture
+## Validation Evidence
 
-```
-              Hermeneia
+Recent merged Reader/product slices have repeatedly run the unrestricted full test suite. The latest merged PR at this synchronization point, PR #189, reports:
 
-     Cognitive Architecture
-┌─────────────────────────────────┐
-│ Witness                         │
-│ Discovery                       │
-│ Reconstruction                  │
-│ Verification                    │
-│ Governance                      │
-│ Communication                   │
-└─────────────────────────────────┘
-               │
-               ▼
-     Publication Infrastructure
-┌─────────────────────────────────┐
-│ Build                           │
-│ Coverage                        │
-│ Release                         │
-│ Preservation                    │
-└─────────────────────────────────┘
-               │
-               ▼
-     Durable Knowledge Artifact
+```text
+1361 passed, 3 skipped
 ```
 
-The engineering layer never tries to think. It serves the cognitive layer.
-Automation may measure, verify, package, and preserve. It may not decide.
+The README intentionally avoids a permanent hard-coded test count because the suite changes continuously. This dated status file may record a point-in-time count as validation evidence.
+
+Recent live-use validation has included local browser checks and selected exact-head Jetson/Orin smoke tests where the changed surface materially involved that runtime.
+
+---
+
+## Current Priority Lanes
+
+### P1 — Real-use Reader validation
+
+Continue using real corpora and manuscripts to expose friction before redesigning from imagination.
+
+Important open work includes:
+
+- #120 — *The Second Sale* live-use validation umbrella
+- #121 — readable projection for layout-derived line breaks / spacing
+- #126 — Field Notes cadence and stacked Reader chrome
+- #129 — authored chapter/section structure
+- #133 — source-locator Reader progress / semantic checkpoints
+- #154 — coherent bottom workstation behavior
+
+### P1 — Whole-study synthesis
+
+The strongest remaining workflow gap is moving from accumulated reading work to study-level organization and synthesis.
+
+- #110 — synthesize from the whole accumulated study record
+- #111 — Evidence Board and true study lineage
+- #152 — visible bucket lenses / thematic reading projections
+
+### P1/P2 — Connections execution control
+
+Issue #159 defines the current provider/runtime control-plane direction:
+
+```text
+Connection
+  → provider/runtime
+  → model catalog
+  → model configuration
+  → default / assignment / per-run selection
+```
+
+Continue in bounded slices. Preserve the separation between provider, model, model version, configuration, Perspective, and investigation identity.
+
+### P2 — Model Observatory
+
+Issue #158 is accepted as a derived analytics/research surface over auditable execution history. It should consume trustworthy run lineage rather than driving premature architecture or replacing ordinary Reader work.
+
+### P2 — Human developer/support channel
+
+Issue #160 records a product-level human Developer channel for support, feedback, questions, and optional external tips. It remains outside the constitutional epistemic pipeline.
 
 ---
 
 ## Release Status
 
-| Artifact | Status |
-|----------|--------|
-| White Paper | RC-2.1 — frozen pending RC-3 conditions |
-| Explorer Phase 1 | Ratified 2026-06-26 |
-| herm build v0.1 | Tagged 2026-06-26 |
-| herm coverage v0.1 | Tagged 2026-06-26 |
-| herm release v0.1 | Tagged 2026-06-26 |
-| v1.0 Release Candidate | Pending P0 completion |
+| Area | Status |
+|---|---|
+| Constitutional foundation | Stable under validation |
+| Reader-centered workbench | Implemented; active live-use refinement |
+| Workspace lifecycle / WBS | Implemented |
+| Explorer / Architect / Artist / Critic / Steward chain | Implemented in bounded forms |
+| Perspective infrastructure | Implemented and evolving under explicit identity rules |
+| Provider/runtime control plane | Partially implemented; active work |
+| Evidence Board / whole-study synthesis | Open |
+| Live demonstration video | Pending |
+| Pitch deck | Pending |
+| Stable v1.0 release candidate | Target, not yet claimed |
 
-## P0 Before v1.0 RC
+---
 
-- [ ] Semantic obligations quality — Architect produces semantic commitments, not lexical tokens
-- [ ] Corpus boundary integrity — visible at every interpretive stage
-- [ ] Onboarding around investigative framing
-- [ ] End-to-end profile verification
-- [ ] Coverage Engine (Sprint 003)
-- [ ] Live demonstration video
-- [ ] Pitch deck
+## Operating Rule
+
+```text
+Use the product first.
+Record friction when it appears.
+Do not redesign from imagination.
+Fix recurring, high-value problems in small green slices.
+```
+
+The architecture is stable against preference, not against evidence.
