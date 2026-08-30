@@ -11925,6 +11925,11 @@ function _crTextOffset(value, text) {
   return Math.max(0, Math.min(text.length, n));
 }
 
+function _crSourceOffset(value) {
+  const n = _crFiniteNumber(value);
+  return n === null || n < 0 ? null : n;
+}
+
 function _crHasAnyValue(needles, haystack) {
   const available = new Set(_crStringList(haystack));
   return _crStringList(needles).some(v => available.has(v));
@@ -11956,8 +11961,37 @@ function _crBlockProvenanceWithinSpan(span, blockCtx) {
   return currentLocators.length > 0 || currentExtractionIds.length > 0;
 }
 
+function _crSourceSpanMatchesProvenance(sourceSpan, locators, extractionIds) {
+  const locator = String(sourceSpan?.source_locator || '');
+  const extractionId = String(sourceSpan?.source_extraction_id || '');
+  const wantedLocators = new Set(_crStringList(locators));
+  const wantedIds = new Set(_crStringList(extractionIds));
+  return (locator && wantedLocators.has(locator)) ||
+    (extractionId && wantedIds.has(extractionId));
+}
+
+function _crDisplaySourceSpansForProvenance(blockCtx, locators, extractionIds) {
+  const spans = Array.isArray(blockCtx?.display_source_spans) ? blockCtx.display_source_spans : [];
+  if (!spans.length) return [];
+  return spans.filter(sourceSpan => _crSourceSpanMatchesProvenance(sourceSpan, locators, extractionIds));
+}
+
+function _crLegacySpanEligibleSourceSpans(span, blockCtx) {
+  const matches = _crDisplaySourceSpansForProvenance(
+    blockCtx,
+    span?.source_locators,
+    span?.extraction_ids
+  );
+  if (matches.length) return matches;
+  return [];
+}
+
 function _crBlockMatchesSpan(span, blockCtx) {
   if (_crSpanHasProvenance(span)) {
+    if (!_crSpanUsesProjectedOffsets(span)) {
+      if (_crLegacySpanEligibleSourceSpans(span, blockCtx).length) return true;
+      if (Array.isArray(blockCtx?.display_source_spans) && blockCtx.display_source_spans.length) return false;
+    }
     return _crBlockProvenanceWithinSpan(span, blockCtx) && (
       _crHasAnyValue(span?.source_locators, blockCtx?.source_locators) ||
       _crHasAnyValue(span?.extraction_ids, blockCtx?.extraction_ids)
@@ -11982,19 +12016,16 @@ function _crBlockMatchesSpanPoint(blockCtx, point) {
 function _crDisplaySourceSpanForPoint(blockCtx, point) {
   const spans = Array.isArray(blockCtx?.display_source_spans) ? blockCtx.display_source_spans : [];
   if (!spans.length) return null;
-  const pointLocators = _crStringList(point?.source_locators);
-  const pointIds = _crStringList(point?.extraction_ids);
-  const matches = spans.filter(span => {
-    const locator = String(span?.source_locator || '');
-    const extractionId = String(span?.source_extraction_id || '');
-    return (locator && pointLocators.includes(locator)) ||
-      (extractionId && pointIds.includes(extractionId));
-  });
+  const matches = _crDisplaySourceSpansForProvenance(
+    blockCtx,
+    point?.source_locators,
+    point?.extraction_ids
+  );
   return matches.length === 1 ? matches[0] : null;
 }
 
 function _crSpanPointOffsetInBlock(blockCtx, point, text) {
-  const offset = _crTextOffset(point?.offset, text);
+  const offset = _crSourceOffset(point?.offset);
   if (offset === null) return null;
   const sourceSpan = _crDisplaySourceSpanForPoint(blockCtx, point);
   if (!sourceSpan) return offset;
@@ -12027,8 +12058,17 @@ function _crSpanRangeForBlock(span, blockCtx, text) {
 
   const isStart = _crBlockMatchesSpanPoint(blockCtx, span.start);
   const isEnd = _crBlockMatchesSpanPoint(blockCtx, span.end);
-  let start = 0;
-  let end = text.length;
+  const sourceSpans = !_crSpanUsesProjectedOffsets(span)
+    ? _crLegacySpanEligibleSourceSpans(span, blockCtx)
+    : [];
+  const eligibleStarts = sourceSpans
+    .map(sourceSpan => _crTextOffset(sourceSpan.start, text))
+    .filter(v => v !== null);
+  const eligibleEnds = sourceSpans
+    .map(sourceSpan => _crTextOffset(sourceSpan.end, text))
+    .filter(v => v !== null);
+  let start = eligibleStarts.length ? Math.min(...eligibleStarts) : 0;
+  let end = eligibleEnds.length ? Math.max(...eligibleEnds) : text.length;
   if (isStart) {
     start = _crSpanUsesProjectedOffsets(span)
       ? _crTextOffset(span.start?.offset, text)
