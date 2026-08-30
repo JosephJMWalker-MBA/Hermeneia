@@ -741,6 +741,137 @@ def create_app(
             "limited_results": matches[:limit],
         }
 
+    def _normalize_blueprint_candidate(value: object) -> tuple[dict | None, str | None]:
+        if not isinstance(value, dict):
+            return None, "proposed_blueprint must be an object"
+        title = str(value.get("title", "")).strip()
+        thesis = str(value.get("thesis", "")).strip()
+        raw_sections = value.get("sections")
+        if not title:
+            return None, "title is required"
+        if not thesis:
+            return None, "thesis is required"
+        if not isinstance(raw_sections, list) or not raw_sections:
+            return None, "at least one section is required"
+
+        sections: list[dict] = []
+        for index, raw_section in enumerate(raw_sections):
+            if not isinstance(raw_section, dict):
+                return None, f"section {index + 1} must be an object"
+            claim = str(raw_section.get("claim", "")).strip()
+            if not claim:
+                return None, f"section {index + 1} claim is required"
+            supporting_observations = raw_section.get("supporting_observations", [])
+            supporting_interpretations = raw_section.get("supporting_interpretations", [])
+            if not isinstance(supporting_observations, list):
+                return None, f"section {index + 1} supporting_observations must be a list"
+            if not isinstance(supporting_interpretations, list):
+                return None, f"section {index + 1} supporting_interpretations must be a list"
+            obs_ids = [str(oid).strip() for oid in supporting_observations]
+            interp_ids = [str(iid).strip() for iid in supporting_interpretations]
+            if any(not oid for oid in obs_ids):
+                return None, f"section {index + 1} supporting_observations contains a blank id"
+            if any(not iid for iid in interp_ids):
+                return None, f"section {index + 1} supporting_interpretations contains a blank id"
+            sections.append({
+                "claim": claim,
+                "supporting_observations": obs_ids,
+                "supporting_interpretations": interp_ids,
+            })
+        return {"title": title, "thesis": thesis, "sections": sections}, None
+
+    def _validate_blueprint_references(conn: sqlite3.Connection, sections: list[dict]) -> str | None:
+        obs_ids = sorted({oid for sec in sections for oid in sec.get("supporting_observations", [])})
+        interp_ids = sorted({iid for sec in sections for iid in sec.get("supporting_interpretations", [])})
+        if obs_ids:
+            found_obs = {
+                row["id"]
+                for row in conn.execute(
+                    f"SELECT id FROM observations WHERE id IN ({','.join('?' for _ in obs_ids)})",
+                    obs_ids,
+                ).fetchall()
+            }
+            missing = [oid for oid in obs_ids if oid not in found_obs]
+            if missing:
+                return "unknown supporting_observations: " + ", ".join(missing)
+        if interp_ids:
+            found_interps = {
+                row["id"]
+                for row in conn.execute(
+                    f"SELECT id FROM interpretations WHERE id IN ({','.join('?' for _ in interp_ids)})",
+                    interp_ids,
+                ).fetchall()
+            }
+            missing = [iid for iid in interp_ids if iid not in found_interps]
+            if missing:
+                return "unknown supporting_interpretations: " + ", ".join(missing)
+        return None
+
+    def _persist_exact_blueprint_and_compile(
+        conn: sqlite3.Connection,
+        candidate: dict,
+        *,
+        source: str,
+    ) -> dict:
+        from ..compiler.architect import compile_architect_plan
+        from ..storage.hashing import make_blueprint_id
+        from ..storage.sqlite import ensure_architect_tables
+
+        sections = candidate["sections"]
+        ref_error = _validate_blueprint_references(conn, sections)
+        if ref_error:
+            raise ValueError(ref_error)
+
+        now = datetime.now(timezone.utc).isoformat()
+        bp_id = make_blueprint_id(candidate["title"], candidate["thesis"], sections)
+
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO narrative_blueprints
+                (id, title, thesis, sections, source, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (bp_id, candidate["title"], candidate["thesis"], json.dumps(sections), source, now),
+        )
+        for oid in {oid for sec in sections for oid in sec.get("supporting_observations", [])}:
+            conn.execute(
+                "INSERT OR IGNORE INTO blueprint_observation_links (blueprint_id, observation_id) VALUES (?, ?)",
+                (bp_id, oid),
+            )
+        for iid in {iid for sec in sections for iid in sec.get("supporting_interpretations", [])}:
+            conn.execute(
+                "INSERT OR IGNORE INTO blueprint_interpretation_links (blueprint_id, interpretation_id) VALUES (?, ?)",
+                (bp_id, iid),
+            )
+
+        ensure_architect_tables(conn)
+        plan = compile_architect_plan(bp_id, conn)
+        pr = plan["plan_row"]
+        conn.execute(
+            """INSERT OR IGNORE INTO architect_plans
+               (id, blueprint_id, blueprint_hash, title, source, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (pr["id"], pr["blueprint_id"], pr["blueprint_hash"],
+             pr["title"], pr["source"], pr["created_at"]),
+        )
+        for para in plan["paragraph_rows"]:
+            conn.execute(
+                """INSERT OR IGNORE INTO architect_plan_paragraphs
+                   (plan_id, order_idx, purpose, blueprint_section,
+                    required_observations, required_interpretations,
+                    required_terms, forbidden_claims, notes)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (para["plan_id"], para["order_idx"], para["purpose"],
+                 para["blueprint_section"], para["required_observations"],
+                 para["required_interpretations"], para["required_terms"],
+                 para["forbidden_claims"], para["notes"]),
+            )
+        return {
+            "blueprint_id": bp_id,
+            "plan_id": pr["id"],
+            "committed_blueprint": candidate,
+        }
+
     def _canonical_path(path: Path) -> Path:
         return path.expanduser().resolve()
 
@@ -6239,7 +6370,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         empty supporting_observations (the plan will still compile and
         render — it just won't have observation-level traceability).
         """
-        import datetime as _dt, traceback as _tb
+        import traceback as _tb
 
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
@@ -6256,9 +6387,6 @@ Return ONLY valid JSON, no markdown, no explanation:
         if not raw_sections:
             return jsonify({"error": "at least one section is required"}), 400
 
-        from ..storage.hashing import make_blueprint_id, make_architect_plan_id
-        from ..compiler.architect import compile_architect_plan
-        from ..storage.sqlite import ensure_architect_tables
         import re as _re
 
         conn = _conn_rw()
@@ -6284,61 +6412,33 @@ Return ONLY valid JSON, no markdown, no explanation:
                     "supporting_interpretations": [],
                 })
 
-            if not sections_data:
-                return jsonify({"error": "No valid sections found"}), 400
-
-            now = _dt.datetime.now(_dt.timezone.utc).isoformat()
-            bp_id = make_blueprint_id(title, thesis, sections_data)
-
-            conn.execute(
-                """INSERT OR IGNORE INTO narrative_blueprints
-                   (id, title, thesis, sections, source, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (bp_id, title, thesis, json.dumps(sections_data), "steward-authored", now),
+            candidate, error = _normalize_blueprint_candidate({
+                "title": title,
+                "thesis": thesis,
+                "sections": sections_data,
+            })
+            if error:
+                return jsonify({"error": error}), 400
+            result = _persist_exact_blueprint_and_compile(
+                conn,
+                candidate,
+                source="steward-authored",
             )
-            for sec in sections_data:
-                for oid in sec["supporting_observations"]:
-                    conn.execute(
-                        "INSERT OR IGNORE INTO blueprint_observation_links (blueprint_id, observation_id) VALUES (?, ?)",
-                        (bp_id, oid),
-                    )
-            conn.commit()
-
-            ensure_architect_tables(conn)
-            plan = compile_architect_plan(bp_id, conn)
-            pr   = plan["plan_row"]
-            plan_id = pr["id"]
-
-            conn.execute(
-                """INSERT OR IGNORE INTO architect_plans
-                   (id, blueprint_id, blueprint_hash, title, source, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (plan_id, pr["blueprint_id"], pr["blueprint_hash"],
-                 pr["title"], pr["source"], pr["created_at"]),
-            )
-            for para in plan["paragraph_rows"]:
-                conn.execute(
-                    """INSERT OR IGNORE INTO architect_plan_paragraphs
-                       (plan_id, order_idx, purpose, blueprint_section,
-                        required_observations, required_interpretations,
-                        required_terms, forbidden_claims, notes)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (para["plan_id"], para["order_idx"], para["purpose"],
-                     para["blueprint_section"], para["required_observations"],
-                     para["required_interpretations"], para["required_terms"],
-                     para["forbidden_claims"], para["notes"]),
-                )
             conn.commit()
 
             return jsonify({
-                "blueprint_id": bp_id,
-                "plan_id": plan_id,
+                "blueprint_id": result["blueprint_id"],
+                "plan_id": result["plan_id"],
                 "title": title,
                 "thesis": thesis,
                 "section_count": len(sections_data),
             }), 201
 
+        except ValueError as exc:
+            conn.rollback()
+            return jsonify({"error": str(exc)}), 400
         except Exception as exc:
+            conn.rollback()
             return jsonify({
                 "error": str(exc),
                 "error_type": type(exc).__name__,
@@ -6850,41 +6950,53 @@ Return ONLY valid JSON, no markdown, no explanation:
         if not save:
             return jsonify({"proposed_blueprint": proposed}), 200
 
-        # Save the Blueprint and run Architect
-        from ..storage.hashing import make_blueprint_id
-        from ..compiler.architect import compile_architect_plan
-        import json as _json
-        from datetime import datetime, timezone
-
         conn = _conn_rw()
         try:
-            bp_id = make_blueprint_id(proposed["title"], proposed["thesis"], proposed["sections"])
-            now = datetime.now(timezone.utc).isoformat()
-
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO narrative_blueprints
-                    (id, title, thesis, sections, source, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (bp_id, proposed["title"], proposed["thesis"],
-                 _json.dumps(proposed["sections"]), "extracted", now),
-            )
+            candidate, error = _normalize_blueprint_candidate(proposed)
+            if error:
+                return jsonify({"error": error}), 422
+            result = _persist_exact_blueprint_and_compile(conn, candidate, source="extracted")
             conn.commit()
 
-            result = compile_architect_plan(bp_id, conn)
-            from ..storage.sqlite import SQLiteStore
-            store = SQLiteStore(db_path)
-            store.insert_architect_plan(result["plan_row"], result["paragraph_rows"])
-            store.close()
-
             return jsonify({
-                "proposed_blueprint": proposed,
-                "blueprint_id": bp_id,
-                "plan_id": result["plan_row"]["id"],
+                "proposed_blueprint": candidate,
+                "blueprint_id": result["blueprint_id"],
+                "plan_id": result["plan_id"],
             }), 201
+        except ValueError as exc:
+            conn.rollback()
+            return jsonify({"error": str(exc)}), 400
         except Exception as exc:
+            conn.rollback()
             return jsonify({"error": str(exc), "detail": _tb.format_exc()}), 500
+        finally:
+            conn.close()
+
+    @app.route("/api/pipeline/ratify-blueprint", methods=["POST"])
+    def api_pipeline_ratify_blueprint():
+        """Persist the exact reviewed Blueprint candidate and compile ArchitectPlan.
+
+        This route is a human approval boundary. It performs no provider call and
+        never reconstructs the candidate from displayed HTML.
+        """
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        payload = request.get_json(silent=True) or {}
+        proposed = payload.get("proposed_blueprint", payload.get("candidate"))
+        candidate, error = _normalize_blueprint_candidate(proposed)
+        if error:
+            return jsonify({"error": error}), 400
+        conn = _conn_rw()
+        try:
+            result = _persist_exact_blueprint_and_compile(conn, candidate, source="extracted")
+            conn.commit()
+            return jsonify(result), 201
+        except ValueError as exc:
+            conn.rollback()
+            return jsonify({"error": str(exc)}), 400
+        except Exception as exc:
+            conn.rollback()
+            return jsonify({"error": str(exc), "error_type": type(exc).__name__}), 500
         finally:
             conn.close()
 
