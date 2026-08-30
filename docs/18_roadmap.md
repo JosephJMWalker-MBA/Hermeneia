@@ -1,301 +1,318 @@
-# Development Roadmap v2.0
+# Development Roadmap v3.0
 
 **Status:** ACTIVE IMPLEMENTATION GUIDE  
+**Synchronized:** 2026-08-29  
 **Constitutional authority:** [`00_Constitution.md`](00_Constitution.md), [`01_Authority_Index.md`](01_Authority_Index.md), [`02_Constitutional_Invariants.md`](02_Constitutional_Invariants.md)  
-**Implementation status:** Era II — Constitutional Engineering in progress
+**Current phase:** Validation through real use
+
+The roadmap governs implementation priority, not constitutional truth. When this file conflicts with higher authority, higher authority controls.
+
+For a dated snapshot of what is already implemented, read [`../IMPLEMENTATION_STATUS.md`](../IMPLEMENTATION_STATUS.md). Do not infer current completion from historical era descriptions alone.
 
 ---
 
 ## Development Gate
 
-Before any implementation sprint, answer:
+Before substantial implementation, classify the proposed work:
 
-1. Is this a **Canonical Object**?
-2. Is this a **Function**?
-3. Is this a **Projection**?
-4. Is this a **Derived Artifact**?
-5. Is this **Human Judgment**?
+1. Is it an existing **Canonical Object**?
+2. Is it a **Function** over authorized objects?
+3. Is it a **Projection**?
+4. Is it a **Derived Artifact**?
+5. Is it **Configuration / execution infrastructure**?
+6. Is it **Human Judgment / stewardship**?
+7. Is it merely a **product/UX surface** over existing authority?
 
-If none apply, stop. Perform constitutional review before implementation.
+If none apply, stop and perform architectural review before implementation.
 
-The roadmap governs implementation order, not constitutional authority. Constitutional authority remains defined by the Constitution, Authority Index, and ratified amendments.
+No implementation may silently introduce ontology, authority, or a new canonical pipeline stage.
 
-No implementation may introduce ontology not already authorized.
-
-Engineering priorities should be ordered by **proof value**, not by UI appeal.
-
-## Parallel Infrastructure Lane
-
-Build, preservation, release, and packaging work may proceed in parallel when
-it does not introduce ontology, storage authority, or pipeline stages.
-
-The non-authoritative work plan is
-[`Infrastructure_Engineering_Track.md`](Infrastructure_Engineering_Track.md).
-
-This lane supports constitutional execution. It does not define constitutional
-truth.
+Engineering priorities should be ordered by **proof value and demonstrated user need**, not by novelty or visual appeal.
 
 ---
 
-## Era I — Constitutional Foundation ✅
+## Completed Foundation
 
-**Goal:** Define what Hermeneia is.
+### Era I — Constitutional Foundation ✅
 
-**Exit criterion:** The architecture exhibits closure under its current principles.
-
-**Completed:**
+Established the governing architecture:
 
 - Constitution
 - Authority Index
 - Constitutional Invariants
 - First Principles
-- Architecture Patterns
-- Architecture Proofs
-- What Hermeneia Is
-- Finding Specification
-- Evaluation Function Specification
-- Provider Ecology Foundation
-- Workspace Projection Pattern
-- Regeneration Principle
-- Conservation of Ontology
+- architecture patterns and proofs
+- evidence identity and provenance
+- epistemic classification
+- ArchitectPlan semantic-contract boundary
+- auditability and monotonic governance
+- provider-neutral execution principles
+- regeneration / projection principles
+- conservation of ontology
+
+### Era II — Constitutional Engineering ✅
+
+Demonstrated that the architecture could execute itself:
+
+- deterministic evaluation functions
+- Finding persistence and lineage
+- Critic infrastructure
+- Steward review and ratification flows
+- provider-neutral Artist execution
+- Architect compilation
+- release/preservation infrastructure
+- end-to-end traceability
+- Workspace Bundle export/import/restore
+
+### Era III — Investigation / Reader Workbench ✅ foundation, ongoing validation
+
+The investigation layer moved from pipeline-first operation toward a Reader-centered workbench:
+
+- Explorer / candidate interpretation workflows
+- Reader-first shell
+- Companion
+- in-place Corpus Search
+- attention timeline / Field Notes
+- durable highlights and semantic capture
+- governing-question compass
+- question-relative Corpus/Lab framing
+- Blueprint / Render / Critic workstation
+- Draft Preview → Ratify → Record
+- voice / ExpressionProfile work
+- workspace lifecycle
+- Perspective definitions/revisions and governed runs
+- accessibility / focus / read-aloud capabilities
+
+Era III is no longer "build Explorer next." Its current job is to prove that the entire investigation method works under sustained use.
 
 ---
 
-## Era II — Constitutional Engineering ✅
+# Current Phase — Validation Through Real Use
 
-**Goal:** Execute the Constitution without expanding it.
+## Governing rule
 
-**Rule:** No implementation may introduce ontology not already authorized.
-
-This era is not discovery. It is proof. The architecture is known. The task is to demonstrate that it can execute itself.
-
-### Sprint E1 — First Evaluation Function
-
-Build the first deterministic Evaluation Function with zero LLM dependency.
-
-**Example: Structural Evaluation Function**
-
-```
-Input:  ArchitectPlan, RenderedNarrative
-Output: Finding[]
+```text
+Use the product first.
+Record friction when it appears.
+Do not redesign from imagination.
 ```
 
-This proves that the Critic layer is computational infrastructure, not another conversational agent.
-
-**Milestone:** First canonical `Finding[]`.
-
-### Sprint E2 — Finding Persistence
-
-After ADR review:
-
-- Ratify `Finding` (or retain `CriticReport` if appropriate)
-- Add immutable storage
-- Add lineage
-- Add supersession behavior
-- Add executable invariants
-
-**Milestone:** First durable machine-generated evaluation object.
-
-### Sprint E3 — Evaluation Function Ecology
-
-Implement independent functions:
-
-- Semantic
-- Structural
-- Provenance
-- Accessibility
-- Constitutional
-
-Each function must be:
-
-- orthogonal
-- deterministic
-- read-only
-- bounded
-
-No aggregation. No scoring. No recommendations.
-
-### Sprint E4 — Projection Layer
-
-Regenerate from canonical Findings:
-
-- Audit Dashboard
-- Trust Card
-- Semantic Inspector
-
-Nothing persisted. Everything disposable.
-
-### Sprint E5 — Stewardship Layer
-
-Introduce human governance:
-
-- Steward decisions
-- Review workflows
-- Acceptance / rejection
-- Human rationale
-
-Machine evaluation ends. Human authority begins.
-
-### Sprint E6 — Witness Layer
-
-Formalize human understanding verification:
-
-- Did the intended understanding reach the audience?
-- Can an 8-year-old complete the task without assistance?
-- Can an 80-year-old complete the task without assistance?
-
-This is intentionally not reducible to computation.
-
-### Sprint E7 — Ratification
-
-Immutable governance artifacts:
-
-- Ratification records
-- Constitutional audit snapshots
-- Human witness sessions
-- Steward signatures
-
-This completes the epistemic lifecycle.
+The architecture has earned the right to be tested as a working instrument. New work should usually begin with an observed failure, recurring friction, missing bridge, or validation need.
 
 ---
 
-## Era III — Investigation
+## Track V1 — Reader durability and sustained-use quality — P1
 
-**Goal:** Make Hermeneia useful for investigators who do not begin with a complete Blueprint.
+Goal: make long reading, annotation, rereading, and manuscript work comfortable enough that the user can stay inside the text.
 
-This era recognizes that Hermeneia has crossed a threshold: the constitutional infrastructure
-is sufficient, and the highest-leverage remaining work is lowering the barrier to inquiry.
+Current evidence-bearing work includes:
 
-**Central claim being proved:** An investigator can begin with an existing report, a loose
-hypothesis, or raw observations, and Hermeneia will help them reconstruct, structure, and
-audit their understanding — not assuming the Blueprint exists, but helping to build it.
+- readable projection of layout-heavy PDFs (#121)
+- meaningful Field Notes cadence and reduction of stacked chrome (#126)
+- authored chapter/section structure (#129)
+- trustworthy source-locator Reader position / boundary crossing (#133)
+- coherent bottom workstation behavior (#154)
+- continued real-corpus pressure testing (#120)
 
-**The missing cognitive role:**
-
-```
-Corpus
-    │
-    ▼
-Explorer      ← Era III primary focus
-    │
-Candidate Interpretations
-    ▼
-Architect
-    │
-Blueprint
-    ▼
-Artist  →  Critic
-```
-
-Explorer is the role that produces candidate interpretations from evidence.
-It does not make judgments. It surfaces possibilities for Steward review.
-
-### Sprint E-III-1 — Explorer Phase 1 (Constitutionally Minimal)
-
-**Requirements:**
-- Input: observations, linked evidence, perspectives
-- Output: candidate Interpretation rows with `evidential_status='speculative'`
-- Prompt engineering only — no new tables, no schema changes
-- Generate multiple candidate interpretations rather than a single best
-- Include supporting observations and confidence estimate in output
-- Present in existing Steward review UI: accept, amend, merge, reject, defer
-- Preserve all constitutional invariants and provenance
-
-**Success criteria:**
-- No ontology changes
-- No ADR required
-- Existing interpretation review becomes useful for unexplored observations
-- Explorer accelerates discovery while leaving judgment entirely with the human steward
-
-### The Onboarding Horizon
-
-The "Start From Existing Work" path (implemented in Era II) extracts Intent.
-The Explorer (Era III) extracts Candidate Interpretations.
-These are complementary. Together they produce:
-
-```
-Upload Report
-    ↓
-I think you're trying to establish: ...
-I found these candidate interpretations: ...
-I found these unresolved tensions: ...
-Continue Investigation →
-```
-
-That is the eventual onboarding experience.
-
-### Two Tracks
-
-Era III divides naturally into two parallel tracks:
-
-**Track A — Product**
-
-Everything an investigator can use today:
-- Explorer
-- Better onboarding
-- Existing-work workflow
-- Improved UI
-- Research notebook
-
-**Track B — Research**
-
-Everything that might become publications:
-- Computational role prompting methodology
-- Kernel hypothesis (the minimal understanding atom)
-- Layer 4 — Purpose
-- Cross-domain recurrence
-- World-model reconstruction from corpora
-
-These tracks should remain separate. Mixing them slows both.
+Success is not "more Reader features." Success is fewer interruptions, clearer intent, and more time spent reading and thinking.
 
 ---
 
-## Era IV — Scientific Research
+## Track V2 — Whole-study synthesis — P1
 
-**Not implementation. Research.**
+Goal: make the **whole accumulated study record** the useful unit of synthesis.
 
-Possible directions:
+Key work:
 
-- Shannon mutual information
-- Kolmogorov complexity
-- Minimum Description Length
-- Semantic entropy
-- Cognitive biodiversity metrics
-- Artist ecology analysis
-- Transmission fidelity studies
+- study-level synthesis over highlights, notes, questions, observations, buckets, and accepted model contributions (#110)
+- Evidence Board and true study lineage (#111)
+- visible bucket lenses and multi-bucket thematic reading (#152)
+- preserve authorship provenance for model-derived contributions (#109)
+- suggest structure without silently assigning it (#108 / #42)
 
-**Constraint:** These SHALL remain analytical projections unless explicitly elevated through constitutional process.
+Expected progression:
 
----
+```text
+read
+→ capture freely
+→ organize / regroup
+→ inspect tensions and unused evidence
+→ run bounded analyses over selected evidence groups
+→ refine working Blueprint
+→ commit governed revisions
+```
 
-## Era IV — Ecological Expansion
-
-Bring Your Own Provider.  
-Bring Your Own Model.  
-Bring Your Own Critic implementation.  
-Bring Your Own Artist.  
-Bring Your Own Steward tooling.
-
-More precisely: Bring Your Own Participant. A Provider may represent a cloud service, an on-device runtime, a local model, a specialized execution environment, or a human. GPT, Claude, Gemini, Apple Intelligence, a local Llama, a human translator, a specialized medical model — they are all implementations of the same constitutional role. The Constitution doesn't care. The ecology simply gains another species.
-
-The constitutional runtime asks only three questions:
-
-- Do I have an ArchitectPlan?
-- Do I have a RenderedNarrative?
-- Can Evaluation Functions evaluate it?
-
-Everything else is ecology.
-
-The Constitution remains unchanged. The ecology grows around it.
+Do not make the user re-enter the same evidence into each downstream stage.
 
 ---
 
-## Legacy milestone mapping
+## Track V3 — Scope, Perspective, and controlled inquiry — P1/P2
 
-The P0-A1, P0-A2, and P1 milestones from Roadmap v1.0 map as follows:
+Goal: make the variables of an inquiry explicit enough that comparisons are meaningful.
 
-| v1.0 | v2.0 |
-|---|---|
-| P0-A1 — Specification Conformance | Era I — Constitutional Foundation ✅ |
-| P0-A2 — Implementation Conformance | Era II, Sprints E1–E2 |
-| P1 — Semantic Communication | Era II, Sprints E3–E7 |
+Accepted conceptual composition:
+
+```text
+Scope
++ Question
++ Perspective
++ Model configuration
+→ execution
+→ evaluation
+→ Steward outcome
+```
+
+Priorities:
+
+- shared Scope semantics over existing material (#157)
+- Perspective / Blueprint / Architect / ExpressionProfile separation (#156)
+- governed Perspective runs and Ask the Room evolution (#99)
+- preserve actual input boundaries and run identity
+
+Do not create a canonical Scope object merely because the UI needs selection state. Preserve resolved Scope when it becomes causally important to an audited run.
+
+---
+
+## Track V4 — Provider/runtime control plane — P1/P2
+
+Goal: let users deliberately control what executes without confusing runtime configuration with epistemic identity.
+
+Issue #159 is the governing design issue for this track.
+
+Required distinction:
+
+```text
+Connection
+  ↓
+Provider/runtime
+  ↓
+Model catalog
+  ↓
+Model configuration
+  ↓
+Default / assignment / per-run selection
+```
+
+Important remaining work includes:
+
+- reconcile saved model configuration work from draft PR #165 onto current main
+- complete safe credential persistence choices
+- expose installed Ollama models accurately
+- support explicit defaults / assignments / per-run override where appropriate
+- record the exact configuration that actually executed
+- keep secrets out of workspaces, exports, lineage, and research datasets
+
+Do not silently switch models or download local models.
+
+---
+
+## Track V5 — Evaluation quality and deterministic instruments — P2
+
+Goal: improve what Hermeneia can measure without pretending measurement is judgment.
+
+Existing evaluation infrastructure should be expanded only where a bounded measurement contract is defensible.
+
+Relevant work:
+
+- interpretation-quality evaluation harness (#63)
+- contradiction boundary design (#68)
+- voice/profile adherence (#93)
+- deterministic affect/style instruments (#155)
+
+North star:
+
+```text
+Deterministic instruments measure.
+Perspectives interpret.
+Humans decide.
+```
+
+---
+
+## Track V6 — Model Observatory / research analytics — P2
+
+Issue #158 defines a future derived analytics surface over trustworthy run lineage.
+
+It may analyze:
+
+- provider/model/configuration identity
+- usage, latency, cost, failures
+- stewardship outcomes
+- Perspective × model behavior
+- Scope × model behavior
+- matched controlled comparisons
+- longitudinal model/version changes
+
+Guardrails:
+
+- no universal "best model" score
+- always show denominators
+- do not mix naturalistic history with controlled benchmarks without labeling
+- aggregate only after granular run identity is preserved
+- metrics summarize recorded behavior; they do not become canonical judgments
+
+This track should not outrun the execution receipts and stewardship data it depends on.
+
+---
+
+## Track V7 — Product support and communication — P2
+
+- human Developer/support channel (#160)
+- live demonstration video
+- pitch / institutional communication materials
+- release documentation
+- contributor/onboarding clarity
+
+Support infrastructure remains outside the canonical epistemic pipeline.
+
+---
+
+# Release Gate — v1.0 RC
+
+A stable release candidate should not be declared solely because the architecture is complete or the test suite is large.
+
+Before v1.0 RC, demonstrate:
+
+- clean install and first-run recovery
+- stable named workspace lifecycle
+- sustained Reader use on multiple real corpora
+- trustworthy source/annotation provenance
+- whole-study movement from accumulated evidence toward synthesis
+- Blueprint → Architect → Artist → Critic → Steward execution
+- explicit provider/model/runtime boundaries
+- workspace export/import/restore confidence
+- tests and representative smoke validation
+- documentation synchronized with implemented reality
+
+Communication should follow demonstrated capability rather than lead it.
+
+---
+
+# Research Horizon
+
+Scientific and ecological research may continue in parallel when it does not destabilize product validation.
+
+Possible research directions include:
+
+- semantic contract fulfillment
+- transmission fidelity
+- model/Perspective interactions
+- multilingual/cross-cultural stewardship
+- deterministic interpretive instruments
+- semantic entropy / information-theoretic analysis
+- corpus-scale relationship discovery
+- longitudinal model behavior
+
+These remain analytical projections or research hypotheses unless explicitly elevated through constitutional process.
+
+---
+
+# Priority Rule
+
+When choosing between a new feature and a recurring failure discovered during serious use, prefer the recurring failure unless the new feature is required to resolve it.
+
+```text
+Evidence before expansion.
+Use before abstraction.
+Small green slices before broad rewrites.
+```
