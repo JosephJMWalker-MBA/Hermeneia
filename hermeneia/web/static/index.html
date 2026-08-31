@@ -1358,7 +1358,22 @@ body.reader-active .cr-tool-drawer { max-width: none; }
   border-color: var(--accent); color: var(--accent);
   background: var(--accent2); font-weight: 600;
 }
-.cr-bottom-workstation-body { flex: 1; min-height: 0; }
+.cr-bottom-workstation-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.cr-bottom-workstation-body > aside,
+.cr-bottom-workstation-body > .corpus-search,
+.cr-bottom-workstation-body > .attn-timeline {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.cr-bottom-workstation-body > aside {
+  display: flex;
+  flex-direction: column;
+}
+.cr-bottom-workstation-body > aside[hidden],
+.cr-bottom-workstation-body > .corpus-search[hidden],
+.cr-bottom-workstation-body > .attn-timeline[hidden] {
+  display: none;
+}
 .cr-workstation-subtabs {
   display: flex; gap: 6px; align-items: center;
   padding: 8px 14px; border-bottom: 1px solid var(--border);
@@ -1424,10 +1439,48 @@ body.reader-active .cr-tool-drawer { max-width: none; }
 /* Artist Draft — a labeled preview beside the structure it must honor. */
 .cr-draft-split { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
 @media (max-width: 820px) { .cr-draft-split { grid-template-columns: 1fr; } }
+.cr-draft-select-label {
+  font-size: 10px; color: var(--dim2); text-transform: uppercase;
+  letter-spacing: .06em; font-weight: 700; white-space: nowrap;
+}
+.cr-draft-bar { flex-wrap: wrap; row-gap: 8px; }
+.cr-draft-bar select { flex: 0 1 auto; }
+.cr-draft-bar .cr-draft-spacer { flex: 1 1 24px; }
+@media (max-width: 520px) {
+  .cr-draft-bar {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 5px 7px;
+    padding: 7px 12px 6px;
+    align-items: center;
+  }
+  .cr-draft-bar .cr-fln-bar-label,
+  .cr-draft-bar .cr-fln-count,
+  .cr-draft-bar .cr-draft-spacer { display: none; }
+  .cr-draft-select-label { font-size: 9px; }
+  .cr-draft-bar select { width: 100%; max-width: none !important; min-width: 0; }
+  #cr-draft-btn {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-left: 0 !important;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
 .cr-draft-structure { font-size: 12px; color: var(--fg2); line-height: 1.5; border-right: 1px solid var(--border); padding-right: 14px; }
 @media (max-width: 820px) { .cr-draft-structure { border-right: none; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: 10px; } }
 .cr-draft-structure-claim { padding: 4px 0; border-top: 1px solid var(--border); }
 .cr-draft-structure-claim .n { color: var(--dim2); margin-right: 4px; }
+.cr-draft-contract-summary, .cr-draft-profile-summary, .cr-draft-execution-summary {
+  margin: 7px 0 9px; padding: 7px 9px; border: 1px solid var(--border);
+  border-radius: var(--r); background: color-mix(in srgb, var(--surface) 48%, transparent);
+  font-size: 11px; color: var(--fg2); line-height: 1.45;
+}
+.cr-draft-contract-summary b, .cr-draft-profile-summary b, .cr-draft-execution-summary b { color: var(--fg); }
+.cr-draft-summary-label {
+  display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--dim2); font-weight: 700; margin-bottom: 2px;
+}
 .cr-draft-preview-banner {
   display: inline-flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .08em; color: #e0a800;
@@ -2161,6 +2214,7 @@ body.has-workflow-rail { padding-bottom: 40px; }
   background: var(--surface);
   display: flex; flex-direction: column;
 }
+.cr-fln-tray[hidden] { display: none; }
 .cr-fln-bar {
   display: flex; align-items: center; gap: 10px;
   padding: 12px 16px 10px; font-size: 13px;
@@ -2184,6 +2238,10 @@ body.has-workflow-rail { padding-bottom: 40px; }
   .cr-bottom-collapse-handle { bottom: calc(40px + min(48vh, 320px) - 15px); }
   body.has-workflow-rail.has-bottom-workstation { padding-bottom: 352px; }
   body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 312px; }
+}
+@media (max-width: 520px) {
+  .cr-bottom-workstation { height: min(60vh, 360px); }
+  .cr-bottom-collapse-handle { bottom: calc(40px + min(60vh, 360px) - 15px); }
 }
 /* ── Investigation Setup ─────────────────────────────── */
 .setup-wrap { max-width: 640px; }
@@ -3193,7 +3251,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
         <button class="cr-bottom-workstation-tab" id="cr-voice-save" type="button" onclick="_crSaveVoiceProfile()" style="margin-left:8px">Save as Expression Profile</button>
       </div>
       <div class="cr-fln-body">
-        <div class="cr-fln-hint" style="margin-bottom:10px">Capture the witness the future draft must not erase — voice, audience, and the words and moves that may not be flattened into generic prose. Saved as an Expression Profile the Artist and Critic will honor later. No drafting happens here.</div>
+        <div class="cr-fln-hint" style="margin-bottom:10px">Capture the Expression Profile: voice, audience, and the words and moves that may not be flattened into generic prose. A Perspective controls how evidence is examined; an Expression Profile controls how an already-governed semantic contract may be expressed. No drafting happens here.</div>
         <div class="cr-voice-grid">
           <div class="cr-voice-col">
             <div class="cr-voice-field"><label class="cr-form-label" for="cr-voice-name">Profile name</label>
@@ -3225,14 +3283,17 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       </div>
     </aside>
 
-    <aside class="cr-artist-draft" id="cr-artist-draft" hidden aria-label="Expression draft preview — skeleton and profile rendered as prose">
-      <div class="cr-fln-bar">
+    <aside class="cr-artist-draft" id="cr-artist-draft" hidden aria-label="Expression draft preview — semantic contract and profile rendered as prose">
+      <div class="cr-fln-bar cr-draft-bar">
         <span class="cr-fln-bar-label">✎ Expression · Draft</span>
         <span class="cr-fln-count" id="cr-draft-status"></span>
-        <span style="flex:1"></span>
-        <select class="ob-extract-provider" id="cr-draft-blueprint" style="max-width:200px" title="Which Structure Preview"></select>
-        <select class="ob-extract-provider" id="cr-draft-profile" style="max-width:180px" title="Which Expression Profile (voice)"></select>
-        <select class="ob-extract-provider" id="cr-draft-provider" style="max-width:150px" title="Provider">
+        <span class="cr-draft-spacer"></span>
+        <label class="cr-draft-select-label" for="cr-draft-blueprint">Semantic contract</label>
+        <select class="ob-extract-provider" id="cr-draft-blueprint" style="max-width:220px" title="Semantic contract compiled from a Blueprint"></select>
+        <label class="cr-draft-select-label" for="cr-draft-profile">Expression Profile</label>
+        <select class="ob-extract-provider" id="cr-draft-profile" style="max-width:190px" title="Expression Profile"></select>
+        <label class="cr-draft-select-label" for="cr-draft-provider">Execution provider</label>
+        <select class="ob-extract-provider" id="cr-draft-provider" style="max-width:150px" title="Execution provider">
           <option value="null">Stub (no AI)</option>
           <option value="anthropic">Claude</option>
           <option value="openai">GPT</option>
@@ -3240,11 +3301,11 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
         <button class="cr-bottom-workstation-tab" id="cr-draft-btn" type="button" onclick="_crPreviewArtistDraft()" style="margin-left:8px">Preview Artist Draft</button>
       </div>
       <div class="cr-fln-body">
-        <div class="cr-fln-hint" style="margin-bottom:10px">A preview of how the accountable structure reads as prose under a chosen voice. Nothing here is saved or accepted — regenerate, discard, or take it elsewhere. This is a draft, not a final essay.</div>
+        <div class="cr-fln-hint" style="margin-bottom:10px">Artist previews render one compiled ArchitectPlan through one Expression Profile with one execution provider. The Blueprint remains ancestry for the contract; it is not a second drafting authority. Nothing here is saved or accepted until you ratify the exact text.</div>
         <div class="cr-draft-split">
           <div class="cr-draft-structure" id="cr-draft-structure"></div>
           <div class="cr-draft-output" id="cr-draft-output">
-            <div style="font-size:12px;color:var(--dim2);line-height:1.5">Pick a skeleton, a voice, and a provider, then Preview Artist Draft. The structure stays on the left so you can see what the prose is accountable to.</div>
+            <div style="font-size:12px;color:var(--dim2);line-height:1.5">Pick a semantic contract, an Expression Profile, and an execution provider, then Preview Artist Draft. The contract stays on the left so you can see what the prose is accountable to.</div>
           </div>
         </div>
       </div>
@@ -11538,22 +11599,55 @@ window._crVoicePrefillFrom = _crVoicePrefillFrom;
 window._crComposeVoiceDirective = _crComposeVoiceDirective;
 
 // ── Expression Draft Preview (Expression resource nested view) ───────────
-// Structure Preview + ExpressionProfile → a labeled PREVIEW of the draft. This
-// is the danger point: keep it honest. It renders via the stub by default,
-// shows the structure the prose is accountable to, and NEVER saves or accepts.
+// ArchitectPlan + ExpressionProfile + provider → a labeled PREVIEW of the
+// draft. This is the danger point: keep it honest. The Blueprint is ancestry
+// for the compiled semantic contract, not a competing Artist authority.
+let _crDraftProfiles = [];
+function _crDraftPlanLabel(bp) {
+  const title = (bp && bp.title) ? String(bp.title).slice(0, 42) : 'Untitled';
+  const suffix = bp && bp.has_architect_plan ? 'contract ready' : 'no contract';
+  return `${title} · ${suffix}`;
+}
+function _crDraftSelectedProfile() {
+  const slug = document.getElementById('cr-draft-profile')?.value || '';
+  return _crDraftProfiles.find(p => p.slug === slug) || null;
+}
+function _crRenderDraftProfileSummary() {
+  const host = document.getElementById('cr-draft-profile-summary');
+  if (!host) return;
+  const p = _crDraftSelectedProfile();
+  host.innerHTML = p
+    ? `<span class="cr-draft-summary-label">Expression Profile</span><b>${x(p.name || p.slug)}</b>${p.voice ? ` · ${x(p.voice)}` : ''}${p.audience ? `<br>${x(p.audience)}` : ''}`
+    : `<span class="cr-draft-summary-label">Expression Profile</span>No Expression Profile selected — the Artist receives the semantic contract without additional voice constraints.`;
+}
+function _crRenderDraftExecutionSummary() {
+  const host = document.getElementById('cr-draft-execution-summary');
+  const provider = document.getElementById('cr-draft-provider')?.value || 'null';
+  if (!host) return;
+  const label = provider === 'null' ? 'Stub (no AI)' : provider;
+  host.innerHTML = `<span class="cr-draft-summary-label">Execution provider</span><b>${x(label)}</b> executes the selected contract/profile preview. It does not change the contract or profile.`;
+}
 async function _crDraftRenderStructure() {
   const structure = document.getElementById('cr-draft-structure');
   const id = document.getElementById('cr-draft-blueprint')?.value;
   if (!structure) return;
-  if (!id) { structure.innerHTML = '<div style="color:var(--dim2)">No Blueprint yet.</div>'; return; }
+  if (!id) { structure.innerHTML = '<div style="color:var(--dim2)">No semantic contract yet.</div>'; return; }
   try {
     const sk = await _crFetchSkeleton(id);
     structure.dataset.planId = sk.planId || '';
-    structure.innerHTML = `<div class="cr-form-label">Accountable structure</div>
+    structure.innerHTML = `<div class="cr-form-label">Semantic contract</div>
+      <div class="cr-draft-contract-summary">
+        <span class="cr-draft-summary-label">ArchitectPlan</span>
+        ${sk.planId ? `<b>${x(sk.planId)}</b><br>Compiled from Blueprint <span style="font-family:var(--mono)">${x((sk.id || id).slice(0, 12))}…</span>. The Artist must render this contract.` : 'No compiled ArchitectPlan is available for this Blueprint.'}
+      </div>
       <div style="font-weight:650;color:var(--fg);margin:5px 0 2px">${x(sk.title)}</div>
       <div style="color:var(--fg2);margin-bottom:6px">${x(sk.thesis)}</div>
       ${sk.claims.map(c => `<div class="cr-draft-structure-claim"><span class="n">${c.n}.</span>${x(c.claim)}${c.evidence.length ? '' : ' <span style="color:#e0a800" title="no evidence linked">⚠</span>'}</div>`).join('')}
-      ${sk.hasPlan ? '' : '<div style="color:#e0a800;margin-top:8px;font-size:11px">No compiled Architect Plan — nothing to render yet.</div>'}`;
+      ${sk.hasPlan ? '' : '<div style="color:#e0a800;margin-top:8px;font-size:11px">No compiled semantic contract — nothing to render yet.</div>'}
+      <div class="cr-draft-profile-summary" id="cr-draft-profile-summary"></div>
+      <div class="cr-draft-execution-summary" id="cr-draft-execution-summary"></div>`;
+    _crRenderDraftProfileSummary();
+    _crRenderDraftExecutionSummary();
   } catch (e) { structure.innerHTML = `<div style="color:#f87171">${x(e.message)}</div>`; }
 }
 
@@ -11564,19 +11658,26 @@ async function _crLoadArtistDraft() {
   try { const d = await get('/api/architect/blueprints'); bps = (d.blueprints || []).slice().reverse(); } catch {}
   if (bpSel) {
     bpSel.innerHTML = bps.length
-      ? bps.map(b => `<option value="${x(b.id)}">${x((b.title || 'Untitled').slice(0, 40))}</option>`).join('')
-      : '<option value="">No Blueprint</option>';
+      ? bps.map(b => `<option value="${x(b.id)}">${x(_crDraftPlanLabel(b))}</option>`).join('')
+      : '<option value="">No semantic contract</option>';
     if (bps.length) bpSel.value = bps.some(b => b.id === _crActiveBlueprintId) ? _crActiveBlueprintId : bps[0].id;
     if (bpSel.dataset.bound !== '1') { bpSel.addEventListener('change', _crDraftRenderStructure); bpSel.dataset.bound = '1'; }
   }
   let profs = [];
   try { const d = await get('/api/profiles'); profs = d.profiles || []; } catch {}
+  _crDraftProfiles = profs;
   if (profSel) {
-    profSel.innerHTML = `<option value="">No profile</option>`
+    profSel.innerHTML = `<option value="">No Expression Profile</option>`
       + profs.map(p => `<option value="${x(p.slug)}">${x(p.name || p.slug)}</option>`).join('');
     // Default to the captured witness (a steward-authored profile) if one exists.
     const steward = profs.find(p => p.source === 'steward-authored');
     if (steward) profSel.value = steward.slug;
+    if (profSel.dataset.bound !== '1') { profSel.addEventListener('change', _crRenderDraftProfileSummary); profSel.dataset.bound = '1'; }
+  }
+  const providerSel = document.getElementById('cr-draft-provider');
+  if (providerSel && providerSel.dataset.bound !== '1') {
+    providerSel.addEventListener('change', _crRenderDraftExecutionSummary);
+    providerSel.dataset.bound = '1';
   }
   await _crDraftRenderStructure();
 }
@@ -11589,11 +11690,11 @@ async function _crPreviewArtistDraft() {
   const btn = document.getElementById('cr-draft-btn');
   const status = document.getElementById('cr-draft-status');
   if (!out) return;
-  if (!id) { out.innerHTML = '<div style="font-size:12px;color:var(--dim2)">Pick a Blueprint first.</div>'; return; }
+  if (!id) { out.innerHTML = '<div style="font-size:12px;color:var(--dim2)">Pick a semantic contract first.</div>'; return; }
   let sk;
   try { sk = await _crFetchSkeleton(id); } catch (e) { out.innerHTML = `<div style="color:#f87171">${x(e.message)}</div>`; return; }
   if (!sk.planId) {
-    out.innerHTML = `<div style="font-size:12px;color:#e0a800;line-height:1.5">This Blueprint has no compiled Architect Plan yet — there is nothing for the Artist to render. Draft/save the Blueprint so a plan is compiled, then return here.</div>`;
+    out.innerHTML = `<div style="font-size:12px;color:#e0a800;line-height:1.5">This Blueprint has no compiled semantic contract yet — there is nothing for the Artist to render. Draft/save the Blueprint so an ArchitectPlan is compiled, then return here.</div>`;
     return;
   }
   if (btn) { btn.disabled = true; btn.textContent = 'Previewing…'; }
@@ -11605,7 +11706,7 @@ async function _crPreviewArtistDraft() {
     });
     const d = await resp.json();
     if (!resp.ok) { out.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(d.error || 'preview failed')}</div>`; if (status) status.textContent = '· ✗'; return; }
-    const profLabel = d.profile_name ? `${d.profile_name} (${d.profile_slug || ''})` : (d.profile_slug || 'no profile');
+    const profLabel = d.profile_name ? `${d.profile_name} (${d.profile_slug || ''})` : (d.profile_slug || 'no Expression Profile');
     // Hold the EXACT previewed draft + its provenance so the critic judges — and
     // ratification saves — THIS text, never a re-render.
     _crLastArtistDraft = {
@@ -11615,7 +11716,7 @@ async function _crPreviewArtistDraft() {
     const canJudge = !!(d.profile_slug);
     out.innerHTML = `
       <div class="cr-draft-preview-banner">◷ Artist draft · preview — not saved, not accepted</div>
-      <div class="cr-draft-meta">Voice: <b>${x(profLabel)}</b> · Provider: <b>${x(d.provider)}</b>${d.persisted === false ? ' · nothing was written to the record' : ''}</div>
+      <div class="cr-draft-meta">Contract: <b>${x((sk.planId || '').slice(0, 12))}…</b> · Expression Profile: <b>${x(profLabel)}</b> · Execution provider: <b>${x(d.provider)}</b>${d.persisted === false ? ' · nothing was written to the record' : ''}</div>
       <div class="cr-draft-text">${x(d.text || '')}</div>
       <div class="cr-draft-judge-row">
         ${canJudge
@@ -11744,6 +11845,9 @@ async function _crRatifyDraft() {
 }
 window._crLoadArtistDraft = _crLoadArtistDraft;
 window._crPreviewArtistDraft = _crPreviewArtistDraft;
+window._crDraftPlanLabel = _crDraftPlanLabel;
+window._crRenderDraftProfileSummary = _crRenderDraftProfileSummary;
+window._crRenderDraftExecutionSummary = _crRenderDraftExecutionSummary;
 window._crCheckVoiceFidelity = _crCheckVoiceFidelity;
 window._crRatifyDraft = _crRatifyDraft;
 window._crRenderRatifyAudits = _crRenderRatifyAudits;
