@@ -938,6 +938,7 @@ def create_app(
         if predecessor_id == successor_id:
             raise ValueError("Blueprint cannot supersede itself")
 
+        ensure_architect_tables(conn)
         conn.commit()
         conn.execute("BEGIN IMMEDIATE")
         try:
@@ -967,7 +968,6 @@ def create_app(
             if existing_edge is not None and existing_successor is not None:
                 plan = compile_architect_plan(successor_id, conn)
                 pr = plan["plan_row"]
-                ensure_architect_tables(conn)
                 conn.execute(
                     """INSERT OR IGNORE INTO architect_plans
                        (id, blueprint_id, blueprint_hash, title, source, created_at)
@@ -1028,7 +1028,6 @@ def create_app(
                     (successor_id, iid),
                 )
 
-            ensure_architect_tables(conn)
             plan = compile_architect_plan(successor_id, conn)
             pr = plan["plan_row"]
             conn.execute(

@@ -10736,6 +10736,7 @@ let _crBlueprintCandidateDirty = false;
 let _crBlueprintOperation = 'idle';
 let _crBlueprintWorkspaceEpoch = 0;
 let _crBlueprintRevision = null;
+let _crBlueprintRevisionRequestSeq = 0;
 async function _crGatherBlueprintEvidence() {
   let notes = [];
   let observations = [];
@@ -11218,6 +11219,7 @@ async function _crDraftBlueprint(save) {
 }
 function _crResetBlueprintWorkingStateForWorkspaceChange() {
   _crBlueprintWorkspaceEpoch += 1;
+  _crBlueprintRevisionRequestSeq += 1;
   _crBlueprintCandidate = null;
   _crBlueprintCandidateDirty = false;
   _crBlueprintOperation = 'idle';
@@ -11346,14 +11348,18 @@ async function _crBeginBlueprintRevision(id) {
       : window.confirm('Start another Blueprint revision?\n\nThis will replace your current unsaved working Blueprint revision.');
     if (!ok) return;
   }
+  const operationEpoch = _crBlueprintWorkspaceEpoch;
+  const requestSeq = ++_crBlueprintRevisionRequestSeq;
   let skeleton;
   try {
     skeleton = await _crFetchSkeleton(id);
   } catch (e) {
+    if (operationEpoch !== _crBlueprintWorkspaceEpoch || requestSeq !== _crBlueprintRevisionRequestSeq) return;
     const body = document.getElementById('cr-render-body');
     if (body) body.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(e.message)}</div>`;
     return;
   }
+  if (operationEpoch !== _crBlueprintWorkspaceEpoch || requestSeq !== _crBlueprintRevisionRequestSeq) return;
   _crBlueprintCandidate = _crBlueprintCandidateFromSkeleton(skeleton);
   _crBlueprintCandidateDirty = false;
   _crBlueprintRevision = {

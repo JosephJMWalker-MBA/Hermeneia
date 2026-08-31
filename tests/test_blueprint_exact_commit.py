@@ -529,6 +529,121 @@ def test_revise_blueprint_reuses_convergent_existing_successor_with_new_edge(tmp
     conn.close()
 
 
+def test_revise_blueprint_rolls_back_fresh_successor_when_supersession_insert_fails(tmp_path):
+    db_path = tmp_path / "revision-rollback-fresh.db"
+    ids = _seed_evidence(db_path)
+    predecessor = _candidate(ids["obs_id"], ids["interp_id"])
+    successor = {
+        "title": "Rollback successor",
+        "thesis": "Rollback thesis.",
+        "sections": [
+            {
+                "claim": "Rollback claim.",
+                "supporting_observations": [ids["obs_id"]],
+                "supporting_interpretations": [ids["interp_id"]],
+            }
+        ],
+    }
+    client = create_app(db_path=db_path).test_client()
+    predecessor_id = client.post("/api/pipeline/ratify-blueprint", json={"proposed_blueprint": predecessor}).get_json()["blueprint_id"]
+    before_detail = client.get(f"/api/architect/blueprints/{predecessor_id}").get_json()
+    conn = sqlite3.connect(db_path)
+    before = _counts(conn)
+    conn.execute(
+        """
+        CREATE TRIGGER fail_blueprint_revision_supersession
+        BEFORE INSERT ON supersession_relations
+        WHEN NEW.reason = 'trigger rollback'
+        BEGIN
+            SELECT RAISE(ABORT, 'injected failure before supersession completion');
+        END;
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    response = client.post("/api/pipeline/revise-blueprint", json={
+        "predecessor_id": predecessor_id,
+        "reason": "trigger rollback",
+        "proposed_blueprint": successor,
+    })
+
+    assert response.status_code == 500
+    assert response.get_json()["error_type"] == "IntegrityError"
+    conn = sqlite3.connect(db_path)
+    after = _counts(conn)
+    conn.close()
+    assert after == before
+    after_detail = client.get(f"/api/architect/blueprints/{predecessor_id}").get_json()
+    assert after_detail["title"] == before_detail["title"]
+    assert after_detail["thesis"] == before_detail["thesis"]
+    assert after_detail["sections"] == before_detail["sections"]
+    assert after_detail["superseded_by"] == []
+
+
+def test_revise_blueprint_rolls_back_failed_relation_to_preexisting_successor_without_deleting_history(tmp_path):
+    db_path = tmp_path / "revision-rollback-existing.db"
+    ids = _seed_evidence(db_path)
+    predecessor_a = _candidate(ids["obs_id"], ids["interp_id"])
+    predecessor_b = {
+        "title": "Rollback predecessor B",
+        "thesis": "Rollback predecessor thesis.",
+        "sections": [{"claim": "Rollback predecessor claim.", "supporting_observations": [], "supporting_interpretations": []}],
+    }
+    successor = {
+        "title": "Pre-existing rollback successor",
+        "thesis": "Pre-existing rollback thesis.",
+        "sections": [{"claim": "Pre-existing rollback claim.", "supporting_observations": [ids["obs_id"]], "supporting_interpretations": []}],
+    }
+    client = create_app(db_path=db_path).test_client()
+    pred_a_id = client.post("/api/pipeline/ratify-blueprint", json={"proposed_blueprint": predecessor_a}).get_json()["blueprint_id"]
+    pred_b_id = client.post("/api/pipeline/ratify-blueprint", json={"proposed_blueprint": predecessor_b}).get_json()["blueprint_id"]
+    existing = client.post("/api/pipeline/revise-blueprint", json={
+        "predecessor_id": pred_a_id,
+        "reason": "already valid history",
+        "proposed_blueprint": successor,
+    }).get_json()
+    successor_id = existing["blueprint_id"]
+    conn = sqlite3.connect(db_path)
+    before = _counts(conn)
+    before_successor = conn.execute("SELECT title, thesis, sections FROM narrative_blueprints WHERE id = ?", (successor_id,)).fetchone()
+    before_plan_count = conn.execute("SELECT COUNT(*) FROM architect_plans WHERE blueprint_id = ?", (successor_id,)).fetchone()[0]
+    conn.execute(
+        """
+        CREATE TRIGGER fail_blueprint_revision_supersession
+        BEFORE INSERT ON supersession_relations
+        WHEN NEW.reason = 'trigger rollback existing'
+        BEGIN
+            SELECT RAISE(ABORT, 'injected failure before supersession completion');
+        END;
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    response = client.post("/api/pipeline/revise-blueprint", json={
+        "predecessor_id": pred_b_id,
+        "reason": "trigger rollback existing",
+        "proposed_blueprint": successor,
+    })
+
+    assert response.status_code == 500
+    conn = sqlite3.connect(db_path)
+    after = _counts(conn)
+    after_successor = conn.execute("SELECT title, thesis, sections FROM narrative_blueprints WHERE id = ?", (successor_id,)).fetchone()
+    after_plan_count = conn.execute("SELECT COUNT(*) FROM architect_plans WHERE blueprint_id = ?", (successor_id,)).fetchone()[0]
+    edge_count = conn.execute(
+        "SELECT COUNT(*) FROM supersession_relations WHERE old_id = ? AND new_id = ?",
+        (pred_b_id, successor_id),
+    ).fetchone()[0]
+    conn.close()
+    assert after == before
+    assert tuple(after_successor) == tuple(before_successor)
+    assert after_plan_count == before_plan_count
+    assert before_plan_count == 1
+    assert edge_count == 0
+
+
 @pytest.mark.parametrize(
     ("payload_update", "error"),
     [

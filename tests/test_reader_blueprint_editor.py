@@ -105,6 +105,7 @@ def _dom_prefix(candidate_expr: str) -> str:
         "let _crBlueprintOperation = 'idle';"
         "let _crBlueprintWorkspaceEpoch = 0;"
         "let _crBlueprintRevision = null;"
+        "let _crBlueprintRevisionRequestSeq = 0;"
         "let _crActiveBlueprintId = '';"
         "const posts=[]; const confirms=[]; let generateMode='success';"
         "const generatedB={title:'Generated B',thesis:'Generated thesis B.',sections:[{claim:'Claim B1.',supporting_observations:['obs-b'],supporting_interpretations:[]}]};"
@@ -1026,6 +1027,129 @@ def test_starting_another_blueprint_revision_requires_confirmation_and_cancel_pr
     }
     assert len(result["confirms"]) == 2
     assert "Start another Blueprint revision?" in result["confirms"][0]
+
+
+def test_stale_blueprint_revision_load_after_workspace_change_is_ignored():
+    html = _index()
+    script = (
+        _dom_prefix("null")
+        + "let pending = null;"
+        + "async function _crFetchSkeleton(id){return await new Promise((resolve,reject)=>{pending={id,resolve,reject};});}"
+        + "async function _crOpenBottomWorkstation(mode){posts.push({url:'open', mode});}"
+        + _editor_functions(html)
+        + """
+(async () => {
+  const load = _crBeginBlueprintRevision('bp-a');
+  await Promise.resolve();
+  _crResetBlueprintWorkingStateForWorkspaceChange();
+  pending.resolve({id:'bp-a',title:'Blueprint A',thesis:'Thesis A.',sections:[{claim:'Claim A.',supporting_observations:['obs-a'],supporting_interpretations:[]}],claims:[],hasPlan:true,planId:'plan-a'});
+  await load;
+  process.stdout.write(JSON.stringify({
+    candidate:_crBlueprintCandidate,
+    revision:_crBlueprintRevision,
+    dirty:_crBlueprintCandidateDirty,
+    active:_crActiveBlueprintId,
+    html:elements['cr-blueprint-proposal'].innerHTML,
+    renderError:elements['cr-render-body'].innerHTML,
+    opens:posts.filter(p => p.url === 'open'),
+    seq:_crBlueprintRevisionRequestSeq,
+    epoch:_crBlueprintWorkspaceEpoch
+  }));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["candidate"] is None
+    assert result["revision"] is None
+    assert result["dirty"] is False
+    assert result["active"] == ""
+    assert result["html"] == ""
+    assert result["renderError"] == ""
+    assert result["opens"] == []
+    assert result["epoch"] == 1
+    assert result["seq"] == 2
+
+
+def test_newer_same_workspace_blueprint_revision_load_wins_over_late_old_success():
+    html = _index()
+    script = (
+        _dom_prefix("null")
+        + "const pending = {};"
+        + "async function _crFetchSkeleton(id){return await new Promise((resolve,reject)=>{pending[id]={resolve,reject};});}"
+        + "async function _crOpenBottomWorkstation(mode){posts.push({url:'open', mode});}"
+        + _editor_functions(html)
+        + """
+(async () => {
+  const oldLoad = _crBeginBlueprintRevision('bp-a');
+  await Promise.resolve();
+  const newLoad = _crBeginBlueprintRevision('bp-c');
+  await Promise.resolve();
+  pending['bp-c'].resolve({id:'bp-c',title:'Blueprint C',thesis:'Thesis C.',sections:[{claim:'Claim C.',supporting_observations:['obs-c'],supporting_interpretations:[]}],claims:[],hasPlan:true,planId:'plan-c'});
+  await newLoad;
+  pending['bp-a'].resolve({id:'bp-a',title:'Blueprint A',thesis:'Thesis A.',sections:[{claim:'Claim A.',supporting_observations:['obs-a'],supporting_interpretations:[]}],claims:[],hasPlan:true,planId:'plan-a'});
+  await oldLoad;
+  process.stdout.write(JSON.stringify({
+    candidate:_crBlueprintCandidate,
+    revision:_crBlueprintRevision,
+    dirty:_crBlueprintCandidateDirty,
+    html:elements['cr-blueprint-proposal'].innerHTML,
+    opens:posts.filter(p => p.url === 'open')
+  }));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["candidate"]["title"] == "Blueprint C"
+    assert result["candidate"]["sections"][0]["supporting_observations"] == ["obs-c"]
+    assert result["revision"] == {
+        "predecessorId": "bp-c",
+        "predecessorTitle": "Blueprint C",
+        "reason": "",
+    }
+    assert result["dirty"] is False
+    assert "Blueprint C" in result["html"]
+    assert "Blueprint A" not in result["html"]
+    assert result["opens"] == [{"url": "open", "mode": "blueprint"}]
+
+
+def test_stale_blueprint_revision_load_error_after_newer_intent_is_ignored():
+    html = _index()
+    script = (
+        _dom_prefix("null")
+        + "const pending = {};"
+        + "async function _crFetchSkeleton(id){return await new Promise((resolve,reject)=>{pending[id]={resolve,reject};});}"
+        + "async function _crOpenBottomWorkstation(mode){posts.push({url:'open', mode});}"
+        + _editor_functions(html)
+        + """
+(async () => {
+  const oldLoad = _crBeginBlueprintRevision('bp-a');
+  await Promise.resolve();
+  const newLoad = _crBeginBlueprintRevision('bp-c');
+  await Promise.resolve();
+  pending['bp-c'].resolve({id:'bp-c',title:'Blueprint C',thesis:'Thesis C.',sections:[{claim:'Claim C.',supporting_observations:[],supporting_interpretations:[]}],claims:[],hasPlan:true,planId:'plan-c'});
+  await newLoad;
+  pending['bp-a'].reject(new Error('stale A failed'));
+  await oldLoad;
+  process.stdout.write(JSON.stringify({
+    candidate:_crBlueprintCandidate,
+    revision:_crBlueprintRevision,
+    renderError:elements['cr-render-body'].innerHTML,
+    html:elements['cr-blueprint-proposal'].innerHTML,
+    opens:posts.filter(p => p.url === 'open')
+  }));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["candidate"]["title"] == "Blueprint C"
+    assert result["revision"]["predecessorId"] == "bp-c"
+    assert result["renderError"] == ""
+    assert "stale A failed" not in result["html"]
+    assert "Blueprint C" in result["html"]
+    assert result["opens"] == [{"url": "open", "mode": "blueprint"}]
 
 
 def test_structure_preview_renders_blueprint_history_and_revision_action():
