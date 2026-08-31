@@ -78,12 +78,16 @@ def _editor_functions(html: str) -> str:
         "_crBlueprintStatusBadge",
         "_crUpdateBlueprintDirtyBadge",
         "_crMarkBlueprintCandidateDirty",
+        "_crClearBlueprintRevisionState",
+        "_crUpdateBlueprintRevisionReason",
         "_crUpdateBlueprintTitle",
         "_crUpdateBlueprintThesis",
         "_crUpdateBlueprintClaim",
         "_crMoveBlueprintClaim",
         "_crAddBlueprintClaim",
         "_crRemoveBlueprintClaim",
+        "_crBlueprintCandidateFromSkeleton",
+        "_crBeginBlueprintRevision",
         "_crValidateBlueprintCandidateForCommit",
         "_crRenderBlueprintEditor",
         "_crRenderBlueprintCandidate",
@@ -100,6 +104,7 @@ def _dom_prefix(candidate_expr: str) -> str:
         "let _crBlueprintCandidateDirty = false;"
         "let _crBlueprintOperation = 'idle';"
         "let _crBlueprintWorkspaceEpoch = 0;"
+        "let _crBlueprintRevision = null;"
         "let _crActiveBlueprintId = '';"
         "const posts=[]; const confirms=[]; let generateMode='success';"
         "const generatedB={title:'Generated B',thesis:'Generated thesis B.',sections:[{claim:'Claim B1.',supporting_observations:['obs-b'],supporting_interpretations:[]}]};"
@@ -110,7 +115,9 @@ def _dom_prefix(candidate_expr: str) -> str:
         "'cr-blueprint-btn':makeEl('cr-blueprint-btn'),"
         "'cr-blueprint-commit-btn':makeEl('cr-blueprint-commit-btn'),"
         "'cr-blueprint-title':makeEl('cr-blueprint-title'),"
-        "'cr-blueprint-thesis':makeEl('cr-blueprint-thesis')"
+        "'cr-blueprint-thesis':makeEl('cr-blueprint-thesis'),"
+        "'cr-blueprint-revision-reason':makeEl('cr-blueprint-revision-reason'),"
+        "'cr-render-body':makeEl('cr-render-body')"
         "};"
         "const document={getElementById(id){return elements[id]||null;},querySelectorAll(){return [];}};"
         "const window={confirm(message){confirms.push(message); return window.confirmResult;}, confirmResult:true};"
@@ -127,6 +134,10 @@ def _dom_prefix(candidate_expr: str) -> str:
         "if(url==='/api/pipeline/ratify-blueprint'){"
         " if(generateMode==='commit-fail'){return {ok:false,json:async()=>({error:'commit failed'})};}"
         " return {ok:true,json:async()=>({blueprint_id:'bp-edited',plan_id:'plan-edited',committed_blueprint:body.proposed_blueprint})};"
+        "}"
+        "if(url==='/api/pipeline/revise-blueprint'){"
+        " if(generateMode==='commit-fail'){return {ok:false,json:async()=>({error:'revision failed'})};}"
+        " return {ok:true,json:async()=>({blueprint_id:'bp-revision',plan_id:'plan-revision',committed_blueprint:body.proposed_blueprint,supersession:{old_id:body.predecessor_id,new_id:'bp-revision',reason:body.reason,ratified_at:'2026-01-01T00:00:00Z'}})};"
         "}"
         "throw new Error('unexpected fetch '+url);"
         "}"
@@ -751,3 +762,298 @@ process.stdout.write(JSON.stringify({candidate:_crBlueprintCandidate, dirty:_crB
     assert result["dirty"] is False
     assert result["html"] == ""
     assert result["display"] == "none"
+
+
+def test_begin_blueprint_revision_loads_committed_blueprint_as_unsaved_working_revision():
+    html = _index()
+    script = (
+        _dom_prefix("null")
+        + "async function _crFetchSkeleton(id){return {id,title:'Committed A',thesis:'Thesis A.',sections:[{claim:'Claim A.',supporting_observations:['obs-1'],supporting_interpretations:['int-1']}],claims:[],hasPlan:true,planId:'plan-a',supersedes:[],supersededBy:[]};}"
+        + "async function _crOpenBottomWorkstation(mode){posts.push({url:'open', mode});}"
+        + _editor_functions(html)
+        + """
+(async () => {
+  await _crBeginBlueprintRevision('bp-a');
+  process.stdout.write(JSON.stringify({
+    candidate:_crBlueprintCandidate,
+    dirty:_crBlueprintCandidateDirty,
+    revision:_crBlueprintRevision,
+    html:elements['cr-blueprint-proposal'].innerHTML,
+    opens:posts.filter(p => p.url === 'open')
+  }));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["candidate"] == {
+        "title": "Committed A",
+        "thesis": "Thesis A.",
+        "sections": [
+            {"claim": "Claim A.", "supporting_observations": ["obs-1"], "supporting_interpretations": ["int-1"]},
+        ],
+    }
+    assert result["dirty"] is False
+    assert result["revision"] == {"predecessorId": "bp-a", "predecessorTitle": "Committed A", "reason": ""}
+    assert "Working revision · not saved of Committed A · bp-a…" in result["html"]
+    assert "Why are you revising this Blueprint?" in result["html"]
+    assert result["opens"] == [{"url": "open", "mode": "blueprint"}]
+
+
+def test_blueprint_revision_requires_human_reason_before_commit():
+    html = _index()
+    script = (
+        _dom_prefix(_candidate_js())
+        + _editor_functions(html)
+        + """
+(async () => {
+  _crBlueprintRevision = {predecessorId:'bp-a', predecessorTitle:'Committed A', reason:'   '};
+  _crUpdateBlueprintTitle('Revision title');
+  await _crCommitBlueprintCandidate();
+  process.stdout.write(JSON.stringify({
+    revision:_crBlueprintRevision,
+    dirty:_crBlueprintCandidateDirty,
+    html:elements['cr-blueprint-proposal'].innerHTML,
+    reviseCount:posts.filter(p => p.url === '/api/pipeline/revise-blueprint').length,
+    ratifyCount:posts.filter(p => p.url === '/api/pipeline/ratify-blueprint').length
+  }));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["reviseCount"] == 0
+    assert result["ratifyCount"] == 0
+    assert result["dirty"] is True
+    assert result["revision"]["predecessorId"] == "bp-a"
+    assert "Add a reason before committing this revision." in result["html"]
+
+
+def test_blueprint_revision_commit_posts_successor_reason_and_clears_transient_state():
+    html = _index()
+    script = (
+        _dom_prefix(_candidate_js())
+        + _editor_functions(html)
+        + """
+(async () => {
+  _crBlueprintRevision = {predecessorId:'bp-a', predecessorTitle:'Committed A', reason:'Initial reason'};
+  _crUpdateBlueprintTitle('Revision title');
+  _crUpdateBlueprintRevisionReason('Human reason.');
+  await _crCommitBlueprintCandidate();
+  const revisePost = posts.find(p => p.url === '/api/pipeline/revise-blueprint');
+  process.stdout.write(JSON.stringify({
+    reviseCount:posts.filter(p => p.url === '/api/pipeline/revise-blueprint').length,
+    ratifyCount:posts.filter(p => p.url === '/api/pipeline/ratify-blueprint').length,
+    payload:revisePost.body,
+    candidate:_crBlueprintCandidate,
+    dirty:_crBlueprintCandidateDirty,
+    revision:_crBlueprintRevision,
+    active:_crActiveBlueprintId,
+    html:elements['cr-blueprint-proposal'].innerHTML
+  }));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["reviseCount"] == 1
+    assert result["ratifyCount"] == 0
+    assert result["payload"]["predecessor_id"] == "bp-a"
+    assert result["payload"]["reason"] == "Human reason."
+    assert result["payload"]["proposed_blueprint"]["title"] == "Revision title"
+    assert result["candidate"] is None
+    assert result["dirty"] is False
+    assert result["revision"] is None
+    assert result["active"] == "bp-revision"
+    assert "supersedes bp-a…" in result["html"]
+
+
+def test_failed_blueprint_revision_commit_preserves_candidate_reason_for_retry():
+    html = _index()
+    script = (
+        _dom_prefix(_candidate_js())
+        + _editor_functions(html)
+        + """
+(async () => {
+  _crBlueprintRevision = {predecessorId:'bp-a', predecessorTitle:'Committed A', reason:'Human reason.'};
+  _crUpdateBlueprintTitle('Revision title');
+  _crUpdateBlueprintClaim(1, 'Revision claim B.');
+  generateMode = 'commit-fail';
+  await _crCommitBlueprintCandidate();
+  const afterFailure = {
+    candidate:JSON.parse(JSON.stringify(_crBlueprintCandidate)),
+    dirty:_crBlueprintCandidateDirty,
+    revision:_crBlueprintRevision,
+    html:elements['cr-blueprint-proposal'].innerHTML
+  };
+  generateMode = 'success';
+  await _crCommitBlueprintCandidate();
+  const revisePosts = posts.filter(p => p.url === '/api/pipeline/revise-blueprint');
+  process.stdout.write(JSON.stringify({afterFailure, retryPayload:revisePosts[1].body, reviseCount:revisePosts.length, candidate:_crBlueprintCandidate, revision:_crBlueprintRevision}));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["afterFailure"]["candidate"]["title"] == "Revision title"
+    assert result["afterFailure"]["candidate"]["sections"][1]["claim"] == "Revision claim B."
+    assert result["afterFailure"]["dirty"] is True
+    assert result["afterFailure"]["revision"] == {
+        "predecessorId": "bp-a",
+        "predecessorTitle": "Committed A",
+        "reason": "Human reason.",
+    }
+    assert "revision failed" in result["afterFailure"]["html"]
+    assert result["reviseCount"] == 2
+    assert result["retryPayload"]["reason"] == "Human reason."
+    assert result["candidate"] is None
+    assert result["revision"] is None
+
+
+def test_working_blueprint_revision_survives_workstation_and_page_continuity():
+    html = _index()
+    script = (
+        _dom_prefix(_candidate_js())
+        + "let _crBottomMode = ''; let _crPage = 1; let _crTotalPages = 2; let renders = 0;"
+        + "function makePanel(id){return {id,hidden:false,dataset:{},style:{},innerHTML:'',textContent:'',setAttribute(){},classList:{toggle(){},remove(){}}};}"
+        + "Object.assign(elements,{"
+        + "'cr-bottom-workstation':makePanel('cr-bottom-workstation'),"
+        + "'cr-bottom-collapse-handle':makePanel('cr-bottom-collapse-handle'),"
+        + "'cr-blueprint-draft':makePanel('cr-blueprint-draft'),"
+        + "'cr-render-preview':makePanel('cr-render-preview'),"
+        + "'cr-critic-audit':makePanel('cr-critic-audit'),"
+        + "'cr-perspective-run':makePanel('cr-perspective-run'),"
+        + "'cr-fln-tray':makePanel('cr-fln-tray'),"
+        + "'corpus-search':makePanel('corpus-search'),"
+        + "'attn-timeline':makePanel('attn-timeline'),"
+        + "'cr-voice-profile':makePanel('cr-voice-profile'),"
+        + "'cr-artist-draft':makePanel('cr-artist-draft'),"
+        + "'cr-record-ledger':makePanel('cr-record-ledger'),"
+        + "'cr-blueprint-subtabs':makePanel('cr-blueprint-subtabs'),"
+        + "'cr-expression-subtabs':makePanel('cr-expression-subtabs'),"
+        + "'cr-blueprint-question':makePanel('cr-blueprint-question'),"
+        + "'cr-blueprint-meta':makePanel('cr-blueprint-meta'),"
+        + "'cr-page-view':{offsetTop:120}"
+        + "});"
+        + "document.body={classList:{toggle(){}}}; document.querySelectorAll=()=>[];"
+        + "function invLoad(){return {thesis:'What does the light do?'};}"
+        + "async function _crGatherBlueprintEvidence(){return {notes:[],highlights:[],observations:[]};}"
+        + "function cmpMarkOnboardingStep(){} async function _attnLoad(){} function _flnLoadEntries(){}"
+        + "async function _crLoadPerspectiveRun(){} function _crLoadRenderPreview(){} function _crLoadCriticAudit(){}"
+        + "function _crLoadVoiceProfile(){} function _crLoadArtistDraft(){} function _crLoadRecordLedger(){}"
+        + "function _crRenderPage(){renders++;} window.scrollTo=()=>{};"
+        + _extract_fn(html, "_crBottomPanels")
+        + _extract_fn(html, "_crWorkstationResourceForMode")
+        + _extract_fn(html, "_crSyncBottomWorkstationState")
+        + _extract_fn(html, "_crOpenBottomWorkstation")
+        + _extract_fn(html, "_crCloseBottomWorkstation")
+        + _extract_fn(html, "_crLoadBlueprintDraft")
+        + _extract_fn(html, "_crNextPage")
+        + _extract_fn(html, "_crPrevPage")
+        + _editor_functions(html)
+        + """
+(async () => {
+  _crBlueprintRevision = {predecessorId:'bp-a', predecessorTitle:'Committed A', reason:'Human reason.'};
+  _crUpdateBlueprintTitle('Revision title');
+  _crUpdateBlueprintClaim(1, 'Revision claim B.');
+  const edited = JSON.stringify(_crBlueprintCandidate);
+  const revision = JSON.stringify(_crBlueprintRevision);
+  await _crOpenBottomWorkstation('blueprint');
+  _crCloseBottomWorkstation();
+  await _crOpenBottomWorkstation('blueprint');
+  const afterReopen = JSON.stringify(_crBlueprintCandidate);
+  await _crOpenBottomWorkstation('perspective');
+  await _crOpenBottomWorkstation('blueprint');
+  const afterResource = JSON.stringify(_crBlueprintCandidate);
+  await _crOpenBottomWorkstation('render');
+  await _crOpenBottomWorkstation('blueprint');
+  const afterSubview = JSON.stringify(_crBlueprintCandidate);
+  _crNextPage();
+  _crPrevPage();
+  await _crOpenBottomWorkstation('blueprint');
+  const afterPage = JSON.stringify(_crBlueprintCandidate);
+  process.stdout.write(JSON.stringify({edited, revision, afterReopen, afterResource, afterSubview, afterPage, afterRevision:JSON.stringify(_crBlueprintRevision), dirty:_crBlueprintCandidateDirty, html:elements['cr-blueprint-proposal'].innerHTML}));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["afterReopen"] == result["edited"]
+    assert result["afterResource"] == result["edited"]
+    assert result["afterSubview"] == result["edited"]
+    assert result["afterPage"] == result["edited"]
+    assert result["afterRevision"] == result["revision"]
+    assert result["dirty"] is True
+    assert "Working revision · edited · not saved of Committed A · bp-a…" in result["html"]
+
+
+def test_starting_another_blueprint_revision_requires_confirmation_and_cancel_preserves_existing_work():
+    html = _index()
+    script = (
+        _dom_prefix(_candidate_js())
+        + "const skeletons={"
+        + "'bp-cancel':{id:'bp-cancel',title:'Cancel target',thesis:'Cancel thesis.',sections:[{claim:'Cancel claim.',supporting_observations:[],supporting_interpretations:[]}],claims:[],hasPlan:true,planId:'plan-cancel'},"
+        + "'bp-next':{id:'bp-next',title:'Next target',thesis:'Next thesis.',sections:[{claim:'Next claim.',supporting_observations:['obs-next'],supporting_interpretations:[]}],claims:[],hasPlan:true,planId:'plan-next'}"
+        + "};"
+        + "async function _crFetchSkeleton(id){return skeletons[id];}"
+        + "async function _crOpenBottomWorkstation(mode){posts.push({url:'open', mode});}"
+        + _editor_functions(html)
+        + """
+(async () => {
+  _crBlueprintRevision = {predecessorId:'bp-a', predecessorTitle:'Committed A', reason:'Human reason.'};
+  _crUpdateBlueprintTitle('Edited revision A');
+  const before = JSON.stringify(_crBlueprintCandidate);
+  window.confirmResult = false;
+  await _crBeginBlueprintRevision('bp-cancel');
+  const afterCancel = {candidate:JSON.stringify(_crBlueprintCandidate), revision:_crBlueprintRevision};
+  window.confirmResult = true;
+  await _crBeginBlueprintRevision('bp-next');
+  const afterConfirm = {candidate:_crBlueprintCandidate, revision:_crBlueprintRevision};
+  process.stdout.write(JSON.stringify({before, afterCancel, afterConfirm, confirms}));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["afterCancel"]["candidate"] == result["before"]
+    assert result["afterCancel"]["revision"]["predecessorId"] == "bp-a"
+    assert result["afterConfirm"]["candidate"]["title"] == "Next target"
+    assert result["afterConfirm"]["candidate"]["sections"][0]["supporting_observations"] == ["obs-next"]
+    assert result["afterConfirm"]["revision"] == {
+        "predecessorId": "bp-next",
+        "predecessorTitle": "Next target",
+        "reason": "",
+    }
+    assert len(result["confirms"]) == 2
+    assert "Start another Blueprint revision?" in result["confirms"][0]
+
+
+def test_structure_preview_renders_blueprint_history_and_revision_action():
+    html = _index()
+    script = (
+        _dom_prefix("null")
+        + "async function _crFetchSkeleton(id){return {id,title:'Blueprint B',thesis:'Thesis B.',claims:[{n:1,claim:'Claim B.',evidence:[]}],hasPlan:true,planId:'plan-b',supersedes:[{old_id:'bp-a',old_title:'Blueprint A',reason:'Because A needed revision.'}],supersededBy:[{new_id:'bp-c',new_title:'Blueprint C',reason:'Because C branched.'}]};}"
+        + _extract_fn(html, "_crBlueprintCanMutate")
+        + _extract_fn(html, "_crRenderBlueprintSkeleton")
+        + """
+(async () => {
+  await _crRenderBlueprintSkeleton('bp-b');
+  process.stdout.write(JSON.stringify({
+    active:_crActiveBlueprintId,
+    html:elements['cr-render-body'].innerHTML
+  }));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["active"] == "bp-b"
+    assert "Supersedes" in result["html"]
+    assert "Blueprint A · bp-a…" in result["html"]
+    assert "Because A needed revision." in result["html"]
+    assert "Superseded by" in result["html"]
+    assert "Blueprint C · bp-c…" in result["html"]
+    assert "Because C branched." in result["html"]
+    assert "_crBeginBlueprintRevision('bp-b')" in result["html"]
+    assert "current" not in result["html"].lower()
+    assert "latest" not in result["html"].lower()
