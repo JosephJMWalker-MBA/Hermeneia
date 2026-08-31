@@ -68,3 +68,89 @@ def test_record_detail_returns_exact_text_and_lineage_surface(seeded):
     classes = {n["class"] for n in graph.get("nodes", [])}
     assert "RenderedNarrative" in classes
     assert "Observation" in classes      # walks back to evidence
+
+
+def test_artist_preview_stays_out_of_record_until_exact_save(tmp_path):
+    db_path = tmp_path / "preview.db"
+    store = SQLiteStore(db_path)
+    ids = _seed_full_chain(store, include_narrative=False, include_report=False)
+    store.close()
+    client = create_app(db_path=db_path).test_client()
+
+    preview = client.post("/api/pipeline/preview-artist", json={
+        "plan_id": ids["plan_id"],
+        "provider": "null",
+        "profile": "literary-en",
+    })
+
+    assert preview.status_code == 200, preview.get_data(as_text=True)
+    assert preview.get_json()["persisted"] is False
+    assert client.get("/api/reader/narratives").get_json()["count"] == 0
+
+    exact = "Preview text saved exactly — no second Artist call."
+    ratify = client.post("/api/pipeline/ratify-draft", json={
+        "plan_id": ids["plan_id"],
+        "provider": "null",
+        "profile_slug": "literary-en",
+        "text": exact,
+    })
+
+    assert ratify.status_code == 201, ratify.get_data(as_text=True)
+    payload = client.get("/api/reader/narratives").get_json()
+    assert payload["count"] == 1
+    detail = client.get(f"/api/reader/narratives/{ratify.get_json()['id']}").get_json()
+    assert detail["rendered_narrative"]["text"] == exact
+
+
+def test_record_list_exposes_pending_accepted_rejected_without_filtering(tmp_path):
+    db_path = tmp_path / "statuses.db"
+    store = SQLiteStore(db_path)
+    ids = _seed_full_chain(store, include_narrative=False, include_report=False)
+    conn = store._conn
+    rows = [
+        ("record-pending", "stub-pending", "pending", None, "2026-08-30T21:10:00+00:00"),
+        ("record-accepted", "stub-accepted", "accepted", "Accepted by steward.", "2026-08-30T21:12:00+00:00"),
+        ("record-rejected", "stub-rejected", "rejected", "Rejected by steward.", "2026-08-30T21:11:00+00:00"),
+    ]
+    for narrative_id, provider, status, rationale, created_at in rows:
+        conn.execute(
+            """
+            INSERT INTO rendered_narratives
+                (id, architect_plan_id, provider, expression_profile_id, text,
+                 prompt_used, execution_config, created_at, narrative_status,
+                 narrative_rationale)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                narrative_id,
+                ids["plan_id"],
+                provider,
+                ids["profile_id"],
+                f"Text for {status}",
+                "Prompt.",
+                '{"provider":"stub"}',
+                created_at,
+                status,
+                rationale,
+            ),
+        )
+    conn.commit()
+    store.close()
+    client = create_app(db_path=db_path).test_client()
+
+    payload = client.get("/api/reader/narratives").get_json()
+
+    assert payload["count"] == 3
+    assert [row["id"] for row in payload["narratives"]] == [
+        "record-accepted",
+        "record-rejected",
+        "record-pending",
+    ]
+    statuses = {row["id"]: row["narrative_status"] for row in payload["narratives"]}
+    assert statuses == {
+        "record-pending": "pending",
+        "record-accepted": "accepted",
+        "record-rejected": "rejected",
+    }
+    rejected = next(row for row in payload["narratives"] if row["id"] == "record-rejected")
+    assert rejected["narrative_rationale"] == "Rejected by steward."

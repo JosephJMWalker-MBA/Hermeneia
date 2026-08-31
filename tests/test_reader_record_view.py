@@ -57,7 +57,11 @@ def test_it_is_a_ledger_not_a_gallery():
     # Framed as an accountable record, never a showcased-content gallery.
     assert "My Essays" not in index
     ledger_region = _extract_fn(index, "_crLoadRecordLedger")
-    assert "No ratified records yet" in ledger_region
+    assert "No narrative records yet" in ledger_region
+    assert "Previewing an Artist draft does not enter the record" in ledger_region
+    assert "Saved does not mean accepted" in index
+    assert "No ratified records yet" not in index
+    assert "ledger of ratified artifacts" not in index
 
 
 def test_record_functions_exposed():
