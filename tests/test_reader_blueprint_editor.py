@@ -475,6 +475,49 @@ fetch = async function(url, opts) {
     assert result["display"] == "none"
 
 
+def test_blueprint_workspace_change_during_seed_assembly_sends_no_provider_request():
+    html = _index()
+    script = (
+        _dom_prefix(_candidate_js())
+        + _editor_functions(html)
+        + """
+let pendingSeed = null;
+_crAssembleBlueprintSeed = async function() {
+  return await new Promise(resolve => { pendingSeed = {resolve}; });
+};
+fetch = async function(url, opts) {
+  const body=opts && opts.body ? JSON.parse(opts.body) : {};
+  posts.push({url, body});
+  return {ok:true,json:async()=>({proposed_blueprint:generatedB})};
+};
+(async () => {
+  _crUpdateBlueprintTitle('Edited A');
+  const generatePromise = _crGenerateBlueprintCandidate(true);
+  await Promise.resolve();
+  _crResetBlueprintWorkingStateForWorkspaceChange();
+  pendingSeed.resolve('valid stale workspace-A seed');
+  await generatePromise;
+  process.stdout.write(JSON.stringify({
+    candidate:_crBlueprintCandidate,
+    dirty:_crBlueprintCandidateDirty,
+    operation:_crBlueprintOperation,
+    html:elements['cr-blueprint-proposal'].innerHTML,
+    display:elements['cr-blueprint-proposal'].style.display,
+    generationCount:posts.filter(p=>p.url==='/api/pipeline/extract-blueprint').length
+  }));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["generationCount"] == 0
+    assert result["candidate"] is None
+    assert result["dirty"] is False
+    assert result["operation"] == "idle"
+    assert result["html"] == ""
+    assert result["display"] == "none"
+
+
 def test_reorder_add_and_remove_edit_candidate_sections_not_evidence_records():
     html = _index()
     script = (

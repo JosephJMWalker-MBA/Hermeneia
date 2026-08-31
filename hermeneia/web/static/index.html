@@ -10985,8 +10985,9 @@ async function _crGenerateBlueprintCandidate(regenerating = false) {
 
   _crSetBlueprintOperation('generating');
   const text = await _crAssembleBlueprintSeed();
+  if (operationEpoch !== _crBlueprintWorkspaceEpoch) return;
   if (!text) {
-    if (operationEpoch === _crBlueprintWorkspaceEpoch) _crSetBlueprintOperation('idle');
+    _crSetBlueprintOperation('idle');
     propEl.style.display = 'block';
     propEl.innerHTML = `<div style="color:#f87171;font-size:13px">Set a governing question and capture at least one highlight, note, or observation first.</div>`;
     return;
