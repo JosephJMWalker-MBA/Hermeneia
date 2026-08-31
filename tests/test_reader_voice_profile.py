@@ -59,6 +59,8 @@ def test_voice_captures_all_witness_fields():
         assert f'id="{field_id}"' in index, field_id
     # The example the user named is offered as guidance.
     assert "do not turn this into consultant language" in index
+    assert "A Perspective controls how evidence is examined" in index
+    assert "Expression Profile controls how an already-governed semantic contract may be expressed" in index
 
 
 def test_voice_saves_via_create_endpoint_no_llm():
