@@ -68,6 +68,10 @@ def _candidate_js() -> str:
 
 def _editor_functions(html: str) -> str:
     names = [
+        "_crCloneBlueprintCandidate",
+        "_crBlueprintCanMutate",
+        "_crSyncBlueprintOperationState",
+        "_crSetBlueprintOperation",
         "_crBlueprintSection",
         "_crBlueprintSections",
         "_crBlueprintEvidenceCountText",
@@ -94,6 +98,8 @@ def _dom_prefix(candidate_expr: str) -> str:
     return (
         f"let _crBlueprintCandidate = {candidate_expr};"
         "let _crBlueprintCandidateDirty = false;"
+        "let _crBlueprintOperation = 'idle';"
+        "let _crBlueprintWorkspaceEpoch = 0;"
         "let _crActiveBlueprintId = '';"
         "const posts=[]; const confirms=[]; let generateMode='success';"
         "const generatedB={title:'Generated B',thesis:'Generated thesis B.',sections:[{claim:'Claim B1.',supporting_observations:['obs-b'],supporting_interpretations:[]}]};"
@@ -106,7 +112,7 @@ def _dom_prefix(candidate_expr: str) -> str:
         "'cr-blueprint-title':makeEl('cr-blueprint-title'),"
         "'cr-blueprint-thesis':makeEl('cr-blueprint-thesis')"
         "};"
-        "const document={getElementById(id){return elements[id]||null;}};"
+        "const document={getElementById(id){return elements[id]||null;},querySelectorAll(){return [];}};"
         "const window={confirm(message){confirms.push(message); return window.confirmResult;}, confirmResult:true};"
         "function setTimeout(fn){fn();}"
         "function _crOpenBottomWorkstation(mode){posts.push({url:'open', mode});}"
@@ -199,6 +205,274 @@ def test_working_blueprint_dom_is_not_commit_authority():
     result = _run_node(script)
     assert result["candidateBeforeCommitTitle"] == "Memory title"
     assert "DOM title" not in json.dumps(result["payload"])
+
+
+def test_blueprint_commit_locks_mutations_and_uses_exact_pending_snapshot():
+    html = _index()
+    script = (
+        _dom_prefix(_candidate_js())
+        + _editor_functions(html)
+        + """
+let pendingCommit = null;
+fetch = async function(url, opts) {
+  const body=opts && opts.body ? JSON.parse(opts.body) : {};
+  posts.push({url, body});
+  if(url==='/api/pipeline/ratify-blueprint'){
+    return await new Promise(resolve => { pendingCommit = {resolve}; });
+  }
+  if(url==='/api/pipeline/extract-blueprint'){
+    return {ok:true,json:async()=>({proposed_blueprint:generatedB})};
+  }
+  throw new Error('unexpected fetch '+url);
+};
+(async () => {
+  _crUpdateBlueprintTitle('Edited A');
+  _crUpdateBlueprintThesis('Edited thesis A.');
+  _crUpdateBlueprintClaim(1, 'Edited claim B.');
+  const edited = JSON.stringify(_crBlueprintCandidate);
+  const commitPromise = _crCommitBlueprintCandidate();
+  await Promise.resolve();
+  const operationDuringCommit = _crBlueprintOperation;
+  _crUpdateBlueprintTitle('Blocked title');
+  _crUpdateBlueprintThesis('Blocked thesis.');
+  _crUpdateBlueprintClaim(0, 'Blocked claim.');
+  _crMoveBlueprintClaim(2, -1);
+  _crAddBlueprintClaim();
+  _crRemoveBlueprintClaim(1);
+  await _crCommitBlueprintCandidate();
+  await _crGenerateBlueprintCandidate(true);
+  const afterBlockedMutations = JSON.stringify(_crBlueprintCandidate);
+  const commitPayload = posts.find(p => p.url === '/api/pipeline/ratify-blueprint').body.proposed_blueprint;
+  pendingCommit.resolve({ok:true,json:async()=>({blueprint_id:'bp-1',plan_id:'plan-1',committed_blueprint:commitPayload})});
+  await commitPromise;
+  process.stdout.write(JSON.stringify({
+    operationDuringCommit,
+    afterBlockedMutations,
+    edited,
+    candidate:_crBlueprintCandidate,
+    dirty:_crBlueprintCandidateDirty,
+    operation:_crBlueprintOperation,
+    commitCount:posts.filter(p=>p.url==='/api/pipeline/ratify-blueprint').length,
+    generationCount:posts.filter(p=>p.url==='/api/pipeline/extract-blueprint').length,
+    commitPayload
+  }));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["operationDuringCommit"] == "committing"
+    assert result["afterBlockedMutations"] == result["edited"]
+    assert result["commitCount"] == 1
+    assert result["generationCount"] == 0
+    assert result["commitPayload"]["title"] == "Edited A"
+    assert result["commitPayload"]["sections"][1]["claim"] == "Edited claim B."
+    assert result["candidate"] is None
+    assert result["dirty"] is False
+    assert result["operation"] == "idle"
+
+
+def test_failed_blueprint_commit_restores_snapshot_and_unlocks_for_retry():
+    html = _index()
+    script = (
+        _dom_prefix(_candidate_js())
+        + _editor_functions(html)
+        + """
+let pendingCommit = null;
+let commitAttempt = 0;
+fetch = async function(url, opts) {
+  const body=opts && opts.body ? JSON.parse(opts.body) : {};
+  posts.push({url, body});
+  if(url==='/api/pipeline/ratify-blueprint'){
+    commitAttempt += 1;
+    if (commitAttempt === 1) {
+      return await new Promise(resolve => { pendingCommit = {resolve}; });
+    }
+    return {ok:true,json:async()=>({blueprint_id:'bp-2',plan_id:'plan-2',committed_blueprint:body.proposed_blueprint})};
+  }
+  throw new Error('unexpected fetch '+url);
+};
+(async () => {
+  _crUpdateBlueprintTitle('Edited A');
+  _crUpdateBlueprintClaim(1, 'Edited claim B.');
+  const edited = JSON.stringify(_crBlueprintCandidate);
+  const commitPromise = _crCommitBlueprintCandidate();
+  await Promise.resolve();
+  pendingCommit.resolve({ok:false,json:async()=>({error:'commit failed'})});
+  await commitPromise;
+  const afterFailure = {
+    candidate:JSON.stringify(_crBlueprintCandidate),
+    dirty:_crBlueprintCandidateDirty,
+    operation:_crBlueprintOperation,
+    html:elements['cr-blueprint-proposal'].innerHTML
+  };
+  _crUpdateBlueprintTitle('Retry title');
+  const afterEdit = JSON.stringify(_crBlueprintCandidate);
+  await _crCommitBlueprintCandidate();
+  const commitPosts = posts.filter(p=>p.url==='/api/pipeline/ratify-blueprint');
+  process.stdout.write(JSON.stringify({edited, afterFailure, afterEdit, commitCount:commitPosts.length, retryPayload:commitPosts[1].body.proposed_blueprint, candidate:_crBlueprintCandidate}));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["afterFailure"]["candidate"] == result["edited"]
+    assert result["afterFailure"]["dirty"] is True
+    assert result["afterFailure"]["operation"] == "idle"
+    assert "commit failed" in result["afterFailure"]["html"]
+    assert json.loads(result["afterEdit"])["title"] == "Retry title"
+    assert result["commitCount"] == 2
+    assert result["retryPayload"]["title"] == "Retry title"
+    assert result["candidate"] is None
+
+
+def test_blueprint_regeneration_locks_mutations_and_replaces_only_on_success():
+    html = _index()
+    script = (
+        _dom_prefix(_candidate_js())
+        + _editor_functions(html)
+        + """
+let pendingGenerate = null;
+fetch = async function(url, opts) {
+  const body=opts && opts.body ? JSON.parse(opts.body) : {};
+  posts.push({url, body});
+  if(url==='/api/pipeline/extract-blueprint'){
+    return await new Promise(resolve => { pendingGenerate = {resolve}; });
+  }
+  if(url==='/api/pipeline/ratify-blueprint'){
+    return {ok:true,json:async()=>({blueprint_id:'bp-blocked',plan_id:'plan-blocked',committed_blueprint:body.proposed_blueprint})};
+  }
+  throw new Error('unexpected fetch '+url);
+};
+(async () => {
+  _crUpdateBlueprintTitle('Edited A');
+  _crUpdateBlueprintClaim(1, 'Edited claim B.');
+  const edited = JSON.stringify(_crBlueprintCandidate);
+  const generatePromise = _crGenerateBlueprintCandidate(true);
+  await Promise.resolve();
+  await Promise.resolve();
+  const operationDuringGenerate = _crBlueprintOperation;
+  _crUpdateBlueprintTitle('Blocked title');
+  _crUpdateBlueprintClaim(0, 'Blocked claim.');
+  _crMoveBlueprintClaim(2, -1);
+  _crAddBlueprintClaim();
+  _crRemoveBlueprintClaim(1);
+  await _crGenerateBlueprintCandidate(true);
+  await _crCommitBlueprintCandidate();
+  const afterBlockedMutations = JSON.stringify(_crBlueprintCandidate);
+  pendingGenerate.resolve({ok:true,json:async()=>({proposed_blueprint:generatedB})});
+  await generatePromise;
+  process.stdout.write(JSON.stringify({
+    operationDuringGenerate,
+    afterBlockedMutations,
+    edited,
+    candidate:_crBlueprintCandidate,
+    dirty:_crBlueprintCandidateDirty,
+    operation:_crBlueprintOperation,
+    generationCount:posts.filter(p=>p.url==='/api/pipeline/extract-blueprint').length,
+    commitCount:posts.filter(p=>p.url==='/api/pipeline/ratify-blueprint').length
+  }));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["operationDuringGenerate"] == "generating"
+    assert result["afterBlockedMutations"] == result["edited"]
+    assert result["generationCount"] == 1
+    assert result["commitCount"] == 0
+    assert result["candidate"]["title"] == "Generated B"
+    assert result["dirty"] is False
+    assert result["operation"] == "idle"
+
+
+def test_failed_blueprint_regeneration_restores_snapshot_and_unlocks():
+    html = _index()
+    script = (
+        _dom_prefix(_candidate_js())
+        + _editor_functions(html)
+        + """
+let pendingGenerate = null;
+fetch = async function(url, opts) {
+  const body=opts && opts.body ? JSON.parse(opts.body) : {};
+  posts.push({url, body});
+  if(url==='/api/pipeline/extract-blueprint'){
+    return await new Promise(resolve => { pendingGenerate = {resolve}; });
+  }
+  throw new Error('unexpected fetch '+url);
+};
+(async () => {
+  _crUpdateBlueprintTitle('Edited A');
+  _crUpdateBlueprintClaim(1, 'Edited claim B.');
+  const edited = JSON.stringify(_crBlueprintCandidate);
+  const generatePromise = _crGenerateBlueprintCandidate(true);
+  await Promise.resolve();
+  await Promise.resolve();
+  pendingGenerate.resolve({ok:false,json:async()=>({error:'generation failed'})});
+  await generatePromise;
+  const afterFailure = {
+    candidate:JSON.stringify(_crBlueprintCandidate),
+    dirty:_crBlueprintCandidateDirty,
+    operation:_crBlueprintOperation,
+    html:elements['cr-blueprint-proposal'].innerHTML
+  };
+  _crUpdateBlueprintTitle('Retry title');
+  process.stdout.write(JSON.stringify({edited, afterFailure, afterEdit:_crBlueprintCandidate, generationCount:posts.filter(p=>p.url==='/api/pipeline/extract-blueprint').length}));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["afterFailure"]["candidate"] == result["edited"]
+    assert result["afterFailure"]["dirty"] is True
+    assert result["afterFailure"]["operation"] == "idle"
+    assert "generation failed" in result["afterFailure"]["html"]
+    assert result["afterEdit"]["title"] == "Retry title"
+    assert result["generationCount"] == 1
+
+
+def test_blueprint_workspace_change_discards_stale_inflight_generation_response():
+    html = _index()
+    script = (
+        _dom_prefix(_candidate_js())
+        + _editor_functions(html)
+        + """
+let pendingGenerate = null;
+fetch = async function(url, opts) {
+  const body=opts && opts.body ? JSON.parse(opts.body) : {};
+  posts.push({url, body});
+  if(url==='/api/pipeline/extract-blueprint'){
+    return await new Promise(resolve => { pendingGenerate = {resolve}; });
+  }
+  throw new Error('unexpected fetch '+url);
+};
+(async () => {
+  _crUpdateBlueprintTitle('Edited A');
+  const generatePromise = _crGenerateBlueprintCandidate(true);
+  await Promise.resolve();
+  await Promise.resolve();
+  _crResetBlueprintWorkingStateForWorkspaceChange();
+  pendingGenerate.resolve({ok:true,json:async()=>({proposed_blueprint:generatedB})});
+  await generatePromise;
+  process.stdout.write(JSON.stringify({
+    candidate:_crBlueprintCandidate,
+    dirty:_crBlueprintCandidateDirty,
+    operation:_crBlueprintOperation,
+    html:elements['cr-blueprint-proposal'].innerHTML,
+    display:elements['cr-blueprint-proposal'].style.display,
+    generationCount:posts.filter(p=>p.url==='/api/pipeline/extract-blueprint').length
+  }));
+})().catch(err => { console.error(err.stack || err.message); process.exit(1); });
+"""
+    )
+
+    result = _run_node(script)
+    assert result["generationCount"] == 1
+    assert result["candidate"] is None
+    assert result["dirty"] is False
+    assert result["operation"] == "idle"
+    assert result["html"] == ""
+    assert result["display"] == "none"
 
 
 def test_reorder_add_and_remove_edit_candidate_sections_not_evidence_records():

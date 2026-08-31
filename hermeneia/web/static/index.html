@@ -10645,6 +10645,8 @@ window._crSavePerspectiveRevision = _crSavePerspectiveRevision;
 // the reviewed structured candidate and then compiles the Architect contract.
 let _crBlueprintCandidate = null;
 let _crBlueprintCandidateDirty = false;
+let _crBlueprintOperation = 'idle';
+let _crBlueprintWorkspaceEpoch = 0;
 async function _crGatherBlueprintEvidence() {
   let notes = [];
   let observations = [];
@@ -10680,12 +10682,48 @@ async function _crLoadBlueprintDraft() {
         + `<div style="font-size:14px;color:var(--fg);line-height:1.5">${x(thesis)}</div>`
       : `<div style="font-size:12px;color:var(--dim2);line-height:1.5">Set a governing question first — the Blueprint is a hypothesis about the argument your reading is building toward.</div>`;
   }
-  if (btn) btn.disabled = !thesis;
+  if (btn) btn.disabled = !thesis || !_crBlueprintCanMutate();
   const { notes, highlights, observations } = await _crGatherBlueprintEvidence();
   if (metaEl) {
     const n = notes.length, h = highlights.length, o = observations.length;
     metaEl.textContent = `· ${n} field note${n===1?'':'s'} · ${h} highlight${h===1?'':'s'} · ${o} approved observation${o===1?'':'s'}`;
   }
+}
+
+function _crCloneBlueprintCandidate(candidate) {
+  if (!candidate || typeof candidate !== 'object') return candidate;
+  return JSON.parse(JSON.stringify(candidate));
+}
+
+function _crBlueprintCanMutate() {
+  return _crBlueprintOperation === 'idle';
+}
+
+function _crSyncBlueprintOperationState() {
+  const busy = !_crBlueprintCanMutate();
+  const generating = _crBlueprintOperation === 'generating';
+  const committing = _crBlueprintOperation === 'committing';
+  const provider = document.getElementById('cr-blueprint-provider');
+  const generateBtn = document.getElementById('cr-blueprint-btn');
+  const commitBtn = document.getElementById('cr-blueprint-commit-btn');
+  if (provider) provider.disabled = busy;
+  if (generateBtn) {
+    generateBtn.disabled = busy;
+    generateBtn.textContent = generating
+      ? 'Generating…'
+      : (_crBlueprintCandidate ? 'Regenerate candidate' : 'Generate candidate');
+  }
+  if (commitBtn) {
+    commitBtn.disabled = busy;
+    commitBtn.textContent = committing ? 'Committing…' : 'Commit reviewed Blueprint';
+  }
+  document.querySelectorAll('#cr-blueprint-proposal input, #cr-blueprint-proposal textarea, #cr-blueprint-proposal button')
+    .forEach(el => { el.disabled = busy; });
+}
+
+function _crSetBlueprintOperation(operation) {
+  _crBlueprintOperation = operation || 'idle';
+  _crSyncBlueprintOperationState();
 }
 
 function _crBlueprintSection(section) {
@@ -10738,23 +10776,25 @@ function _crUpdateBlueprintDirtyBadge() {
 }
 
 function _crMarkBlueprintCandidateDirty() {
+  if (!_crBlueprintCanMutate()) return;
   _crBlueprintCandidateDirty = true;
   _crUpdateBlueprintDirtyBadge();
 }
 
 function _crUpdateBlueprintTitle(value) {
-  if (!_crBlueprintCandidate) return;
+  if (!_crBlueprintCanMutate() || !_crBlueprintCandidate) return;
   _crBlueprintCandidate.title = String(value ?? '');
   _crMarkBlueprintCandidateDirty();
 }
 
 function _crUpdateBlueprintThesis(value) {
-  if (!_crBlueprintCandidate) return;
+  if (!_crBlueprintCanMutate() || !_crBlueprintCandidate) return;
   _crBlueprintCandidate.thesis = String(value ?? '');
   _crMarkBlueprintCandidateDirty();
 }
 
 function _crUpdateBlueprintClaim(index, value) {
+  if (!_crBlueprintCanMutate()) return;
   const sections = _crBlueprintSections();
   if (index < 0 || index >= sections.length) return;
   sections[index].claim = String(value ?? '');
@@ -10762,6 +10802,7 @@ function _crUpdateBlueprintClaim(index, value) {
 }
 
 function _crMoveBlueprintClaim(index, direction) {
+  if (!_crBlueprintCanMutate()) return;
   const sections = _crBlueprintSections();
   const target = index + direction;
   if (index < 0 || index >= sections.length || target < 0 || target >= sections.length) return;
@@ -10773,6 +10814,7 @@ function _crMoveBlueprintClaim(index, direction) {
 }
 
 function _crAddBlueprintClaim() {
+  if (!_crBlueprintCanMutate()) return;
   const sections = _crBlueprintSections();
   sections.push({ claim: '', supporting_observations: [], supporting_interpretations: [] });
   _crBlueprintCandidateDirty = true;
@@ -10781,6 +10823,7 @@ function _crAddBlueprintClaim() {
 }
 
 function _crRemoveBlueprintClaim(index) {
+  if (!_crBlueprintCanMutate()) return;
   const sections = _crBlueprintSections();
   if (sections.length <= 1 || index < 0 || index >= sections.length) return;
   sections.splice(index, 1);
@@ -10803,20 +10846,21 @@ function _crValidateBlueprintCandidateForCommit() {
 
 function _crRenderBlueprintEditor(bp, error = '') {
   const sections = _crBlueprintSections();
+  const disabled = _crBlueprintCanMutate() ? '' : 'disabled';
   const claimRows = sections.map((section, i) => `
     <div class="cr-blueprint-claim" data-blueprint-claim-index="${i}">
       <div class="cr-blueprint-claim-head">
         <div class="cr-blueprint-claim-number">${i + 1}.</div>
         <label class="cr-blueprint-editor-field" style="flex:1" for="cr-blueprint-claim-${i}">
           <span class="cr-blueprint-editor-label">Claim ${i + 1}</span>
-          <textarea class="cr-blueprint-editor-textarea" id="cr-blueprint-claim-${i}" oninput="_crUpdateBlueprintClaim(${i}, this.value)">${x(section.claim)}</textarea>
+          <textarea class="cr-blueprint-editor-textarea" id="cr-blueprint-claim-${i}" oninput="_crUpdateBlueprintClaim(${i}, this.value)" ${disabled}>${x(section.claim)}</textarea>
         </label>
       </div>
       <div class="cr-blueprint-claim-evidence">Evidence: ${x(_crBlueprintEvidenceCountText(section))}</div>
       <div class="cr-blueprint-claim-actions">
-        <button class="btn-trace" type="button" onclick="_crMoveBlueprintClaim(${i}, -1)" aria-label="Move claim ${i + 1} up" ${i === 0 ? 'disabled' : ''}>↑</button>
-        <button class="btn-trace" type="button" onclick="_crMoveBlueprintClaim(${i}, 1)" aria-label="Move claim ${i + 1} down" ${i === sections.length - 1 ? 'disabled' : ''}>↓</button>
-        <button class="btn-trace" type="button" onclick="_crRemoveBlueprintClaim(${i})" aria-label="Remove claim ${i + 1}" ${sections.length <= 1 ? 'disabled title="At least one claim is required"' : ''}>Remove</button>
+        <button class="btn-trace" type="button" onclick="_crMoveBlueprintClaim(${i}, -1)" aria-label="Move claim ${i + 1} up" ${disabled || (i === 0 ? 'disabled' : '')}>↑</button>
+        <button class="btn-trace" type="button" onclick="_crMoveBlueprintClaim(${i}, 1)" aria-label="Move claim ${i + 1} down" ${disabled || (i === sections.length - 1 ? 'disabled' : '')}>↓</button>
+        <button class="btn-trace" type="button" onclick="_crRemoveBlueprintClaim(${i})" aria-label="Remove claim ${i + 1}" ${disabled || (sections.length <= 1 ? 'disabled title="At least one claim is required"' : '')}>Remove</button>
       </div>
     </div>`
   ).join('');
@@ -10828,24 +10872,23 @@ function _crRenderBlueprintEditor(bp, error = '') {
       <div class="ob-extract-proposal-title">Working Blueprint${_crBlueprintStatusBadge('working')}</div>
       <label class="cr-blueprint-editor-field" for="cr-blueprint-title">
         <span class="cr-blueprint-editor-label">Title</span>
-        <input class="cr-blueprint-editor-input" id="cr-blueprint-title" value="${x(bp.title || '')}" oninput="_crUpdateBlueprintTitle(this.value)">
+        <input class="cr-blueprint-editor-input" id="cr-blueprint-title" value="${x(bp.title || '')}" oninput="_crUpdateBlueprintTitle(this.value)" ${disabled}>
       </label>
       <label class="cr-blueprint-editor-field" for="cr-blueprint-thesis">
         <span class="cr-blueprint-editor-label">Working thesis</span>
-        <textarea class="cr-blueprint-editor-textarea" id="cr-blueprint-thesis" oninput="_crUpdateBlueprintThesis(this.value)">${x(bp.thesis || '')}</textarea>
+        <textarea class="cr-blueprint-editor-textarea" id="cr-blueprint-thesis" oninput="_crUpdateBlueprintThesis(this.value)" ${disabled}>${x(bp.thesis || '')}</textarea>
       </label>
       <div>
         <div class="cr-blueprint-editor-label" style="margin-bottom:8px">Claims</div>
         <div class="cr-blueprint-claims">${claimRows}</div>
       </div>
-      <div><button class="btn-trace" type="button" onclick="_crAddBlueprintClaim()">+ Add claim</button></div>
+      <div><button class="btn-trace" type="button" onclick="_crAddBlueprintClaim()" ${disabled}>+ Add claim</button></div>
       <div class="ob-extract-note">
         Edit the working synthesis here. Evidence links stay with their claim when you edit or reorder it. Commit saves this exact working object.
       </div>
       ${errorLine}
       <div class="ob-extract-actions">
-        <button class="btn-primary" id="cr-blueprint-commit-btn" onclick="_crCommitBlueprintCandidate()">Commit reviewed Blueprint</button>
-        <button class="btn-trace" onclick="_crGenerateBlueprintCandidate(true)">Regenerate candidate</button>
+        <button class="btn-primary" id="cr-blueprint-commit-btn" onclick="_crCommitBlueprintCandidate()" ${disabled}>Commit reviewed Blueprint</button>
       </div>
     </div>`;
 }
@@ -10925,12 +10968,14 @@ async function _crAssembleBlueprintSeed() {
 }
 
 async function _crGenerateBlueprintCandidate(regenerating = false) {
+  if (!_crBlueprintCanMutate()) return;
   const provider = document.getElementById('cr-blueprint-provider')?.value || 'null';
   const propEl   = document.getElementById('cr-blueprint-proposal');
   const btn      = document.getElementById('cr-blueprint-btn');
   if (!propEl) return;
-  const previousCandidate = _crBlueprintCandidate;
+  const previousCandidate = _crCloneBlueprintCandidate(_crBlueprintCandidate);
   const previousDirty = _crBlueprintCandidateDirty;
+  const operationEpoch = _crBlueprintWorkspaceEpoch;
   if (_crBlueprintCandidate && _crBlueprintCandidateDirty) {
     const ok = (typeof window === 'undefined' || typeof window.confirm !== 'function')
       ? true
@@ -10938,14 +10983,15 @@ async function _crGenerateBlueprintCandidate(regenerating = false) {
     if (!ok) return;
   }
 
+  _crSetBlueprintOperation('generating');
   const text = await _crAssembleBlueprintSeed();
   if (!text) {
+    if (operationEpoch === _crBlueprintWorkspaceEpoch) _crSetBlueprintOperation('idle');
     propEl.style.display = 'block';
     propEl.innerHTML = `<div style="color:#f87171;font-size:13px">Set a governing question and capture at least one highlight, note, or observation first.</div>`;
     return;
   }
 
-  if (btn) { btn.disabled = true; btn.textContent = regenerating ? 'Regenerating…' : 'Generating…'; }
   if (!regenerating) propEl.style.display = 'none';
   try {
     const resp = await fetch('/api/pipeline/extract-blueprint', {
@@ -10954,6 +11000,7 @@ async function _crGenerateBlueprintCandidate(regenerating = false) {
       body: JSON.stringify({ text, provider, save: false }),
     });
     const data = await resp.json();
+    if (operationEpoch !== _crBlueprintWorkspaceEpoch) return;
     if (!resp.ok) {
       propEl.style.display = 'block';
       if (_crBlueprintCandidate) {
@@ -10967,6 +11014,7 @@ async function _crGenerateBlueprintCandidate(regenerating = false) {
     _crBlueprintCandidateDirty = false;
     _crRenderBlueprintCandidate(_crBlueprintCandidate, 'working');
   } catch (err) {
+    if (operationEpoch !== _crBlueprintWorkspaceEpoch) return;
     _crBlueprintCandidate = previousCandidate;
     _crBlueprintCandidateDirty = previousDirty;
     propEl.style.display = 'block';
@@ -10976,10 +11024,11 @@ async function _crGenerateBlueprintCandidate(regenerating = false) {
       propEl.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(err.message)}</div>`;
     }
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = _crBlueprintCandidate ? 'Regenerate candidate' : 'Generate candidate'; }
+    if (operationEpoch === _crBlueprintWorkspaceEpoch) _crSetBlueprintOperation('idle');
   }
 }
 async function _crCommitBlueprintCandidate() {
+  if (!_crBlueprintCanMutate()) return;
   const propEl = document.getElementById('cr-blueprint-proposal');
   const btn = document.getElementById('cr-blueprint-commit-btn');
   if (!propEl || !_crBlueprintCandidate) return;
@@ -10988,15 +11037,22 @@ async function _crCommitBlueprintCandidate() {
     _crRenderBlueprintCandidate(_crBlueprintCandidate, 'working', null, validation);
     return;
   }
-  if (btn) { btn.disabled = true; btn.textContent = 'Committing…'; }
+  const candidateSnapshot = _crCloneBlueprintCandidate(_crBlueprintCandidate);
+  const previousDirty = _crBlueprintCandidateDirty;
+  const operationEpoch = _crBlueprintWorkspaceEpoch;
+  _crSetBlueprintOperation('committing');
+  _crRenderBlueprintCandidate(candidateSnapshot, 'working');
   try {
     const resp = await fetch('/api/pipeline/ratify-blueprint', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ proposed_blueprint: _crBlueprintCandidate }),
+      body: JSON.stringify({ proposed_blueprint: candidateSnapshot }),
     });
     const data = await resp.json();
+    if (operationEpoch !== _crBlueprintWorkspaceEpoch) return;
     if (!resp.ok) {
+      _crBlueprintCandidate = candidateSnapshot;
+      _crBlueprintCandidateDirty = previousDirty;
       _crRenderBlueprintCandidate(_crBlueprintCandidate, 'working', null, data.error || 'commit failed');
       return;
     }
@@ -11006,10 +11062,12 @@ async function _crCommitBlueprintCandidate() {
     _crBlueprintCandidate = null;
     _crBlueprintCandidateDirty = false;
   } catch (err) {
+    if (operationEpoch !== _crBlueprintWorkspaceEpoch) return;
+    _crBlueprintCandidate = candidateSnapshot;
+    _crBlueprintCandidateDirty = previousDirty;
     _crRenderBlueprintCandidate(_crBlueprintCandidate, 'working', null, err.message);
   } finally {
-    const newBtn = document.getElementById('cr-blueprint-commit-btn');
-    if (newBtn) { newBtn.disabled = false; newBtn.textContent = 'Commit reviewed Blueprint'; }
+    if (operationEpoch === _crBlueprintWorkspaceEpoch) _crSetBlueprintOperation('idle');
   }
 }
 async function _crDraftBlueprint(save) {
@@ -11017,8 +11075,10 @@ async function _crDraftBlueprint(save) {
   return _crGenerateBlueprintCandidate();
 }
 function _crResetBlueprintWorkingStateForWorkspaceChange() {
+  _crBlueprintWorkspaceEpoch += 1;
   _crBlueprintCandidate = null;
   _crBlueprintCandidateDirty = false;
+  _crBlueprintOperation = 'idle';
   const propEl = document.getElementById('cr-blueprint-proposal');
   if (propEl) {
     propEl.style.display = 'none';
@@ -11026,6 +11086,7 @@ function _crResetBlueprintWorkingStateForWorkspaceChange() {
   }
   const btn = document.getElementById('cr-blueprint-btn');
   if (btn) btn.textContent = 'Generate candidate';
+  _crSyncBlueprintOperationState();
 }
 window._crLoadBlueprintDraft = _crLoadBlueprintDraft;
 window._crDraftBlueprint = _crDraftBlueprint;
@@ -11039,6 +11100,8 @@ window._crUpdateBlueprintClaim = _crUpdateBlueprintClaim;
 window._crMoveBlueprintClaim = _crMoveBlueprintClaim;
 window._crAddBlueprintClaim = _crAddBlueprintClaim;
 window._crRemoveBlueprintClaim = _crRemoveBlueprintClaim;
+window._crBlueprintCanMutate = _crBlueprintCanMutate;
+window._crSetBlueprintOperation = _crSetBlueprintOperation;
 
 // ── Structure Preview (Blueprint resource nested view) ───────────────────
 // A saved Blueprint shown as an evidence-backed essay skeleton: title, thesis,
