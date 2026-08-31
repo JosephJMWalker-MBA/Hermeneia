@@ -11885,6 +11885,7 @@ window._crRenderRatifyAudits = _crRenderRatifyAudits;
 // persistence, and it does not recompute or create narrative artifacts.
 let _crRecordLast = null;
 let _crRecordSummaries = {};
+let _crRecordLoadSeq = 0;
 let _crRecordDetailSeq = 0;
 function _crShortId(id, len = 12) {
   const s = String(id || '');
@@ -11945,6 +11946,7 @@ function _crRecordCriticBlock(report) {
 function _crResetRecordLedgerStateForWorkspaceChange() {
   _crRecordLast = null;
   _crRecordSummaries = {};
+  _crRecordLoadSeq += 1;
   _crRecordDetailSeq += 1;
   const count = document.getElementById('cr-record-count');
   const list = document.getElementById('cr-record-list');
@@ -11957,9 +11959,11 @@ async function _crLoadRecordLedger() {
   const list = document.getElementById('cr-record-list');
   const count = document.getElementById('cr-record-count');
   if (!list) return;
+  const seq = ++_crRecordLoadSeq;
   let narratives = [];
   try { const d = await get('/api/reader/narratives'); narratives = d.narratives || []; }
-  catch (e) { list.innerHTML = `<div style="color:#f87171;font-size:12px">${x(e.message)}</div>`; return; }
+  catch (e) { if (seq === _crRecordLoadSeq) list.innerHTML = `<div style="color:#f87171;font-size:12px">${x(e.message)}</div>`; return; }
+  if (seq !== _crRecordLoadSeq) return;
   _crRecordSummaries = {};
   narratives.forEach(n => { if (n && n.id) _crRecordSummaries[n.id] = n; });
   if (count) {

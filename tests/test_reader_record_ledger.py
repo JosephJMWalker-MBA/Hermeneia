@@ -188,6 +188,121 @@ const detail = id => ({rendered_narrative:{id, provider:'Stub', text:`Text ${id}
     assert state == {"afterBHasB": True, "lateAStillB": True}
 
 
+def test_record_stale_list_response_after_workspace_reset_cannot_replace_current_list() -> None:
+    script = (
+        _base_harness()
+        + _record_script()
+        + """
+let resolveA, resolveB;
+global.get = url => new Promise(resolve => {
+  if (!resolveA) resolveA = resolve;
+  else resolveB = resolve;
+});
+const row = id => ({id, provider:'Stub', created_at:'2026-08-30T21:14:00Z', narrative_status:'pending', narrative_rationale:null, profile:{name:'Profile', slug:id.toLowerCase()}, blueprint:{title:`Blueprint ${id}`}});
+(async () => {
+  const loadA = _crLoadRecordLedger();
+  _crResetRecordLedgerStateForWorkspaceChange();
+  const loadB = _crLoadRecordLedger();
+  resolveB({narratives:[row('B')]});
+  await loadB;
+  const afterB = {
+    count: elements['cr-record-count'].textContent,
+    list: elements['cr-record-list'].innerHTML,
+    summaries: Object.keys(_crRecordSummaries)
+  };
+  resolveA({narratives:[row('A')]});
+  await loadA;
+  process.stdout.write(JSON.stringify({
+    count: elements['cr-record-count'].textContent,
+    listHasB: elements['cr-record-list'].innerHTML.includes('Blueprint B'),
+    listHasA: elements['cr-record-list'].innerHTML.includes('Blueprint A'),
+    summaries: Object.keys(_crRecordSummaries),
+    afterB,
+    detailCleared: elements['cr-record-detail'].innerHTML.includes('Select a saved narrative record')
+  }));
+})();
+"""
+    )
+    state = _run_node(script)
+
+    assert state["count"] == "· 1 records · 0 accepted · 1 pending · 0 rejected"
+    assert state["listHasB"] is True
+    assert state["listHasA"] is False
+    assert state["summaries"] == ["B"]
+    assert state["afterB"]["summaries"] == ["B"]
+    assert state["detailCleared"] is True
+
+
+def test_record_stale_list_error_after_workspace_reset_is_ignored() -> None:
+    script = (
+        _base_harness()
+        + _record_script()
+        + """
+let rejectA;
+global.get = url => new Promise((resolve, reject) => { rejectA = reject; });
+(async () => {
+  const loadA = _crLoadRecordLedger();
+  _crResetRecordLedgerStateForWorkspaceChange();
+  rejectA(new Error('workspace A stale failure'));
+  await loadA;
+  process.stdout.write(JSON.stringify({
+    count: elements['cr-record-count'].textContent,
+    list: elements['cr-record-list'].innerHTML,
+    staleErrorVisible: elements['cr-record-list'].innerHTML.includes('workspace A stale failure'),
+    summaries: Object.keys(_crRecordSummaries),
+    detailCleared: elements['cr-record-detail'].innerHTML.includes('Select a saved narrative record')
+  }));
+})();
+"""
+    )
+    state = _run_node(script)
+
+    assert state == {
+        "count": "",
+        "list": "",
+        "staleErrorVisible": False,
+        "summaries": [],
+        "detailCleared": True,
+    }
+
+
+def test_record_concurrent_same_workspace_list_load_uses_newest_response() -> None:
+    script = (
+        _base_harness()
+        + _record_script()
+        + """
+let resolve1, resolve2;
+global.get = url => new Promise(resolve => {
+  if (!resolve1) resolve1 = resolve;
+  else resolve2 = resolve;
+});
+const row = id => ({id, provider:'Stub', created_at:'2026-08-30T21:14:00Z', narrative_status:'accepted', narrative_rationale:'ok', profile:{name:'Profile', slug:id.toLowerCase()}, blueprint:{title:`Blueprint ${id}`}});
+(async () => {
+  const load1 = _crLoadRecordLedger();
+  const load2 = _crLoadRecordLedger();
+  resolve2({narratives:[row('newer')]});
+  await load2;
+  resolve1({narratives:[row('older')]});
+  await load1;
+  process.stdout.write(JSON.stringify({
+    listHasNewer: elements['cr-record-list'].innerHTML.includes('Blueprint newer'),
+    listHasOlder: elements['cr-record-list'].innerHTML.includes('Blueprint older'),
+    summaries: Object.keys(_crRecordSummaries),
+    count: elements['cr-record-count'].textContent
+  }));
+})();
+"""
+    )
+    state = _run_node(script)
+
+    assert state == {
+        "listHasNewer": True,
+        "listHasOlder": False,
+        "summaries": ["newer"],
+        "count": "· 1 records · 1 accepted · 0 pending · 0 rejected",
+    }
+
+
 def test_workspace_change_clears_record_state_and_detail() -> None:
     script = (
         _base_harness()
@@ -195,6 +310,8 @@ def test_workspace_change_clears_record_state_and_detail() -> None:
         + """
 _crRecordLast = {id:'old', text:'old text', lineageHref:'/old'};
 _crRecordSummaries = {old:{id:'old'}};
+_crRecordLoadSeq = 3;
+_crRecordDetailSeq = 7;
 elements['cr-record-count'].textContent = '· 1 records';
 elements['cr-record-list'].innerHTML = '<button class="cr-record-row">Old</button>';
 elements['cr-record-detail'].innerHTML = '<div>Old workspace narrative</div>';
@@ -204,7 +321,9 @@ process.stdout.write(JSON.stringify({
   list: elements['cr-record-list'].innerHTML,
   detailCleared: elements['cr-record-detail'].innerHTML.includes('Select a saved narrative record'),
   lastCleared: _crRecordLast === null,
-  summariesCleared: Object.keys(_crRecordSummaries).length === 0
+  summariesCleared: Object.keys(_crRecordSummaries).length === 0,
+  loadSeqInvalidated: _crRecordLoadSeq === 4,
+  detailSeqInvalidated: _crRecordDetailSeq === 8
 }));
 """
     )
@@ -216,4 +335,6 @@ process.stdout.write(JSON.stringify({
         "detailCleared": True,
         "lastCleared": True,
         "summariesCleared": True,
+        "loadSeqInvalidated": True,
+        "detailSeqInvalidated": True,
     }
