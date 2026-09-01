@@ -10647,7 +10647,9 @@ async function _crRunPerspective() {
   const model = document.getElementById('cr-perspective-model')?.value || '';
   const question = document.getElementById('cr-perspective-question')?.value?.trim() || '';
   _crPerspectiveScope = _crPerspectiveScope || _crPerspectiveScopeFromSelection();
-  if (operationEpoch !== _crPerspectiveWorkspaceEpoch || _crPerspectiveScope?.workspace_epoch !== _crPerspectiveWorkspaceEpoch) {
+  const scopeEpoch = _crPerspectiveScope?.workspace_epoch;
+  const operationCurrent = () => operationEpoch === _crPerspectiveWorkspaceEpoch && scopeEpoch === _crPerspectiveWorkspaceEpoch;
+  if (!operationCurrent()) {
     showAppError('Reader workspace changed. Refresh the Perspective Scope before running.');
     return;
   }
@@ -10709,6 +10711,7 @@ async function _crRunPerspective() {
     const receipt = _crPerspectiveMode === 'room'
       ? await _crPostPerspectiveRoom(payload)
       : await post('/api/perspective/run', payload);
+    if (!operationCurrent()) return;
     _crPerspectiveLastReceipt = receipt;
     if (_crPerspectiveMode === 'room') {
       if (out) out.innerHTML = _crRenderPerspectiveRoom(receipt, model);
@@ -10734,9 +10737,11 @@ async function _crRunPerspective() {
       </div>`;
     if (status) status.textContent = 'Proposed reading';
   } catch (e) {
+    if (!operationCurrent()) return;
     if (out) out.innerHTML = `<div class="e10-empty" style="color:var(--red)">${x(e.message)}</div>`;
     if (status) status.textContent = 'Unavailable';
   } finally {
+    if (!operationCurrent()) return;
     if (btn) { btn.disabled = false; btn.textContent = _crPerspectiveMode === 'room' ? 'Ask the Room' : 'Run Perspective'; }
   }
 }

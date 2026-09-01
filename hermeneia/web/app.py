@@ -4596,11 +4596,20 @@ def create_app(
             "runtime_host": host,
         }, None
 
-    def _run_local_perspective(definition, *, question, scope_receipt, context, prior_readings=None):
+    def _run_local_perspective(
+        definition,
+        *,
+        question,
+        scope_receipt,
+        scope_materialization,
+        context,
+        prior_readings=None,
+    ):
         prompt = build_perspective_prompt(
             definition,
             question=question,
             scope_receipt=scope_receipt,
+            scope_materialization=scope_materialization,
             prior_proposed_readings=prior_readings,
         )
         provider_id = str(context["provider_id"])
@@ -4671,6 +4680,9 @@ def create_app(
             perspective.definition,
             question=question,
             scope_receipt=scope_receipt,
+            scope_materialization=scope_receipt.get("materialization")
+            if isinstance(scope_receipt.get("materialization"), dict)
+            else None,
             context=context,
         )
         if run_error is not None:
@@ -4742,6 +4754,9 @@ def create_app(
                 definition,
                 question=question,
                 scope_receipt=scope_receipt,
+                scope_materialization=scope_receipt.get("materialization")
+                if isinstance(scope_receipt.get("materialization"), dict)
+                else None,
                 context=context,
                 prior_readings=prior_readings,
             )

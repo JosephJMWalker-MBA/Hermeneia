@@ -49,6 +49,7 @@ def _seed_scope_db(
     *,
     doc_id: str = "scope-doc",
     page: int = 2,
+    id_prefix: str = "scope-ex",
     blocks: list[str] | None = None,
     excluded: bool = False,
 ) -> dict[str, object]:
@@ -78,14 +79,14 @@ def _seed_scope_db(
                    VALUES (?, 'Evidence', ?, ?, ?, ?, 'test-parser', 'test',
                            '{}', ?, ?, ?, '2026-08-29T12:00:00+00:00')""",
                 (
-                    f"scope-ex-{index}",
+                    f"{id_prefix}-{index}",
                     doc_id,
                     page,
                     f"block:{index}",
                     text,
                     f"page:{page}:block:{index}",
                     doc_id,
-                    f"scope-hash-{index}",
+                    f"{id_prefix}-hash-{index}",
                 ),
             )
         conn.commit()
@@ -96,7 +97,7 @@ def _seed_scope_db(
         "page": page,
         "blocks": blocks,
         "locators": [f"page:{page}:block:{index}" for index in range(1, len(blocks) + 1)],
-        "extraction_ids": [f"scope-ex-{index}" for index in range(1, len(blocks) + 1)],
+        "extraction_ids": [f"{id_prefix}-{index}" for index in range(1, len(blocks) + 1)],
     }
 
 
@@ -170,6 +171,26 @@ def test_tampered_client_selection_text_fails_closed(tmp_path):
         conn.close()
 
 
+def test_browser_preview_whitespace_can_differ_but_provider_material_is_authoritative(tmp_path):
+    db_path = tmp_path / "scope.db"
+    seed = _seed_scope_db(db_path)
+    scope = _selection_scope(
+        seed,
+        text="beta begins. Middle line with Unicode ✓ and punctuation. Omega",
+    )
+
+    conn = _conn(db_path)
+    try:
+        receipt = resolve_scope_for_provider(conn, scope)
+    finally:
+        conn.close()
+
+    authoritative = "beta begins.\n\nMiddle line with Unicode ✓ and punctuation.\n\nOmega"
+    assert receipt["primary"]["text"] == authoritative
+    assert receipt["materialization"]["primary"]["text"] == authoritative
+    assert receipt["primary"]["text"] != scope["primary"]["text"]
+
+
 def test_current_page_is_resolved_server_side(tmp_path):
     db_path = tmp_path / "scope.db"
     seed = _seed_scope_db(db_path)
@@ -196,6 +217,110 @@ def test_current_page_is_resolved_server_side(tmp_path):
     assert page["text"] == "\n\n".join(seed["blocks"])
     assert page["source_metadata_origin"] == "server_resolved_reader_projection"
     assert "Browser" not in page["text"]
+
+
+def test_current_page_must_match_primary_document_and_page(tmp_path):
+    db_path = tmp_path / "scope.db"
+    seed = _seed_scope_db(db_path)
+    other_doc = _seed_scope_db(
+        db_path,
+        doc_id="other-doc",
+        page=2,
+        id_prefix="other-ex",
+        blocks=["Other document source text."],
+    )
+    other_page = _seed_scope_db(
+        db_path,
+        doc_id="scope-doc",
+        page=3,
+        id_prefix="page3-ex",
+        blocks=["Same document, different page."],
+    )
+    primary_text = "beta begins.\n\nMiddle line with Unicode ✓ and punctuation.\n\nOmega"
+
+    same_page_scope = _selection_scope(seed, text=primary_text)
+    same_page_scope["supporting"] = {
+        "current_page": {
+            "include": True,
+            "source_document_id": seed["doc_id"],
+            "page": seed["page"],
+        }
+    }
+    conn = _conn(db_path)
+    try:
+        assert resolve_scope_for_provider(conn, same_page_scope)["included"]["current_page"] is True
+    finally:
+        conn.close()
+
+    other_doc_scope = _selection_scope(seed, text=primary_text)
+    other_doc_scope["supporting"] = {
+        "current_page": {
+            "include": True,
+            "source_document_id": other_doc["doc_id"],
+            "page": other_doc["page"],
+        }
+    }
+    conn = _conn(db_path)
+    try:
+        with pytest.raises(ScopeResolutionError, match="must match the primary Reader selection"):
+            resolve_scope_for_provider(conn, other_doc_scope)
+    finally:
+        conn.close()
+
+    other_page_scope = _selection_scope(seed, text=primary_text)
+    other_page_scope["supporting"] = {
+        "current_page": {
+            "include": True,
+            "source_document_id": seed["doc_id"],
+            "page": other_page["page"],
+        }
+    }
+    conn = _conn(db_path)
+    try:
+        with pytest.raises(ScopeResolutionError, match="must match the primary Reader selection"):
+            resolve_scope_for_provider(conn, other_page_scope)
+    finally:
+        conn.close()
+
+
+def test_reader_span_page_and_contradictory_provenance_fail_closed(tmp_path):
+    db_path = tmp_path / "scope.db"
+    seed = _seed_scope_db(db_path)
+    text = "beta begins.\n\nMiddle line with Unicode ✓ and punctuation.\n\nOmega"
+
+    wrong_page = _selection_scope(seed, text=text)
+    wrong_page["primary"]["locator"] = _span_locator(
+        page=99,
+        start_block=0,
+        start_offset=6,
+        end_block=2,
+        end_offset=5,
+        locators=seed["locators"],
+        extraction_ids=seed["extraction_ids"],
+    )
+    conn = _conn(db_path)
+    try:
+        with pytest.raises(ScopeResolutionError, match="locator page disagrees"):
+            resolve_scope_for_provider(conn, wrong_page)
+    finally:
+        conn.close()
+
+    contradictory = _selection_scope(seed, text=text)
+    contradictory["primary"]["locator"] = _span_locator(
+        page=int(seed["page"]),
+        start_block=0,
+        start_offset=6,
+        end_block=2,
+        end_offset=5,
+        locators=["page:2:block:999", seed["locators"][1], seed["locators"][2]],
+        extraction_ids=seed["extraction_ids"],
+    )
+    conn = _conn(db_path)
+    try:
+        with pytest.raises(ScopeResolutionError, match="cannot be mapped safely"):
+            resolve_scope_for_provider(conn, contradictory)
+    finally:
+        conn.close()
 
 
 def test_invalid_locator_and_excluded_document_fail_closed(tmp_path):
@@ -265,6 +390,88 @@ def test_durable_highlight_ids_materialize_exact_records_and_study_packet(tmp_pa
     packet = receipt["materialization"]["study_packet"]
     assert packet["packet_type"] == "study-synthesis-packet-v1"
     assert packet["provenance"]["source_records"]["reader_highlight_ids"] == ["hl-a", "hl-b"]
+    assert [item["text"] for item in receipt["materialization"]["supporting"]] == [
+        "First durable mark.",
+        "Second durable mark.",
+    ]
+
+
+def test_unranked_highlight_exact_text_is_lossless_material_with_derived_packet_provenance(tmp_path):
+    db_path = tmp_path / "scope.db"
+    seed = _seed_scope_db(db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """INSERT INTO reader_highlights
+               (id, source_document_id, source_role, page, source_locator,
+                selected_text, relevance, tags, status, created_at, updated_at)
+               VALUES
+               ('hl-unranked', ?, 'primary', ?, ?, 'Exact unranked Reader mark.',
+                'unclear', '[]', 'saved_highlight',
+                '2026-08-29T12:03:00+00:00', '2026-08-29T12:03:00+00:00')""",
+            (seed["doc_id"], seed["page"], seed["locators"][0]),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    scope = _selection_scope(
+        seed,
+        text="beta begins.\n\nMiddle line with Unicode ✓ and punctuation.\n\nOmega",
+    )
+    scope["supporting"] = {"highlights": {"include": True, "ids": ["hl-unranked"]}}
+
+    conn = _conn(db_path)
+    try:
+        receipt = resolve_scope_for_provider(conn, scope)
+    finally:
+        conn.close()
+
+    assert receipt["materialization"]["supporting"][0]["id"] == "hl-unranked"
+    assert receipt["materialization"]["supporting"][0]["text"] == "Exact unranked Reader mark."
+    packet = receipt["materialization"]["study_packet"]
+    assert packet["provenance"]["source_records"]["reader_highlight_ids"] == ["hl-unranked"]
+    assert all(
+        item.get("id") != "hl-unranked"
+        for item in packet.get("ranked_highlights", [])
+    )
+
+
+def test_cross_document_highlight_fails_closed(tmp_path):
+    db_path = tmp_path / "scope.db"
+    seed = _seed_scope_db(db_path)
+    other = _seed_scope_db(
+        db_path,
+        doc_id="other-doc",
+        id_prefix="other-ex",
+        blocks=["Other document source text."],
+    )
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """INSERT INTO reader_highlights
+               (id, source_document_id, source_role, page, source_locator,
+                selected_text, relevance, tags, status, created_at, updated_at)
+               VALUES
+               ('hl-other-doc', ?, 'primary', ?, ?, 'Other document mark.',
+                'supports', '[]', 'saved_highlight',
+                '2026-08-29T12:04:00+00:00', '2026-08-29T12:04:00+00:00')""",
+            (other["doc_id"], other["page"], other["locators"][0]),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    scope = _selection_scope(
+        seed,
+        text="beta begins.\n\nMiddle line with Unicode ✓ and punctuation.\n\nOmega",
+    )
+    scope["supporting"] = {"highlights": {"include": True, "ids": ["hl-other-doc"]}}
+
+    conn = _conn(db_path)
+    try:
+        with pytest.raises(ScopeResolutionError, match="primary Reader selection document"):
+            resolve_scope_for_provider(conn, scope)
+    finally:
+        conn.close()
 
 
 def test_missing_highlight_id_fails_closed(tmp_path):

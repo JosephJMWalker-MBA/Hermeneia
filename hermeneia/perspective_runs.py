@@ -373,12 +373,27 @@ def build_perspective_prompt(
     *,
     question: str,
     scope_receipt: dict[str, object],
+    scope_materialization: dict[str, object] | None = None,
     prior_proposed_readings: list[dict[str, object]] | None = None,
 ) -> str:
-    primary = scope_receipt["primary"]
+    materialization = scope_materialization or (
+        scope_receipt.get("materialization")
+        if isinstance(scope_receipt.get("materialization"), dict)
+        else None
+    )
+    materialization = materialization if isinstance(materialization, dict) else {}
+    primary = (
+        materialization.get("primary")
+        if isinstance(materialization.get("primary"), dict)
+        else scope_receipt["primary"]
+    )
     selected_text = str(primary["text"])
     supporting = [
-        item for item in scope_receipt.get("supporting", [])
+        item for item in (
+            materialization.get("supporting")
+            if isinstance(materialization.get("supporting"), list)
+            else scope_receipt.get("supporting", [])
+        )
         if isinstance(item, dict) and item.get("included")
     ]
     lines = [
@@ -389,7 +404,7 @@ def build_perspective_prompt(
         "Distinguish what the evidence supports from what you infer.",
         "Surface uncertainty and alternatives.",
         "Do not alter, correct, or normalize the source text.",
-        "Do not silently broaden context beyond the Scope Receipt.",
+        "Do not silently broaden context beyond the resolved Scope.",
         "",
         f"Perspective: {definition.label}",
         f"Perspective ID: {definition.id}",
@@ -406,7 +421,7 @@ def build_perspective_prompt(
         "",
         f"Question: {question.strip()}",
         "",
-        "Scope Receipt:",
+        "Resolved Scope:",
         f"- Primary kind: {primary.get('kind')}",
         f"- Source document: {primary.get('source_document_id') or 'unknown'}",
         f"- Page: {primary.get('page') or 'unknown'}",

@@ -152,7 +152,7 @@ def _has_provenance(value: dict[str, object]) -> bool:
     return bool(_clean_string_list(value.get("source_locators")) or _clean_string_list(value.get("extraction_ids")))
 
 
-def _provenance_intersects(
+def _provenance_matches(
     left: dict[str, object],
     right: dict[str, object],
 ) -> bool:
@@ -160,7 +160,16 @@ def _provenance_intersects(
     right_locators = set(_clean_string_list(right.get("source_locators")))
     left_ids = set(_clean_string_list(left.get("extraction_ids")))
     right_ids = set(_clean_string_list(right.get("extraction_ids")))
-    return bool((left_locators and right_locators and left_locators & right_locators) or (left_ids and right_ids and left_ids & right_ids))
+    matched = False
+    if right_locators and left_locators:
+        if not left_locators & right_locators:
+            return False
+        matched = True
+    if right_ids and left_ids:
+        if not left_ids & right_ids:
+            return False
+        matched = True
+    return matched
 
 
 def _span_point(point: object) -> dict[str, object]:
@@ -202,12 +211,12 @@ def _matching_point_index(
     hinted = _point_block_index(point)
     if hinted is not None and hinted < len(contexts):
         hinted_context = contexts[hinted]
-        if _provenance_intersects(hinted_context, point):
+        if _provenance_matches(hinted_context, point):
             return hinted
     matches = [
         index
         for index, context in enumerate(contexts)
-        if _provenance_intersects(context, point)
+        if _provenance_matches(context, point)
     ]
     if len(matches) != 1:
         raise ScopeResolutionError("Reader selection locator cannot be mapped safely")
@@ -218,12 +227,20 @@ def _resolved_reader_selection_text(
     blocks: list[dict[str, object]],
     contexts: list[dict[str, object]],
     locator: str,
+    *,
+    page: int,
 ) -> tuple[str, dict[str, object]]:
     span = decode_reader_span_locator(locator)
     if span is None:
         raise ScopeResolutionError("Reader selection requires a valid reader-span locator")
     if span.get("coordinate_space") != "reader_projection":
         raise ScopeResolutionError("Reader selection locator has unsupported coordinate space")
+    try:
+        span_page = int(span.get("page"))
+    except (TypeError, ValueError):
+        raise ScopeResolutionError("Reader selection locator page is missing")
+    if span_page != page:
+        raise ScopeResolutionError("Reader selection locator page disagrees with requested Reader page")
     if not _has_provenance({
         "source_locators": span.get("source_locators"),
         "extraction_ids": span.get("extraction_ids"),
@@ -262,7 +279,8 @@ def _resolved_reader_selection_text(
 
 def _verify_client_text(kind: str, client_text: object, resolved_text: str) -> None:
     supplied = _clean_text(client_text)
-    if supplied and supplied != _clean_text(resolved_text):
+    resolved = _clean_text(resolved_text)
+    if supplied and supplied != resolved and " ".join(supplied.split()) != " ".join(resolved.split()):
         raise ScopeResolutionError(f"{kind} text disagrees with authoritative Reader source")
 
 
@@ -286,7 +304,12 @@ def _resolve_reader_selection(
         for index, block in enumerate(blocks)
     ]
     locator = _clean_text(primary.get("locator"))
-    resolved_text, reconstruction = _resolved_reader_selection_text(blocks, contexts, locator)
+    resolved_text, reconstruction = _resolved_reader_selection_text(
+        blocks,
+        contexts,
+        locator,
+        page=page,
+    )
     _verify_client_text("Reader selection", primary.get("text"), resolved_text)
     source_locators = _unique(
         locator
@@ -339,6 +362,8 @@ def _resolve_current_page(
         page_number = int(page)
     except (TypeError, ValueError):
         raise ScopeResolutionError("Included current page requires page")
+    if doc_id != fallback_doc_id or page_number != fallback_page:
+        raise ScopeResolutionError("Included current page must match the primary Reader selection document and page")
     doc = _active_document(conn, doc_id)
     blocks = _projected_page(conn, doc_id=doc_id, page=page_number)
     contexts = [
@@ -383,6 +408,8 @@ def _resolve_current_page(
 def _load_highlights(
     conn: sqlite3.Connection,
     ids: list[str],
+    *,
+    primary_doc_id: str,
 ) -> list[dict[str, object]]:
     if not ids:
         return []
@@ -399,6 +426,8 @@ def _load_highlights(
         raise ScopeResolutionError(f"highlight ID not found: {missing[0]}")
     for row in by_id.values():
         _active_document(conn, str(row["source_document_id"]))
+        if str(row["source_document_id"]) != primary_doc_id:
+            raise ScopeResolutionError("Included highlights must belong to the primary Reader selection document")
         row["tags"] = json.loads(row.get("tags") or "[]") if isinstance(row.get("tags"), str) else []
     return [by_id[highlight_id] for highlight_id in ids]
 
@@ -406,11 +435,13 @@ def _load_highlights(
 def _resolve_highlights(
     conn: sqlite3.Connection,
     highlight_payload: dict[str, Any],
+    *,
+    primary_doc_id: str,
 ) -> tuple[list[dict[str, object]], dict[str, object] | None]:
     ids = _unique(_clean_string_list(highlight_payload.get("ids")))
     if not ids:
         raise ScopeResolutionError("Included highlights require durable highlight IDs")
-    highlights = _load_highlights(conn, ids)
+    highlights = _load_highlights(conn, ids, primary_doc_id=primary_doc_id)
     doc_ids = _unique([str(item["source_document_id"]) for item in highlights])
     placeholders = ",".join("?" for _ in doc_ids)
     docs = conn.execute(
@@ -440,6 +471,7 @@ def _resolve_highlights(
             "id": row["id"],
             "kind": "reader_highlight",
             "text": row["selected_text"],
+            "included": True,
             "role": "supporting",
             "evidence_status": "durable_reader_highlight",
             "source_document_id": row["source_document_id"],
@@ -491,7 +523,11 @@ def resolve_scope_for_provider(
     highlight_payload = supporting_payload.get("highlights")
     include_highlights = isinstance(highlight_payload, dict) and bool(highlight_payload.get("include"))
     if include_highlights:
-        highlights, study_packet = _resolve_highlights(conn, highlight_payload)
+        highlights, study_packet = _resolve_highlights(
+            conn,
+            highlight_payload,
+            primary_doc_id=str(primary["source_document_id"]),
+        )
         supporting.extend(highlights)
         supporting_material.extend(highlights)
 

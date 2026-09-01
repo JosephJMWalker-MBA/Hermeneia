@@ -26,6 +26,7 @@ from hermeneia.narrative.artist_providers import (
     GeminiArtistProvider,
     OpenAIArtistProvider,
 )
+from hermeneia.perspective_runs import build_perspective_prompt, perspective_definition
 from hermeneia.perspective_identity import frame_v2_row_from_draft
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.web.app import create_app
@@ -2593,6 +2594,7 @@ def _seed_perspective_scope_source(
     *,
     doc_id: str = "doc-selected",
     page: int = 3,
+    id_prefix: str = "ex-page",
     blocks: list[str] | None = None,
     excluded: bool = False,
 ) -> dict[str, object]:
@@ -2621,14 +2623,14 @@ def _seed_perspective_scope_source(
                    VALUES (?, 'Evidence', ?, ?, ?, ?, 'test-parser', 'test',
                            '{}', ?, ?, ?, ?)""",
                 (
-                    f"ex-page-{idx}",
+                    f"{id_prefix}-{idx}",
                     doc_id,
                     page,
                     f"block:{idx}",
                     text,
                     f"page:{page}:block:{idx}",
                     doc_id,
-                    f"hash-ex-page-{idx}",
+                    f"hash-{id_prefix}-{idx}",
                     now,
                 ),
             )
@@ -2640,7 +2642,7 @@ def _seed_perspective_scope_source(
         "page": page,
         "blocks": blocks,
         "locators": [f"page:{page}:block:{idx}" for idx in range(1, len(blocks) + 1)],
-        "extraction_ids": [f"ex-page-{idx}" for idx in range(1, len(blocks) + 1)],
+        "extraction_ids": [f"{id_prefix}-{idx}" for idx in range(1, len(blocks) + 1)],
     }
 
 
@@ -2809,6 +2811,189 @@ def test_perspective_run_tampered_scope_fails_before_provider_call(
     assert _CapturingProvider.render_prompts == []
 
 
+def test_perspective_run_rejects_cross_page_current_page_before_provider_call(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    _CapturingProvider.calls = []
+    _CapturingProvider.render_prompts = []
+    db_path = tmp_path / "perspective.db"
+    _seed_perspective_scope_source(db_path)
+    _seed_perspective_scope_source(
+        db_path,
+        doc_id="doc-selected",
+        page=4,
+        id_prefix="page4-ex",
+        blocks=["Same document, different page source context."],
+    )
+    client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
+
+    response = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(
+                supporting={
+                    "current_page": {
+                        "include": True,
+                        "source_document_id": "doc-selected",
+                        "page": 4,
+                    },
+                },
+            ),
+        },
+    )
+
+    assert response.status_code == 400
+    assert "must match the primary Reader selection" in response.get_json()["error"]
+    assert _CapturingProvider.calls == []
+    assert _CapturingProvider.render_prompts == []
+
+
+def test_perspective_run_rejects_cross_document_current_page_before_provider_call(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    _CapturingProvider.calls = []
+    _CapturingProvider.render_prompts = []
+    db_path = tmp_path / "perspective.db"
+    _seed_perspective_scope_source(db_path)
+    _seed_perspective_scope_source(
+        db_path,
+        doc_id="other-doc",
+        page=3,
+        id_prefix="other-ex",
+        blocks=["Other document source context."],
+    )
+    client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
+
+    response = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(
+                supporting={
+                    "current_page": {
+                        "include": True,
+                        "source_document_id": "other-doc",
+                        "page": 3,
+                    },
+                },
+            ),
+        },
+    )
+
+    assert response.status_code == 400
+    assert "must match the primary Reader selection" in response.get_json()["error"]
+    assert _CapturingProvider.calls == []
+    assert _CapturingProvider.render_prompts == []
+
+
+def test_perspective_run_rejects_cross_document_highlight_before_provider_call(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    _CapturingProvider.calls = []
+    _CapturingProvider.render_prompts = []
+    db_path = tmp_path / "perspective.db"
+    _seed_perspective_scope_source(db_path)
+    other = _seed_perspective_scope_source(
+        db_path,
+        doc_id="other-doc",
+        page=3,
+        id_prefix="other-ex",
+        blocks=["Other document source text."],
+    )
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """INSERT INTO reader_highlights
+               (id, source_document_id, source_role, page, source_locator,
+                selected_text, relevance, tags, status, created_at, updated_at)
+               VALUES
+               ('hl-other-doc', ?, 'primary', ?, ?, 'Other document mark.',
+                'supports', '[]', 'saved_highlight',
+                '2026-08-29T12:04:00+00:00', '2026-08-29T12:04:00+00:00')""",
+            (other["doc_id"], other["page"], other["locators"][0]),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
+
+    response = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(
+                supporting={"highlights": {"include": True, "ids": ["hl-other-doc"]}},
+            ),
+        },
+    )
+
+    assert response.status_code == 400
+    assert "primary Reader selection document" in response.get_json()["error"]
+    assert _CapturingProvider.calls == []
+    assert _CapturingProvider.render_prompts == []
+
+
+def test_perspective_run_sends_unranked_highlight_exact_material_to_provider(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    _CapturingProvider.calls = []
+    _CapturingProvider.render_prompts = []
+    db_path = tmp_path / "perspective.db"
+    seed = _seed_perspective_scope_source(db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """INSERT INTO reader_highlights
+               (id, source_document_id, source_role, page, source_locator,
+                selected_text, relevance, tags, status, created_at, updated_at)
+               VALUES
+               ('hl-unranked', ?, 'primary', ?, ?, 'Exact unranked Reader mark.',
+                'unclear', '[]', 'saved_highlight',
+                '2026-08-29T12:05:00+00:00', '2026-08-29T12:05:00+00:00')""",
+            (seed["doc_id"], seed["page"], seed["locators"][0]),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
+
+    response = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope(
+                supporting={"highlights": {"include": True, "ids": ["hl-unranked"]}},
+            ),
+        },
+    )
+
+    assert response.status_code == 201
+    receipt = response.get_json()["scope_receipt"]
+    assert receipt["materialization"]["supporting"][0]["id"] == "hl-unranked"
+    assert receipt["materialization"]["supporting"][0]["text"] == "Exact unranked Reader mark."
+    assert receipt["materialization"]["study_packet"]["provenance"]["source_records"][
+        "reader_highlight_ids"
+    ] == ["hl-unranked"]
+    assert "Exact unranked Reader mark." in _CapturingProvider.render_prompts[-1]
+
+
 def test_perspective_run_includes_only_explicit_supporting_scope(
     tmp_path,
     monkeypatch,
@@ -2880,6 +3065,101 @@ def test_perspective_run_includes_only_explicit_supporting_scope(
     assert "SUPPORTING INVESTIGATION CONTEXT:" not in prompt
     assert "How does aspiration distort perception?" not in prompt
     assert "entire corpus" not in prompt.lower()
+
+
+def test_perspective_prompt_uses_scope_materialization_not_receipt_projection() -> None:
+    receipt = {
+        "primary": {
+            "kind": "reader_selection",
+            "text": "Receipt text should not reach provider.",
+            "source_document_id": "doc-selected",
+            "page": 3,
+            "locator": "reader-span:v1:receipt",
+        },
+        "supporting": [
+            {
+                "kind": "current_page",
+                "included": True,
+                "text": "Receipt page should not reach provider.",
+                "page": 3,
+            },
+        ],
+        "materialization": {
+            "primary": {
+                "kind": "reader_selection",
+                "text": "Materialized source text reaches provider.",
+                "source_document_id": "doc-selected",
+                "page": 3,
+                "locator": "reader-span:v1:material",
+            },
+            "supporting": [
+                {
+                    "kind": "current_page",
+                    "included": True,
+                    "text": "Materialized current page reaches provider.",
+                    "page": 3,
+                },
+            ],
+        },
+    }
+
+    prompt = build_perspective_prompt(
+        perspective_definition("close-reader"),
+        question="What matters?",
+        scope_receipt=receipt,
+        scope_materialization=receipt["materialization"],
+    )
+
+    assert "Materialized source text reaches provider." in prompt
+    assert "Materialized current page reaches provider." in prompt
+    assert "Receipt text should not reach provider." not in prompt
+    assert "Receipt page should not reach provider." not in prompt
+
+
+def test_same_scope_material_resolves_same_evidence_under_different_perspectives(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    _CapturingProvider.render_responses = [
+        "Close reading response.",
+        "Contextual reading response.",
+    ]
+    db_path = tmp_path / "perspective.db"
+    _seed_perspective_scope_source(db_path)
+    client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
+    scope = _reader_selection_scope()
+
+    close = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": scope,
+        },
+    )
+    contextual = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "contextual-reader",
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": scope,
+        },
+    )
+
+    assert close.status_code == 201
+    assert contextual.status_code == 201
+    close_receipt = close.get_json()
+    contextual_receipt = contextual.get_json()
+    assert close_receipt["perspective"]["id"] == "close-reader"
+    assert contextual_receipt["perspective"]["id"] == "contextual-reader"
+    assert close_receipt["scope_receipt"]["primary"] == contextual_receipt["scope_receipt"]["primary"]
+    assert close_receipt["scope_receipt"]["materialization"]["primary"] == contextual_receipt[
+        "scope_receipt"
+    ]["materialization"]["primary"]
+    assert close_receipt["response"] != contextual_receipt["response"]
 
 
 def _transient_perspective_draft(**overrides) -> dict:
