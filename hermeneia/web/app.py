@@ -9389,6 +9389,215 @@ Return ONLY valid JSON, no markdown, no explanation:
             "empty": len(active_hl) == 0 and total_pages_read == 0,
         })
 
+    @app.route("/api/evidence-board")
+    def api_evidence_board():
+        """Read-only study inventory projection for the Reader workstation."""
+        if not db_path.exists():
+            return jsonify({
+                "documents": [],
+                "highlights": [],
+                "field_notes": [],
+                "observations": [],
+                "counts": {
+                    "highlights": 0,
+                    "dismissed_highlights": 0,
+                    "field_notes": 0,
+                    "observations": 0,
+                    "questions": 0,
+                    "theme_buckets": 0,
+                    "evidence_buckets": 0,
+                    "uncategorized_highlights": 0,
+                },
+                "theme_buckets": [],
+                "evidence_buckets": [],
+                "uncategorized_definition": "Reader highlights with no theme_bucket and no evidence_bucket.",
+            }), 200
+
+        current_doc_id = str(request.args.get("current_document_id") or "").strip()
+        current_page = request.args.get("current_page", type=int)
+        conn = _conn()
+        if current_doc_id:
+            try:
+                require_active_document(conn, current_doc_id)
+            except _ScopeAccessError as exc:
+                conn.close()
+                return _scope_error_response(exc)
+
+        documents = [
+            {
+                "id": row["id"],
+                "filename": row["original_filename"],
+                "source_role": row["source_role"] or "primary",
+                "total_pages": row["total_pages"],
+                "excluded": bool(row["excluded_from_analysis"]),
+            }
+            for row in conn.execute(
+                """SELECT id, original_filename, source_role, total_pages,
+                          excluded_from_analysis
+                   FROM source_documents
+                   WHERE COALESCE(excluded_from_analysis, 0) = 0
+                   ORDER BY source_role = 'primary' DESC, original_filename, id"""
+            ).fetchall()
+        ]
+
+        rows = conn.execute(
+            """SELECT rh.*, sd.original_filename, sd.source_role AS document_source_role
+               FROM reader_highlights rh
+               JOIN source_documents sd ON sd.id = rh.source_document_id
+               WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
+                 AND rh.status != 'dismissed'
+               ORDER BY rh.created_at DESC, rh.id"""
+        ).fetchall()
+        dismissed_count = conn.execute(
+            """SELECT COUNT(*)
+               FROM reader_highlights rh
+               JOIN source_documents sd ON sd.id = rh.source_document_id
+               WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
+                 AND rh.status = 'dismissed'"""
+        ).fetchone()[0]
+
+        highlights = []
+        for row in rows:
+            same_current_doc = bool(current_doc_id and row["source_document_id"] == current_doc_id)
+            if same_current_doc:
+                scope_reason = "Eligible for current single-document Scope."
+            elif current_doc_id:
+                scope_reason = "Different source document; not eligible for current single-document Scope."
+            else:
+                scope_reason = "Open a Reader document before adding board highlights to Scope."
+            highlights.append({
+                "id": row["id"],
+                "record_type": "reader_highlight",
+                "selected_text": row["selected_text"],
+                "source_document_id": row["source_document_id"],
+                "document_name": row["original_filename"],
+                "source_role": row["source_role"] or row["document_source_role"] or "primary",
+                "page": row["page"],
+                **_reader_source_locator_fields(row["source_locator"]),
+                "relevance": row["relevance"] or "unclear",
+                "theme_bucket": row["theme_bucket"],
+                "evidence_bucket": row["evidence_bucket"],
+                "rank": row["rank"],
+                "status": row["status"],
+                "note_text": row["note_text"],
+                "question_text": row["question_text"],
+                "question_type": row["question_type"] or "unclassified",
+                "tags": _json_list(row["tags"]),
+                "observation_id": row["observation_id"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+                "authorship": "human-authored Reader mark",
+                "scope_eligible": same_current_doc,
+                "scope_ineligibility_reason": "" if same_current_doc else scope_reason,
+            })
+
+        field_notes = [
+            {
+                "id": row["id"],
+                "record_type": "field_note",
+                "lane": row["lane"],
+                "understanding": row["understanding"],
+                "pressing_questions": row["pressing_questions"],
+                "governing_question": row["governing_question"],
+                "source_document_id": row["source_document_id"],
+                "document_name": row["original_filename"],
+                "source_role": row["source_role"] or None,
+                "page": row["page"],
+                "created_at": row["created_at"],
+                "authorship": "human-authored field note",
+            }
+            for row in conn.execute(
+                """SELECT il.*, sd.original_filename, sd.source_role
+                   FROM investigation_log il
+                   LEFT JOIN source_documents sd ON sd.id = il.source_document_id
+                   WHERE il.source_document_id IS NULL
+                      OR COALESCE(sd.excluded_from_analysis, 0) = 0
+                   ORDER BY il.created_at DESC, il.id"""
+            ).fetchall()
+        ]
+
+        observation_rows = conn.execute(
+            """SELECT o.id, o.raw_text, o.source_document_id, o.source_extraction_id,
+                      o.source_locator, o.page, o.paragraph, o.sentence, o.created_at,
+                      sd.original_filename, sd.source_role, orv.review_status
+               FROM observations o
+               JOIN source_documents sd ON sd.id = o.source_document_id
+               LEFT JOIN observation_reviews orv ON orv.observation_id = o.id
+               WHERE COALESCE(sd.excluded_from_analysis, 0) = 0
+               ORDER BY o.page, o.paragraph, o.sentence, o.id"""
+        ).fetchall()
+        observations = [
+            {
+                "id": row["id"],
+                "record_type": "canonical_observation",
+                "content": row["raw_text"],
+                "source_document_id": row["source_document_id"],
+                "document_name": row["original_filename"],
+                "source_role": row["source_role"] or "primary",
+                "source_extraction_id": row["source_extraction_id"],
+                **_reader_source_locator_fields(row["source_locator"]),
+                "page": row["page"],
+                "paragraph": row["paragraph"],
+                "sentence": row["sentence"],
+                "review_status": row["review_status"] or "unreviewed",
+                "created_at": row["created_at"],
+                "epistemic_status": "canonical source-derived observation",
+            }
+            for row in observation_rows
+        ]
+        conn.close()
+
+        def bucket_rows(field: str) -> list[dict]:
+            buckets: dict[str, list[dict]] = {}
+            for item in highlights:
+                label = item.get(field)
+                if isinstance(label, str) and label.strip():
+                    buckets.setdefault(label.strip(), []).append(item)
+            return [
+                {
+                    "bucket": label,
+                    "kind": field,
+                    "count": len(items),
+                    "highlight_ids": [item["id"] for item in items],
+                    "projection": "derived grouping over reader_highlights." + field,
+                }
+                for label, items in sorted(buckets.items(), key=lambda pair: pair[0].lower())
+            ]
+
+        theme_buckets = bucket_rows("theme_bucket")
+        evidence_buckets = bucket_rows("evidence_bucket")
+        uncategorized = [
+            item for item in highlights
+            if not (item.get("theme_bucket") or "").strip()
+            and not (item.get("evidence_bucket") or "").strip()
+        ]
+        question_count = sum(1 for item in highlights if (item.get("question_text") or "").strip())
+        question_count += sum(1 for item in field_notes if (item.get("pressing_questions") or "").strip())
+        return jsonify({
+            "documents": documents,
+            "current_reader": {
+                "source_document_id": current_doc_id or None,
+                "page": current_page,
+            },
+            "highlights": highlights,
+            "field_notes": field_notes,
+            "observations": observations,
+            "counts": {
+                "highlights": len(highlights),
+                "dismissed_highlights": dismissed_count,
+                "field_notes": len(field_notes),
+                "observations": len(observations),
+                "questions": question_count,
+                "theme_buckets": len(theme_buckets),
+                "evidence_buckets": len(evidence_buckets),
+                "uncategorized_highlights": len(uncategorized),
+            },
+            "theme_buckets": theme_buckets,
+            "evidence_buckets": evidence_buckets,
+            "uncategorized_definition": "Reader highlights with no theme_bucket and no evidence_bucket.",
+            "canonical_evidence_modified": False,
+        })
+
     @app.route("/api/reader/documents/<doc_id>/related-observations")
     def api_reader_related_observations(doc_id: str):
         """Find machine observations near a passage (by page) or from this document."""

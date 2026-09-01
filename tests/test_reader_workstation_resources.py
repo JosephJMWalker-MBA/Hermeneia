@@ -28,7 +28,7 @@ def _extract_fn(html: str, name: str) -> str:
     return match.group(0)
 
 
-def test_bottom_workstation_has_seven_human_resource_tabs():
+def test_bottom_workstation_has_eight_human_resource_tabs():
     index = _index()
     top_tabs = re.findall(
         r'<button class="cr-bottom-workstation-tab" id="(cr-bottom-resource-[^"]+)" '
@@ -39,6 +39,7 @@ def test_bottom_workstation_has_seven_human_resource_tabs():
     assert top_tabs == [
         ("cr-bottom-resource-search", "search", "Search"),
         ("cr-bottom-resource-timeline", "timeline", "Timeline"),
+        ("cr-bottom-resource-evidence", "evidence", "Evidence"),
         ("cr-bottom-resource-notes", "notes", "Notes"),
         ("cr-bottom-resource-perspective", "perspective", "Perspective"),
         ("cr-bottom-resource-blueprint", "blueprint", "Blueprint"),
@@ -103,11 +104,11 @@ def test_sync_maps_internal_modes_to_public_resources_and_nested_tabs():
         "function makeEl(id){ return elements[id] = { id, hidden:false, dataset:{}, attrs:{}, "
         "classList:{classes:new Set(), toggle(name,on){ on ? this.classes.add(name) : this.classes.delete(name);}}, "
         "getAttribute(name){ return this.attrs[name]; }, setAttribute(name,value){ this.attrs[name]=String(value); } }; }\n"
-        "['cr-bottom-workstation','corpus-search','attn-timeline','cr-fln-tray','cr-perspective-run',"
+        "['cr-bottom-workstation','corpus-search','attn-timeline','evidence-board','cr-fln-tray','cr-perspective-run',"
         "'cr-blueprint-draft','cr-render-preview','cr-critic-audit','cr-voice-profile','cr-artist-draft',"
         "'cr-record-ledger','cr-blueprint-subtabs','cr-expression-subtabs'].forEach(makeEl);\n"
         "elements['cr-bottom-workstation'].hidden = false;\n"
-        "const resourceBtns = ['search','timeline','notes','perspective','blueprint','expression','record'].map(r => ({"
+        "const resourceBtns = ['search','timeline','evidence','notes','perspective','blueprint','expression','record'].map(r => ({"
         "dataset:{workstationResource:r}, attrs:{role:'tab'}, classList:{classes:new Set(), toggle(n,on){ on ? this.classes.add(n) : this.classes.delete(n);}},"
         "getAttribute(n){ return this.attrs[n]; }, setAttribute(n,v){ this.attrs[n]=String(v); }}));\n"
         "const subBtns = ['blueprint','render','critic','voice','draft'].map(m => ({"
