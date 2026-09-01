@@ -325,6 +325,51 @@ def test_evidence_board_theme_bucket_selects_exact_eligible_current_snapshot() -
     assert result["postCalls"] == 0
 
 
+def test_evidence_board_zero_eligible_bucket_does_not_offer_selection_or_clear_candidate_selection() -> None:
+    result = _run_node(
+        _base_script(
+            """
+            _evidenceBoardData = {
+              counts: {},
+              theme_buckets: [{bucket: 'trust', count: 2}],
+              evidence_buckets: [],
+              highlights: [
+                {id: 'hl-existing', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'Existing', theme_bucket: 'other'},
+                {id: 'hl-cross-1', source_document_id: 'doc-b', scope_eligible: false, scope_ineligibility_reason: 'Different source document.', selected_text: 'B1', theme_bucket: 'trust'},
+                {id: 'hl-cross-2', source_document_id: 'doc-b', scope_eligible: false, scope_ineligibility_reason: 'Different source document.', selected_text: 'B2', theme_bucket: ' trust '},
+              ],
+              field_notes: [],
+              observations: [],
+            };
+            _evidenceBoardToggleHighlight('hl-existing');
+            const selectedBeforeBucket = _evidenceBoardSelectedIds();
+            _evidenceBoardOpenBucket('theme_bucket', 'trust');
+            const stats = _evidenceBoardOpenBucketStats();
+            const rendered = elements['evidence-board-body'].innerHTML;
+            const selectedAfterOpen = _evidenceBoardSelectedIds();
+            _evidenceBoardSelectOpenBucketEligible();
+            process.stdout.write(JSON.stringify({
+              selectedBeforeBucket,
+              selectedAfterOpen,
+              selectedAfterInvoke: _evidenceBoardSelectedIds(),
+              stats,
+              rendered,
+              postCalls,
+            }));
+            """
+        )
+    )
+
+    assert result["selectedBeforeBucket"] == ["hl-existing"]
+    assert result["selectedAfterOpen"] == ["hl-existing"]
+    assert result["selectedAfterInvoke"] == ["hl-existing"]
+    assert result["stats"] == {"total": 2, "eligible": 0, "ineligible": 2, "eligible_ids": []}
+    assert "0 eligible for current Reader Scope" in result["rendered"]
+    assert "No items eligible for current Reader Scope" in result["rendered"]
+    assert "Select 0 eligible" not in result["rendered"]
+    assert result["postCalls"] == 0
+
+
 def test_evidence_board_evidence_bucket_selects_exact_members_and_manual_toggle_remains_available() -> None:
     result = _run_node(
         _base_script(

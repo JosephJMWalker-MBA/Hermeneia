@@ -12861,6 +12861,7 @@ function _evidenceBoardSelectOpenBucketEligible() {
     showAppError('Open a theme or evidence bucket before selecting its eligible items.');
     return;
   }
+  if (!stats.eligible) return;
   const rows = _evidenceBoardVisibleHighlights().filter(row => row.scope_eligible);
   const next = new Set(rows.map(row => row.id).filter(Boolean));
   _evidenceBoardSelectedHighlightIds = next;
@@ -12984,9 +12985,12 @@ function _evidenceBoardRender() {
   const themeBuckets = data.theme_buckets || [];
   const evidenceBuckets = data.evidence_buckets || [];
   const bucketStats = _evidenceBoardOpenBucketStats();
+  const bucketSelectControl = bucketStats && bucketStats.eligible
+    ? `<button class="cr-bottom-workstation-tab" type="button" onclick="_evidenceBoardSelectOpenBucketEligible()">Select ${bucketStats.eligible} eligible item${bucketStats.eligible === 1 ? '' : 's'}</button>`
+    : '<span>No items eligible for current Reader Scope</span>';
   const bucketTitle = _evidenceBoardActiveBucket && bucketStats
     ? `<div class="evidence-board-meta">Open bucket: ${x(_evidenceBoardActiveBucket.bucket)} · ${bucketStats.total} total · ${bucketStats.eligible} eligible for current Reader Scope · ${bucketStats.ineligible} from other documents
-        <button class="cr-bottom-workstation-tab" type="button" onclick="_evidenceBoardSelectOpenBucketEligible()">Select ${bucketStats.eligible} eligible item${bucketStats.eligible === 1 ? '' : 's'}</button>
+        ${bucketSelectControl}
         <button class="cr-bottom-workstation-tab" type="button" onclick="_evidenceBoardClearBucket()">Show all highlights</button>
       </div>`
     : '';
