@@ -59,6 +59,7 @@ from ..compiler.projections.interpretive_divergence import (
 )
 from ..storage.sqlite import SQLiteStore
 from ..reader_span import reader_span_display_locator, reader_span_raw_locator
+from ..scope_resolution import ScopeResolutionError, resolve_scope_for_provider
 from ..connections_settings import (
     DEFAULT_OLLAMA_HOST,
     InvalidConnectionsSettingError,
@@ -94,7 +95,6 @@ from ..perspective_runs import (
     build_perspective_prompt,
     build_perspective_receipt,
     build_perspective_room_receipt,
-    normalize_reader_selection_scope,
     perspective_definitions_payload,
     resolve_perspective_request,
     resolve_room_participants,
@@ -4596,11 +4596,20 @@ def create_app(
             "runtime_host": host,
         }, None
 
-    def _run_local_perspective(definition, *, question, scope_receipt, context, prior_readings=None):
+    def _run_local_perspective(
+        definition,
+        *,
+        question,
+        scope_receipt,
+        scope_materialization,
+        context,
+        prior_readings=None,
+    ):
         prompt = build_perspective_prompt(
             definition,
             question=question,
             scope_receipt=scope_receipt,
+            scope_materialization=scope_materialization,
             prior_proposed_readings=prior_readings,
         )
         provider_id = str(context["provider_id"])
@@ -4653,10 +4662,15 @@ def create_app(
             return jsonify({"error": "question is required"}), 400
 
         scope_payload = payload.get("scope") if isinstance(payload.get("scope"), dict) else {}
+        if not db_path.exists():
+            return jsonify({"error": "database not found", "configuration_valid": False}), 404
+        conn = _conn()
         try:
-            scope_receipt = normalize_reader_selection_scope(scope_payload)
-        except ValueError as exc:
+            scope_receipt = resolve_scope_for_provider(conn, scope_payload)
+        except ScopeResolutionError as exc:
             return jsonify({"error": str(exc), "configuration_valid": False}), 400
+        finally:
+            conn.close()
 
         context, error = _local_perspective_execution_context(raw_model)
         if error is not None:
@@ -4666,6 +4680,9 @@ def create_app(
             perspective.definition,
             question=question,
             scope_receipt=scope_receipt,
+            scope_materialization=scope_receipt.get("materialization")
+            if isinstance(scope_receipt.get("materialization"), dict)
+            else None,
             context=context,
         )
         if run_error is not None:
@@ -4687,11 +4704,6 @@ def create_app(
         raw_model = str(payload.get("model") or "").strip()
         if not question:
             return jsonify({"error": "question is required"}), 400
-        scope_payload = payload.get("scope") if isinstance(payload.get("scope"), dict) else {}
-        try:
-            scope_receipt = normalize_reader_selection_scope(scope_payload)
-        except ValueError as exc:
-            return jsonify({"error": str(exc), "configuration_valid": False}), 400
         try:
             if "participants" in payload:
                 roster_source, room_participants = resolve_room_participants(
@@ -4704,6 +4716,16 @@ def create_app(
                 )
         except ValueError as exc:
             return jsonify({"error": str(exc), "configuration_valid": False}), 400
+        scope_payload = payload.get("scope") if isinstance(payload.get("scope"), dict) else {}
+        if not db_path.exists():
+            return jsonify({"error": "database not found", "configuration_valid": False}), 404
+        conn = _conn()
+        try:
+            scope_receipt = resolve_scope_for_provider(conn, scope_payload)
+        except ScopeResolutionError as exc:
+            return jsonify({"error": str(exc), "configuration_valid": False}), 400
+        finally:
+            conn.close()
         context, error = _local_perspective_execution_context(raw_model)
         if error is not None:
             body, status = error
@@ -4732,6 +4754,9 @@ def create_app(
                 definition,
                 question=question,
                 scope_receipt=scope_receipt,
+                scope_materialization=scope_receipt.get("materialization")
+                if isinstance(scope_receipt.get("materialization"), dict)
+                else None,
                 context=context,
                 prior_readings=prior_readings,
             )

@@ -310,18 +310,8 @@ def normalize_reader_selection_scope(scope: dict[str, Any]) -> dict[str, object]
         else {}
     )
     include_governing = bool(governing_payload.get("include"))
-    governing_text = _clean_text(governing_payload.get("text"))
     if include_governing:
-        if not governing_text:
-            raise ValueError("Included governing question is unavailable.")
-        supporting.append({
-            "kind": "governing_question",
-            "text": governing_text,
-            "included": True,
-            "role": "supporting",
-            "evidence_status": "investigation_context",
-            "source_metadata_origin": "reader_client",
-        })
+        raise ValueError("Governing question is not Scope material for Perspective runs.")
 
     page_payload = (
         supporting_payload.get("current_page")
@@ -383,12 +373,27 @@ def build_perspective_prompt(
     *,
     question: str,
     scope_receipt: dict[str, object],
+    scope_materialization: dict[str, object] | None = None,
     prior_proposed_readings: list[dict[str, object]] | None = None,
 ) -> str:
-    primary = scope_receipt["primary"]
+    materialization = scope_materialization or (
+        scope_receipt.get("materialization")
+        if isinstance(scope_receipt.get("materialization"), dict)
+        else None
+    )
+    materialization = materialization if isinstance(materialization, dict) else {}
+    primary = (
+        materialization.get("primary")
+        if isinstance(materialization.get("primary"), dict)
+        else scope_receipt["primary"]
+    )
     selected_text = str(primary["text"])
     supporting = [
-        item for item in scope_receipt.get("supporting", [])
+        item for item in (
+            materialization.get("supporting")
+            if isinstance(materialization.get("supporting"), list)
+            else scope_receipt.get("supporting", [])
+        )
         if isinstance(item, dict) and item.get("included")
     ]
     lines = [
@@ -399,7 +404,7 @@ def build_perspective_prompt(
         "Distinguish what the evidence supports from what you infer.",
         "Surface uncertainty and alternatives.",
         "Do not alter, correct, or normalize the source text.",
-        "Do not silently broaden context beyond the Scope Receipt.",
+        "Do not silently broaden context beyond the resolved Scope.",
         "",
         f"Perspective: {definition.label}",
         f"Perspective ID: {definition.id}",
@@ -416,7 +421,7 @@ def build_perspective_prompt(
         "",
         f"Question: {question.strip()}",
         "",
-        "Scope Receipt:",
+        "Resolved Scope:",
         f"- Primary kind: {primary.get('kind')}",
         f"- Source document: {primary.get('source_document_id') or 'unknown'}",
         f"- Page: {primary.get('page') or 'unknown'}",
@@ -442,17 +447,21 @@ def build_perspective_prompt(
                 f"Current page {item.get('page') or 'unknown'}:",
                 str(item.get("text") or ""),
             ])
-    governing_questions = [
-        item for item in supporting if item.get("kind") == "governing_question"
+    reader_highlights = [
+        item for item in supporting if item.get("kind") == "reader_highlight"
     ]
-    if governing_questions:
+    if reader_highlights:
         lines.extend([
             "",
-            "SUPPORTING INVESTIGATION CONTEXT:",
-            "This is investigation context, not source evidence, and it does not replace the User Question.",
+            "SUPPORTING DURABLE READER HIGHLIGHTS:",
+            "These are user-authored Reader marks explicitly included in Scope.",
         ])
-        for item in governing_questions:
-            lines.extend(["", "Governing Question:", str(item.get("text") or "")])
+        for item in reader_highlights:
+            lines.extend([
+                "",
+                f"Highlight {item.get('id') or 'unknown'}:",
+                str(item.get("text") or ""),
+            ])
     prior_readings = prior_proposed_readings or []
     if prior_readings:
         lines.extend([
