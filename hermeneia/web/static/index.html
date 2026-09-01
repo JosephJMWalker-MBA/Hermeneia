@@ -12810,6 +12810,18 @@ function _evidenceBoardVisibleHighlights() {
   return rows.filter(row => _evidenceBoardNormalizeBucketValue(row[key]) === label);
 }
 
+function _evidenceBoardOpenBucketStats() {
+  if (!_evidenceBoardActiveBucket) return null;
+  const rows = _evidenceBoardVisibleHighlights();
+  const eligibleRows = rows.filter(row => row.scope_eligible);
+  return {
+    total: rows.length,
+    eligible: eligibleRows.length,
+    ineligible: rows.length - eligibleRows.length,
+    eligible_ids: eligibleRows.map(row => row.id).filter(Boolean).sort(),
+  };
+}
+
 function _evidenceBoardHighlightById(id) {
   return (_evidenceBoardData?.highlights || []).find(row => row.id === id) || null;
 }
@@ -12841,6 +12853,23 @@ function _evidenceBoardClearSelection() {
 
 function _evidenceBoardSelectedIds() {
   return Array.from(_evidenceBoardSelectedHighlightIds).sort();
+}
+
+function _evidenceBoardSelectOpenBucketEligible() {
+  const stats = _evidenceBoardOpenBucketStats();
+  if (!stats) {
+    showAppError('Open a theme or evidence bucket before selecting its eligible items.');
+    return;
+  }
+  const rows = _evidenceBoardVisibleHighlights().filter(row => row.scope_eligible);
+  const next = new Set(rows.map(row => row.id).filter(Boolean));
+  _evidenceBoardSelectedHighlightIds = next;
+  _evidenceBoardSelectionDocId = rows.length ? rows[0].source_document_id : '';
+  _evidenceBoardRender();
+  const meta = document.getElementById('evidence-board-meta');
+  if (meta) {
+    meta.textContent = `${next.size} eligible highlight${next.size === 1 ? '' : 's'} selected from ${stats.total} bucket member${stats.total === 1 ? '' : 's'}`;
+  }
 }
 
 function _evidenceBoardScopeHighlightsPayload(primaryDocId) {
@@ -12954,8 +12983,12 @@ function _evidenceBoardRender() {
     : 'Projection over existing study records';
   const themeBuckets = data.theme_buckets || [];
   const evidenceBuckets = data.evidence_buckets || [];
-  const bucketTitle = _evidenceBoardActiveBucket
-    ? `<div class="evidence-board-meta">Open bucket: ${x(_evidenceBoardActiveBucket.bucket)} <button class="cr-bottom-workstation-tab" type="button" onclick="_evidenceBoardClearBucket()">Show all highlights</button></div>`
+  const bucketStats = _evidenceBoardOpenBucketStats();
+  const bucketTitle = _evidenceBoardActiveBucket && bucketStats
+    ? `<div class="evidence-board-meta">Open bucket: ${x(_evidenceBoardActiveBucket.bucket)} · ${bucketStats.total} total · ${bucketStats.eligible} eligible for current Reader Scope · ${bucketStats.ineligible} from other documents
+        <button class="cr-bottom-workstation-tab" type="button" onclick="_evidenceBoardSelectOpenBucketEligible()">Select ${bucketStats.eligible} eligible item${bucketStats.eligible === 1 ? '' : 's'}</button>
+        <button class="cr-bottom-workstation-tab" type="button" onclick="_evidenceBoardClearBucket()">Show all highlights</button>
+      </div>`
     : '';
   body.innerHTML = `
     <div class="evidence-board-grid">

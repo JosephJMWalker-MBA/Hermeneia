@@ -56,10 +56,12 @@ def _evidence_board_js() -> str:
         "function _evidenceBoardOpenBucket(",
         "function _evidenceBoardClearBucket(",
         "function _evidenceBoardVisibleHighlights(",
+        "function _evidenceBoardOpenBucketStats(",
         "function _evidenceBoardHighlightById(",
         "function _evidenceBoardToggleHighlight(",
         "function _evidenceBoardClearSelection(",
         "function _evidenceBoardSelectedIds(",
+        "function _evidenceBoardSelectOpenBucketEligible(",
         "function _evidenceBoardScopeHighlightsPayload(",
         "function _evidenceBoardAppliedHighlightsPayload(",
         "function _evidenceBoardApplySelectionToScope(",
@@ -272,6 +274,188 @@ def test_evidence_board_bucket_filter_does_not_change_current_scope() -> None:
     assert result["visible"] == ["hl-a"]
     assert result["scopeHighlights"] is None
     assert result["selected"] == []
+    assert result["postCalls"] == 0
+
+
+def test_evidence_board_theme_bucket_selects_exact_eligible_current_snapshot() -> None:
+    result = _run_node(
+        _base_script(
+            """
+            _evidenceBoardData = {
+              counts: {},
+              theme_buckets: [{bucket: 'trust', count: 3}],
+              evidence_buckets: [],
+              highlights: [
+                {id: 'hl-a', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'A', theme_bucket: ' trust '},
+                {id: 'hl-b', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'B', theme_bucket: 'trust'},
+                {id: 'hl-c', source_document_id: 'doc-b', scope_eligible: false, scope_ineligibility_reason: 'Different source document.', selected_text: 'C', theme_bucket: 'trust'},
+                {id: 'hl-d', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'D', theme_bucket: 'other'},
+              ],
+              field_notes: [],
+              observations: [],
+            };
+            _evidenceBoardOpenBucket('theme_bucket', 'trust');
+            const selectedAfterOpen = _evidenceBoardSelectedIds();
+            const stats = _evidenceBoardOpenBucketStats();
+            const renderedBeforeSelect = elements['evidence-board-body'].innerHTML;
+            _evidenceBoardSelectOpenBucketEligible();
+            process.stdout.write(JSON.stringify({
+              selectedAfterOpen,
+              selectedAfterBucketSelect: _evidenceBoardSelectedIds(),
+              stats,
+              scopeHighlights: _crPerspectiveScope?.supporting?.highlights || null,
+              renderedBeforeSelect,
+              meta: elements['evidence-board-meta'].textContent,
+              postCalls,
+            }));
+            """
+        )
+    )
+
+    assert result["selectedAfterOpen"] == []
+    assert result["stats"] == {"total": 3, "eligible": 2, "ineligible": 1, "eligible_ids": ["hl-a", "hl-b"]}
+    assert result["selectedAfterBucketSelect"] == ["hl-a", "hl-b"]
+    assert result["scopeHighlights"] is None
+    assert "trust" in result["renderedBeforeSelect"]
+    assert "3 total" in result["renderedBeforeSelect"]
+    assert "2 eligible for current Reader Scope" in result["renderedBeforeSelect"]
+    assert "1 from other documents" in result["renderedBeforeSelect"]
+    assert "Select 2 eligible items" in result["renderedBeforeSelect"]
+    assert "2 eligible highlights selected from 3 bucket members" in result["meta"]
+    assert result["postCalls"] == 0
+
+
+def test_evidence_board_evidence_bucket_selects_exact_members_and_manual_toggle_remains_available() -> None:
+    result = _run_node(
+        _base_script(
+            """
+            _evidenceBoardData = {
+              counts: {},
+              theme_buckets: [],
+              evidence_buckets: [{bucket: 'institutions', count: 2}],
+              highlights: [
+                {id: 'hl-d', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'D', evidence_bucket: 'institutions'},
+                {id: 'hl-e', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'E', evidence_bucket: ' institutions '},
+                {id: 'hl-f', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'F', evidence_bucket: ''},
+              ],
+              field_notes: [],
+              observations: [],
+            };
+            _evidenceBoardToggleHighlight('hl-f');
+            _evidenceBoardOpenBucket('evidence_bucket', 'institutions');
+            const selectedAfterOpen = _evidenceBoardSelectedIds();
+            _evidenceBoardSelectOpenBucketEligible();
+            const selectedAfterBucketSelect = _evidenceBoardSelectedIds();
+            _evidenceBoardToggleHighlight('hl-d');
+            process.stdout.write(JSON.stringify({
+              selectedAfterOpen,
+              selectedAfterBucketSelect,
+              selectedAfterManualToggle: _evidenceBoardSelectedIds(),
+              visible: _evidenceBoardVisibleHighlights().map(row => row.id),
+              postCalls,
+            }));
+            """
+        )
+    )
+
+    assert result["selectedAfterOpen"] == ["hl-f"]
+    assert result["selectedAfterBucketSelect"] == ["hl-d", "hl-e"]
+    assert result["selectedAfterManualToggle"] == ["hl-e"]
+    assert result["visible"] == ["hl-d", "hl-e"]
+    assert result["postCalls"] == 0
+
+
+def test_evidence_board_bucket_selection_and_applied_scope_are_independent() -> None:
+    result = _run_node(
+        _base_script(
+            """
+            _evidenceBoardData = {
+              counts: {},
+              theme_buckets: [{bucket: 'trust', count: 2}, {bucket: 'risk', count: 1}],
+              evidence_buckets: [],
+              highlights: [
+                {id: 'hl-a', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'A', theme_bucket: 'trust'},
+                {id: 'hl-b', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'B', theme_bucket: 'trust'},
+                {id: 'hl-c', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'C', theme_bucket: 'risk'},
+              ],
+              field_notes: [],
+              observations: [],
+            };
+            _evidenceBoardOpenBucket('theme_bucket', 'trust');
+            _evidenceBoardSelectOpenBucketEligible();
+            _evidenceBoardApplySelectionToScope();
+            const appliedAfterTrust = _crPerspectiveScope.supporting.highlights.ids;
+            _evidenceBoardOpenBucket('theme_bucket', 'risk');
+            _evidenceBoardSelectOpenBucketEligible();
+            const candidateAfterRisk = _evidenceBoardSelectedIds();
+            const appliedBeforeSecondSet = _crPerspectiveScope.supporting.highlights.ids;
+            _evidenceBoardApplySelectionToScope();
+            const appliedAfterRisk = _crPerspectiveScope.supporting.highlights.ids;
+            process.stdout.write(JSON.stringify({
+              appliedAfterTrust,
+              candidateAfterRisk,
+              appliedBeforeSecondSet,
+              appliedAfterRisk,
+              postCalls,
+            }));
+            """
+        )
+    )
+
+    assert result["appliedAfterTrust"] == ["hl-a", "hl-b"]
+    assert result["candidateAfterRisk"] == ["hl-c"]
+    assert result["appliedBeforeSecondSet"] == ["hl-a", "hl-b"]
+    assert result["appliedAfterRisk"] == ["hl-c"]
+    assert result["postCalls"] == 0
+
+
+def test_evidence_board_real_use_bucket_selection_manual_add_and_replacement_flow() -> None:
+    result = _run_node(
+        _base_script(
+            """
+            _evidenceBoardData = {
+              counts: {},
+              theme_buckets: [{bucket: 'trust', count: 3}],
+              evidence_buckets: [{bucket: 'institutions', count: 2}],
+              highlights: [
+                {id: 'hl-1', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'A1', theme_bucket: 'trust'},
+                {id: 'hl-2', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'A2', theme_bucket: ' trust '},
+                {id: 'hl-3', source_document_id: 'doc-b', scope_eligible: false, scope_ineligibility_reason: 'Different source document.', selected_text: 'B3', theme_bucket: 'trust'},
+                {id: 'hl-4', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'A4', evidence_bucket: 'institutions'},
+                {id: 'hl-5', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'A5', evidence_bucket: 'institutions'},
+                {id: 'hl-6', source_document_id: 'doc-a', scope_eligible: true, selected_text: 'A6'},
+              ],
+              field_notes: [],
+              observations: [],
+            };
+            _evidenceBoardOpenBucket('theme_bucket', 'trust');
+            const trustStats = _evidenceBoardOpenBucketStats();
+            _evidenceBoardSelectOpenBucketEligible();
+            _evidenceBoardToggleHighlight('hl-6');
+            const candidateBeforeSet = _evidenceBoardSelectedIds();
+            _evidenceBoardApplySelectionToScope();
+            const appliedAfterTrustPlusManual = _crPerspectiveScope.supporting.highlights.ids;
+            _evidenceBoardOpenBucket('evidence_bucket', 'institutions');
+            _evidenceBoardSelectOpenBucketEligible();
+            const candidateAfterInstitutions = _evidenceBoardSelectedIds();
+            const appliedBeforeSecondSet = _crPerspectiveScope.supporting.highlights.ids;
+            process.stdout.write(JSON.stringify({
+              trustStats,
+              candidateBeforeSet,
+              appliedAfterTrustPlusManual,
+              candidateAfterInstitutions,
+              appliedBeforeSecondSet,
+              postCalls,
+            }));
+            """
+        )
+    )
+
+    assert result["trustStats"] == {"total": 3, "eligible": 2, "ineligible": 1, "eligible_ids": ["hl-1", "hl-2"]}
+    assert result["candidateBeforeSet"] == ["hl-1", "hl-2", "hl-6"]
+    assert result["appliedAfterTrustPlusManual"] == ["hl-1", "hl-2", "hl-6"]
+    assert result["candidateAfterInstitutions"] == ["hl-4", "hl-5"]
+    assert result["appliedBeforeSecondSet"] == ["hl-1", "hl-2", "hl-6"]
     assert result["postCalls"] == 0
 
 
