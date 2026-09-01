@@ -10735,6 +10735,8 @@ let _crBlueprintCandidate = null;
 let _crBlueprintCandidateDirty = false;
 let _crBlueprintOperation = 'idle';
 let _crBlueprintWorkspaceEpoch = 0;
+let _crBlueprintRevision = null;
+let _crBlueprintRevisionRequestSeq = 0;
 async function _crGatherBlueprintEvidence() {
   let notes = [];
   let observations = [];
@@ -10803,7 +10805,9 @@ function _crSyncBlueprintOperationState() {
   }
   if (commitBtn) {
     commitBtn.disabled = busy;
-    commitBtn.textContent = committing ? 'Committing…' : 'Commit reviewed Blueprint';
+    commitBtn.textContent = committing
+      ? 'Committing…'
+      : (_crBlueprintRevision ? 'Commit revision' : 'Commit reviewed Blueprint');
   }
   document.querySelectorAll('#cr-blueprint-proposal input, #cr-blueprint-proposal textarea, #cr-blueprint-proposal button')
     .forEach(el => { el.disabled = busy; });
@@ -10849,6 +10853,13 @@ function _crBlueprintStatusBadge(state = 'working') {
   if (committed) {
     return `<span style="background:#2d6a4f;color:#b7e4c7;font-size:10px;padding:2px 7px;border-radius:4px;margin-left:8px">Committed Blueprint</span>`;
   }
+  if (_crBlueprintRevision) {
+    const title = _crBlueprintRevision.predecessorTitle || 'Blueprint';
+    const id = (_crBlueprintRevision.predecessorId || '').slice(0, 12);
+    const stateLabel = _crBlueprintCandidateDirty ? 'edited · not saved' : 'not saved';
+    const label = `Working revision · ${stateLabel} of ${title} · ${id}…`;
+    return `<span id="cr-blueprint-status-badge" style="background:#3b2f13;color:#fde68a;font-size:10px;padding:2px 7px;border-radius:4px;margin-left:8px">${x(label)}</span>`;
+  }
   const label = _crBlueprintCandidateDirty
     ? 'Working candidate · edited · not saved'
     : 'Working candidate · not saved';
@@ -10858,6 +10869,13 @@ function _crBlueprintStatusBadge(state = 'working') {
 function _crUpdateBlueprintDirtyBadge() {
   const badge = document.getElementById('cr-blueprint-status-badge');
   if (!badge) return;
+  if (_crBlueprintRevision) {
+    const title = _crBlueprintRevision.predecessorTitle || 'Blueprint';
+    const id = (_crBlueprintRevision.predecessorId || '').slice(0, 12);
+    const stateLabel = _crBlueprintCandidateDirty ? 'edited · not saved' : 'not saved';
+    badge.textContent = `Working revision · ${stateLabel} of ${title} · ${id}…`;
+    return;
+  }
   badge.textContent = _crBlueprintCandidateDirty
     ? 'Working candidate · edited · not saved'
     : 'Working candidate · not saved';
@@ -10867,6 +10885,16 @@ function _crMarkBlueprintCandidateDirty() {
   if (!_crBlueprintCanMutate()) return;
   _crBlueprintCandidateDirty = true;
   _crUpdateBlueprintDirtyBadge();
+}
+
+function _crClearBlueprintRevisionState() {
+  _crBlueprintRevision = null;
+}
+
+function _crUpdateBlueprintRevisionReason(value) {
+  if (!_crBlueprintCanMutate() || !_crBlueprintRevision) return;
+  _crBlueprintRevision.reason = String(value ?? '');
+  _crMarkBlueprintCandidateDirty();
 }
 
 function _crUpdateBlueprintTitle(value) {
@@ -10929,12 +10957,22 @@ function _crValidateBlueprintCandidateForCommit() {
   for (let i = 0; i < sections.length; i++) {
     if (!String(sections[i].claim ?? '').trim()) return `Claim ${i + 1} needs text.`;
   }
+  if (_crBlueprintRevision && !String(_crBlueprintRevision.reason ?? '').trim()) {
+    return 'Add a reason before committing this revision.';
+  }
   return '';
 }
 
 function _crRenderBlueprintEditor(bp, error = '') {
   const sections = _crBlueprintSections();
   const disabled = _crBlueprintCanMutate() ? '' : 'disabled';
+  const revisionReason = _crBlueprintRevision
+    ? `
+      <label class="cr-blueprint-editor-field" for="cr-blueprint-revision-reason">
+        <span class="cr-blueprint-editor-label">Why are you revising this Blueprint?</span>
+        <textarea class="cr-blueprint-editor-textarea" id="cr-blueprint-revision-reason" oninput="_crUpdateBlueprintRevisionReason(this.value)" ${disabled}>${x(_crBlueprintRevision.reason || '')}</textarea>
+      </label>`
+    : '';
   const claimRows = sections.map((section, i) => `
     <div class="cr-blueprint-claim" data-blueprint-claim-index="${i}">
       <div class="cr-blueprint-claim-head">
@@ -10970,13 +11008,14 @@ function _crRenderBlueprintEditor(bp, error = '') {
         <div class="cr-blueprint-editor-label" style="margin-bottom:8px">Claims</div>
         <div class="cr-blueprint-claims">${claimRows}</div>
       </div>
+      ${revisionReason}
       <div><button class="btn-trace" type="button" onclick="_crAddBlueprintClaim()" ${disabled}>+ Add claim</button></div>
       <div class="ob-extract-note">
         Edit the working synthesis here. Evidence links stay with their claim when you edit or reorder it. Commit saves this exact working object.
       </div>
       ${errorLine}
       <div class="ob-extract-actions">
-        <button class="btn-primary" id="cr-blueprint-commit-btn" onclick="_crCommitBlueprintCandidate()" ${disabled}>Commit reviewed Blueprint</button>
+        <button class="btn-primary" id="cr-blueprint-commit-btn" onclick="_crCommitBlueprintCandidate()" ${disabled}>${_crBlueprintRevision ? 'Commit revision' : 'Commit reviewed Blueprint'}</button>
       </div>
     </div>`;
 }
@@ -10994,7 +11033,7 @@ function _crRenderBlueprintCandidate(bp, state = 'working', result = null, error
     `<div class="ob-extract-section"><span style="color:var(--dim2);font-size:11px;margin-right:6px">${i+1}.</span>${x(s.claim)}</div>`
   ).join('');
   const resultLine = committed && result
-    ? `<div class="ob-extract-note" style="color:var(--green)">Architect contract compiled · Blueprint ${x((result.blueprint_id || '').slice(0, 12))}… · ArchitectPlan ${x((result.plan_id || '').slice(0, 12))}…</div>`
+    ? `<div class="ob-extract-note" style="color:var(--green)">Architect contract compiled · Blueprint ${x((result.blueprint_id || '').slice(0, 12))}… · ArchitectPlan ${x((result.plan_id || '').slice(0, 12))}…${result.supersession ? ` · supersedes ${x((result.supersession.old_id || '').slice(0, 12))}…` : ''}</div>`
     : '';
   const errorLine = error
     ? `<div class="ob-extract-note" style="color:#f87171">✗ ${x(error)}</div>`
@@ -11063,6 +11102,7 @@ async function _crGenerateBlueprintCandidate(regenerating = false) {
   if (!propEl) return;
   const previousCandidate = _crCloneBlueprintCandidate(_crBlueprintCandidate);
   const previousDirty = _crBlueprintCandidateDirty;
+  const previousRevision = _crBlueprintRevision ? {..._crBlueprintRevision} : null;
   const operationEpoch = _crBlueprintWorkspaceEpoch;
   if (_crBlueprintCandidate && _crBlueprintCandidateDirty) {
     const ok = (typeof window === 'undefined' || typeof window.confirm !== 'function')
@@ -11101,11 +11141,13 @@ async function _crGenerateBlueprintCandidate(regenerating = false) {
     }
     _crBlueprintCandidate = data.proposed_blueprint;
     _crBlueprintCandidateDirty = false;
+    _crBlueprintRevision = null;
     _crRenderBlueprintCandidate(_crBlueprintCandidate, 'working');
   } catch (err) {
     if (operationEpoch !== _crBlueprintWorkspaceEpoch) return;
     _crBlueprintCandidate = previousCandidate;
     _crBlueprintCandidateDirty = previousDirty;
+    _crBlueprintRevision = previousRevision;
     propEl.style.display = 'block';
     if (_crBlueprintCandidate) {
       _crRenderBlueprintCandidate(_crBlueprintCandidate, 'working', null, err.message);
@@ -11128,20 +11170,30 @@ async function _crCommitBlueprintCandidate() {
   }
   const candidateSnapshot = _crCloneBlueprintCandidate(_crBlueprintCandidate);
   const previousDirty = _crBlueprintCandidateDirty;
+  const revisionSnapshot = _crBlueprintRevision ? {..._crBlueprintRevision} : null;
   const operationEpoch = _crBlueprintWorkspaceEpoch;
   _crSetBlueprintOperation('committing');
   _crRenderBlueprintCandidate(candidateSnapshot, 'working');
   try {
-    const resp = await fetch('/api/pipeline/ratify-blueprint', {
+    const url = revisionSnapshot ? '/api/pipeline/revise-blueprint' : '/api/pipeline/ratify-blueprint';
+    const payload = revisionSnapshot
+      ? {
+          predecessor_id: revisionSnapshot.predecessorId,
+          reason: revisionSnapshot.reason,
+          proposed_blueprint: candidateSnapshot,
+        }
+      : { proposed_blueprint: candidateSnapshot };
+    const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ proposed_blueprint: candidateSnapshot }),
+      body: JSON.stringify(payload),
     });
     const data = await resp.json();
     if (operationEpoch !== _crBlueprintWorkspaceEpoch) return;
     if (!resp.ok) {
       _crBlueprintCandidate = candidateSnapshot;
       _crBlueprintCandidateDirty = previousDirty;
+      _crBlueprintRevision = revisionSnapshot;
       _crRenderBlueprintCandidate(_crBlueprintCandidate, 'working', null, data.error || 'commit failed');
       return;
     }
@@ -11150,10 +11202,12 @@ async function _crCommitBlueprintCandidate() {
     _crRenderBlueprintCandidate(_crBlueprintCandidate, 'committed', data);
     _crBlueprintCandidate = null;
     _crBlueprintCandidateDirty = false;
+    _crBlueprintRevision = null;
   } catch (err) {
     if (operationEpoch !== _crBlueprintWorkspaceEpoch) return;
     _crBlueprintCandidate = candidateSnapshot;
     _crBlueprintCandidateDirty = previousDirty;
+    _crBlueprintRevision = revisionSnapshot;
     _crRenderBlueprintCandidate(_crBlueprintCandidate, 'working', null, err.message);
   } finally {
     if (operationEpoch === _crBlueprintWorkspaceEpoch) _crSetBlueprintOperation('idle');
@@ -11165,9 +11219,11 @@ async function _crDraftBlueprint(save) {
 }
 function _crResetBlueprintWorkingStateForWorkspaceChange() {
   _crBlueprintWorkspaceEpoch += 1;
+  _crBlueprintRevisionRequestSeq += 1;
   _crBlueprintCandidate = null;
   _crBlueprintCandidateDirty = false;
   _crBlueprintOperation = 'idle';
+  _crClearBlueprintRevisionState();
   const propEl = document.getElementById('cr-blueprint-proposal');
   if (propEl) {
     propEl.style.display = 'none';
@@ -11191,6 +11247,8 @@ window._crAddBlueprintClaim = _crAddBlueprintClaim;
 window._crRemoveBlueprintClaim = _crRemoveBlueprintClaim;
 window._crBlueprintCanMutate = _crBlueprintCanMutate;
 window._crSetBlueprintOperation = _crSetBlueprintOperation;
+window._crClearBlueprintRevisionState = _crClearBlueprintRevisionState;
+window._crUpdateBlueprintRevisionReason = _crUpdateBlueprintRevisionReason;
 
 // ── Structure Preview (Blueprint resource nested view) ───────────────────
 // A saved Blueprint shown as an evidence-backed essay skeleton: title, thesis,
@@ -11253,7 +11311,64 @@ async function _crFetchSkeleton(id) {
     });
     return { n: i + 1, claim: sec.claim || '', evidence };
   });
-  return { id, title: bp.title || 'Untitled', thesis: bp.thesis || '', claims, hasPlan: !!bp.architect_plan, planId: (bp.architect_plan && bp.architect_plan.id) || null };
+  return {
+    id,
+    title: bp.title || 'Untitled',
+    thesis: bp.thesis || '',
+    sections,
+    claims,
+    hasPlan: !!bp.architect_plan,
+    planId: (bp.architect_plan && bp.architect_plan.id) || null,
+    supersedes: Array.isArray(bp.supersedes) ? bp.supersedes : [],
+    supersededBy: Array.isArray(bp.superseded_by) ? bp.superseded_by : [],
+  };
+}
+
+function _crBlueprintCandidateFromSkeleton(skeleton) {
+  return {
+    title: skeleton?.title || '',
+    thesis: skeleton?.thesis || '',
+    sections: (skeleton?.sections || []).map(section => ({
+      claim: section.claim || '',
+      supporting_observations: Array.isArray(section.supporting_observations)
+        ? section.supporting_observations.slice()
+        : [],
+      supporting_interpretations: Array.isArray(section.supporting_interpretations)
+        ? section.supporting_interpretations.slice()
+        : [],
+    })),
+  };
+}
+
+async function _crBeginBlueprintRevision(id) {
+  if (!_crBlueprintCanMutate() || !id) return;
+  if (_crBlueprintCandidate && _crBlueprintCandidateDirty) {
+    const ok = (typeof window === 'undefined' || typeof window.confirm !== 'function')
+      ? true
+      : window.confirm('Start another Blueprint revision?\n\nThis will replace your current unsaved working Blueprint revision.');
+    if (!ok) return;
+  }
+  const operationEpoch = _crBlueprintWorkspaceEpoch;
+  const requestSeq = ++_crBlueprintRevisionRequestSeq;
+  let skeleton;
+  try {
+    skeleton = await _crFetchSkeleton(id);
+  } catch (e) {
+    if (operationEpoch !== _crBlueprintWorkspaceEpoch || requestSeq !== _crBlueprintRevisionRequestSeq) return;
+    const body = document.getElementById('cr-render-body');
+    if (body) body.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${x(e.message)}</div>`;
+    return;
+  }
+  if (operationEpoch !== _crBlueprintWorkspaceEpoch || requestSeq !== _crBlueprintRevisionRequestSeq) return;
+  _crBlueprintCandidate = _crBlueprintCandidateFromSkeleton(skeleton);
+  _crBlueprintCandidateDirty = false;
+  _crBlueprintRevision = {
+    predecessorId: id,
+    predecessorTitle: skeleton.title || 'Untitled',
+    reason: '',
+  };
+  await _crOpenBottomWorkstation('blueprint');
+  _crRenderBlueprintCandidate(_crBlueprintCandidate, 'working');
 }
 
 async function _crRenderBlueprintSkeleton(id) {
@@ -11299,6 +11414,22 @@ async function _crRenderBlueprintSkeleton(id) {
   const auditLine = unsupported.length
     ? `<div class="cr-render-audit-line">Evidence audit: ${supported}/${claims.length} claims supported. Unsupported: ${unsupported.map(n => `#${n}`).join(', ')}.</div>`
     : `<div class="cr-render-audit-line">Evidence audit: every claim has at least one piece of linked evidence.</div>`;
+  const incoming = bp.supersedes.length
+    ? `<div class="cr-render-kicker" style="margin-top:12px">Supersedes</div>`
+      + bp.supersedes.map(edge => `
+        <div class="cr-render-evidence">
+          <span class="cr-render-evidence-kind">${x((edge.old_title || edge.old_id || '').slice(0, 70))} · ${x((edge.old_id || '').slice(0, 12))}…</span>
+          <div>${x(edge.reason || '')}</div>
+        </div>`).join('')
+    : '';
+  const outgoing = bp.supersededBy.length
+    ? `<div class="cr-render-kicker" style="margin-top:12px">Superseded by</div>`
+      + bp.supersededBy.map(edge => `
+        <div class="cr-render-evidence">
+          <span class="cr-render-evidence-kind">${x((edge.new_title || edge.new_id || '').slice(0, 70))} · ${x((edge.new_id || '').slice(0, 12))}…</span>
+          <div>${x(edge.reason || '')}</div>
+        </div>`).join('')
+    : '';
 
   body.innerHTML = `
     <div class="cr-render-doc">
@@ -11309,6 +11440,11 @@ async function _crRenderBlueprintSkeleton(id) {
       ${auditLine}
       <div class="cr-render-kicker" style="margin-top:12px">Claim sequence</div>
       ${claimHtml || '<div style="font-size:12px;color:var(--dim2)">This Blueprint has no claims.</div>'}
+      ${incoming}
+      ${outgoing}
+      <div class="ob-extract-actions" style="margin-top:12px">
+        <button class="btn-primary" type="button" onclick="_crBeginBlueprintRevision('${x(id)}')" ${_crBlueprintCanMutate() ? '' : 'disabled'}>Revise</button>
+      </div>
     </div>`;
 }
 
@@ -11345,6 +11481,8 @@ async function _crCopyRenderSkeleton() {
 window._crLoadRenderPreview = _crLoadRenderPreview;
 window._crRenderBlueprintSkeleton = _crRenderBlueprintSkeleton;
 window._crCopyRenderSkeleton = _crCopyRenderSkeleton;
+window._crBeginBlueprintRevision = _crBeginBlueprintRevision;
+window._crBlueprintCandidateFromSkeleton = _crBlueprintCandidateFromSkeleton;
 
 // ── Blueprint Check (Blueprint resource nested view) ─────────────────────
 // Audits the current skeleton against the governing question, the Blueprint

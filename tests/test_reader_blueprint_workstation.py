@@ -65,6 +65,8 @@ def _blueprint_editor_deps(html: str) -> str:
         "_crBlueprintStatusBadge",
         "_crUpdateBlueprintDirtyBadge",
         "_crMarkBlueprintCandidateDirty",
+        "_crClearBlueprintRevisionState",
+        "_crUpdateBlueprintRevisionReason",
         "_crUpdateBlueprintTitle",
         "_crUpdateBlueprintThesis",
         "_crUpdateBlueprintClaim",
@@ -152,8 +154,11 @@ def test_blueprint_commit_submits_stored_candidate_not_displayed_html_or_generat
     commit_end = index.index("async function _crDraftBlueprint", commit_start)
     commit_fn = index[commit_start:commit_end]
 
-    assert "JSON.stringify({ proposed_blueprint: candidateSnapshot })" in commit_fn
+    assert "proposed_blueprint: candidateSnapshot" in commit_fn
+    assert "predecessor_id: revisionSnapshot.predecessorId" in commit_fn
+    assert "reason: revisionSnapshot.reason" in commit_fn
     assert "/api/pipeline/ratify-blueprint" in commit_fn
+    assert "/api/pipeline/revise-blueprint" in commit_fn
     assert "/api/pipeline/extract-blueprint" not in commit_fn
     assert "_crAssembleBlueprintSeed" not in commit_fn
 
@@ -161,7 +166,7 @@ def test_blueprint_commit_submits_stored_candidate_not_displayed_html_or_generat
 def test_blueprint_client_flow_preserves_working_candidate_across_commit_and_failures():
     html = _index()
     script = (
-        "let _crBlueprintCandidate = null; let _crBlueprintCandidateDirty = false; let _crBlueprintOperation = 'idle'; let _crBlueprintWorkspaceEpoch = 0; let _crActiveBlueprintId = '';"
+        "let _crBlueprintCandidate = null; let _crBlueprintCandidateDirty = false; let _crBlueprintOperation = 'idle'; let _crBlueprintWorkspaceEpoch = 0; let _crBlueprintRevision = null; let _crBlueprintRevisionRequestSeq = 0; let _crActiveBlueprintId = '';"
         "const candidateA={title:'Reviewed A',thesis:'Thesis A.',sections:[{claim:'Claim A.',supporting_observations:['obs-1'],supporting_interpretations:[]}]};"
         "const candidateB={title:'Replacement B',thesis:'Thesis B.',sections:[{claim:'Claim B.',supporting_observations:[],supporting_interpretations:[]}]};"
         "const posts=[]; let generateFailures=0; let commitFailures=0;"
@@ -226,7 +231,7 @@ def test_blueprint_working_candidate_survives_reopening_and_resource_switches():
     html = _index()
     script = (
         "let _crBlueprintCandidate = {title:'Reviewed A',thesis:'Thesis A.',sections:[{claim:'Claim A.',supporting_observations:['obs-1'],supporting_interpretations:[]}]};"
-        "let _crBlueprintCandidateDirty = false; let _crBlueprintOperation = 'idle'; let _crBlueprintWorkspaceEpoch = 0;"
+        "let _crBlueprintCandidateDirty = false; let _crBlueprintOperation = 'idle'; let _crBlueprintWorkspaceEpoch = 0; let _crBlueprintRevision = null; let _crBlueprintRevisionRequestSeq = 0;"
         "let _crBottomMode = ''; const loads=[]; const posts=[];"
         "function x(v){return String(v == null ? '' : v).replace(/[&<>\"']/g, c => c);}"
         "function makeEl(id){return {id,hidden:false,dataset:{},style:{display:'none'},innerHTML:'',textContent:'',disabled:false,setAttribute(){},classList:{toggle(){},remove(){}}};}"
@@ -307,7 +312,7 @@ def test_blueprint_working_candidate_survives_page_navigation():
     html = _index()
     script = (
         "let _crBlueprintCandidate = {title:'Reviewed A',thesis:'Thesis A.',sections:[{claim:'Claim A.',supporting_observations:[],supporting_interpretations:[]}]};"
-        "let _crBlueprintCandidateDirty = false; let _crBlueprintOperation = 'idle'; let _crBlueprintWorkspaceEpoch = 0;"
+        "let _crBlueprintCandidateDirty = false; let _crBlueprintOperation = 'idle'; let _crBlueprintWorkspaceEpoch = 0; let _crBlueprintRevision = null; let _crBlueprintRevisionRequestSeq = 0;"
         "let _crPage = 1; let _crTotalPages = 2; let renders = 0;"
         "function x(v){return String(v == null ? '' : v).replace(/[&<>\"']/g, c => c);}"
         "const elements={"
@@ -355,7 +360,7 @@ def test_blueprint_working_candidate_clears_only_on_confirmed_workspace_change()
     html = _index()
     script = (
         "let _crBlueprintCandidate = {title:'Reviewed A',thesis:'Thesis A.',sections:[{claim:'Claim A.',supporting_observations:[],supporting_interpretations:[]}]};"
-        "let _crBlueprintCandidateDirty = false; let _crBlueprintOperation = 'idle'; let _crBlueprintWorkspaceEpoch = 0;"
+        "let _crBlueprintCandidateDirty = false; let _crBlueprintOperation = 'idle'; let _crBlueprintWorkspaceEpoch = 0; let _crBlueprintRevision = null; let _crBlueprintRevisionRequestSeq = 0;"
         "let _wsCurrentWorkspace = null; let resetCount = 0;"
         "function x(v){return String(v == null ? '' : v).replace(/[&<>\"']/g, c => c);}"
         "const elements={"
@@ -372,6 +377,7 @@ def test_blueprint_working_candidate_clears_only_on_confirmed_workspace_change()
         + _extract_fn(html, "_wsWorkspaceMatches")
         + _extract_fn(html, "_crBlueprintCanMutate")
         + _extract_fn(html, "_crSyncBlueprintOperationState")
+        + _extract_fn(html, "_crClearBlueprintRevisionState")
         + _extract_fn(html, "_crResetBlueprintWorkingStateForWorkspaceChange")
         + _extract_fn(html, "_wsApplyCurrentWorkspace")
         + """
