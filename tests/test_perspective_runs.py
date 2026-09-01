@@ -493,7 +493,7 @@ def test_reader_selection_scope_receipt_is_explicit_primary_and_defaults_support
     assert receipt["excluded"]["other_documents"] is True
 
 
-def test_reader_selection_scope_can_explicitly_include_governing_question_and_page() -> None:
+def test_reader_selection_scope_can_explicitly_include_current_page_but_not_question() -> None:
     receipt = normalize_reader_selection_scope({
         "primary": {
             "kind": "reader_selection",
@@ -504,8 +504,7 @@ def test_reader_selection_scope_can_explicitly_include_governing_question_and_pa
         },
         "supporting": {
             "governing_question": {
-                "include": True,
-                "text": "How does aspiration distort perception?",
+                "include": False,
             },
             "current_page": {
                 "include": True,
@@ -519,18 +518,15 @@ def test_reader_selection_scope_can_explicitly_include_governing_question_and_pa
     })
 
     assert receipt["included"] == {
-        "governing_question": True,
         "current_page": True,
+        "governing_question": False,
     }
-    assert receipt["excluded"]["governing_question"] is False
+    assert receipt["excluded"]["governing_question"] is True
     assert receipt["excluded"]["current_page"] is False
     assert [item["kind"] for item in receipt["supporting"]] == [
-        "governing_question",
         "current_page",
     ]
-    governing, page = receipt["supporting"]
-    assert governing["evidence_status"] == "investigation_context"
-    assert governing["text"] == "How does aspiration distort perception?"
+    page = receipt["supporting"][0]
     assert page["evidence_status"] == "source_context"
     assert page["text"] == "Page source text."
     assert page["source_locators"] == ["p7:b1", "p7:b2"]
@@ -545,8 +541,7 @@ def test_perspective_prompt_separates_primary_supporting_and_deliberation_contex
         "primary": {"kind": "reader_selection", "text": "Selected passage."},
         "supporting": {
             "governing_question": {
-                "include": True,
-                "text": "How does aspiration distort perception?",
+                "include": False,
             },
             "current_page": {
                 "include": True,
@@ -571,10 +566,9 @@ def test_perspective_prompt_separates_primary_supporting_and_deliberation_contex
     assert "SUPPORTING SOURCE CONTEXT:" in prompt
     assert "Current page 21:" in prompt
     assert "Current page source text." in prompt
-    assert "SUPPORTING INVESTIGATION CONTEXT:" in prompt
-    assert "This is investigation context, not source evidence" in prompt
-    assert "Governing Question:" in prompt
-    assert "How does aspiration distort perception?" in prompt
+    assert "SUPPORTING INVESTIGATION CONTEXT:" not in prompt
+    assert "Governing Question:" not in prompt
+    assert "How does aspiration distort perception?" not in prompt
     assert "PRIOR PROPOSED READINGS — DELIBERATION CONTEXT, NOT SOURCE EVIDENCE" in prompt
     assert "Prior model response." in prompt
     assert "Prior model response." not in str(receipt)
@@ -594,7 +588,7 @@ def test_scope_rejects_unsupported_included_material_and_missing_requested_conte
                 "primary": {"kind": "reader_selection", "text": "Text."},
                 "supporting": {"governing_question": {"include": True, "text": " "}},
             },
-            "governing question is unavailable",
+            "Governing question is not Scope material",
         ),
         (
             {

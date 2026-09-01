@@ -9779,6 +9779,7 @@ let _crPerspectiveKind = 'built-in';
 let _crPerspectiveDraftActive = null;
 let _crPerspectiveDraftDirty = false;
 let _crPerspectiveRevisionBaseId = '';
+let _crPerspectiveWorkspaceEpoch = 0;
 
 function _crPerspectiveDraftLines(value) {
   return String(value || '').split(/\r?\n/).map(item => item.trim()).filter(Boolean);
@@ -9886,10 +9887,21 @@ function _crPopulateSavedPerspectiveSelect() {
 }
 
 function _crResetPerspectiveRoomStateForWorkspaceChange() {
+  _crPerspectiveWorkspaceEpoch += 1;
+  _crPerspectiveScope = null;
+  _crPerspectiveLastReceipt = null;
   _crPerspectiveRoomRoster = [];
   _crPerspectiveRoomRosterDirty = false;
   const roomPlan = document.getElementById('cr-perspective-room-plan');
   if (roomPlan && !roomPlan.hidden) _crRenderPerspectiveRoomPlan();
+  _crPerspectiveRenderScope();
+}
+
+function _crResetPerspectiveScopeForReaderContextChange() {
+  _crPerspectiveWorkspaceEpoch += 1;
+  _crPerspectiveScope = null;
+  _crPerspectiveLastReceipt = null;
+  _crPerspectiveRenderScope();
 }
 
 function _crRoomParticipantId(item) {
@@ -10194,7 +10206,6 @@ function _crPerspectiveCurrentPageScope() {
   return {
     include: true,
     kind: 'current_page',
-    text: blocks.map(block => block.text).join('\n\n'),
     source_document_id: _crDocId || '',
     page: _crPage || null,
     source_locators: _crUniqueStringList(blocks.flatMap(block => block.context.source_locators || [])),
@@ -10205,11 +10216,10 @@ function _crPerspectiveCurrentPageScope() {
 function _crPerspectiveScopeFromSelection(selection = null) {
   const resolved = selection || _crGetReaderSelection({ refresh: false, fallback: true });
   if (!resolved?.valid || !resolved.text) return null;
-  const includeGoverning = !!document.getElementById('cr-perspective-include-governing')?.checked;
   const includePage = !!document.getElementById('cr-perspective-include-page')?.checked;
-  const governingQuestion = (invLoad()?.thesis || '').trim();
   const currentPage = _crPerspectiveCurrentPageScope();
   return {
+    workspace_epoch: _crPerspectiveWorkspaceEpoch,
     primary: {
       kind: 'reader_selection',
       text: resolved.text,
@@ -10221,15 +10231,14 @@ function _crPerspectiveScopeFromSelection(selection = null) {
     },
     supporting: {
       governing_question: {
-        include: includeGoverning && !!governingQuestion,
-        text: governingQuestion,
+        include: false,
       },
       current_page: includePage && currentPage
         ? currentPage
         : { include: false },
     },
     included: {
-      governing_question: includeGoverning && !!governingQuestion,
+      governing_question: false,
       current_page: includePage && !!currentPage,
     },
   };
@@ -10238,15 +10247,12 @@ function _crPerspectiveScopeFromSelection(selection = null) {
 function _crPerspectiveSyncScopeControls() {
   const governingInput = document.getElementById('cr-perspective-include-governing');
   const governingState = document.getElementById('cr-perspective-governing-state');
-  const governingQuestion = (invLoad()?.thesis || '').trim();
   if (governingInput) {
-    governingInput.disabled = !governingQuestion;
-    if (!governingQuestion) governingInput.checked = false;
+    governingInput.disabled = true;
+    governingInput.checked = false;
   }
   if (governingState) {
-    governingState.textContent = governingQuestion
-      ? `Supporting investigation context · ${governingQuestion.slice(0, 72)}${governingQuestion.length > 72 ? '…' : ''}`
-      : 'Unavailable: no governing question set';
+    governingState.textContent = 'Question stays separate from Scope in this slice';
   }
   const pageInput = document.getElementById('cr-perspective-include-page');
   const pageState = document.getElementById('cr-perspective-page-state');
@@ -10274,7 +10280,6 @@ function _crPerspectiveRenderScope() {
   const loc = _crPerspectiveScope.primary.locator || `page ${_crPerspectiveScope.primary.page || '?'}`;
   const supporting = _crPerspectiveScope?.included || {};
   const extras = [
-    supporting.governing_question ? 'governing question' : '',
     supporting.current_page ? 'current page' : '',
   ].filter(Boolean);
   chip.innerHTML = `<strong>Selected passage · Primary</strong> · ${x(loc)}<br><span style="color:var(--fg2)">"${x(text.slice(0, 140))}${text.length > 140 ? '…' : ''}"</span><br><span>Supporting included: ${extras.length ? x(extras.join(', ')) : 'none'}</span>`;
@@ -10490,6 +10495,7 @@ function _crRenderPerspectiveScopeReceipt(scopeReceipt) {
     primary.role === 'primary' ? 'primary' : '',
     primary.evidence_status === 'source_evidence' ? 'source evidence' : '',
     primary.page ? `p.${x(primary.page)}` : '',
+    primary.source_metadata_origin === 'server_resolved_reader_projection' ? 'server-resolved' : '',
   ].filter(Boolean).join(' · ');
   const primaryLocator = primary.locator ? `<div>Locator: ${x(primary.locator)}</div>` : '';
   const primaryPreview = _crScopeReceiptPreview(primary.text)
@@ -10511,11 +10517,24 @@ function _crRenderPerspectiveScopeReceipt(scopeReceipt) {
         item.page ? `p.${x(item.page)}` : '',
         _crCountLabel(locatorCount, 'source locator', 'source locators'),
         _crCountLabel(extractionCount, 'extraction ID', 'extraction IDs'),
-        item.source_metadata_origin === 'reader_client' ? 'Reader/client metadata' : '',
+        item.source_metadata_origin === 'server_resolved_reader_projection' ? 'Server-resolved Reader projection' : '',
       ].filter(Boolean).join(' · ');
       return `
         <div style="margin-top:7px">
           <strong style="color:var(--fg2)">Current page</strong> · Supporting source context
+          <div>${provenance}</div>
+          <div style="color:var(--fg2)">"${_crScopeReceiptPreview(item.text)}"</div>
+        </div>`;
+    }
+    if (kind === 'reader_highlight') {
+      const provenance = [
+        item.id ? `ID ${x(item.id)}` : '',
+        item.page ? `p.${x(item.page)}` : '',
+        item.relevance ? x(item.relevance) : '',
+      ].filter(Boolean).join(' · ');
+      return `
+        <div style="margin-top:7px">
+          <strong style="color:var(--fg2)">Reader highlight</strong> · Durable Reader mark
           <div>${provenance}</div>
           <div style="color:var(--fg2)">"${_crScopeReceiptPreview(item.text)}"</div>
         </div>`;
@@ -10535,6 +10554,7 @@ function _crRenderPerspectiveScopeReceipt(scopeReceipt) {
   return `
     <div class="e10-scope-receipt" style="font-size:11px;color:var(--dim2);line-height:1.6;margin-top:10px">
       <strong style="color:var(--fg2)">Scope Receipt</strong>
+      <div style="margin-top:4px">Server-resolved · provider input boundary</div>
       <div style="margin-top:6px">
         <strong style="color:var(--fg2)">Primary</strong><br>
         ${x(primaryMeta || 'Selected passage · primary source evidence')}
@@ -10618,6 +10638,7 @@ function _crRenderPerspectiveRoom(receipt, model) {
 }
 
 async function _crRunPerspective() {
+  const operationEpoch = _crPerspectiveWorkspaceEpoch;
   const btn = document.getElementById('cr-perspective-run-btn');
   const out = document.getElementById('cr-perspective-output');
   const status = document.getElementById('cr-perspective-status');
@@ -10626,6 +10647,10 @@ async function _crRunPerspective() {
   const model = document.getElementById('cr-perspective-model')?.value || '';
   const question = document.getElementById('cr-perspective-question')?.value?.trim() || '';
   _crPerspectiveScope = _crPerspectiveScope || _crPerspectiveScopeFromSelection();
+  if (operationEpoch !== _crPerspectiveWorkspaceEpoch || _crPerspectiveScope?.workspace_epoch !== _crPerspectiveWorkspaceEpoch) {
+    showAppError('Reader workspace changed. Refresh the Perspective Scope before running.');
+    return;
+  }
   if (!_crPerspectiveScope?.primary?.text) {
     showAppError('Select Reader text before running a Perspective.');
     return;
@@ -13626,6 +13651,9 @@ function _crResetReaderTransientSelectionForContext() {
   _crClearReaderSelectionState();
   _crSelText = '';
   _crSelectionRect = null;
+  if (typeof _crResetPerspectiveScopeForReaderContextChange === 'function') {
+    _crResetPerspectiveScopeForReaderContextChange();
+  }
 }
 
 function _crHandleSelection(e) {

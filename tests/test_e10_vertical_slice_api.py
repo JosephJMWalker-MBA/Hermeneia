@@ -10,6 +10,7 @@ import time
 import types
 from queue import Queue
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 
@@ -2551,20 +2552,121 @@ def _canonical_counts(db_path: Path) -> dict[str, int]:
         conn.close()
 
 
+def _scope_span_locator(
+    *,
+    page: int = 3,
+    start_block: int = 0,
+    start_offset: int = 0,
+    end_block: int = 0,
+    end_offset: int | None = None,
+    locators: list[str] | None = None,
+    extraction_ids: list[str] | None = None,
+) -> str:
+    locators = locators or [f"page:{page}:block:{start_block + 1}"]
+    extraction_ids = extraction_ids or [f"ex-page-{start_block + 1}"]
+    end_offset = end_offset if end_offset is not None else len("Only this selected passage participates.")
+    span = {
+        "coordinate_space": "reader_projection",
+        "page": page,
+        "start": {
+            "block_index": start_block,
+            "source_locator": locators[0],
+            "source_locators": [locators[0]],
+            "extraction_ids": [extraction_ids[0]],
+            "offset": start_offset,
+        },
+        "end": {
+            "block_index": end_block,
+            "source_locator": locators[-1],
+            "source_locators": [locators[-1]],
+            "extraction_ids": [extraction_ids[-1]],
+            "offset": end_offset,
+        },
+        "source_locators": locators,
+        "extraction_ids": extraction_ids,
+    }
+    return "reader-span:v1:" + quote(json.dumps(span, separators=(",", ":")))
+
+
+def _seed_perspective_scope_source(
+    db_path: Path,
+    *,
+    doc_id: str = "doc-selected",
+    page: int = 3,
+    blocks: list[str] | None = None,
+    excluded: bool = False,
+) -> dict[str, object]:
+    blocks = blocks or [
+        "Only this selected passage participates.",
+        "Stable page context for every Room participant.",
+    ]
+    store = SQLiteStore(db_path)
+    store.close()
+    now = "2026-08-29T12:00:00+00:00"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """INSERT OR IGNORE INTO source_documents
+               (id, original_filename, file_hash, total_pages, registered_at,
+                compiler_version, excluded_from_analysis, source_role)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (doc_id, "scope-source.pdf", doc_id, page, now, "test", int(excluded), "primary"),
+        )
+        for idx, text in enumerate(blocks, start=1):
+            conn.execute(
+                """INSERT OR IGNORE INTO source_extractions
+                   (id, epistemic_class, document_id, page, region, raw_text,
+                    parser, parser_version, coordinates, source_locator, source_hash,
+                    hash, extracted_at)
+                   VALUES (?, 'Evidence', ?, ?, ?, ?, 'test-parser', 'test',
+                           '{}', ?, ?, ?, ?)""",
+                (
+                    f"ex-page-{idx}",
+                    doc_id,
+                    page,
+                    f"block:{idx}",
+                    text,
+                    f"page:{page}:block:{idx}",
+                    doc_id,
+                    f"hash-ex-page-{idx}",
+                    now,
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return {
+        "doc_id": doc_id,
+        "page": page,
+        "blocks": blocks,
+        "locators": [f"page:{page}:block:{idx}" for idx in range(1, len(blocks) + 1)],
+        "extraction_ids": [f"ex-page-{idx}" for idx in range(1, len(blocks) + 1)],
+    }
+
+
 def _reader_selection_scope(
     text: str = "Only this selected passage participates.",
     *,
     supporting: dict | None = None,
+    block_index: int = 0,
 ) -> dict:
+    end_offset = len(text)
+    block_number = block_index + 1
     scope = {
         "primary": {
             "kind": "reader_selection",
             "text": text,
             "source_document_id": "doc-selected",
             "page": 3,
-            "locator": "reader-span:v1:%7B%22page%22%3A3%7D",
-            "source_locators": ["page:3:block:1"],
-            "extraction_ids": ["ex-selected"],
+            "locator": _scope_span_locator(
+                start_block=block_index,
+                end_block=block_index,
+                end_offset=end_offset,
+                locators=[f"page:3:block:{block_number}"],
+                extraction_ids=[f"ex-page-{block_number}"],
+            ),
+            "source_locators": [f"page:3:block:{block_number}"],
+            "extraction_ids": [f"ex-page-{block_number}"],
         },
         "included": {"governing_question": False, "current_page": False},
     }
@@ -2575,8 +2677,10 @@ def _reader_selection_scope(
 
 def test_perspective_run_requires_explicit_scope_question_and_local_model(tmp_path, monkeypatch):
     _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    db_path = tmp_path / "perspective.db"
+    _seed_perspective_scope_source(db_path)
     client = create_app(
-        db_path=tmp_path / "perspective.db",
+        db_path=db_path,
         provider_registry=_ollama_registry(),
     ).test_client()
 
@@ -2626,6 +2730,13 @@ def test_perspective_run_uses_selected_reader_text_and_exact_local_execution_ide
     store = SQLiteStore(db_path)
     _seed_full_chain(store)
     store.close()
+    _seed_perspective_scope_source(
+        db_path,
+        blocks=[
+            "Selected passage text with punctuation — and Unicode.",
+            "Stable page context for every Room participant.",
+        ],
+    )
     before = _canonical_counts(db_path)
 
     client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
@@ -2651,7 +2762,7 @@ def test_perspective_run_uses_selected_reader_text_and_exact_local_execution_ide
     assert body["execution"]["model_id"] == "qwen2.5:0.5b"
     assert body["execution"]["selection_source"] == "per_run"
     assert body["scope_receipt"]["primary"]["text"] == "Selected passage text with punctuation — and Unicode."
-    assert body["scope_receipt"]["primary"]["source_metadata_origin"] == "reader_client"
+    assert body["scope_receipt"]["primary"]["source_metadata_origin"] == "server_resolved_reader_projection"
     assert body["scope_receipt"]["included"]["governing_question"] is False
     assert body["scope_receipt"]["included"]["current_page"] is False
     assert "governing_question_text" not in body["scope_receipt"]
@@ -2665,14 +2776,55 @@ def test_perspective_run_uses_selected_reader_text_and_exact_local_execution_ide
     assert _canonical_counts(db_path) == before
 
 
+def test_perspective_run_tampered_scope_fails_before_provider_call(
+    tmp_path,
+    monkeypatch,
+):
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    _CapturingProvider.calls = []
+    _CapturingProvider.render_prompts = []
+    db_path = tmp_path / "perspective.db"
+    _seed_perspective_scope_source(
+        db_path,
+        blocks=[
+            "Authoritative source text.",
+            "Authorized page context.",
+        ],
+    )
+    client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
+
+    response = client.post(
+        "/api/perspective/run",
+        json={
+            "perspective_id": "close-reader",
+            "question": "What matters?",
+            "model": "qwen2.5:0.5b",
+            "scope": _reader_selection_scope("Authoritative source texx."),
+        },
+    )
+
+    assert response.status_code == 400
+    assert "authoritative Reader source" in response.get_json()["error"]
+    assert _CapturingProvider.calls == []
+    assert _CapturingProvider.render_prompts == []
+
+
 def test_perspective_run_includes_only_explicit_supporting_scope(
     tmp_path,
     monkeypatch,
 ):
     _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
     _CapturingProvider.render_prompts = []
+    db_path = tmp_path / "perspective.db"
+    _seed_perspective_scope_source(
+        db_path,
+        blocks=[
+            "Selected passage remains primary.",
+            "Current page source context.",
+        ],
+    )
     client = create_app(
-        db_path=tmp_path / "perspective.db",
+        db_path=db_path,
         provider_registry=_ollama_registry(),
     ).test_client()
 
@@ -2686,12 +2838,10 @@ def test_perspective_run_includes_only_explicit_supporting_scope(
                 "Selected passage remains primary.",
                 supporting={
                     "governing_question": {
-                        "include": True,
-                        "text": "How does aspiration distort perception?",
+                        "include": False,
                     },
                     "current_page": {
                         "include": True,
-                        "text": "Current page source context.",
                         "source_document_id": "doc-selected",
                         "page": 3,
                         "source_locators": ["page:3:block:1", "page:3:block:2"],
@@ -2709,16 +2859,15 @@ def test_perspective_run_includes_only_explicit_supporting_scope(
     receipt = body["scope_receipt"]
     assert receipt["primary"]["text"] == "Selected passage remains primary."
     assert receipt["included"] == {
-        "governing_question": True,
         "current_page": True,
+        "governing_question": False,
+        "highlights": False,
     }
     assert receipt["excluded"]["entire_corpus"] is True
     assert [item["kind"] for item in receipt["supporting"]] == [
-        "governing_question",
         "current_page",
     ]
-    governing, page = receipt["supporting"]
-    assert governing["evidence_status"] == "investigation_context"
+    page = receipt["supporting"][0]
     assert page["evidence_status"] == "source_context"
     assert page["source_locators"] == ["page:3:block:1", "page:3:block:2"]
     assert page["extraction_ids"] == ["ex-page-1", "ex-page-2"]
@@ -2728,9 +2877,8 @@ def test_perspective_run_includes_only_explicit_supporting_scope(
     assert "Selected passage remains primary." in prompt
     assert "SUPPORTING SOURCE CONTEXT:" in prompt
     assert "Current page source context." in prompt
-    assert "SUPPORTING INVESTIGATION CONTEXT:" in prompt
-    assert "not source evidence" in prompt
-    assert "How does aspiration distort perception?" in prompt
+    assert "SUPPORTING INVESTIGATION CONTEXT:" not in prompt
+    assert "How does aspiration distort perception?" not in prompt
     assert "entire corpus" not in prompt.lower()
 
 
@@ -2762,6 +2910,13 @@ def test_transient_perspective_run_uses_same_local_execution_path_and_receipt(
     store = SQLiteStore(db_path)
     _seed_full_chain(store)
     store.close()
+    _seed_perspective_scope_source(
+        db_path,
+        blocks=[
+            "Authority appears before trust is earned.",
+            "Current page source context.",
+        ],
+    )
     before = _canonical_counts(db_path)
     client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
     selected = client.put("/api/e10/providers/local/model", json={"model": "qwen3:4b"})
@@ -2777,12 +2932,10 @@ def test_transient_perspective_run_uses_same_local_execution_path_and_receipt(
                 "Authority appears before trust is earned.",
                 supporting={
                     "governing_question": {
-                        "include": True,
-                        "text": "How does aspiration distort perception?",
+                        "include": False,
                     },
                     "current_page": {
                         "include": True,
-                        "text": "Current page source context.",
                         "source_document_id": "doc-selected",
                         "page": 3,
                         "source_locators": ["page:3:block:1"],
@@ -2808,8 +2961,9 @@ def test_transient_perspective_run_uses_same_local_execution_path_and_receipt(
     assert body["execution"]["model_id"] == "qwen2.5:0.5b"
     assert body["execution"]["selection_source"] == "per_run"
     assert body["scope_receipt"]["included"] == {
-        "governing_question": True,
         "current_page": True,
+        "governing_question": False,
+        "highlights": False,
     }
     assert len(_CapturingProvider.calls) == 1
     assert _CapturingProvider.calls[-1]["model"] == "qwen2.5:0.5b"
@@ -2821,7 +2975,7 @@ def test_transient_perspective_run_uses_same_local_execution_path_and_receipt(
     assert "Challenge unsupported claims of legitimacy." in prompt
     assert "PRIMARY SOURCE ATTENTION:" in prompt
     assert "SUPPORTING SOURCE CONTEXT:" in prompt
-    assert "SUPPORTING INVESTIGATION CONTEXT:" in prompt
+    assert "SUPPORTING INVESTIGATION CONTEXT:" not in prompt
     assert "ambient-openai-key-that-must-not-be-used" not in prompt
     assert _canonical_counts(db_path) == before
 
@@ -2835,8 +2989,13 @@ def test_transient_perspective_fingerprint_is_independent_of_question_scope_and_
     monkeypatch,
 ):
     _install_fake_ollama(monkeypatch, ["qwen3:4b", "qwen2.5:0.5b"])
+    db_path = tmp_path / "transient-perspective.db"
+    _seed_perspective_scope_source(
+        db_path,
+        blocks=["First selected passage.", "Second selected passage."],
+    )
     client = create_app(
-        db_path=tmp_path / "transient-perspective.db",
+        db_path=db_path,
         provider_registry=_ollama_registry(),
     ).test_client()
 
@@ -2855,7 +3014,7 @@ def test_transient_perspective_fingerprint_is_independent_of_question_scope_and_
             "perspective_draft": _transient_perspective_draft(),
             "question": "Question B?",
             "model": "qwen3:4b",
-            "scope": _reader_selection_scope("Second selected passage."),
+            "scope": _reader_selection_scope("Second selected passage.", block_index=1),
         },
     )
 
@@ -2880,8 +3039,10 @@ def test_transient_perspective_request_shape_and_forbidden_fields_are_rejected(
     monkeypatch,
 ):
     _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    db_path = tmp_path / "transient-perspective.db"
+    _seed_perspective_scope_source(db_path)
     client = create_app(
-        db_path=tmp_path / "transient-perspective.db",
+        db_path=db_path,
         provider_registry=_ollama_registry(),
     ).test_client()
 
@@ -2934,8 +3095,10 @@ def test_transient_perspective_request_shape_and_forbidden_fields_are_rejected(
 
 def test_transient_perspective_does_not_enter_builtin_definitions(tmp_path, monkeypatch):
     _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    db_path = tmp_path / "transient-perspective.db"
+    _seed_perspective_scope_source(db_path)
     client = create_app(
-        db_path=tmp_path / "transient-perspective.db",
+        db_path=db_path,
         provider_registry=_ollama_registry(),
     ).test_client()
 
@@ -2962,8 +3125,10 @@ def test_transient_perspective_does_not_enter_builtin_definitions(tmp_path, monk
 
 def test_perspective_run_rejects_unsupported_scope_expansion(tmp_path, monkeypatch):
     _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    db_path = tmp_path / "perspective.db"
+    _seed_perspective_scope_source(db_path)
     client = create_app(
-        db_path=tmp_path / "perspective.db",
+        db_path=db_path,
         provider_registry=_ollama_registry(),
     ).test_client()
 
@@ -2988,8 +3153,10 @@ def test_perspective_run_per_run_model_does_not_change_connection_selected_model
     monkeypatch,
 ):
     _install_fake_ollama(monkeypatch, ["qwen3:4b", "qwen2.5:0.5b"])
+    db_path = tmp_path / "perspective.db"
+    _seed_perspective_scope_source(db_path)
     client = create_app(
-        db_path=tmp_path / "perspective.db",
+        db_path=db_path,
         provider_registry=_ollama_registry(),
     ).test_client()
 
@@ -3021,8 +3188,10 @@ def test_perspective_run_missing_or_offline_local_model_fails_without_fallback(
 ):
     _install_fake_ollama(monkeypatch, ["qwen3:4b"])
     _CapturingProvider.calls = []
+    db_path = tmp_path / "perspective.db"
+    _seed_perspective_scope_source(db_path)
     client = create_app(
-        db_path=tmp_path / "perspective.db",
+        db_path=db_path,
         provider_registry=_ollama_registry(),
     ).test_client()
 
@@ -3058,8 +3227,10 @@ def test_perspective_run_missing_or_offline_local_model_fails_without_fallback(
 
 def test_perspective_room_requires_explicit_scope_question_and_local_model(tmp_path, monkeypatch):
     _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    db_path = tmp_path / "perspective.db"
+    _seed_perspective_scope_source(db_path)
     client = create_app(
-        db_path=tmp_path / "perspective.db",
+        db_path=db_path,
         provider_registry=_ollama_registry(),
     ).test_client()
 
@@ -3109,6 +3280,13 @@ def test_perspective_room_sequences_three_perspectives_with_one_scope_question_a
     store = SQLiteStore(db_path)
     _seed_full_chain(store)
     store.close()
+    _seed_perspective_scope_source(
+        db_path,
+        blocks=[
+            "Room source text only.",
+            "Stable page context for every Room participant.",
+        ],
+    )
     before = _canonical_counts(db_path)
     client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
     selected = client.put("/api/e10/providers/local/model", json={"model": "qwen3:4b"})
@@ -3124,7 +3302,6 @@ def test_perspective_room_sequences_three_perspectives_with_one_scope_question_a
                 supporting={
                     "current_page": {
                         "include": True,
-                        "text": "Stable page context for every Room participant.",
                         "source_document_id": "doc-selected",
                         "page": 3,
                         "source_locators": ["page:3:block:1", "page:3:block:2"],
@@ -3152,7 +3329,9 @@ def test_perspective_room_sequences_three_perspectives_with_one_scope_question_a
     assert body["scope_receipt"]["included"]["current_page"] is True
     assert "governing_question_text" not in body["scope_receipt"]
     assert body["scope_receipt"]["supporting"][0]["kind"] == "current_page"
-    assert body["scope_receipt"]["supporting"][0]["text"] == "Stable page context for every Room participant."
+    assert body["scope_receipt"]["supporting"][0]["text"] == (
+        "Room source text only.\n\nStable page context for every Room participant."
+    )
     assert [row["perspective"]["id"] for row in body["participants"]] == [
         "close-reader",
         "contextual-reader",
@@ -3270,6 +3449,13 @@ def test_perspective_room_custom_roster_mixes_builtin_saved_and_historical_exact
         declared_by="Another Steward",
     ))
     store.close()
+    _seed_perspective_scope_source(
+        db_path,
+        blocks=[
+            "Custom Room source text.",
+            "Same supporting source context.",
+        ],
+    )
     before = _room_canonical_counts(db_path)
 
     client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
@@ -3278,11 +3464,10 @@ def test_perspective_room_custom_roster_mixes_builtin_saved_and_historical_exact
         supporting={
             "current_page": {
                 "include": True,
-                "text": "Same supporting source context.",
                 "source_document_id": "doc-selected",
                 "page": 3,
-                "source_locators": ["page:3:block:1"],
-                "extraction_ids": ["ex-page-1"],
+                "source_locators": ["page:3:block:1", "page:3:block:2"],
+                "extraction_ids": ["ex-page-1", "ex-page-2"],
             },
         },
     )
@@ -3356,6 +3541,7 @@ def test_perspective_room_custom_roster_validation_fails_before_model_call(
     }
     store.register_perspective(legacy)
     store.close()
+    _seed_perspective_scope_source(db_path)
     client = create_app(db_path=db_path, provider_registry=_ollama_registry()).test_client()
     base = {
         "question": "What matters?",
@@ -3451,8 +3637,10 @@ def test_perspective_room_custom_roster_accepts_two_three_and_four_participants(
     monkeypatch,
 ):
     _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    db_path = tmp_path / "custom-room-sizes.db"
+    _seed_perspective_scope_source(db_path)
     client = create_app(
-        db_path=tmp_path / "custom-room-sizes.db",
+        db_path=db_path,
         provider_registry=_ollama_registry(),
     ).test_client()
 
@@ -3460,7 +3648,7 @@ def test_perspective_room_custom_roster_accepts_two_three_and_four_participants(
         _CapturingProvider.calls = []
         saved_size_id = ""
         if size == 4:
-            store = SQLiteStore(tmp_path / "custom-room-sizes.db")
+            store = SQLiteStore(db_path)
             saved = store.insert_frame_perspective(_frame_v2_row({
                 "label": "Size Test Reader",
                 "purpose": "Support a four-chair custom Room.",
@@ -3495,8 +3683,10 @@ def test_perspective_room_missing_or_offline_local_model_fails_before_execution(
     monkeypatch,
 ):
     _install_fake_ollama(monkeypatch, ["qwen3:4b"])
+    db_path = tmp_path / "perspective-room.db"
+    _seed_perspective_scope_source(db_path)
     client = create_app(
-        db_path=tmp_path / "perspective-room.db",
+        db_path=db_path,
         provider_registry=_ollama_registry(),
     ).test_client()
 
@@ -3533,8 +3723,10 @@ def test_perspective_room_mid_failure_preserves_prior_and_marks_later_not_run(
     _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
     _CapturingProvider.render_responses = ["Close reading A."]
     _CapturingProvider.fail_on_render_calls = {2}
+    db_path = tmp_path / "perspective-room.db"
+    _seed_perspective_scope_source(db_path)
     client = create_app(
-        db_path=tmp_path / "perspective-room.db",
+        db_path=db_path,
         provider_registry=_ollama_registry(),
     ).test_client()
 
@@ -3613,9 +3805,10 @@ def test_perspective_run_ui_separates_scope_perspective_question_and_model():
     assert 'placeholder="What tension in this passage deserves more attention?"' in index_html
     assert "q.value = 'What tension in this passage is easiest to overlook?'" not in perspective_js
     assert "governing_question: invLoad()?.thesis" not in perspective_js
-    assert "includeGoverning && !!governingQuestion" in perspective_js
+    assert "Question stays separate from Scope in this slice" in perspective_js
+    assert "includeGoverning && !!governingQuestion" not in perspective_js
     assert "includePage && !!currentPage" in perspective_js
-    assert "Unavailable: no governing question set" in perspective_js
+    assert "Unavailable: no governing question set" not in perspective_js
     assert "Unavailable: current page source text not resolved" in perspective_js
     assert "function _crPerspectiveCurrentPageScope()" in perspective_js
     assert "_crCurrentExtractions || []" in perspective_js
@@ -3763,7 +3956,7 @@ def test_perspective_run_ui_renders_completed_scope_receipt_from_response():
     assert "Supporting source context" in receipt_renderer
     assert "source locator" in receipt_renderer
     assert "extraction ID" in receipt_renderer
-    assert "Reader/client metadata" in receipt_renderer
+    assert "Server-resolved Reader projection" in receipt_renderer
 
     assert "invLoad()" not in receipt_renderer
     assert "_crPage" not in receipt_renderer

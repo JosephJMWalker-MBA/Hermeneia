@@ -54,6 +54,13 @@ def _room_ui_js() -> str:
     return "\n".join(_extract_function(source, signature) for signature in signatures)
 
 
+def _perspective_run_js() -> str:
+    source = _index()
+    return "\n".join([
+        _extract_function(source, "async function _crRunPerspective("),
+    ])
+
+
 def _node_base() -> str:
     return f"""
     function makeElement(hidden = false) {{
@@ -88,6 +95,7 @@ def _node_base() -> str:
     function _runtimeApplyWorkspaceDraftScope() {{}}
     function _wsRenderWorkspaceCatalog() {{}}
     function _crRenderSavedPerspectiveDetail() {{}}
+    function _crPerspectiveRenderScope() {{}}
     function showAppError(message) {{ globalThis.lastAppError = message; }}
     let _wsCurrentWorkspace = null;
     let _crPerspectiveDefinitions = [];
@@ -95,8 +103,25 @@ def _node_base() -> str:
     let _crPerspectiveRoomRoster = [];
     let _crPerspectiveRoomRosterDirty = false;
     let _crPerspectiveSavedDefinitions = [];
+    let _crPerspectiveScope = null;
+    let _crPerspectiveLastReceipt = null;
+    let _crPerspectiveWorkspaceEpoch = 0;
     {_room_ui_js()}
     """
+
+
+def _run_perspective_node(script: str) -> dict:
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available for Perspective UI tests")
+    result = subprocess.run(
+        [node, "-e", script],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
 
 
 def _run_node(script: str) -> dict:
@@ -111,6 +136,82 @@ def _run_node(script: str) -> dict:
     )
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
+
+
+def test_stale_perspective_scope_does_not_dispatch_provider_request() -> None:
+    result = _run_perspective_node(
+        f"""
+        function makeElement(value = '') {{
+          return {{
+            value,
+            disabled: false,
+            textContent: '',
+            innerHTML: '',
+            focus() {{ this.focused = true; }},
+          }};
+        }}
+        const elements = {{
+          'cr-perspective-run-btn': makeElement(''),
+          'cr-perspective-output': makeElement(''),
+          'cr-perspective-status': makeElement(''),
+          'cr-perspective-select': makeElement('close-reader'),
+          'cr-perspective-saved-select': makeElement(''),
+          'cr-perspective-model': makeElement('qwen2.5:0.5b'),
+          'cr-perspective-question': makeElement('What should we notice?'),
+        }};
+        const document = {{ getElementById(id) {{ return elements[id] || null; }} }};
+        function x(value) {{ return String(value ?? ''); }}
+        function showAppError(message) {{ globalThis.lastAppError = message; }}
+        let postCalls = 0;
+        async function post(url, payload) {{
+          postCalls += 1;
+          return {{
+            perspective: {{ id: 'close-reader', version: '1', label: 'Close Reader' }},
+            execution: {{ provider_id: 'ollama-local', model_id: payload.model }},
+            response: 'Should not be rendered.',
+            scope_receipt: payload.scope,
+          }};
+        }}
+        let _crPerspectiveWorkspaceEpoch = 1;
+        let _crPerspectiveScope = {{
+          workspace_epoch: 0,
+          primary: {{ kind: 'reader_selection', text: 'Old workspace selection.' }},
+        }};
+        let _crPerspectiveLastReceipt = null;
+        let _crPerspectiveMode = 'single';
+        let _crPerspectiveKind = 'built-in';
+        let _crPerspectiveDraftActive = null;
+        let _crPerspectiveDraftDirty = false;
+        function _crPerspectiveScopeFromSelection() {{
+          return {{
+            workspace_epoch: 0,
+            primary: {{ kind: 'reader_selection', text: 'Old workspace selection.' }},
+          }};
+        }}
+        function _crRenderPerspectiveDefinitionReceipt() {{ return ''; }}
+        function _crRenderPerspectiveScopeReceipt() {{ return ''; }}
+        function _crRenderPerspectiveRoom() {{ return ''; }}
+        {_perspective_run_js()}
+        _crRunPerspective().then(() => {{
+          process.stdout.write(JSON.stringify({{
+            postCalls,
+            error: globalThis.lastAppError || '',
+            receipt: _crPerspectiveLastReceipt,
+            output: elements['cr-perspective-output'].innerHTML,
+            status: elements['cr-perspective-status'].textContent,
+          }}));
+        }}).catch(error => {{
+          console.error(error && error.stack ? error.stack : error);
+          process.exit(1);
+        }});
+        """
+    )
+
+    assert result["postCalls"] == 0
+    assert "Reader workspace changed" in result["error"]
+    assert result["receipt"] is None
+    assert result["output"] == ""
+    assert result["status"] == ""
 
 
 def test_custom_room_roster_clears_only_on_workspace_identity_change() -> None:

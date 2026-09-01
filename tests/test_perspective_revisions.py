@@ -23,6 +23,7 @@ from test_e10_vertical_slice_api import (
     _install_fake_ollama,
     _ollama_registry,
     _reader_selection_scope,
+    _seed_perspective_scope_source,
 )
 
 
@@ -397,8 +398,16 @@ def test_saved_perspective_api_and_run_use_canonical_identity(tmp_path, monkeypa
     _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
     _CapturingProvider.calls = []
     _CapturingProvider.render_prompts = []
+    db_path = tmp_path / "saved-run.db"
+    _seed_perspective_scope_source(
+        db_path,
+        blocks=[
+            "Only this source passage.",
+            "Saved Perspective page context.",
+        ],
+    )
     client = create_app(
-        db_path=tmp_path / "saved-run.db",
+        db_path=db_path,
         provider_registry=_ollama_registry(),
     ).test_client()
 
