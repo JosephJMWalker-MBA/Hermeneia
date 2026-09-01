@@ -1,8 +1,8 @@
 # Implementation Status
 
-**Last updated:** 2026-08-29  
-**Status:** Validation Phase — active development  
-**Reference main commit at synchronization:** `19e1ea4d5f143d217860e42cadc9ee23af5ec5e0`
+**Last updated:** 2026-09-01
+**Status:** Validation Phase — active development
+**Reference main commit at synchronization:** `519599e632bce9061056951f34998f87b782efe1`
 
 > This file is an operational status summary, not constitutional authority. When a status statement conflicts with governing architecture, resolve authority through `docs/01_Authority_Index.md`.
 
@@ -74,6 +74,7 @@ Generated content, deterministic projections, machine suggestions, and human jud
 - Perspective definitions and append-only Perspective revision identity
 - governed Perspective-run infrastructure and comparison surfaces
 - NarrativeBlueprint workflows
+- append-only committed Blueprint revisions and supersession lineage
 - deterministic ArchitectPlan compilation
 - provider-neutral Artist rendering
 - Critic evaluation and findings
@@ -95,10 +96,10 @@ Generated content, deterministic projections, machine suggestions, and human jud
 
 ## Validation Evidence
 
-Recent merged Reader/product slices have repeatedly run the unrestricted full test suite. The latest merged PR at this synchronization point, PR #189, reports:
+Recent merged Reader/product slices have repeatedly run the unrestricted full test suite. The latest merged PR at this synchronization point, PR #197, reports:
 
 ```text
-1361 passed, 3 skipped
+1460 passed, 3 skipped
 ```
 
 The README intentionally avoids a permanent hard-coded test count because the suite changes continuously. This dated status file may record a point-in-time count as validation evidence.
@@ -117,10 +118,10 @@ Important open work includes:
 
 - #120 — *The Second Sale* live-use validation umbrella
 - #121 — readable projection for layout-derived line breaks / spacing
-- #126 — Field Notes cadence and stacked Reader chrome
 - #129 — authored chapter/section structure
 - #133 — source-locator Reader progress / semantic checkpoints
-- #154 — coherent bottom workstation behavior
+
+The coherent bottom workstation and governed Blueprint lifecycle work from #154/#156 are now implemented. The next Reader-adjacent synthesis slice should not re-open those foundations unless live-use evidence exposes a concrete defect.
 
 ### P1 — Whole-study synthesis
 
@@ -143,6 +144,17 @@ Connection
 ```
 
 Continue in bounded slices. Preserve the separation between provider, model, model version, configuration, Perspective, and investigation identity.
+
+The conservative next-development sequence is:
+
+```text
+completed governed Blueprint lifecycle
+  → explicit Scope boundary (#157)
+  → whole-study synthesis / Evidence Board (#110/#111)
+  → live-use validation
+  → Connections execution-control completion (#159 / reconcile useful #165 work)
+  → Model Observatory (#158) later
+```
 
 ### P2 — Model Observatory
 
