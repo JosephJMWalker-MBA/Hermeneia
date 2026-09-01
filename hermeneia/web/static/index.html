@@ -1361,7 +1361,8 @@ body.reader-active .cr-tool-drawer { max-width: none; }
 .cr-bottom-workstation-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .cr-bottom-workstation-body > aside,
 .cr-bottom-workstation-body > .corpus-search,
-.cr-bottom-workstation-body > .attn-timeline {
+.cr-bottom-workstation-body > .attn-timeline,
+.cr-bottom-workstation-body > .evidence-board {
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -1371,8 +1372,93 @@ body.reader-active .cr-tool-drawer { max-width: none; }
 }
 .cr-bottom-workstation-body > aside[hidden],
 .cr-bottom-workstation-body > .corpus-search[hidden],
-.cr-bottom-workstation-body > .attn-timeline[hidden] {
+.cr-bottom-workstation-body > .attn-timeline[hidden],
+.cr-bottom-workstation-body > .evidence-board[hidden] {
   display: none;
+}
+.evidence-board {
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+}
+.evidence-board-body {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+.evidence-board-grid {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.9fr) minmax(320px, 2fr);
+  gap: 12px;
+  min-height: 0;
+}
+.evidence-board-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--panel), var(--bg) 22%);
+  padding: 10px;
+}
+.evidence-board-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+.evidence-board-count {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+}
+.evidence-board-count strong {
+  display: block;
+  color: var(--fg2);
+  font-size: 18px;
+}
+.evidence-board-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.evidence-board-row {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  padding: 9px;
+  font: inherit;
+}
+.evidence-board-row[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.evidence-board-row[disabled] {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+.evidence-board-row-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--fg2);
+  font-size: 12px;
+  font-weight: 700;
+}
+.evidence-board-row-text {
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.evidence-board-meta {
+  margin-top: 5px;
+  color: var(--dim2);
+  font-size: 11px;
+  line-height: 1.45;
+}
+@media (max-width: 760px) {
+  .evidence-board-grid { grid-template-columns: 1fr; }
 }
 .cr-workstation-subtabs {
   display: flex; gap: 6px; align-items: center;
@@ -3065,6 +3151,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
     <div class="cr-bottom-workstation-tabs" role="tablist" aria-label="Reader workstation resources">
       <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-search" data-workstation-resource="search" type="button" role="tab" aria-controls="corpus-search" aria-selected="false" onclick="_crToggleBottomWorkstationResource('search')">Search</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-timeline" data-workstation-resource="timeline" type="button" role="tab" aria-controls="attn-timeline" aria-selected="false" onclick="_crToggleBottomWorkstationResource('timeline')">Timeline</button>
+      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-evidence" data-workstation-resource="evidence" type="button" role="tab" aria-controls="evidence-board" aria-selected="false" onclick="_crToggleBottomWorkstationResource('evidence')">Evidence</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-notes" data-workstation-resource="notes" type="button" role="tab" aria-controls="cr-fln-tray" aria-selected="false" onclick="_crToggleBottomWorkstationResource('fieldnotes')">Notes</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-perspective" data-workstation-resource="perspective" type="button" role="tab" aria-controls="cr-perspective-run" aria-selected="false" onclick="_crToggleBottomWorkstationResource('perspective')">Perspective</button>
       <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-blueprint" data-workstation-resource="blueprint" type="button" role="tab" aria-controls="cr-blueprint-draft cr-render-preview cr-critic-audit" aria-selected="false" onclick="_crToggleBottomWorkstationResource('blueprint')">Blueprint</button>
@@ -3112,6 +3199,18 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
       </div>
       <div class="attn-track" id="attn-track">
         <div class="attn-hint">Loading your attention timeline…</div>
+      </div>
+    </aside>
+
+    <aside class="evidence-board" id="evidence-board" hidden aria-label="Evidence Board — accumulated study material">
+      <div class="cr-fln-bar">
+        <span class="cr-fln-bar-label">▥ Evidence Board</span>
+        <span class="cr-fln-count" id="evidence-board-meta"></span>
+        <span style="flex:1"></span>
+        <button class="cr-bottom-workstation-tab" type="button" onclick="_evidenceBoardLoad()">Refresh</button>
+      </div>
+      <div class="evidence-board-body" id="evidence-board-body">
+        <div class="attn-hint">Open the board to inspect accumulated study material.</div>
       </div>
     </aside>
 
@@ -4531,6 +4630,9 @@ function _wsApplyCurrentWorkspace(workspace) {
   }
   if (workspaceChanged && typeof _crResetRecordLedgerStateForWorkspaceChange === 'function') {
     _crResetRecordLedgerStateForWorkspaceChange();
+  }
+  if (workspaceChanged && typeof _crResetEvidenceBoardForReaderContextChange === 'function') {
+    _crResetEvidenceBoardForReaderContextChange();
   }
   const chip = document.getElementById('runtime-workspace-chip');
   const name = document.getElementById('runtime-workspace-name');
@@ -9661,6 +9763,7 @@ function _crBottomPanels() {
   return {
     search: document.getElementById('corpus-search'),
     timeline: document.getElementById('attn-timeline'),
+    evidence: document.getElementById('evidence-board'),
     fieldnotes: document.getElementById('cr-fln-tray'),
     perspective: document.getElementById('cr-perspective-run'),
     blueprint: document.getElementById('cr-blueprint-draft'),
@@ -9736,6 +9839,8 @@ async function _crOpenBottomWorkstation(mode) {
   if (mode === 'timeline') {
     cmpMarkOnboardingStep('timeline', { keepPaused: true });
     await _attnLoad();
+  } else if (mode === 'evidence') {
+    await _evidenceBoardLoad();
   } else if (mode === 'fieldnotes') {
     document.getElementById('cr-fln-tray')?.classList.remove('cr-fln-glow');
     _flnLoadEntries();
@@ -10218,6 +10323,7 @@ function _crPerspectiveScopeFromSelection(selection = null) {
   if (!resolved?.valid || !resolved.text) return null;
   const includePage = !!document.getElementById('cr-perspective-include-page')?.checked;
   const currentPage = _crPerspectiveCurrentPageScope();
+  const highlightScope = _evidenceBoardAppliedHighlightsPayload(resolved.source_document_id || _crDocId || '');
   return {
     workspace_epoch: _crPerspectiveWorkspaceEpoch,
     primary: {
@@ -10236,10 +10342,12 @@ function _crPerspectiveScopeFromSelection(selection = null) {
       current_page: includePage && currentPage
         ? currentPage
         : { include: false },
+      highlights: highlightScope.error ? { include: false, ids: [] } : highlightScope,
     },
     included: {
       governing_question: false,
       current_page: includePage && !!currentPage,
+      highlights: !highlightScope.error && !!highlightScope.include,
     },
   };
 }
@@ -10279,8 +10387,10 @@ function _crPerspectiveRenderScope() {
   }
   const loc = _crPerspectiveScope.primary.locator || `page ${_crPerspectiveScope.primary.page || '?'}`;
   const supporting = _crPerspectiveScope?.included || {};
+  const highlightIds = _crPerspectiveScope?.supporting?.highlights?.ids || [];
   const extras = [
     supporting.current_page ? 'current page' : '',
+    supporting.highlights ? `${highlightIds.length} Reader highlight${highlightIds.length === 1 ? '' : 's'}` : '',
   ].filter(Boolean);
   chip.innerHTML = `<strong>Selected passage · Primary</strong> · ${x(loc)}<br><span style="color:var(--fg2)">"${x(text.slice(0, 140))}${text.length > 140 ? '…' : ''}"</span><br><span>Supporting included: ${extras.length ? x(extras.join(', ')) : 'none'}</span>`;
 }
@@ -10749,6 +10859,11 @@ async function _crRunPerspective() {
 window._crPerspectiveFromSelection = _crPerspectiveFromSelection;
 window._crLoadPerspectiveRun = _crLoadPerspectiveRun;
 window._crRunPerspective = _crRunPerspective;
+window._evidenceBoardLoad = _evidenceBoardLoad;
+window._evidenceBoardRender = _evidenceBoardRender;
+window._evidenceBoardToggleHighlight = _evidenceBoardToggleHighlight;
+window._evidenceBoardApplySelectionToScope = _evidenceBoardApplySelectionToScope;
+window._evidenceBoardClearSelection = _evidenceBoardClearSelection;
 window._crSetPerspectiveMode = _crSetPerspectiveMode;
 window._crSetPerspectiveKind = _crSetPerspectiveKind;
 window._crMovePerspectiveRoomParticipant = _crMovePerspectiveRoomParticipant;
@@ -12256,6 +12371,7 @@ function _crBindBottomWorkstationControls() {
   const bindings = [
     ['cr-bottom-resource-search', () => _crToggleBottomWorkstationResource('search')],
     ['cr-bottom-resource-timeline', () => _crToggleBottomWorkstationResource('timeline')],
+    ['cr-bottom-resource-evidence', () => _crToggleBottomWorkstationResource('evidence')],
     ['cr-bottom-resource-notes', () => _crToggleBottomWorkstationResource('fieldnotes')],
     ['cr-bottom-resource-perspective', () => _crToggleBottomWorkstationResource('perspective')],
     ['cr-bottom-resource-blueprint', () => _crToggleBottomWorkstationResource('blueprint')],
@@ -12600,6 +12716,274 @@ function _attnOpen(docId, page) {
   e10Go('reader');
   if (docId === _crDocId) { _crGoToPage(page); }
   else { _crOpenDoc(docId).then(() => _crGoToPage(page)).catch(() => {}); }
+}
+
+// ── Evidence Board (provider-free study inventory) ───────────────────────
+// A projection over existing study records. Selecting board rows mutates only
+// transient workstation state until the user explicitly adds exact highlight
+// IDs as supporting material in the current Perspective Scope.
+let _evidenceBoardData = null;
+let _evidenceBoardSelectedHighlightIds = new Set();
+let _evidenceBoardSelectionDocId = '';
+let _evidenceBoardAppliedScopeHighlightIds = [];
+let _evidenceBoardAppliedScopeDocId = '';
+let _evidenceBoardActiveBucket = null;
+let _evidenceBoardLoadSeq = 0;
+let _evidenceBoardEpoch = 0;
+
+function _crResetEvidenceBoardForReaderContextChange() {
+  _evidenceBoardEpoch += 1;
+  _evidenceBoardSelectedHighlightIds = new Set();
+  _evidenceBoardSelectionDocId = '';
+  _evidenceBoardAppliedScopeHighlightIds = [];
+  _evidenceBoardAppliedScopeDocId = '';
+  _evidenceBoardActiveBucket = null;
+  _evidenceBoardData = null;
+  const meta = document.getElementById('evidence-board-meta');
+  if (meta) meta.textContent = '';
+  const body = document.getElementById('evidence-board-body');
+  if (body && _crBottomMode === 'evidence') {
+    body.innerHTML = '<div class="attn-hint">Reader context changed. Refresh the Evidence Board.</div>';
+  }
+}
+
+async function _evidenceBoardLoad() {
+  const seq = ++_evidenceBoardLoadSeq;
+  const epoch = _evidenceBoardEpoch;
+  const body = document.getElementById('evidence-board-body');
+  if (body) body.innerHTML = '<div class="attn-hint">Loading accumulated study material…</div>';
+  const params = new URLSearchParams();
+  if (_crDocId) params.set('current_document_id', _crDocId);
+  if (_crPage) params.set('current_page', String(_crPage));
+  try {
+    const data = await get(`/api/evidence-board${params.toString() ? '?' + params.toString() : ''}`);
+    if (seq !== _evidenceBoardLoadSeq || epoch !== _evidenceBoardEpoch) return;
+    _evidenceBoardData = data;
+    _evidenceBoardSelectedHighlightIds = new Set();
+    _evidenceBoardSelectionDocId = '';
+    _evidenceBoardActiveBucket = null;
+    _evidenceBoardRender();
+  } catch (e) {
+    if (seq !== _evidenceBoardLoadSeq || epoch !== _evidenceBoardEpoch) return;
+    if (body) body.innerHTML = `<div class="attn-hint" style="color:var(--red)">${x(e.message)}</div>`;
+  }
+}
+
+function _evidenceBoardCountsHtml(counts = {}) {
+  const row = (label, key) => `<div class="evidence-board-count"><strong>${x(counts[key] || 0)}</strong><span>${x(label)}</span></div>`;
+  return `
+    <div class="evidence-board-counts">
+      ${row('Highlights', 'highlights')}
+      ${row('Field Notes', 'field_notes')}
+      ${row('Observations', 'observations')}
+      ${row('Question-bearing records', 'question_bearing_records')}
+      ${row('Theme buckets', 'theme_buckets')}
+      ${row('Evidence buckets', 'evidence_buckets')}
+      ${row('Uncategorized', 'uncategorized_highlights')}
+    </div>`;
+}
+
+function _evidenceBoardNormalizeBucketValue(value) {
+  return String(value || '').trim();
+}
+
+function _evidenceBoardBucketButton(bucket, kind) {
+  const active = _evidenceBoardActiveBucket?.kind === kind && _evidenceBoardActiveBucket?.bucket === bucket.bucket;
+  return `<button class="cr-bottom-workstation-tab${active ? ' active' : ''}" type="button" onclick="_evidenceBoardOpenBucket(${x(JSON.stringify(kind))}, ${x(JSON.stringify(bucket.bucket))})">${x(bucket.bucket)} · ${x(bucket.count)}</button>`;
+}
+
+function _evidenceBoardOpenBucket(kind, bucket) {
+  _evidenceBoardActiveBucket = { kind, bucket };
+  _evidenceBoardRender();
+}
+
+function _evidenceBoardClearBucket() {
+  _evidenceBoardActiveBucket = null;
+  _evidenceBoardRender();
+}
+
+function _evidenceBoardVisibleHighlights() {
+  const rows = _evidenceBoardData?.highlights || [];
+  if (!_evidenceBoardActiveBucket) return rows;
+  const key = _evidenceBoardActiveBucket.kind;
+  const label = _evidenceBoardNormalizeBucketValue(_evidenceBoardActiveBucket.bucket);
+  return rows.filter(row => _evidenceBoardNormalizeBucketValue(row[key]) === label);
+}
+
+function _evidenceBoardHighlightById(id) {
+  return (_evidenceBoardData?.highlights || []).find(row => row.id === id) || null;
+}
+
+function _evidenceBoardToggleHighlight(id) {
+  const row = _evidenceBoardHighlightById(id);
+  if (!row) return;
+  if (!row.scope_eligible) {
+    showAppError(row.scope_ineligibility_reason || 'This highlight is not eligible for the current Reader Scope.');
+    return;
+  }
+  if (_evidenceBoardSelectionDocId && _evidenceBoardSelectionDocId !== row.source_document_id) {
+    showAppError('Selected highlights must belong to one current Reader document.');
+    return;
+  }
+  const next = new Set(_evidenceBoardSelectedHighlightIds);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  _evidenceBoardSelectedHighlightIds = next;
+  _evidenceBoardSelectionDocId = next.size ? row.source_document_id : '';
+  _evidenceBoardRender();
+}
+
+function _evidenceBoardClearSelection() {
+  _evidenceBoardSelectedHighlightIds = new Set();
+  _evidenceBoardSelectionDocId = '';
+  _evidenceBoardRender();
+}
+
+function _evidenceBoardSelectedIds() {
+  return Array.from(_evidenceBoardSelectedHighlightIds).sort();
+}
+
+function _evidenceBoardScopeHighlightsPayload(primaryDocId) {
+  const ids = _evidenceBoardSelectedIds();
+  if (!ids.length) return { include: false, ids: [] };
+  const rows = ids.map(_evidenceBoardHighlightById).filter(Boolean);
+  if (rows.length !== ids.length) return { include: false, ids: [] };
+  if (rows.some(row => row.source_document_id !== primaryDocId || !row.scope_eligible)) {
+    return { include: false, ids: [], error: 'Selected Evidence Board highlights no longer match the current Reader document.' };
+  }
+  return { include: true, ids };
+}
+
+function _evidenceBoardAppliedHighlightsPayload(primaryDocId) {
+  const ids = Array.from(_evidenceBoardAppliedScopeHighlightIds || []).sort();
+  if (!ids.length) return { include: false, ids: [] };
+  if (_evidenceBoardAppliedScopeDocId !== primaryDocId) return { include: false, ids: [] };
+  const rows = ids.map(_evidenceBoardHighlightById).filter(Boolean);
+  if (rows.length !== ids.length) return { include: false, ids: [] };
+  if (rows.some(row => row.source_document_id !== primaryDocId || !row.scope_eligible)) {
+    return { include: false, ids: [] };
+  }
+  return { include: true, ids };
+}
+
+function _evidenceBoardApplySelectionToScope() {
+  const ids = _evidenceBoardSelectedIds();
+  if (!ids.length) {
+    showAppError('Select one or more eligible Reader highlights first.');
+    return;
+  }
+  const selection = _crGetReaderSelection({ refresh: false, fallback: true });
+  _crPerspectiveScope = _crPerspectiveScope || _crPerspectiveScopeFromSelection(selection);
+  const primaryDocId = _crPerspectiveScope?.primary?.source_document_id || selection?.source_document_id || _crDocId || '';
+  if (!_crPerspectiveScope?.primary?.text || !primaryDocId) {
+    showAppError('Select Reader text before setting supporting Scope.');
+    return;
+  }
+  const payload = _evidenceBoardScopeHighlightsPayload(primaryDocId);
+  if (payload.error) {
+    showAppError(payload.error);
+    return;
+  }
+  _evidenceBoardAppliedScopeHighlightIds = Array.from(payload.ids || []).sort();
+  _evidenceBoardAppliedScopeDocId = primaryDocId;
+  _crPerspectiveScope.supporting = {
+    ...(_crPerspectiveScope.supporting || {}),
+    highlights: payload,
+  };
+  _crPerspectiveScope.included = {
+    ...(_crPerspectiveScope.included || {}),
+    highlights: payload.include,
+  };
+  _crPerspectiveRenderScope();
+  const meta = document.getElementById('evidence-board-meta');
+  if (meta) meta.textContent = `${ids.length} highlight${ids.length === 1 ? '' : 's'} set as supporting Scope`;
+}
+
+function _evidenceBoardHighlightRow(row) {
+  const selected = _evidenceBoardSelectedHighlightIds.has(row.id);
+  const disabled = row.scope_eligible ? '' : ' disabled';
+  const loc = [row.document_name, row.page ? `p.${row.page}` : '', row.source_locator || ''].filter(Boolean).join(' · ');
+  const bucketMeta = [
+    row.relevance || 'unclear',
+    row.theme_bucket ? `theme: ${row.theme_bucket}` : '',
+    row.evidence_bucket ? `evidence: ${row.evidence_bucket}` : '',
+    row.rank ? `rank ${row.rank}` : '',
+    row.status || '',
+  ].filter(Boolean).join(' · ');
+  return `<button class="evidence-board-row" type="button" data-evidence-highlight-id="${x(row.id)}" aria-pressed="${selected ? 'true' : 'false'}" onclick="_evidenceBoardToggleHighlight(${x(JSON.stringify(row.id))})"${disabled}>
+    <div class="evidence-board-row-title"><span>${x(row.id)}</span><span>${row.scope_eligible ? 'Scope eligible' : 'Different document'}</span></div>
+    <div class="evidence-board-row-text">${x(row.selected_text || '')}</div>
+    ${row.note_text ? `<div class="evidence-board-meta"><strong>Note</strong> ${x(row.note_text)}</div>` : ''}
+    ${row.question_text ? `<div class="evidence-board-meta"><strong>Question</strong> ${x(row.question_text)}</div>` : ''}
+    <div class="evidence-board-meta">${x(loc)}</div>
+    <div class="evidence-board-meta">${x(bucketMeta)}</div>
+    ${row.scope_eligible ? '' : `<div class="evidence-board-meta">${x(row.scope_ineligibility_reason || '')}</div>`}
+  </button>`;
+}
+
+function _evidenceBoardFieldNoteRow(row) {
+  const loc = [row.document_name, row.page ? `p.${row.page}` : '', row.lane ? `lane: ${row.lane}` : ''].filter(Boolean).join(' · ');
+  return `<div class="evidence-board-row" data-evidence-field-note-id="${x(row.id)}">
+    <div class="evidence-board-row-title"><span>Field Note ${x(row.id)}</span><span>${row.origin_status === 'not_recorded' ? 'origin not recorded' : x(row.origin_status || '')}</span></div>
+    <div class="evidence-board-row-text">${x(row.understanding || row.pressing_questions || '')}</div>
+    ${row.pressing_questions ? `<div class="evidence-board-meta"><strong>Pressing questions</strong> ${x(row.pressing_questions)}</div>` : ''}
+    ${row.governing_question ? `<div class="evidence-board-meta"><strong>Governing question</strong> ${x(row.governing_question)}</div>` : ''}
+    <div class="evidence-board-meta">${x(loc)}</div>
+  </div>`;
+}
+
+function _evidenceBoardObservationRow(row) {
+  const loc = [row.document_name, row.page ? `p.${row.page}` : '', row.source_locator || ''].filter(Boolean).join(' · ');
+  return `<div class="evidence-board-row" data-evidence-observation-id="${x(row.id)}">
+    <div class="evidence-board-row-title"><span>Observation ${x(row.id)}</span><span>${x(row.review_status || 'unreviewed')}</span></div>
+    <div class="evidence-board-row-text">${x(row.content || '')}</div>
+    <div class="evidence-board-meta">${x(loc)}</div>
+    <div class="evidence-board-meta">${x(row.epistemic_status || 'canonical source-derived observation')}</div>
+  </div>`;
+}
+
+function _evidenceBoardRender() {
+  const body = document.getElementById('evidence-board-body');
+  const meta = document.getElementById('evidence-board-meta');
+  if (!body) return;
+  const data = _evidenceBoardData || {};
+  const selectedIds = _evidenceBoardSelectedIds();
+  const visibleHighlights = _evidenceBoardVisibleHighlights();
+  if (meta) meta.textContent = selectedIds.length
+    ? `${selectedIds.length} selected · ${selectedIds.join(', ')}`
+    : 'Projection over existing study records';
+  const themeBuckets = data.theme_buckets || [];
+  const evidenceBuckets = data.evidence_buckets || [];
+  const bucketTitle = _evidenceBoardActiveBucket
+    ? `<div class="evidence-board-meta">Open bucket: ${x(_evidenceBoardActiveBucket.bucket)} <button class="cr-bottom-workstation-tab" type="button" onclick="_evidenceBoardClearBucket()">Show all highlights</button></div>`
+    : '';
+  body.innerHTML = `
+    <div class="evidence-board-grid">
+      <div class="evidence-board-card">
+        <div class="cr-fln-hint" style="margin-bottom:10px">What has this study accumulated? Reader marks and Field Notes are user study work; canonical observations are source-derived evidence available to the study. This board does not analyze, persist, or alter evidence.</div>
+        ${_evidenceBoardCountsHtml(data.counts || {})}
+        <div class="evidence-board-meta" style="margin-top:8px"><strong>Uncategorized</strong><br>${x(data.uncategorized_definition || '')}</div>
+        <div class="evidence-board-meta" style="margin-top:10px"><strong>Theme buckets</strong></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">${themeBuckets.map(b => _evidenceBoardBucketButton(b, 'theme_bucket')).join('') || '<span class="evidence-board-meta">None yet.</span>'}</div>
+        <div class="evidence-board-meta" style="margin-top:10px"><strong>Evidence buckets</strong></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">${evidenceBuckets.map(b => _evidenceBoardBucketButton(b, 'evidence_bucket')).join('') || '<span class="evidence-board-meta">None yet.</span>'}</div>
+        <div class="evidence-board-meta" style="margin-top:10px"><strong>Selected highlight IDs</strong><br>${selectedIds.length ? x(selectedIds.join(', ')) : 'None selected.'}</div>
+        <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:10px">
+          <button class="btn-primary" type="button" onclick="_evidenceBoardApplySelectionToScope()">Set selected as supporting Scope</button>
+          <button class="cr-bottom-workstation-tab" type="button" onclick="_evidenceBoardClearSelection()">Clear selection</button>
+        </div>
+        <div class="evidence-board-meta" style="margin-top:8px">Selection is transient. Nothing is sent to a provider until a separate Perspective run is started.</div>
+      </div>
+      <div class="evidence-board-card">
+        <div class="evidence-board-row-title"><span>Reader highlights</span><span>${visibleHighlights.length} shown</span></div>
+        ${bucketTitle}
+        <div class="evidence-board-list" style="margin-top:8px">${visibleHighlights.map(_evidenceBoardHighlightRow).join('') || '<div class="attn-hint">No active Reader highlights yet.</div>'}</div>
+        <div class="evidence-board-row-title" style="margin-top:14px"><span>Field Notes</span><span>${(data.field_notes || []).length}</span></div>
+        <div class="evidence-board-list" style="margin-top:8px">${(data.field_notes || []).map(_evidenceBoardFieldNoteRow).join('') || '<div class="attn-hint">No Field Notes yet.</div>'}</div>
+        <div class="evidence-board-row-title" style="margin-top:14px"><span>Canonical observations</span><span>${(data.observations || []).length}</span></div>
+        <div class="evidence-board-list" style="margin-top:8px">${(data.observations || []).map(_evidenceBoardObservationRow).join('') || '<div class="attn-hint">No canonical observations yet.</div>'}</div>
+      </div>
+    </div>`;
 }
 
 async function _crOpenDoc(docId) {
@@ -13658,6 +14042,9 @@ function _crResetReaderTransientSelectionForContext() {
   _crSelectionRect = null;
   if (typeof _crResetPerspectiveScopeForReaderContextChange === 'function') {
     _crResetPerspectiveScopeForReaderContextChange();
+  }
+  if (typeof _crResetEvidenceBoardForReaderContextChange === 'function') {
+    _crResetEvidenceBoardForReaderContextChange();
   }
 }
 
