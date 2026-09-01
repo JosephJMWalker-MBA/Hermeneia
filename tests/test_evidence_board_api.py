@@ -104,7 +104,7 @@ def _seed_board_db(db_path: Path) -> None:
                 "[]",
                 "saved_highlight",
                 3,
-                "aspiration",
+                " aspiration ",
                 "cross-source",
             ),
             (
@@ -138,6 +138,14 @@ def _seed_board_db(db_path: Path) -> None:
                (id, lane, understanding, pressing_questions, source_document_id,
                 page, governing_question, created_at)
                VALUES ('fn-a', 'corpus', 'Field understanding.', 'What remains?',
+               'doc-a', 2, 'How does attention accumulate?', ?)""",
+            (now,),
+        )
+        conn.execute(
+            """INSERT INTO investigation_log
+               (id, lane, understanding, pressing_questions, source_document_id,
+                page, governing_question, created_at)
+               VALUES ('fn-instrument', 'instrument', 'Instrument note.', 'Should stay out?',
                        'doc-a', 2, 'How does attention accumulate?', ?)""",
             (now,),
         )
@@ -180,17 +188,22 @@ def test_evidence_board_inventory_counts_and_record_types(tmp_path):
         "dismissed_highlights": 1,
         "field_notes": 1,
         "observations": 1,
-        "questions": 3,
+        "question_bearing_records": 3,
         "theme_buckets": 1,
         "evidence_buckets": 2,
         "uncategorized_highlights": 1,
+        "deferred_instrument_notes": 1,
     }
     assert {item["id"] for item in body["highlights"]} == {"hl-a", "hl-b", "hl-c"}
     assert "hl-dismissed" not in {item["id"] for item in body["highlights"]}
+    assert {item["id"] for item in body["field_notes"]} == {"fn-a"}
     assert body["field_notes"][0]["record_type"] == "field_note"
     assert body["field_notes"][0]["understanding"] == "Field understanding."
+    assert body["field_notes"][0]["origin_status"] == "not_recorded"
+    assert "authorship" not in body["field_notes"][0]
     assert body["observations"][0]["record_type"] == "canonical_observation"
     assert body["observations"][0]["review_status"] == "approved"
+    assert "Count of Reader highlights with question_text plus corpus Field Notes" in body["question_count_semantics"]
     assert body["canonical_evidence_modified"] is False
     assert _counts(db_path) == before
 
@@ -218,6 +231,18 @@ def test_evidence_board_bucket_groupings_are_derived_from_highlight_fields(tmp_p
         "chapter-2": ["hl-a"],
         "cross-source": ["hl-c"],
     }
+
+
+def test_evidence_board_field_notes_are_corpus_lane_only(tmp_path):
+    db_path = tmp_path / "board.db"
+    _seed_board_db(db_path)
+    client = create_app(db_path=db_path).test_client()
+
+    body = client.get("/api/evidence-board?current_document_id=doc-a").get_json()
+
+    assert [item["lane"] for item in body["field_notes"]] == ["corpus"]
+    assert "fn-instrument" not in {item["id"] for item in body["field_notes"]}
+    assert body["counts"]["deferred_instrument_notes"] == 1
 
 
 def test_evidence_board_marks_cross_document_highlights_ineligible_for_current_scope(tmp_path):

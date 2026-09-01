@@ -9403,10 +9403,11 @@ Return ONLY valid JSON, no markdown, no explanation:
                     "dismissed_highlights": 0,
                     "field_notes": 0,
                     "observations": 0,
-                    "questions": 0,
+                    "question_bearing_records": 0,
                     "theme_buckets": 0,
                     "evidence_buckets": 0,
                     "uncategorized_highlights": 0,
+                    "deferred_instrument_notes": 0,
                 },
                 "theme_buckets": [],
                 "evidence_buckets": [],
@@ -9491,6 +9492,14 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "scope_ineligibility_reason": "" if same_current_doc else scope_reason,
             })
 
+        deferred_instrument_notes = conn.execute(
+            """SELECT COUNT(*)
+               FROM investigation_log il
+               LEFT JOIN source_documents sd ON sd.id = il.source_document_id
+               WHERE il.lane = 'instrument'
+                 AND (il.source_document_id IS NULL
+                      OR COALESCE(sd.excluded_from_analysis, 0) = 0)"""
+        ).fetchone()[0]
         field_notes = [
             {
                 "id": row["id"],
@@ -9504,14 +9513,15 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "source_role": row["source_role"] or None,
                 "page": row["page"],
                 "created_at": row["created_at"],
-                "authorship": "human-authored field note",
+                "origin_status": "not_recorded",
             }
             for row in conn.execute(
                 """SELECT il.*, sd.original_filename, sd.source_role
                    FROM investigation_log il
                    LEFT JOIN source_documents sd ON sd.id = il.source_document_id
-                   WHERE il.source_document_id IS NULL
-                      OR COALESCE(sd.excluded_from_analysis, 0) = 0
+                   WHERE il.lane = 'corpus'
+                     AND (il.source_document_id IS NULL
+                          OR COALESCE(sd.excluded_from_analysis, 0) = 0)
                    ORDER BY il.created_at DESC, il.id"""
             ).fetchall()
         ]
@@ -9571,8 +9581,8 @@ Return ONLY valid JSON, no markdown, no explanation:
             if not (item.get("theme_bucket") or "").strip()
             and not (item.get("evidence_bucket") or "").strip()
         ]
-        question_count = sum(1 for item in highlights if (item.get("question_text") or "").strip())
-        question_count += sum(1 for item in field_notes if (item.get("pressing_questions") or "").strip())
+        question_bearing_records = sum(1 for item in highlights if (item.get("question_text") or "").strip())
+        question_bearing_records += sum(1 for item in field_notes if (item.get("pressing_questions") or "").strip())
         return jsonify({
             "documents": documents,
             "current_reader": {
@@ -9587,14 +9597,19 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "dismissed_highlights": dismissed_count,
                 "field_notes": len(field_notes),
                 "observations": len(observations),
-                "questions": question_count,
+                "question_bearing_records": question_bearing_records,
                 "theme_buckets": len(theme_buckets),
                 "evidence_buckets": len(evidence_buckets),
                 "uncategorized_highlights": len(uncategorized),
+                "deferred_instrument_notes": deferred_instrument_notes,
             },
             "theme_buckets": theme_buckets,
             "evidence_buckets": evidence_buckets,
             "uncategorized_definition": "Reader highlights with no theme_bucket and no evidence_bucket.",
+            "question_count_semantics": (
+                "Count of Reader highlights with question_text plus corpus Field Notes "
+                "with pressing_questions; Field Note question text is not parsed."
+            ),
             "canonical_evidence_modified": False,
         })
 

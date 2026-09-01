@@ -10323,7 +10323,7 @@ function _crPerspectiveScopeFromSelection(selection = null) {
   if (!resolved?.valid || !resolved.text) return null;
   const includePage = !!document.getElementById('cr-perspective-include-page')?.checked;
   const currentPage = _crPerspectiveCurrentPageScope();
-  const highlightScope = _evidenceBoardScopeHighlightsPayload(resolved.source_document_id || _crDocId || '');
+  const highlightScope = _evidenceBoardAppliedHighlightsPayload(resolved.source_document_id || _crDocId || '');
   return {
     workspace_epoch: _crPerspectiveWorkspaceEpoch,
     primary: {
@@ -12725,6 +12725,8 @@ function _attnOpen(docId, page) {
 let _evidenceBoardData = null;
 let _evidenceBoardSelectedHighlightIds = new Set();
 let _evidenceBoardSelectionDocId = '';
+let _evidenceBoardAppliedScopeHighlightIds = [];
+let _evidenceBoardAppliedScopeDocId = '';
 let _evidenceBoardActiveBucket = null;
 let _evidenceBoardLoadSeq = 0;
 let _evidenceBoardEpoch = 0;
@@ -12733,6 +12735,8 @@ function _crResetEvidenceBoardForReaderContextChange() {
   _evidenceBoardEpoch += 1;
   _evidenceBoardSelectedHighlightIds = new Set();
   _evidenceBoardSelectionDocId = '';
+  _evidenceBoardAppliedScopeHighlightIds = [];
+  _evidenceBoardAppliedScopeDocId = '';
   _evidenceBoardActiveBucket = null;
   _evidenceBoardData = null;
   const meta = document.getElementById('evidence-board-meta');
@@ -12772,11 +12776,15 @@ function _evidenceBoardCountsHtml(counts = {}) {
       ${row('Highlights', 'highlights')}
       ${row('Field Notes', 'field_notes')}
       ${row('Observations', 'observations')}
-      ${row('Questions', 'questions')}
+      ${row('Question-bearing records', 'question_bearing_records')}
       ${row('Theme buckets', 'theme_buckets')}
       ${row('Evidence buckets', 'evidence_buckets')}
       ${row('Uncategorized', 'uncategorized_highlights')}
     </div>`;
+}
+
+function _evidenceBoardNormalizeBucketValue(value) {
+  return String(value || '').trim();
 }
 
 function _evidenceBoardBucketButton(bucket, kind) {
@@ -12798,8 +12806,8 @@ function _evidenceBoardVisibleHighlights() {
   const rows = _evidenceBoardData?.highlights || [];
   if (!_evidenceBoardActiveBucket) return rows;
   const key = _evidenceBoardActiveBucket.kind;
-  const label = _evidenceBoardActiveBucket.bucket;
-  return rows.filter(row => String(row[key] || '') === label);
+  const label = _evidenceBoardNormalizeBucketValue(_evidenceBoardActiveBucket.bucket);
+  return rows.filter(row => _evidenceBoardNormalizeBucketValue(row[key]) === label);
 }
 
 function _evidenceBoardHighlightById(id) {
@@ -12846,14 +12854,27 @@ function _evidenceBoardScopeHighlightsPayload(primaryDocId) {
   return { include: true, ids };
 }
 
+function _evidenceBoardAppliedHighlightsPayload(primaryDocId) {
+  const ids = Array.from(_evidenceBoardAppliedScopeHighlightIds || []).sort();
+  if (!ids.length) return { include: false, ids: [] };
+  if (_evidenceBoardAppliedScopeDocId !== primaryDocId) return { include: false, ids: [] };
+  const rows = ids.map(_evidenceBoardHighlightById).filter(Boolean);
+  if (rows.length !== ids.length) return { include: false, ids: [] };
+  if (rows.some(row => row.source_document_id !== primaryDocId || !row.scope_eligible)) {
+    return { include: false, ids: [] };
+  }
+  return { include: true, ids };
+}
+
 function _evidenceBoardApplySelectionToScope() {
   const ids = _evidenceBoardSelectedIds();
   if (!ids.length) {
     showAppError('Select one or more eligible Reader highlights first.');
     return;
   }
-  _crPerspectiveScope = _crPerspectiveScope || _crPerspectiveScopeFromSelection();
-  const primaryDocId = _crPerspectiveScope?.primary?.source_document_id || _crDocId || '';
+  const selection = _crGetReaderSelection({ refresh: false, fallback: true });
+  _crPerspectiveScope = _crPerspectiveScope || _crPerspectiveScopeFromSelection(selection);
+  const primaryDocId = _crPerspectiveScope?.primary?.source_document_id || selection?.source_document_id || _crDocId || '';
   if (!_crPerspectiveScope?.primary?.text || !primaryDocId) {
     showAppError('Select Reader text before setting supporting Scope.');
     return;
@@ -12863,6 +12884,8 @@ function _evidenceBoardApplySelectionToScope() {
     showAppError(payload.error);
     return;
   }
+  _evidenceBoardAppliedScopeHighlightIds = Array.from(payload.ids || []).sort();
+  _evidenceBoardAppliedScopeDocId = primaryDocId;
   _crPerspectiveScope.supporting = {
     ...(_crPerspectiveScope.supporting || {}),
     highlights: payload,
@@ -12901,7 +12924,7 @@ function _evidenceBoardHighlightRow(row) {
 function _evidenceBoardFieldNoteRow(row) {
   const loc = [row.document_name, row.page ? `p.${row.page}` : '', row.lane ? `lane: ${row.lane}` : ''].filter(Boolean).join(' · ');
   return `<div class="evidence-board-row" data-evidence-field-note-id="${x(row.id)}">
-    <div class="evidence-board-row-title"><span>Field Note ${x(row.id)}</span><span>${x(row.authorship || '')}</span></div>
+    <div class="evidence-board-row-title"><span>Field Note ${x(row.id)}</span><span>${row.origin_status === 'not_recorded' ? 'origin not recorded' : x(row.origin_status || '')}</span></div>
     <div class="evidence-board-row-text">${x(row.understanding || row.pressing_questions || '')}</div>
     ${row.pressing_questions ? `<div class="evidence-board-meta"><strong>Pressing questions</strong> ${x(row.pressing_questions)}</div>` : ''}
     ${row.governing_question ? `<div class="evidence-board-meta"><strong>Governing question</strong> ${x(row.governing_question)}</div>` : ''}
@@ -12937,7 +12960,7 @@ function _evidenceBoardRender() {
   body.innerHTML = `
     <div class="evidence-board-grid">
       <div class="evidence-board-card">
-        <div class="cr-fln-hint" style="margin-bottom:10px">What have I actually collected? This board is a projection over existing study records. It does not analyze, persist, or alter evidence.</div>
+        <div class="cr-fln-hint" style="margin-bottom:10px">What has this study accumulated? Reader marks and Field Notes are user study work; canonical observations are source-derived evidence available to the study. This board does not analyze, persist, or alter evidence.</div>
         ${_evidenceBoardCountsHtml(data.counts || {})}
         <div class="evidence-board-meta" style="margin-top:8px"><strong>Uncategorized</strong><br>${x(data.uncategorized_definition || '')}</div>
         <div class="evidence-board-meta" style="margin-top:10px"><strong>Theme buckets</strong></div>
