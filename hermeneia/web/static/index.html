@@ -3463,7 +3463,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
      navigation: resource clicks keep the Reader as the main canvas and open
      exactly one workstation surface above this rail. -->
 <nav class="workflow-rail" id="workflow-rail" hidden aria-label="Reader workstation">
-  <button class="wf-step" data-stage="reader" type="button" onclick="_wfGo('reader')" title="Return to the book">Read</button>
+  <button class="wf-step" id="workflow-reader-step" data-stage="reader" type="button" onclick="_wfGo('reader')" title="Return to the book">Read</button>
   <span class="wf-sep">›</span>
   <button class="wf-step" id="cr-bottom-resource-search" data-workstation-resource="search" type="button" aria-controls="corpus-search" onclick="_wfGo('search')" title="Search the corpus without leaving the book">Search</button>
   <span class="wf-sep">›</span>
@@ -7841,7 +7841,7 @@ function _wfGo(target) {
 function _renderWorkflowRail(activeId) {
   const rail = document.getElementById('workflow-rail');
   if (!rail) return;
-  const read = rail.querySelector('[data-stage="reader"]');
+  const read = document.getElementById('workflow-reader-step');
   if (read) read.classList.toggle('active', activeId === 'reader' && !_crBottomMode);
 }
 function _updateStageNavBar(id) {
@@ -9812,7 +9812,7 @@ function _crSyncBottomWorkstationState() {
     btn.classList.toggle('active', active);
     if (btn.getAttribute('role') === 'tab') btn.setAttribute('aria-selected', String(active));
   });
-  const readStep = document.querySelector('#workflow-rail [data-stage="reader"]');
+  const readStep = document.getElementById('workflow-reader-step');
   if (readStep) readStep.classList.toggle('active', _currentStageId === 'reader' && !open);
   document.querySelectorAll('[data-workstation-mode]').forEach(btn => {
     const active = open && btn.dataset.workstationMode === _crBottomMode;
