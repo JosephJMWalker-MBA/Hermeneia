@@ -82,14 +82,15 @@ def test_wf_go_returns_to_reader_then_opens_workstation_resource():
 
 def test_leaving_reader_collapses_the_workstation():
     index = _index()
-    assert "if (id !== 'reader' && _crBottomMode) _crCloseBottomWorkstation();" in index
+    assert "if (id !== 'reader' && workstation && !workstation.hidden) _crCloseBottomWorkstation();" in index
 
 
 def test_read_active_state_yields_to_an_open_workstation_resource():
     index = _index()
     assert "_currentStageId === 'reader' && !open" in index
-    assert "activeId === 'reader' && !_crBottomMode" in index
+    assert "activeId === 'reader' && !workstationOpen" in index
     assert "getElementById('workflow-reader-step')" in index
+    assert "getElementById('cr-bottom-workstation')" in index
 
 
 def test_old_prev_next_stepper_is_superseded():
