@@ -89,6 +89,7 @@ def test_read_active_state_yields_to_an_open_workstation_resource():
     index = _index()
     assert "_currentStageId === 'reader' && !open" in index
     assert "activeId === 'reader' && !_crBottomMode" in index
+    assert "getElementById('workflow-reader-step')" in index
 
 
 def test_old_prev_next_stepper_is_superseded():
