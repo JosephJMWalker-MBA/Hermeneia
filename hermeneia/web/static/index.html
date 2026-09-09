@@ -7842,7 +7842,9 @@ function _renderWorkflowRail(activeId) {
   const rail = document.getElementById('workflow-rail');
   if (!rail) return;
   const read = document.getElementById('workflow-reader-step');
-  if (read) read.classList.toggle('active', activeId === 'reader' && !_crBottomMode);
+  const shell = document.getElementById('cr-bottom-workstation');
+  const workstationOpen = !!(shell && !shell.hidden);
+  if (read) read.classList.toggle('active', activeId === 'reader' && !workstationOpen);
 }
 function _updateStageNavBar(id) {
   _currentStageId = id;
@@ -8017,7 +8019,8 @@ function _e10ApplyRouteChrome(id, scrollTarget, opts) {
   document.body.classList.toggle('reader-active', id === 'reader');
   // Reader workstation resources never float over legacy full-page surfaces.
   // Leaving Reader collapses the workstation; reopening a resource returns here.
-  if (id !== 'reader' && _crBottomMode) _crCloseBottomWorkstation();
+  const workstation = document.getElementById('cr-bottom-workstation');
+  if (id !== 'reader' && workstation && !workstation.hidden) _crCloseBottomWorkstation();
   // Highlight active pipeline step + update mini cycle
   document.querySelectorAll('.nav-step').forEach(btn => {
     const stepId = btn.id.replace('navstep-', '');
