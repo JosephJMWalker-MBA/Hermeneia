@@ -1739,9 +1739,9 @@ body.has-bottom-workstation:not(.has-workflow-rail) { padding-bottom: 352px; --r
 .attn-card-loc { font-size: 10px; color: var(--dim2); font-family: var(--mono); margin-top: auto; }
 .attn-rank { color: var(--accent); font-size: 10px; }
 
-/* Bottom workflow rail (PR 4): a compact, persistent strip of interpretive
-   steps beneath the Reader. The old prev/next stepper is superseded by these
-   jump-anywhere tabs. */
+/* Persistent Reader workstation rail: a compact resource switcher beneath the
+   Reader. It opens tools in the bottom workstation instead of routing away
+   from the book. */
 .stage-nav-bar { display: none; }
 .workflow-rail {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 330;
@@ -3147,17 +3147,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
         aria-expanded="false" aria-label="Collapse bottom workstation">⌄ Return to reading</button>
 <section class="cr-bottom-workstation" id="cr-bottom-workstation" hidden aria-label="Bottom workstation">
   <div class="cr-bottom-workstation-head">
-    <span class="cr-bottom-workstation-title">Bottom workstation</span>
-    <div class="cr-bottom-workstation-tabs" role="tablist" aria-label="Reader workstation resources">
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-search" data-workstation-resource="search" type="button" role="tab" aria-controls="corpus-search" aria-selected="false" onclick="_crToggleBottomWorkstationResource('search')">Search</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-timeline" data-workstation-resource="timeline" type="button" role="tab" aria-controls="attn-timeline" aria-selected="false" onclick="_crToggleBottomWorkstationResource('timeline')">Timeline</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-evidence" data-workstation-resource="evidence" type="button" role="tab" aria-controls="evidence-board" aria-selected="false" onclick="_crToggleBottomWorkstationResource('evidence')">Evidence</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-notes" data-workstation-resource="notes" type="button" role="tab" aria-controls="cr-fln-tray" aria-selected="false" onclick="_crToggleBottomWorkstationResource('fieldnotes')">Notes</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-perspective" data-workstation-resource="perspective" type="button" role="tab" aria-controls="cr-perspective-run" aria-selected="false" onclick="_crToggleBottomWorkstationResource('perspective')">Perspective</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-blueprint" data-workstation-resource="blueprint" type="button" role="tab" aria-controls="cr-blueprint-draft cr-render-preview cr-critic-audit" aria-selected="false" onclick="_crToggleBottomWorkstationResource('blueprint')">Blueprint</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-expression" data-workstation-resource="expression" type="button" role="tab" aria-controls="cr-voice-profile cr-artist-draft" aria-selected="false" onclick="_crToggleBottomWorkstationResource('voice')">Expression</button>
-      <button class="cr-bottom-workstation-tab" id="cr-bottom-resource-record" data-workstation-resource="record" type="button" role="tab" aria-controls="cr-record-ledger" aria-selected="false" onclick="_crToggleBottomWorkstationResource('record')">Record</button>
-    </div>
+    <span class="cr-bottom-workstation-title">Reader workstation</span>
   </div>
   <div class="cr-bottom-workstation-body">
     <div class="cr-workstation-subtabs" id="cr-blueprint-subtabs" role="tablist" aria-label="Blueprint views" hidden>
@@ -3469,24 +3459,27 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
   </button>
 </div>
 
-<!-- Bottom workflow rail (PR 4): compact interpretive steps beneath the Reader.
-     Tabs, not prev/next — jump to any step; the Reader stays the anchor. -->
-<nav class="workflow-rail" id="workflow-rail" hidden aria-label="Interpretive workflow">
-  <button class="wf-step" data-stage="reader" onclick="_wfGo('reader')" title="The book">Read</button>
+<!-- Persistent Reader workstation rail. This is a mode switcher, not page
+     navigation: resource clicks keep the Reader as the main canvas and open
+     exactly one workstation surface above this rail. -->
+<nav class="workflow-rail" id="workflow-rail" hidden aria-label="Reader workstation">
+  <button class="wf-step" data-stage="reader" type="button" onclick="_wfGo('reader')" title="Return to the book">Read</button>
   <span class="wf-sep">›</span>
-  <button class="wf-step" data-stage="corpus" onclick="_wfGo('corpus')" title="Evidence base">Corpus</button>
+  <button class="wf-step" id="cr-bottom-resource-search" data-workstation-resource="search" type="button" aria-controls="corpus-search" onclick="_wfGo('search')" title="Search the corpus without leaving the book">Search</button>
   <span class="wf-sep">›</span>
-  <button class="wf-step" data-stage="lab" onclick="_wfGo('lab')" title="Generate candidate interpretations">Interpret</button>
+  <button class="wf-step" id="cr-bottom-resource-timeline" data-workstation-resource="timeline" type="button" aria-controls="attn-timeline" onclick="_wfGo('timeline')" title="Review the trail of attention">Timeline</button>
   <span class="wf-sep">›</span>
-  <button class="wf-step" data-stage="review" onclick="_wfGo('review')" title="Steward proposals">Review</button>
+  <button class="wf-step" id="cr-bottom-resource-evidence" data-workstation-resource="evidence" type="button" aria-controls="evidence-board" onclick="_wfGo('evidence')" title="Work with accumulated evidence">Evidence</button>
   <span class="wf-sep">›</span>
-  <button class="wf-step" data-stage="architect" onclick="_wfGo('architect')" title="Build the argument">Blueprint</button>
+  <button class="wf-step" id="cr-bottom-resource-notes" data-workstation-resource="notes" type="button" aria-controls="cr-fln-tray" onclick="_wfGo('notes')" title="Open Field Notes below the Reader">Notes</button>
   <span class="wf-sep">›</span>
-  <button class="wf-step" data-stage="reports" onclick="_wfGo('reports')" title="Render outputs">Render</button>
+  <button class="wf-step" id="cr-bottom-resource-perspective" data-workstation-resource="perspective" type="button" aria-controls="cr-perspective-run" onclick="_wfGo('perspective')" title="Examine the scoped evidence from a Perspective">Perspective</button>
   <span class="wf-sep">›</span>
-  <button class="wf-step" data-stage="critic" onclick="_wfGo('critic')" title="Audit fidelity">Critic</button>
+  <button class="wf-step" id="cr-bottom-resource-blueprint" data-workstation-resource="blueprint" type="button" aria-controls="cr-blueprint-draft cr-render-preview cr-critic-audit" onclick="_wfGo('blueprint')" title="Build and check the current Blueprint">Blueprint</button>
   <span class="wf-sep">›</span>
-  <button class="wf-step" data-stage="lineage" onclick="_wfGo('lineage')" title="Trace claims to evidence">Lineage</button>
+  <button class="wf-step" id="cr-bottom-resource-expression" data-workstation-resource="expression" type="button" aria-controls="cr-voice-profile cr-artist-draft" onclick="_wfGo('expression')" title="Set voice and preview expression">Expression</button>
+  <span class="wf-sep">›</span>
+  <button class="wf-step" id="cr-bottom-resource-record" data-workstation-resource="record" type="button" aria-controls="cr-record-ledger" onclick="_wfGo('record')" title="Inspect the durable record and its lineage">Record</button>
 </nav>
 
 <!-- Reader tools dock — Companion owns the Reader sidebar; this rail is the
@@ -7833,12 +7826,23 @@ const _STAGE_NAMES = {
 };
 let _currentStageId = 'onboarding';
 
-function _wfGo(stage) { e10Go(stage); }
+function _wfGo(target) {
+  if (target === 'reader') {
+    if (_currentStageId !== 'reader') e10Go('reader');
+    _crCloseBottomWorkstation();
+    return;
+  }
+  const mode = target === 'notes' ? 'fieldnotes'
+    : target === 'expression' ? 'voice'
+    : target;
+  if (_currentStageId !== 'reader') e10Go('reader');
+  return _crToggleBottomWorkstationResource(mode);
+}
 function _renderWorkflowRail(activeId) {
   const rail = document.getElementById('workflow-rail');
   if (!rail) return;
-  rail.querySelectorAll('.wf-step').forEach(b =>
-    b.classList.toggle('active', b.dataset.stage === activeId));
+  const read = rail.querySelector('[data-stage="reader"]');
+  if (read) read.classList.toggle('active', activeId === 'reader' && !_crBottomMode);
 }
 function _updateStageNavBar(id) {
   _currentStageId = id;
@@ -8011,6 +8015,9 @@ function _e10ApplyRouteChrome(id, scrollTarget, opts) {
   // The Reader is the main canvas: let it use more horizontal width than the
   // narrow text pages the rest of the app uses.
   document.body.classList.toggle('reader-active', id === 'reader');
+  // Reader workstation resources never float over legacy full-page surfaces.
+  // Leaving Reader collapses the workstation; reopening a resource returns here.
+  if (id !== 'reader' && _crBottomMode) _crCloseBottomWorkstation();
   // Highlight active pipeline step + update mini cycle
   document.querySelectorAll('.nav-step').forEach(btn => {
     const stepId = btn.id.replace('navstep-', '');
@@ -9805,6 +9812,8 @@ function _crSyncBottomWorkstationState() {
     btn.classList.toggle('active', active);
     if (btn.getAttribute('role') === 'tab') btn.setAttribute('aria-selected', String(active));
   });
+  const readStep = document.querySelector('#workflow-rail [data-stage="reader"]');
+  if (readStep) readStep.classList.toggle('active', _currentStageId === 'reader' && !open);
   document.querySelectorAll('[data-workstation-mode]').forEach(btn => {
     const active = open && btn.dataset.workstationMode === _crBottomMode;
     btn.classList.toggle('active', active);
@@ -12369,14 +12378,14 @@ window._crResetRecordLedgerStateForWorkspaceChange = _crResetRecordLedgerStateFo
 
 function _crBindBottomWorkstationControls() {
   const bindings = [
-    ['cr-bottom-resource-search', () => _crToggleBottomWorkstationResource('search')],
-    ['cr-bottom-resource-timeline', () => _crToggleBottomWorkstationResource('timeline')],
-    ['cr-bottom-resource-evidence', () => _crToggleBottomWorkstationResource('evidence')],
-    ['cr-bottom-resource-notes', () => _crToggleBottomWorkstationResource('fieldnotes')],
-    ['cr-bottom-resource-perspective', () => _crToggleBottomWorkstationResource('perspective')],
-    ['cr-bottom-resource-blueprint', () => _crToggleBottomWorkstationResource('blueprint')],
-    ['cr-bottom-resource-expression', () => _crToggleBottomWorkstationResource('voice')],
-    ['cr-bottom-resource-record', () => _crToggleBottomWorkstationResource('record')],
+    ['cr-bottom-resource-search', () => _wfGo('search')],
+    ['cr-bottom-resource-timeline', () => _wfGo('timeline')],
+    ['cr-bottom-resource-evidence', () => _wfGo('evidence')],
+    ['cr-bottom-resource-notes', () => _wfGo('notes')],
+    ['cr-bottom-resource-perspective', () => _wfGo('perspective')],
+    ['cr-bottom-resource-blueprint', () => _wfGo('blueprint')],
+    ['cr-bottom-resource-expression', () => _wfGo('expression')],
+    ['cr-bottom-resource-record', () => _wfGo('record')],
     ['cr-blueprint-subtab-build', () => _crOpenBottomWorkstation('blueprint')],
     ['cr-blueprint-subtab-structure', () => _crOpenBottomWorkstation('render')],
     ['cr-blueprint-subtab-check', () => _crOpenBottomWorkstation('critic')],
