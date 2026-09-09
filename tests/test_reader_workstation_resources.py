@@ -28,12 +28,18 @@ def _extract_fn(html: str, name: str) -> str:
     return match.group(0)
 
 
-def test_bottom_workstation_has_eight_human_resource_tabs():
+def test_persistent_workstation_rail_has_eight_human_resource_tabs():
     index = _index()
-    top_tabs = re.findall(
-        r'<button class="cr-bottom-workstation-tab" id="(cr-bottom-resource-[^"]+)" '
-        r'data-workstation-resource="([^"]+)".*?>(.*?)</button>',
+    rail = re.search(
+        r'<nav class="workflow-rail" id="workflow-rail".*?</nav>',
         index,
+        re.S,
+    )
+    assert rail
+    top_tabs = re.findall(
+        r'<button class="wf-step" id="(cr-bottom-resource-[^"]+)" '
+        r'data-workstation-resource="([^"]+)".*?>(.*?)</button>',
+        rail.group(0),
     )
 
     assert top_tabs == [
@@ -49,6 +55,15 @@ def test_bottom_workstation_has_eight_human_resource_tabs():
     for inherited in ("render", "critic", "voice", "draft"):
         assert f'data-workstation-resource="{inherited}"' not in index
         assert f'id="cr-bottom-tab-{inherited}"' not in index
+
+    shell_head = re.search(
+        r'<div class="cr-bottom-workstation-head">(?P<body>.*?)</div>\s*'
+        r'<div class="cr-bottom-workstation-body">',
+        index,
+        re.S,
+    )
+    assert shell_head
+    assert "data-workstation-resource" not in shell_head.group("body")
 
 
 def test_blueprint_and_expression_have_nested_views_not_peer_resource_tabs():
@@ -69,16 +84,14 @@ def test_blueprint_and_expression_have_nested_views_not_peer_resource_tabs():
     assert 'data-workstation-submode="draft"' in index
 
 
-def test_workstation_header_keeps_tabs_scrollable_and_uses_center_collapse_handle():
+def test_persistent_rail_stays_scrollable_and_uses_center_collapse_handle():
     index = _index()
 
-    tabs_css = re.search(r"\.cr-bottom-workstation-tabs \{(?P<body>.*?)\n\}", index, re.S)
-    tab_css = re.search(r"\.cr-bottom-workstation-tab \{(?P<body>.*?)\n\}", index, re.S)
-    assert tabs_css and tab_css
-    assert "flex-wrap: nowrap" in tabs_css.group("body")
-    assert "overflow-x: auto" in tabs_css.group("body")
-    assert "min-width: 0" in tabs_css.group("body")
-    assert "flex: 0 0 auto" in tab_css.group("body")
+    rail_css = re.search(r"\.workflow-rail \{(?P<body>.*?)\n\}", index, re.S)
+    step_css = re.search(r"\.wf-step \{(?P<body>.*?)\n\}", index, re.S)
+    assert rail_css and step_css
+    assert "overflow-x: auto" in rail_css.group("body")
+    assert "white-space: nowrap" in step_css.group("body")
 
     assert 'id="cr-bottom-collapse-handle"' in index
     assert 'aria-label="Collapse bottom workstation"' in index
