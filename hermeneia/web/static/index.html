@@ -123,9 +123,9 @@ body.reader-active .wrap { max-width: 1180px; padding: 0 20px; }
 }
 .return-reader-fab {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 86;
+  right: 82px;
+  bottom: 56px;
+  z-index: 470;
   min-height: 42px;
   padding: 0 18px;
   border-radius: 999px;
@@ -1808,6 +1808,8 @@ body.has-workflow-rail { padding-bottom: 40px; }
 .cr-read-page-btn:hover { border-color: var(--accent); color: var(--accent); }
 .cr-read-page-btn:disabled { opacity: .45; cursor: default; }
 .cr-read-page-btn:disabled:hover { border-color: var(--border2); color: var(--fg2); }
+.cr-page-read-controls { display: flex; align-items: center; gap: 6px; }
+.cr-read-page-btn[hidden] { display: none; }
 .cr-page-count { flex: 1; }
 .cr-page-region {
   font-size: 10px; color: var(--dim2); font-family: var(--mono);
@@ -2336,6 +2338,16 @@ body.has-workflow-rail { padding-bottom: 40px; }
 .cr-fln-hint  { font-size: 12px; color: var(--accent); }
 .cr-fln-body {
   flex: 1; min-height: 0; overflow-y: auto;
+}
+/* Shared content gutter for workstation surfaces that do not own an inner wrapper. */
+#cr-perspective-run > .cr-fln-body,
+#cr-blueprint-draft > .cr-fln-body,
+#cr-render-preview > .cr-fln-body,
+#cr-critic-audit > .cr-fln-body,
+#cr-voice-profile > .cr-fln-body,
+#cr-artist-draft > .cr-fln-body,
+#cr-record-ledger > .cr-fln-body {
+  padding: 12px 16px 18px;
 }
 .cr-fln-inner { max-width: 900px; margin: 0 auto; padding: 14px 16px 18px; }
 .cr-fln-tray.cr-fln-glow { animation: flnGlow 1.8s ease-in-out 2; }
@@ -4304,7 +4316,15 @@ function _cmpApplyDraft(options = {}) {
 }
 
 // ── Accessibility Dock v0.2 ────────────────────────────
-const _a11y = { read: false, focus: false, textLg: false, speaking: false, collapsed: false };
+const _a11y = {
+  read: false,
+  focus: false,
+  textLg: false,
+  speaking: false,
+  paused: false,
+  speechSource: null,
+  collapsed: false,
+};
 let _a11yHintTimer = null;
 let _a11yHintShown = false;
 let _a11yLastReaderSelection = '';
@@ -4380,7 +4400,9 @@ function _a11ySync() {
   document.body.classList.toggle('a11y-text-lg', _a11y.textLg);
 
   // Status bar
-  if (_a11y.speaking) {
+  if (_a11y.paused) {
+    _a11ySetStatus('Paused', 'status-ready');
+  } else if (_a11y.speaking) {
     _a11ySetStatus('Speaking…', 'status-speaking');
   } else if (_a11y.read) {
     _a11ySetStatus('Select text to read', 'status-ready');
@@ -4438,7 +4460,7 @@ function _requestReadingToolsSpeech(text, options = {}) {
     if (!confirmed) return false;
     _a11ySetReadEnabled(true, { showHint: true });
   }
-  a11ySpeak(passage);
+  a11ySpeak(passage, options);
   return true;
 }
 
@@ -4456,7 +4478,7 @@ function a11yClickRead() {
   }
 }
 
-function a11ySpeak(text) {
+function a11ySpeak(text, options = {}) {
   if (!_a11ySpeechSupported()) {
     _a11ySetStatus('Speech not supported in this browser');
     return;
@@ -4466,17 +4488,53 @@ function a11ySpeak(text) {
     return;
   }
   speechSynthesis.cancel();
+  _a11y.paused = false;
+  _a11y.speechSource = options.source_document_id && options.page
+    ? {
+        kind: 'reader_page',
+        source_document_id: String(options.source_document_id),
+        page: Number(options.page),
+      }
+    : null;
   const utt = new SpeechSynthesisUtterance(text);
   utt.rate = 1.0; utt.pitch = 1.0; utt.volume = 1.0;
-  utt.onstart = () => { _a11y.speaking = true; _a11ySync(); };
-  utt.onend   = () => { _a11y.speaking = false; _a11ySync(); };
-  utt.onerror = (e) => {
-    _a11y.speaking = false;
+  utt.onstart = () => {
+    _a11y.speaking = true;
+    _a11y.paused = false;
     _a11ySync();
+    if (typeof _crSyncPageSpeechControls === 'function') _crSyncPageSpeechControls();
+  };
+  utt.onend = () => {
+    _a11y.speaking = false;
+    _a11y.paused = false;
+    _a11y.speechSource = null;
+    _a11ySync();
+    if (typeof _crSyncPageSpeechControls === 'function') _crSyncPageSpeechControls();
+  };
+  utt.onerror = () => {
+    _a11y.speaking = false;
+    _a11y.paused = false;
+    _a11y.speechSource = null;
+    _a11ySync();
+    if (typeof _crSyncPageSpeechControls === 'function') _crSyncPageSpeechControls();
     _a11ySetStatus('Speech error — try again');
   };
   speechSynthesis.speak(utt);
   a11yDismissTip();
+}
+
+function a11yPauseResume() {
+  if (!_a11y.speaking || typeof speechSynthesis === 'undefined') return false;
+  if (_a11y.paused) {
+    speechSynthesis.resume();
+    _a11y.paused = false;
+  } else {
+    speechSynthesis.pause();
+    _a11y.paused = true;
+  }
+  _a11ySync();
+  if (typeof _crSyncPageSpeechControls === 'function') _crSyncPageSpeechControls();
+  return true;
 }
 
 // Called from the floating tip's Read button
@@ -4491,7 +4549,10 @@ function a11yReadSelection() {
 function a11yStop() {
   if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
   _a11y.speaking = false;
+  _a11y.paused = false;
+  _a11y.speechSource = null;
   _a11ySync();
+  if (typeof _crSyncPageSpeechControls === 'function') _crSyncPageSpeechControls();
   a11yDismissTip();
   if (_a11y.read) {
     _a11ySetStatus('Stopped — select text to read again', 'status-ready');
@@ -6546,9 +6607,11 @@ function dictWrap(targetId, innerHtml) {
 }
 
 function _thesisBarClick() {
-  // Go to the book and focus the question, whether setting or revising it.
+  // Go to the book, open the Question dock, and focus the editable question.
+  // The question form moved into the dock; routing to Reader alone leaves it hidden.
   e10Go('reader');
   setTimeout(() => {
+    _dockOpenPanel('question');
     try { _crRenderQuestionCard(true); } catch {}
     document.getElementById('cr-question-input')?.focus();
   }, 60);
@@ -8242,6 +8305,34 @@ async function e10LoadProviders() {
         </div>
       </div>
     </div>`;
+  _e10BindProviderCardControls(host);
+}
+
+function _e10BindProviderCardControls(host) {
+  if (!host) return;
+  host.querySelectorAll('[data-provider-model-select]').forEach(select => {
+    select.addEventListener('change', () =>
+      e10SelectProviderModel(select.dataset.participant || '', select.value, select));
+  });
+  host.querySelectorAll('[data-ollama-install]').forEach(button => {
+    button.addEventListener('click', () =>
+      e10InstallOllamaModel(button.dataset.participant || '', button.dataset.model || '', button));
+  });
+  host.querySelectorAll('[data-provider-calibrate]').forEach(button => {
+    button.addEventListener('click', () =>
+      e10CalibrateRole(button.dataset.participant || '', button.dataset.role || '', button));
+  });
+  host.querySelectorAll('[data-provider-override-toggle]').forEach(button => {
+    button.addEventListener('click', () => e10ToggleOverride(button.dataset.panelId || ''));
+  });
+  host.querySelectorAll('[data-provider-override-apply]').forEach(button => {
+    button.addEventListener('click', () =>
+      e10ApplyOverride(
+        button.dataset.participant || '',
+        button.dataset.role || '',
+        button.dataset.panelId || '',
+      ));
+  });
 }
 
 function _e10CalibrationTestLog(participant) {
@@ -8297,7 +8388,6 @@ function e10ProviderCard(provider, cal, perf) {
   const setup = provider.setup || {};
   const isOllama = provider.provider_id && provider.provider_id.startsWith('ollama-');
   const roleOrder = ['Explorer','Architect','Artist','Critic','Witness'];
-  const pk = JSON.stringify(provider.participant);
   const selectedModel = provider.selected_model || provider.default_model || '';
   const modelCatalog = provider.model_catalog || {};
   const catalogModels = Array.isArray(modelCatalog.models) ? modelCatalog.models : [];
@@ -8342,7 +8432,7 @@ function e10ProviderCard(provider, cal, perf) {
     </div>
     ${modelCatalog.error ? `<div style="font-size:11px;color:var(--yellow);margin-bottom:6px">${x(modelCatalog.error)}</div>` : ''}
     <div style="display:flex;align-items:center;gap:6px;margin:8px 0">
-      <select ${modelSelectorDisabled ? 'disabled' : ''} data-current-model="${x(selectedModel)}" onchange="e10SelectProviderModel(${pk},this.value,this)" style="font-size:11px;padding:4px 7px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);max-width:100%">
+      <select ${modelSelectorDisabled ? 'disabled' : ''} data-provider-model-select="1" data-participant="${x(provider.participant)}" data-current-model="${x(selectedModel)}" style="font-size:11px;padding:4px 7px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);max-width:100%">
         ${modelOptions || `<option value="">No models discovered</option>`}
       </select>
       <span style="font-size:10px;color:var(--dim2)">${knownModelIds.length ? `${knownModelIds.length} known · ${availableModelIds.length} available` : 'none verified'}</span>
@@ -8375,7 +8465,6 @@ function e10ProviderCard(provider, cal, perf) {
       (!installJob.ollama_host || installJob.ollama_host === provider.ollama_host)
     );
     const canInstallSelected = Boolean(provider.ollama_server_running && selectedModel && !provider.selected_model_installed && !activeInstallForSelected);
-    const selectedModelArg = JSON.stringify(selectedModel).replace(/</g, '\\u003c');
     const installPanel = installJob ? `<div style="margin:8px 0;padding:7px 8px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg)">
         <div style="font-size:11px;color:${installJob.status === 'failed' ? 'var(--red)' : installJob.status === 'succeeded' ? 'var(--green)' : 'var(--yellow)'};margin-bottom:4px">${x(installJob.message || installJob.status || 'Installing model...')}</div>
         <div style="font-family:var(--mono);font-size:10px;color:var(--dim2);line-height:1.6;max-height:92px;overflow:auto">
@@ -8383,7 +8472,7 @@ function e10ProviderCard(provider, cal, perf) {
         </div>
       </div>` : '';
     const installAction = canInstallSelected ? `<div style="display:flex;align-items:center;gap:8px;margin:8px 0">
-        <button class="btn-trace" style="font-size:10px;padding:3px 8px" onclick="e10InstallOllamaModel('${x(provider.participant)}',${selectedModelArg},this)">Install ${x(selectedModel)}</button>
+        <button class="btn-trace" style="font-size:10px;padding:3px 8px" data-ollama-install="1" data-participant="${x(provider.participant)}" data-model="${x(selectedModel)}">Install ${x(selectedModel)}</button>
         <span style="font-size:10px;color:var(--dim2)">on ${x(provider.ollama_host || 'http://localhost:11434')}</span>
       </div>` : '';
     ollamaSteps = `<div style="margin:8px 0 4px;font-size:11px;color:var(--dim2)">
@@ -8428,8 +8517,8 @@ function e10ProviderCard(provider, cal, perf) {
       <td style="padding:5px 8px;font-size:11px">${_suitabilityBadge('', suitStatus).replace('></span>', `>${suitStatus}</span>`)}</td>
       <td style="padding:5px 8px;font-size:11px" title="${x(failReason)}">${_e10CalibrationStatusBadge(calStatus)}</td>
       <td style="padding:5px 0 5px 8px;white-space:nowrap">
-        <button class="btn-trace" style="font-size:10px;padding:2px 8px" onclick="e10CalibrateRole(${pk},${JSON.stringify(role)},this)">Run test</button>
-        <button class="btn-trace" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="e10ToggleOverride(${JSON.stringify(overrideId)})">Manual override</button>
+        <button class="btn-trace" style="font-size:10px;padding:2px 8px" data-provider-calibrate="1" data-participant="${x(provider.participant)}" data-role="${x(role)}">Run test</button>
+        <button class="btn-trace" style="font-size:10px;padding:2px 8px;margin-left:4px" data-provider-override-toggle="1" data-panel-id="${x(overrideId)}">Manual override</button>
         <div id="${overrideId}" style="display:none;margin-top:6px">
           <select id="${overrideId}-status" style="font-size:11px;padding:2px 5px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg)">
             <option value="" disabled selected>Choose override…</option>
@@ -8439,7 +8528,7 @@ function e10ProviderCard(provider, cal, perf) {
             <option value="untested">Reset to untested</option>
           </select>
           <input id="${overrideId}-note" type="text" placeholder="Steward note (required)" style="font-size:11px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);color:var(--fg);margin-left:4px;width:180px">
-          <button class="btn-trace" style="font-size:10px;padding:2px 8px;margin-left:4px" onclick="e10ApplyOverride(${pk},${JSON.stringify(role)},${JSON.stringify(overrideId)})">Apply</button>
+          <button class="btn-trace" style="font-size:10px;padding:2px 8px;margin-left:4px" data-provider-override-apply="1" data-participant="${x(provider.participant)}" data-role="${x(role)}" data-panel-id="${x(overrideId)}">Apply</button>
         </div>
       </td>
     </tr>`;
@@ -13565,11 +13654,15 @@ function _crRenderPage() {
     view.innerHTML = `
       <div class="cr-page-header">
         <span class="cr-page-count">Page ${_crPage} of ${_crTotalPages}</span>
-        <button class="cr-read-page-btn" type="button" onclick="_crReadCurrentPage()" aria-label="Read page ${x(_crPage)} aloud">▶ Read page</button>
+        <div class="cr-page-read-controls">
+          <button class="cr-read-page-btn" id="cr-read-page-btn" type="button" onclick="_crToggleCurrentPageSpeech()" aria-label="Read page ${x(_crPage)} aloud">▶ Read page</button>
+          <button class="cr-read-page-btn" id="cr-read-page-stop" type="button" onclick="a11yStop()" aria-label="Stop reading" hidden>■ Stop</button>
+        </div>
       </div>
       ${blocks || '<div class="e10-empty">No text extracted for this page.</div>'}`;
   }
 
+  _crSyncPageSpeechControls();
   _fsApply();
   // Locator metadata is register-gated: stored always, shown to researchers
   document.getElementById('cr-page-view')?.classList.toggle('show-regions', _register === 'expert');
@@ -14507,6 +14600,35 @@ function _crCurrentPageSpeechText() {
     .map(ex => String(ex?.text || '').trim())
     .filter(Boolean)
     .join('\n\n');
+}
+
+function _crCurrentPageSpeechIsActive() {
+  const source = _a11y.speechSource;
+  return !!(
+    _a11y.speaking &&
+    source &&
+    source.kind === 'reader_page' &&
+    source.source_document_id === String(_crDocId || '') &&
+    Number(source.page) === Number(_crPage)
+  );
+}
+
+function _crSyncPageSpeechControls() {
+  const toggle = document.getElementById('cr-read-page-btn');
+  const stop = document.getElementById('cr-read-page-stop');
+  if (!toggle || !stop) return;
+  const active = _crCurrentPageSpeechIsActive();
+  toggle.textContent = active ? (_a11y.paused ? '▶ Resume' : '⏸ Pause') : '▶ Read page';
+  toggle.setAttribute(
+    'aria-label',
+    active ? (_a11y.paused ? 'Resume reading this page' : 'Pause reading this page') : `Read page ${_crPage} aloud`,
+  );
+  stop.hidden = !active;
+}
+
+function _crToggleCurrentPageSpeech() {
+  if (_crCurrentPageSpeechIsActive()) return a11yPauseResume();
+  return _crReadCurrentPage();
 }
 
 function _crReadCurrentPage() {
