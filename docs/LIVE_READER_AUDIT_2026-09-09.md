@@ -52,6 +52,86 @@ This removes the defect class rather than patching individual quotes.
 
 ---
 
+## Post-fix live validation
+
+The corrections were exercised in the real operating topology rather than only by static inspection:
+
+```
+Mac browser / keyboard
+        │
+        │ SSH tunnel
+        ▼
+Orin: Hermeneia server
+        │
+        ├── workspace/database
+        └── local Ollama models
+```
+
+### Verified in live use
+
+#### Reader page speech transport
+**Verified:** page reading starts normally and the new page-local transport is substantially better in use. Pause / Resume / Stop are available where the reading was initiated instead of requiring a trip into Reader Tools.
+
+**Disposition:** functionally validated. Leave the behavior alone until a broader UX pass produces a concrete reason to change it.
+
+#### Return to Reading
+**Verified:** the Return to Reading control is no longer buried beneath the persistent bottom rail and returns to the Reader correctly from the other workspace/full-page surfaces.
+
+**Disposition:** functionally validated.
+
+#### Ollama model installation
+**Verified:** the repaired Install control starts a real Ollama pull job. During the live test the progress initially remained at 0%, then advanced to 1%, demonstrating that the job was active rather than dead. Navigating away from Connections did **not** cancel the installation; terminal output on the Orin continued to show progress.
+
+This validates the important runtime contract:
+
+```
+Install requested
+      ↓
+server-side background job starts
+      ↓
+user may leave Connections
+      ↓
+Ollama pull continues on the Orin
+      ↓
+Hermeneia remains usable
+```
+
+**Disposition:** functional path validated; remaining work is UX/presentation, not job architecture.
+
+### Not separately re-verified in this final live pass
+
+The provider model-selection persistence fix and the governing-question dock correction have regression coverage and code-level corrections in this branch, but the final live comments did not explicitly re-confirm those two behaviors after the branch update. They should remain part of normal acceptance testing before merge rather than being described as live-verified here.
+
+---
+
+## UX follow-up for a deliberate pass
+
+### Background model-install experience
+
+The current install behavior is now functionally correct but visually under-communicates long-running work. A later serious UX pass should treat model installation as a first-class background job.
+
+Desired states:
+
+```
+Queued
+→ Preparing
+→ Downloading
+→ Verifying
+→ Complete
+```
+
+The UI should, where the Ollama event stream supports it:
+
+- distinguish "working at 0%" from an actually stalled job;
+- show downloaded / total bytes or another useful progress detail rather than percentage alone;
+- preserve installation state when the user leaves and later returns to Connections;
+- expose a subtle global "model installing" indicator outside Connections;
+- surface completion and failure clearly without requiring the user to watch terminal output;
+- keep cancellation semantics explicit if cancellation is added later.
+
+Do **not** redesign the background-job architecture merely to solve this presentation problem. The live audit demonstrated that the server-side job correctly survives navigation away from Connections.
+
+
 ## Documented for a deliberate architecture / IA pass
 
 ### A. Lineage must distinguish two kinds of lineage
@@ -137,3 +217,22 @@ The live audit exposed three useful defect classes rather than isolated cosmetic
 - **Generated inline-handler defects** — dynamic data embedded into executable HTML attributes created controls that rendered but did not execute.
 
 The architectural findings above should be implemented only after their durable contracts are agreed, rather than being improvised as one-off UI changes.
+
+---
+
+## Final audit status
+
+| Finding | Status |
+| --- | --- |
+| Reader workstation rail navigated away from the Reader | Fixed in PR #202; live-validated |
+| Read Page lacked obvious local Pause / Stop controls | Fixed in PR #203; live-validated |
+| Workstation body padding / gutters inconsistent | Fixed in PR #203; visual cleanup remains part of broader UX pass |
+| Ollama Install button rendered but did not execute | Fixed in PR #203; live-validated |
+| Provider model dropdown did not persist the selected model | Fixed in PR #203; regression-covered, final live re-check still recommended |
+| Governing-question banner did not expose its editor | Fixed in PR #203; regression-covered, final live re-check still recommended |
+| Return to Reading buried under bottom rail | Fixed in PR #203; live-validated |
+| Lineage too narrow for intended full investigation history | Documented architecture work; not implemented |
+| Ask the Room should also be available from Companion | Documented IA work; not implemented |
+| Model-install progress presentation | Functional architecture validated; deferred to serious UX pass |
+
+The audit is therefore closed as a discovery pass. Remaining work is intentionally split between ordinary acceptance testing, a dedicated UX pass, and the two larger architectural/IA changes above.
