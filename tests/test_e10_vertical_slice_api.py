@@ -2514,6 +2514,11 @@ def test_e10_ui_exposes_provider_configuration_surface():
     assert "model_catalog" in index_html
     assert "e10SelectProviderModel" in index_html
     assert "e10SelectOllamaModel" in index_html
+    assert 'data-provider-model-select="1"' in index_html
+    assert 'data-ollama-install="1"' in index_html
+    assert "function _e10BindProviderCardControls(host)" in index_html
+    assert 'onchange="e10SelectProviderModel(' not in index_html
+    assert 'onclick="e10InstallOllamaModel(' not in index_html
     assert "e10SaveOllamaHost" in index_html
     assert "/api/e10/ollama/host" in index_html
     assert "/api/e10/ollama/install" in index_html
