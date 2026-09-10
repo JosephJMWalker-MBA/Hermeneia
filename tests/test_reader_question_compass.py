@@ -335,7 +335,9 @@ def test_unset_global_question_bar_click_opens_existing_question_editor():
     let route = null;
     let renderedEditing = null;
     let focused = false;
+    let dockPanel = null;
     function e10Go(dest) {{ route = dest; }}
+    function _dockOpenPanel(key) {{ dockPanel = key; }}
     function _crRenderQuestionCard(editing) {{ renderedEditing = editing; }}
     const document = {{
       getElementById(id) {{
@@ -346,12 +348,13 @@ def test_unset_global_question_bar_click_opens_existing_question_editor():
     function setTimeout(fn) {{ fn(); }}
     {click}
     _thesisBarClick();
-    console.log(JSON.stringify({{ route, renderedEditing, focused }}));
+    console.log(JSON.stringify({{ route, dockPanel, renderedEditing, focused }}));
     """
     state = _run_node(harness)
 
     assert state == {
         "route": "reader",
+        "dockPanel": "question",
         "renderedEditing": True,
         "focused": True,
     }
