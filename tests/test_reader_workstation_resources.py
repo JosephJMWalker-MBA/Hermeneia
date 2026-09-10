@@ -165,3 +165,20 @@ def test_field_notes_shortcut_still_opens_bottom_workstation():
     assert "if (key === 'fieldnotes')" in rail_go
     assert "flnToggleTray(true)" in rail_go
     assert "_crOpenBottomWorkstation('fieldnotes')" in fln_toggle
+
+
+def test_newer_workstation_surfaces_share_content_gutter_without_double_padding_notes():
+    index = _index()
+
+    for selector in (
+        "#cr-perspective-run > .cr-fln-body",
+        "#cr-blueprint-draft > .cr-fln-body",
+        "#cr-render-preview > .cr-fln-body",
+        "#cr-critic-audit > .cr-fln-body",
+        "#cr-voice-profile > .cr-fln-body",
+        "#cr-artist-draft > .cr-fln-body",
+        "#cr-record-ledger > .cr-fln-body",
+    ):
+        assert selector in index
+    assert "padding: 12px 16px 18px;" in index
+    assert ".cr-fln-inner { max-width: 900px; margin: 0 auto; padding: 14px 16px 18px; }" in index

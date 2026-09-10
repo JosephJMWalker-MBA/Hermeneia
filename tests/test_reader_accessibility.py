@@ -1183,3 +1183,21 @@ def test_large_text_uses_reflow_not_transform_or_zoom():
     assert "zoom" not in combined
     assert "white-space: pre-wrap" in page_text
     assert "overflow-wrap: anywhere" in page_text
+
+
+def test_read_page_exposes_inline_pause_resume_and_stop_transport():
+    html = INDEX.read_text()
+
+    assert 'id="cr-read-page-btn"' in html
+    assert 'onclick="_crToggleCurrentPageSpeech()"' in html
+    assert 'id="cr-read-page-stop"' in html
+    assert 'onclick="a11yStop()"' in html
+    assert "function a11yPauseResume()" in html
+    assert "speechSynthesis.pause()" in html
+    assert "speechSynthesis.resume()" in html
+    assert "function _crCurrentPageSpeechIsActive()" in html
+    assert "function _crSyncPageSpeechControls()" in html
+    assert "'▶ Resume'" in html
+    assert "'⏸ Pause'" in html
+    assert "_a11y.speechSource" in html
+    assert "_a11y.paused = false" in html

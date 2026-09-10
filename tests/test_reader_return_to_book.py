@@ -267,3 +267,13 @@ process.stdout.write(JSON.stringify({value:input.value,searchClears,bottom:_crBo
         "bottomCloseCalls": 0,
         "prevented": True,
     }
+
+
+def test_return_to_reading_fab_clears_workflow_rail_and_reader_dock():
+    html = _index()
+    match = re.search(r"\.return-reader-fab \{(?P<body>.*?)\n\}", html, re.S)
+    assert match
+    css = match.group("body")
+    assert "right: 82px;" in css
+    assert "bottom: 56px;" in css
+    assert "z-index: 470;" in css
