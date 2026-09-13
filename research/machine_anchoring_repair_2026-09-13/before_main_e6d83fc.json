@@ -1,0 +1,284 @@
+{
+ "api_pass": 10,
+ "api_total": 15,
+ "boundary_pass": 0,
+ "boundary_total": 3,
+ "canonical_unchanged_all": true,
+ "db_bytes_unchanged_all": true,
+ "results": [
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "protected",
+   "fixture": "unique_direct_match",
+   "human": [],
+   "machine": [
+    [
+     0,
+     28,
+     41,
+     "o1"
+    ]
+   ],
+   "pass": true,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "protected",
+   "fixture": "html_escaped_text",
+   "human": [],
+   "machine": [
+    [
+     0,
+     0,
+     22,
+     "o1"
+    ]
+   ],
+   "pass": true,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "protected",
+   "fixture": "drop_cap_continuation",
+   "human": [],
+   "machine": [
+    [
+     0,
+     1,
+     45,
+     "o1"
+    ]
+   ],
+   "pass": true,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "protected",
+   "fixture": "unique_prose_merge_continuation",
+   "human": [],
+   "machine": [
+    [
+     0,
+     38,
+     58,
+     "o1"
+    ]
+   ],
+   "pass": true,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "protected",
+   "fixture": "unchanged_substring_after_offset_shift",
+   "human": [],
+   "machine": [
+    [
+     0,
+     18,
+     32,
+     "o1"
+    ]
+   ],
+   "pass": true,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "protected",
+   "fixture": "document_filtering",
+   "human": [],
+   "machine": [],
+   "pass": true,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "protected",
+   "fixture": "neighboring_page_filtering",
+   "human": [],
+   "machine": [],
+   "pass": true,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "protected",
+   "fixture": "rejected_observation_hidden",
+   "human": [],
+   "machine": [],
+   "pass": true,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "protected",
+   "fixture": "ordinary_human_precedence",
+   "human": [
+    [
+     0,
+     17,
+     26
+    ]
+   ],
+   "machine": [],
+   "pass": true,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "protected",
+   "fixture": "lens_off_on_reconstruction",
+   "human": [],
+   "machine": [
+    [
+     0,
+     28,
+     41,
+     "o1"
+    ]
+   ],
+   "pass": true,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "failure_family_1",
+   "fixture": "wrong_repeated_occurrence",
+   "human": [],
+   "machine": [
+    [
+     0,
+     0,
+     5,
+     "o1"
+    ]
+   ],
+   "pass": false,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "failure_family_2",
+   "fixture": "same_text_two_source_extractions",
+   "human": [],
+   "machine": [
+    [
+     0,
+     0,
+     15,
+     "o1"
+    ],
+    [
+     1,
+     0,
+     15,
+     "o1"
+    ]
+   ],
+   "pass": false,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "failure_family_3",
+   "fixture": "projected_soft_wrap",
+   "human": [],
+   "machine": [],
+   "pass": false,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "failure_family_4",
+   "fixture": "offset_adjustment_inside_transformed_sentence",
+   "human": [],
+   "machine": [],
+   "pass": false,
+   "path": "real_api_renderer"
+  },
+  {
+   "canonical_unchanged": true,
+   "db_bytes_unchanged": true,
+   "family": "failure_family_5",
+   "fixture": "human_overlap_suppresses_not_relocates",
+   "human": [
+    [
+     0,
+     0,
+     5
+    ]
+   ],
+   "machine": [
+    [
+     0,
+     6,
+     11,
+     "o1"
+    ]
+   ],
+   "pass": false,
+   "path": "real_api_renderer"
+  },
+  {
+   "family": "renderer_boundary",
+   "fixture": "identity_less_injected_observation",
+   "machine": [
+    [
+     0,
+     15,
+     "o1"
+    ]
+   ],
+   "pass": false,
+   "path": "renderer_boundary"
+  },
+  {
+   "family": "renderer_boundary",
+   "fixture": "misattributed_extraction_identity",
+   "machine": [
+    [
+     0,
+     5,
+     "o1"
+    ]
+   ],
+   "pass": false,
+   "path": "renderer_boundary"
+  },
+  {
+   "family": "renderer_boundary",
+   "fixture": "out_of_range_canonical_span",
+   "machine": [
+    [
+     0,
+     5,
+     "o1"
+    ]
+   ],
+   "pass": false,
+   "path": "renderer_boundary"
+  }
+ ],
+ "root_commit": "e6d83fcde49dabe250b105d540a64dea3a6b9831",
+ "second_run_byte_identical": true,
+ "total": 18,
+ "total_pass": 10
+}

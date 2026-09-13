@@ -13512,6 +13512,67 @@ function _crHumanSegmentsFromRanges(ranges) {
   return segments;
 }
 
+// Canonical boundary → display boundary within one display_source_span, using
+// the projection's own offset_adjustments (delta of the last adjustment at or
+// before the source offset).
+function _crProjectSourceBoundary(sourceSpan, offset) {
+  const adjustments = Array.isArray(sourceSpan?.offset_adjustments) ? sourceSpan.offset_adjustments : [];
+  let delta = 0;
+  adjustments.forEach(adjustment => {
+    const at = _crFiniteNumber(adjustment?.source_offset);
+    const nextDelta = _crFiniteNumber(adjustment?.display_delta);
+    if (at !== null && nextDelta !== null && offset >= at) delta = nextDelta;
+  });
+  return offset + delta;
+}
+
+function _crWithoutWhitespace(s) {
+  return String(s || '').replace(/\s+/g, '');
+}
+
+// Exact display range for a machine Observation in this block, or null. Needs
+// the API's canonical_span (parent SourceExtraction id + offsets). The block
+// must contain that extraction; a projected block must carry exactly one
+// display_source_span for it. Mapped offsets are never clamped or searched for:
+// out of range, ambiguous, or unfaithful to the canonical text → abstain.
+function _crMachineRangeForBlock(o, blockCtx, text) {
+  const span = o?.canonical_span;
+  const extractionId = String(span?.source_extraction_id || '');
+  const sourceStart = _crSourceOffset(span?.start);
+  const sourceEnd = _crSourceOffset(span?.end);
+  const canonicalText = typeof span?.text === 'string' ? span.text : '';
+  if (!text || !extractionId || sourceStart === null || sourceEnd === null) return null;
+  if (sourceEnd <= sourceStart || !canonicalText.trim()) return null;
+  if (!_crStringList(blockCtx?.extraction_ids).includes(extractionId)) return null;
+
+  const displaySpans = Array.isArray(blockCtx?.display_source_spans) ? blockCtx.display_source_spans : [];
+  let start = sourceStart;
+  let end = sourceEnd;
+  let projected = false;
+  if (displaySpans.length) {
+    const matches = displaySpans.filter(s => String(s?.source_extraction_id || '') === extractionId);
+    if (matches.length !== 1) return null;
+    const sourceSpan = matches[0];
+    const spanStart = _crFiniteNumber(sourceSpan.start);
+    const spanEnd = _crFiniteNumber(sourceSpan.end);
+    if (spanStart === null || spanEnd === null || spanEnd < spanStart || spanEnd > text.length) return null;
+    projected = Array.isArray(sourceSpan.offset_adjustments) && sourceSpan.offset_adjustments.length > 0;
+    start = spanStart + _crProjectSourceBoundary(sourceSpan, sourceStart);
+    end = spanStart + _crProjectSourceBoundary(sourceSpan, sourceEnd);
+    if (start < spanStart || end > spanEnd) return null;
+  }
+  while (start < end && /\s/.test(text[start] || '')) start++;
+  while (end > start && /\s/.test(text[end - 1] || '')) end--;
+  if (start < 0 || end > text.length || end <= start) return null;
+  // Reader projections only rewrite whitespace, so a faithful mapping shows the
+  // same characters; an unprojected block must show them verbatim.
+  const shown = text.slice(start, end);
+  const faithful = projected
+    ? _crWithoutWhitespace(shown) === _crWithoutWhitespace(canonicalText)
+    : shown === canonicalText;
+  return faithful ? { start, end } : null;
+}
+
 // Renders a block's text non-destructively from source: user highlights are
 // wrapped from saved Reader span locators, falling back to exact-substring
 // matches for legacy rows, and — when the Machine Lens is on — machine
@@ -13547,19 +13608,14 @@ function _crRenderTextWithHighlights(text, highlights, machineObs, blockCtx = {}
     }
   });
   const ranges = _crHumanSegmentsFromRanges(humanRanges);
-  // Machine observations — only where they do not overlap a user mark.
-  // Exact substring is the safe strategy; an observation whose raw_text is not
-  // found verbatim in this block (normalization, cross-block spans) is simply
-  // not drawn rather than mismatched.
+  // Machine observations — anchored by identity, never by text search. The
+  // Observation's canonical span inside its parent SourceExtraction is mapped
+  // through this block's projection provenance. If that exact span overlaps a
+  // user mark it is suppressed, never relocated to another equal string.
   (machineObs || []).forEach(o => {
-    const seg = (o.raw_text || '').trim();
-    if (!seg || o.review_status === 'rejected') return;   // rejected = hidden
-    let start = text.indexOf(seg);
-    while (start >= 0) {
-      const end = start + seg.length;
-      if (_crPushNonOverlappingRange(ranges, start, end, { kind: 'machine', obs: o })) break;
-      start = text.indexOf(seg, start + 1);
-    }
+    if (!o || o.review_status === 'rejected') return;   // rejected = hidden
+    const range = _crMachineRangeForBlock(o, blockCtx, text);
+    if (range) _crPushNonOverlappingRange(ranges, range.start, range.end, { kind: 'machine', obs: o });
   });
   if (ranges.length === 0) return x(text);
 

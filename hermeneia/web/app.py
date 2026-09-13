@@ -129,7 +129,7 @@ from ..explorer.interpreter import (
 )
 from ..explorer.bucketer import BucketingError, generate_candidate_buckets
 from ..study import compile_study, compile_synthesis_packet
-from .reader_projection import project_reader_page
+from .reader_projection import observation_canonical_span, project_reader_page
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -9625,14 +9625,24 @@ Return ONLY valid JSON, no markdown, no explanation:
         except _ScopeAccessError as exc:
             conn.close()
             return _scope_error_response(exc)
-        if page is not None:
-            rows = conn.execute(
-                """SELECT o.id, o.raw_text, o.page, o.source_locator,
+        # Identity for Machine Lens anchoring: the parent SourceExtraction and
+        # the Observation's canonical occurrence inside it. Read-only.
+        select_from = """SELECT o.id, o.raw_text, o.page, o.source_locator,
+                          o.source_extraction_id, o.sentence,
                           sd.original_filename, sd.source_role,
-                          orv.review_status
+                          orv.review_status,
+                          se.raw_text AS extraction_raw_text,
+                          p.char_offset_start, p.char_offset_end
                    FROM observations o
                    JOIN source_documents sd ON sd.id = o.source_document_id
                    LEFT JOIN observation_reviews orv ON orv.observation_id = o.id
+                   LEFT JOIN source_extractions se
+                          ON se.id = o.source_extraction_id
+                         AND se.document_id = o.source_document_id
+                   LEFT JOIN provenance p ON p.id = o.id"""
+        if page is not None:
+            rows = conn.execute(
+                select_from + """
                    WHERE o.source_document_id = ? AND ABS(o.page - ?) <= 1
                      AND sd.excluded_from_analysis = 0
                    ORDER BY ABS(o.page - ?), o.paragraph
@@ -9641,12 +9651,7 @@ Return ONLY valid JSON, no markdown, no explanation:
             ).fetchall()
         else:
             rows = conn.execute(
-                """SELECT o.id, o.raw_text, o.page, o.source_locator,
-                          sd.original_filename, sd.source_role,
-                          orv.review_status
-                   FROM observations o
-                   JOIN source_documents sd ON sd.id = o.source_document_id
-                   LEFT JOIN observation_reviews orv ON orv.observation_id = o.id
+                select_from + """
                    WHERE o.source_document_id = ?
                      AND sd.excluded_from_analysis = 0
                    ORDER BY o.page, o.paragraph
@@ -9654,6 +9659,22 @@ Return ONLY valid JSON, no markdown, no explanation:
                 (doc_id,)
             ).fetchall()
         conn.close()
-        return jsonify({"observations": [dict(r) for r in rows]})
+
+        def _anchored(row) -> dict:
+            item = dict(row)
+            span = observation_canonical_span(
+                item.pop("extraction_raw_text", None),
+                item.get("raw_text"),
+                item.get("sentence"),
+                item.pop("char_offset_start", None),
+                item.pop("char_offset_end", None),
+            )
+            item["canonical_span"] = (
+                {"source_extraction_id": item["source_extraction_id"], **span}
+                if span and item.get("source_extraction_id") else None
+            )
+            return item
+
+        return jsonify({"observations": [_anchored(r) for r in rows]})
 
     return app
