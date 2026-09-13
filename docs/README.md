@@ -62,6 +62,27 @@ These explain what the system currently is and where the product is going, but d
 
 These are synchronization/orientation documents. They may become stale as code and issues advance. Do not treat an older implementation snapshot as stronger than current repository evidence or governing authority.
 
+### Ratification-era root artifacts
+
+The following root files preserve the architecture-discovery / ratification process:
+
+- `../EPISTEMIC_BACKLOG.md`
+- `../QUESTION_DEPENDENCY_GRAPH.md`
+- `../RATIFICATION.md`
+
+They remain scientifically and historically useful, but parts of their internal authority language predate the ratified 2026-06-19 Constitution and Authority Index.
+
+Therefore:
+
+```text
+historical/internal hierarchy text
+!= current authority routing
+```
+
+When they disagree with `01_Authority_Index.md`, the current Authority Index controls.
+
+`RATIFICATION.md` already carries a partial-supersession notice. The backlog and dependency graph should be read as preserved research/governance lineage rather than as independent replacements for current constitutional authority.
+
 ### Historical / superseded constitutional material
 
 Examples include:
@@ -109,6 +130,16 @@ current product
 ```
 
 See `ORIGIN_AND_EVOLUTION.md` for the full relationship.
+
+---
+
+## Corpus / fixture distinction
+
+Gatsby remains a useful founding corpus and real-corpus validation fixture.
+
+It is not a special architectural dependency.
+
+See `../corpora/README.md` for the current multi-corpus framing.
 
 ---
 
