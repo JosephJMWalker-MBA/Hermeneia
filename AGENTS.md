@@ -1,310 +1,379 @@
-# **Hermeneia Agent Instructions**
+# Hermeneia Agent Guidance
 
-This repository is specification-driven.
+Hermeneia is specification-driven, but it is no longer in the original architecture-freeze implementation phase.
 
-The architecture documents are the source of truth.
+**Current phase:** validation through real use, bounded implementation, and research pressure.
 
-Code is merely one implementation.
+The foundation is:
 
-If implementation and specification disagree, the implementation is wrong.
+```text
+stable against preference
+not stable against evidence
+```
 
-## **Agent Mission**
+Agents may assist with engineering, research, evaluation, documentation, and product validation depending on the assigned task. They may not silently change constitutional ontology, evidence identity, authority, or provenance rules.
 
-Your purpose is not to invent architecture.
+---
 
-Your purpose is to faithfully implement architecture.
+## Start here
 
-You are an engineer, not an architect.
+Before substantive work, read the smallest relevant current-state path:
 
-You may suggest improvements, but you must never silently change ontology or constitutional behavior.
+1. `README.md` — current project identity and repository map
+2. `docs/README.md` — documentation classes / current-vs-historical routing
+3. `docs/What_Hermeneia_Is.md` — project identity
+4. `docs/FROZEN_PRODUCT_DIRECTION.md` — current Reader-centered product direction
+5. `IMPLEMENTATION_STATUS.md` — dated operational state
+6. `docs/01_Authority_Index.md` — canonical authority routing
+7. `docs/00_Constitution.md` — highest governing law
+8. `docs/02_Constitutional_Invariants.md` — executable constitutional obligations
+9. relevant active ADRs/specifications for the surface being changed
 
-## **Hierarchy of Authority**
+For historical context, use `docs/ORIGIN_AND_EVOLUTION.md` and superseded material identified by the Authority Index.
+
+Do not reconstruct current state from old roadmap checkboxes, stale root snapshots, filename order, or issue chronology alone.
+
+---
+
+## Current project identity
+
+Hermeneia began with AI-assisted *Great Gatsby* essay work for a Department of the Treasury hiring exercise, including preservation of human authorship/judgment and culturally distinct interpretive lenses.
+
+That use case remains valid lineage and a useful test case.
+
+It is not the current product boundary.
+
+Current identity:
+
+> **Hermeneia is an operating environment for the disciplined evolution of understanding.**
+
+Current product direction:
+
+> **Hermeneia is a Reader-centered workbench for governed interpretation.**
+
+Do not reduce the system to Gatsby, essay generation, cultural-lens prompting, one model workflow, or one linear pipeline.
+
+---
+
+## Authority hierarchy
 
 When conflicts occur, resolve them in this order:
 
-1. docs/00\_Constitution.md  
-2. docs/01\_Authority\_Index.md  
-3. Ratified documents in docs/amendments/  
-4. docs/02\_Constitutional\_Invariants.md  
-5. Active ADRs  
-6. Active implementation documents and compiler specifications  
-7. Existing code  
-8. Generated code
+1. `docs/00_Constitution.md`
+2. `docs/01_Authority_Index.md`
+3. ratified documents in `docs/amendments/`
+4. `docs/02_Constitutional_Invariants.md`
+5. active ADRs
+6. active implementation documents and compiler specifications
+7. code
+8. generated artifacts
 
 Never reverse this order.
 
-## **Constitutional Rule**
+A detailed old document does not outrank a newer active authority merely because it contains more implementation detail.
 
-SourceDocuments, SourceExtractions, and Observations are immutable evidence.
+---
 
-Interpretations evolve.
+## Agent mission
 
-Perspectives accumulate.
+Your job is to help Hermeneia learn and improve **without silently corrupting the epistemic foundation**.
 
-Narratives are disposable.
+Depending on the task, this may mean:
 
-Every object must maintain permanently verifiable lineage to immutable ancestors.
+- implement an already-governed design;
+- reproduce and diagnose product friction;
+- build a bounded projection or derived surface;
+- evaluate a hypothesis;
+- compare architecture with observed use;
+- preserve a negative result;
+- identify a genuine architectural insufficiency and escalate it for human/constitutional review.
 
-Any implementation that violates these principles must be rejected.
+Do not treat “do not invent architecture” as “do not notice architectural problems.”
 
-## **Ontology Discipline**
+The correct rule is:
 
-Do not create new domain objects unless explicitly requested.
+```text
+observe freely
+analyze explicitly
+propose clearly
+change constitutional architecture only through its governing process
+```
 
-Do not rename ontology objects.
+---
 
-Do not merge ontology objects.
+## Constitutional evidence boundary
 
-Do not split ontology objects.
+The ratified forensic evidence chain is:
 
-Do not infer missing ontology.
-
-Instead: raise an architectural question.
-
-## **No Silent Creativity**
-
-Do not:
-
-* invent fields  
-* invent tables  
-* invent APIs  
-* invent abstractions  
-* invent pipeline stages
-
-without explicit approval.
-
-Ask first.
-
-## **Purity of Layers**
-
-**Forensic evidence layer:**
-
-* deterministic  
-* local  
-* immutable  
-* no LLM  
-* no embeddings  
-* no inference  
-* no sentiment  
-* no symbolism
+```text
+SourceDocument
+    ↓
+SourceExtraction
+    ↓
+Observation
+```
 
 SourceDocument is the original artifact.
 
-SourceExtraction is exact parser output.
+SourceExtraction preserves parser output exactly as encountered.
 
-Observation is one sentence derived from SourceExtraction without altering its characters.
+Observation is the constitutional semantic unit segmented from SourceExtraction without altering its characters.
 
-Normalization, tokens, and whitespace maps are derived metadata only. They never replace evidence.
+Normalization, readable reconstruction, tokens, whitespace maps, search indexes, summaries, and projections are derived conveniences. They must not silently replace evidence.
 
-**Inference layer:**
+### Anti-helpfulness rule
 
-* derived only
+Do not silently “fix” malformed source text, spelling, punctuation, spacing, ambiguity, or parser artifacts in canonical evidence.
 
-**Perspective layer:**
+A correction or readable reconstruction belongs in a descendant claim/projection unless governing authority explicitly changes the evidence model.
 
-* accumulative only
+Preserve reality first. Improve usability downstream.
 
-**Narrative layer:**
+---
 
-* generated only
+## Cognitive and authority boundaries
 
-Never leak higher-layer concepts downward.
+Keep these roles distinguishable:
 
-## **Provenance**
+```text
+source evidence
+human attention / questions
+machine proposal
+human interpretation
+Perspective
+stewarded synthesis
+semantic contract
+expression constraints
+rendered expression
+Critic finding
+Steward judgment
+```
 
-Every generated object must be able to trace its ancestry.
+Do not silently promote a machine suggestion into governed understanding.
 
-No floating nodes.
+Do not make a projection canonical because it is polished.
+
+Do not make Critic findings governance decisions.
+
+Do not make model/provider/configuration part of Perspective identity.
+
+Do not infer that multiple Perspectives must converge.
+
+---
+
+## Ontology discipline
+
+Prefer established primitives before creating new domain objects.
+
+Do not silently:
+
+- invent canonical object types;
+- rename constitutional objects;
+- merge or split constitutional objects;
+- add a field/table merely because a UI would be easier;
+- promote a useful workflow concept into ontology without evidence and review.
+
+First ask whether the requirement can be represented as:
+
+```text
+canonical object
+function
+derived artifact
+projection
+configuration
+relationship
+human judgment
+```
+
+If not, document the architectural pressure explicitly.
+
+---
+
+## Product-validation discipline
+
+Hermeneia is currently validated through real use.
+
+Default loop:
+
+```text
+use the product
+→ observe actual friction
+→ preserve the witness
+→ classify the problem
+→ choose the smallest lawful correction
+→ test
+→ use again
+```
+
+Classify before redesigning:
+
+```text
+UX
+projection
+configuration
+provider/runtime
+function/derivation
+implementation defect
+specification gap
+architecture
+constitutional insufficiency
+```
+
+Do not jump directly from inconvenience to ontology.
+
+The Reader remains the center of gravity. Tools should unfold around the work rather than crowding it out.
+
+---
+
+## Scope, Perspective, and execution identity
+
+Keep these distinct:
+
+```text
+Scope
+Perspective
+Connection
+Provider
+Model
+Model Version
+Configuration
+Investigation
+```
+
+Scope answers what existing material an operation may know about.
+
+Perspective answers from where material is examined.
+
+Provider/model/configuration identifies execution conditions.
+
+None silently substitutes for another.
+
+---
+
+## Provenance
+
+Every canonical or governed derived object must retain the lineage required by its active specification.
 
 No floating interpretations.
 
-No floating concepts.
+No floating generated artifacts where provenance is required.
 
-If provenance cannot be established, generation must fail.
+No hidden replacement of the source record.
 
-## **The Anti-Helpfulness Mandate**
+Where execution is nondeterministic, preserve enough provider/model/configuration/input/output metadata for audit rather than pretending byte-for-byte reproducibility.
 
-As an AI, you are biased toward being "helpful" and fixing errors. In Hermeneia, this is a flaw.
+---
 
-During compilation (Stage 1), do not "clean up" the author's text. If a PDF parser yields malformed text with weird spacing, SourceExtraction must preserve the exact parser output and Observation must preserve the exact characters selected from it.
+## Database operations
 
-We preserve reality, not an idealized version of it. Do not attempt to fix typos, resolve ambiguous pronouns, or normalize punctuation.
+The `.herm` store is append-only for canonical objects and relations where constitutional/storage authority requires it.
 
-## **Database Operations**
+Do not use UPDATE or DELETE to mutate forensic evidence or governed history.
 
-The .herm SQLite schema is strictly append-only for canonical objects and relations.
+If a correction requires a new lineage, create a new lineage or governed successor rather than rewriting the past.
 
-Do not write UPDATE or DELETE queries for SourceDocuments, SourceExtractions, Observations, or provenance. If an extraction is wrong, create a new compilation lineage or discard and recompile the entire .herm file. Data mutation is forbidden at the forensic evidence layer.
+Consult the active storage specification before changing persistence semantics.
 
-## **Human Stewardship**
+---
 
-Hermeneia exists to increase human interpretation, not replace it.
+## Testing as enforcement
 
-When uncertain, prefer exposing ambiguity over collapsing it.
+Tests are not merely code-coverage devices. They enforce constitutional and product invariants.
 
-When multiple perspectives exist, preserve them.
+For architecture-sensitive changes, tests should establish the relevant boundary explicitly.
 
-When perspective debt exists, surface it.
+Examples:
 
-Never hide uncertainty.
+- evidence remains immutable;
+- derived readability does not mutate SourceExtraction/Observation;
+- machine output does not auto-ratify;
+- provider/configuration changes do not alter Perspective identity;
+- workspace boundaries remain isolated;
+- lineage survives export/import/restore;
+- a Reader improvement does not destroy source anchoring.
 
-## **Architectural Bias**
+Record infrastructure failures as infrastructure failures rather than semantic/product failures.
 
-Prefer:
+---
 
-* explicit over implicit  
-* deterministic over probabilistic  
-* append-only over mutation  
-* compiler over prompt  
-* graph over string  
-* provenance over confidence  
-* human contribution over automation
+## Pull request expectations
 
-## **Code Style**
+Every substantive PR should make clear:
 
-Prefer pure functions.
+1. What observed problem, issue, specification, or research result motivates this change?
+2. What active authority/specification governs the changed surface?
+3. What invariant or product boundary must remain true?
+4. Is the change canonical, derived, projection-only, configuration-only, or UI-only?
+5. What tests or real-use witness demonstrate the change?
+6. What remains unresolved or deliberately out of scope?
 
-Prefer immutable models (e.g., Pydantic frozen=True).
+A PR does **not** need an artificial direct lineage to the original white paper if a more precise current authority governs the work.
 
-Prefer composition over inheritance.
+Use the strongest current governing source, not ceremonial ancestry.
 
-Prefer typed interfaces (Strict Python type hinting is mandatory).
+---
 
-Avoid hidden state.
+## Historical material
 
-Avoid singleton patterns.
+Hermeneia intentionally preserves superseded and early-stage material.
 
-Avoid magic behavior.
+Do not infer:
 
-Every transformation should be inspectable.
-
-## **Testing as Enforcement**
-
-Tests are not merely for code coverage; they are the executable form of the Constitution.
-
-Every test suite must explicitly assert the applicable laws in docs/02\_Constitutional\_Invariants.md. If a component handles a SourceDocument, SourceExtraction, or Observation, you must write a test proving it cannot be modified.
-
-## **Pull Request Expectations**
-
-Every PR should answer:
-
-1. What specification does this implement?  
-2. What invariant does this preserve?  
-3. What constitutional article does this rely upon?  
-4. Can this change be traced back to the white paper?
-
-If these questions cannot be answered, the PR is incomplete.
-
-## **Failure Mode**
-
-When architecture is ambiguous:
-
-**STOP.**
-
-Do not guess.
-
-Do not improvise.
-
-Open an architectural discussion instead.
-
-A delayed implementation is preferable to an incorrect ontology.
-
-## **Git Operating Policy**
-
-Git exists to preserve the constitutional lineage of the Hermeneia project.
-
-Git is infrastructure. Git is not the authority. The repository exists to preserve the evolution of the authoritative artifacts.
-
-### Repository Authority
-
-The authoritative Git repository shall exist at the constitutional project root:
-
-```
-Hermeneia/
-    .git/
+```text
+file exists
+→ file is current authority
 ```
 
-Never initialize or maintain nested Git repositories inside canonical project directories unless explicitly approved.
+Use `docs/01_Authority_Index.md` and `docs/README.md` to route old documents.
 
-If a nested repository is discovered: stop, report it, do not silently continue.
+Do not rewrite historical Gatsby/Treasury or early architecture artifacts to make the present system look inevitable. Preserve the actual evolution.
 
-### Repository Health Check
+---
 
-Before beginning substantive engineering work, verify:
+## Git operating policy
 
-```
+Before substantive engineering work, verify repository state:
+
+```bash
 git rev-parse --show-toplevel
 git status
 git remote -v
 git branch
 ```
 
-If any command fails: stop, explain why, do not guess.
+Default branch: `main`.
 
-✓ Repository root verified  
-✓ Working tree clean (or changes understood)  
-✓ Remote reachable  
-✓ Branch verified  
-✓ No nested Git repositories
+Do not create nested repositories inside canonical project directories.
 
-### Recovery
+Do not force-push without explicit human approval.
 
-If Git reports `fatal: not a git repository`:
+Commits should describe architectural or product intent, not merely file movement.
 
-1. Locate existing repositories.
-2. Determine constitutional project root.
-3. Compare repository root against project root.
-4. Explain findings.
-5. Wait for approval before restructuring history.
-
-Never suggest `git init` until repository authority has been investigated.
-
-### Commit Philosophy
-
-Commits describe architectural intent, not file movement.
-
-Good: `Promote repository authority to project root`  
-Not: `Updated files`
-
-### Push Philosophy
-
-Never perform `git push --force` without explicit human approval. If history replacement appears appropriate, explain why, explain consequences, explain alternatives, and require confirmation. Prefer `git push --force-with-lease`.
-
-### Branch Philosophy
-
-Default branch: `main`. Do not create feature branches automatically. Branch strategy belongs to the human steward.
-
-### Ignore Policy
-
-Git tracks constitutional artifacts. Git ignores disposable projections.
-
-Track: `docs/`, `research/`, `tests/`, `hermeneia/`, `schemas/`  
-Ignore: `__pycache__/`, `build/`, `*.egg-info/`, `.pytest_cache/`
-
-When uncertain: ask whether the artifact is authoritative, derived, or disposable.
-
-### Release Discipline
-
-A release commit should occur only after:
-
-- Critic pass complete
-- Coverage reviewed
-- Steward decision made
-
-Git tags represent release decisions. They do not replace release documentation.
-
-### Behavioral Rule
-
-Infrastructure automation may: inspect, verify, package, preserve.
-
-Infrastructure automation shall not: rewrite history, change authority, force synchronization — without explicit human ratification.
+Track authoritative/research artifacts; ignore disposable build/runtime artifacts according to `.gitignore` and active repository policy.
 
 ---
 
-## **Final Principle**
+## When architecture is ambiguous
+
+Do not guess a constitutional answer.
+
+Instead:
+
+1. identify the ambiguity;
+2. show the competing interpretations;
+3. identify the active authorities involved;
+4. preserve relevant evidence from code/use/history;
+5. propose the smallest options;
+6. require human/constitutional resolution before changing ontology or authority.
+
+A delayed architectural change is preferable to silent semantic corruption.
+
+---
+
+## Final principle
 
 The greatest failure is not a compiler error.
 
-The greatest failure is silently corrupting the epistemic foundation.
+The greatest failure is silently corrupting the relationship among evidence, interpretation, authorship, provenance, and stewardship.
 
-Protect the ontology above all else.
+Protect that relationship while allowing the product and research program to keep learning from reality.
