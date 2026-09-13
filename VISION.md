@@ -1,5 +1,9 @@
 # Vision
 
+**Status:** Interpretive orientation  
+**Authority:** Non-constitutional; current authority resolves through `docs/01_Authority_Index.md`  
+**Current identity:** See `README.md`, `docs/What_Hermeneia_Is.md`, and `docs/FROZEN_PRODUCT_DIRECTION.md`
+
 Hermeneia seeks to become a durable operating system for human
 understanding.
 
