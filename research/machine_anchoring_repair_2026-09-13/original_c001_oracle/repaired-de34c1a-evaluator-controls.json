@@ -1,0 +1,82 @@
+{
+  "all_abstain": [
+    {
+      "all_abstain_passes": false,
+      "id": "direct_unique"
+    },
+    {
+      "all_abstain_passes": false,
+      "id": "repeated_identical_second"
+    },
+    {
+      "all_abstain_passes": false,
+      "id": "same_text_other_extraction"
+    },
+    {
+      "all_abstain_passes": false,
+      "id": "soft_wrap_sentence"
+    },
+    {
+      "all_abstain_passes": false,
+      "id": "offset_shift_unaltered_substring"
+    },
+    {
+      "all_abstain_passes": false,
+      "id": "offset_adjustment_inside_sentence"
+    },
+    {
+      "all_abstain_passes": false,
+      "id": "drop_cap_continuation"
+    },
+    {
+      "all_abstain_passes": false,
+      "id": "prose_merge_unique"
+    },
+    {
+      "all_abstain_passes": true,
+      "id": "wrong_document_api"
+    },
+    {
+      "all_abstain_passes": true,
+      "id": "neighbor_page_api"
+    },
+    {
+      "all_abstain_passes": true,
+      "id": "rejected_observation"
+    },
+    {
+      "all_abstain_passes": true,
+      "id": "human_overlap"
+    },
+    {
+      "all_abstain_passes": true,
+      "id": "human_overlap_relocates_machine"
+    },
+    {
+      "all_abstain_passes": false,
+      "id": "escaped_text_unique"
+    },
+    {
+      "all_abstain_passes": true,
+      "id": "whitespace_only_no_mark"
+    },
+    {
+      "all_abstain_passes": true,
+      "id": "wrong_extraction_renderer"
+    },
+    {
+      "all_abstain_passes": true,
+      "id": "wrong_source_renderer"
+    },
+    {
+      "all_abstain_passes": true,
+      "id": "ambiguous_reconstruction_renderer"
+    }
+  ],
+  "canonical_mutation_rejected": true,
+  "duplicate_mark_rejected": true,
+  "perfect_oracle_accepted": true,
+  "positive_fixture_count": 9,
+  "wrong_identity_rejected": true,
+  "wrong_position_rejected": true
+}
