@@ -1,7 +1,7 @@
 # What Hermeneia Is
 
-**Status:** PROJECT IDENTITY STATEMENT
-**Authority:** Interpretive orientation only
+**Status:** PROJECT IDENTITY STATEMENT  
+**Authority:** Interpretive orientation only  
 **Implementation status:** DOCUMENTATION ONLY
 
 ---
@@ -15,6 +15,20 @@ governance, evidence, and accountability.
 
 Hermeneia preserves the evolution of understanding by separating and governing
 the cognitive responsibilities through which understanding develops.
+
+## Origin is not scope
+
+Hermeneia began with a concrete *Great Gatsby* / Department of the Treasury use case: use AI tools during serious essay work while preserving human authorship and judgment, grounding claims in source evidence, and comparing culturally or semantically distinct readings.
+
+That origin still fits the system and remains useful as a test case.
+
+It does not define the system's current scope.
+
+The project has evolved from a provenance-aware essay workflow into a Reader-centered, multi-corpus, human-stewarded environment for preserving inquiry itself.
+
+See `ORIGIN_AND_EVOLUTION.md` for the historical path.
+
+---
 
 The confirmed cognitive responsibilities are:
 
@@ -132,7 +146,7 @@ This layer answers: *Can we trust the system?*
 
 The separation of cognitive responsibilities across pipeline roles.
 
-```
+```text
 Explorer       discovers candidate interpretations
 Architect      reconstructs semantic obligations
 Artist         communicates in expressive form
@@ -146,7 +160,7 @@ This layer answers: *Can meaning survive different expressions?*
 
 The framework that governs inquiry itself.
 
-```
+```text
 Execution Contract
     ↓
 Research Session
