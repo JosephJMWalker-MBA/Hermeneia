@@ -1,66 +1,68 @@
-> **Product direction:** Read [`docs/FROZEN_PRODUCT_DIRECTION.md`](docs/FROZEN_PRODUCT_DIRECTION.md)
-> first for the Reader-centered experience. Read [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md)
-> for the dated operational state. Constitutional authority always resolves through
-> [`docs/01_Authority_Index.md`](docs/01_Authority_Index.md).
+# Claude Orientation — Hermeneia
 
-# ARCHITECTURE FREEZE v1.0 — LIFTED
+Hermeneia is in **Validation Phase — active development**.
 
-**Status:** Validation Phase — active development  
-**Freeze lifted:** 2026-06-25  
-**Orientation synchronized:** 2026-08-29
-
-The constitutional architecture demonstrated sufficient stability through implementation, testing, and repeated experimental execution to continue building without treating every new product finding as a foundational rewrite.
-
-This does not mean Hermeneia is finished. It means the foundation is stable enough to be pressure-tested through real use.
-
----
-
-## Validation Phase
-
-The governing engineering posture is:
+The original architecture freeze has been lifted. The foundation is:
 
 ```text
 stable against preference
 not stable against evidence
 ```
 
-New architectural ideas do not acquire authority merely because they are useful or attractive. Product findings should first be implemented, when possible, as bounded projections, configuration, workflow, or derived infrastructure over established primitives. If evidence demonstrates a genuine architectural insufficiency, route the question through the constitutional process.
-
-### Current validation goals
-
-- Validate Hermeneia through sustained use on additional real corpora and manuscripts.
-- Keep the Reader as the center of gravity while tools unfold around the work.
-- Strengthen whole-study synthesis from accumulated highlights, questions, notes, observations, buckets, and Perspectives.
-- Preserve question-relative investigation framing and explicit Scope/provider/model boundaries.
-- Continue provider/runtime work without confusing Connection, Provider, Model, Model Version, Configuration, Perspective, or epistemic identity.
-- Improve onboarding, accessibility, recovery, and workflow coherence based on observed friction.
-- Preserve exact provenance for nondeterministic execution and human stewardship.
-- Prepare a stable v1.0 release candidate only after the product survives real-use validation.
-- Complete live demonstration and communication materials after the demonstrated product state is stable enough to show honestly.
-
-The dated operational state lives in `IMPLEMENTATION_STATUS.md`; do not reconstruct current completion from old roadmap checkboxes.
+Your job is not to protect the architecture from reality. Your job is to understand the current authorities accurately, preserve the epistemic boundaries they govern, and help pressure-test or improve the system without silently changing ontology or authority.
 
 ---
 
-## Stable Cognitive Responsibilities
+## Read first
 
-```text
-Explorer       surfaces candidate interpretations from evidence
-Architect      reconstructs semantic obligations from stewarded understanding
-Artist         realizes understanding in a chosen expressive form
-Critic         evaluates whether expression preserved declared obligations
-Steward        exercises judgment that cannot be reduced to computation
-```
+Before substantial work, read:
 
-These are cognitive responsibilities, not merely software modules.
+1. `README.md` — current identity and repository map
+2. `docs/README.md` — documentation classes and current-vs-historical routing
+3. `docs/What_Hermeneia_Is.md` — identity statement
+4. `docs/ORIGIN_AND_EVOLUTION.md` — founding Gatsby/Treasury lineage and system evolution
+5. `docs/FROZEN_PRODUCT_DIRECTION.md` — current Reader-centered product direction
+6. `IMPLEMENTATION_STATUS.md` — dated operational state
+7. `docs/01_Authority_Index.md` — canonical authority routing
+8. `docs/00_Constitution.md` — highest governing law
+9. `docs/02_Constitutional_Invariants.md` — executable constitutional obligations
+10. relevant active ADRs/specifications for the surface under review
 
-`Witness` remains under active investigation as attention-before-interpretation. Witness-oriented interfaces and experiments may exist without making Witness a new canonical epistemic class merely through implementation.
+Do not reconstruct current state from old roadmap files, early numbered conceptual notes, superseded ADRs, or issue chronology alone.
 
 ---
 
-## Epistemic / Expression Boundary
+## Identity
 
-The operational lineage remains explicit:
+Hermeneia began with a *Great Gatsby* / Department of the Treasury use case involving AI-assisted essay work, preservation of human authorship/judgment, evidence traceability, and culturally distinct interpretive lenses.
+
+That origin remains valid lineage and a useful proving ground.
+
+It is not the current product boundary.
+
+Current identity:
+
+> **Hermeneia is an operating environment for the disciplined evolution of understanding.**
+
+Current product direction:
+
+> **Hermeneia is a Reader-centered workbench for governed interpretation.**
+
+Do not reduce Hermeneia to:
+
+- Gatsby or literature analysis;
+- essay generation;
+- a cultural-lens prompt system;
+- a chatbot wrapper;
+- one model/provider;
+- one linear pipeline;
+- one machine-generated “lens.”
+
+---
+
+## Constitutional boundary
+
+The forensic evidence chain is:
 
 ```text
 SourceDocument
@@ -68,107 +70,205 @@ SourceDocument
 SourceExtraction
     ↓
 Observation
-    ↓
-Candidate Interpretation     ← machine assistance may propose
-    ↓
-Interpretation               ← human stewardship
-    ↓
-NarrativeBlueprint           ← governed synthesis
-    ↓
-ArchitectPlan                ← semantic contract
-    ↓
-ExpressionProfile            ← audience / language / voice / rhetorical constraints
-    ↓
-RenderedNarrative            ← Artist execution
-    ↓
-Finding[]                    ← bounded Critic evaluation
-    ↓
-Stewardship / Ratification   ← human authority
 ```
 
-Perspective is an interpretive frame used during inquiry and execution. Provider/model/configuration is execution identity. Neither should be silently collapsed into the other or into the semantic identity of the evidence.
+Evidence is preserved exactly according to constitutional/storage rules.
 
-The Constitution, amendments, invariants, active ADRs, and implementation specifications remain authoritative over this orientation summary.
+Readable reconstruction, normalization, summaries, indexes, search helpers, projections, and machine suggestions are downstream conveniences. They must not silently mutate canonical evidence.
 
----
+Preserve distinctions among:
 
-## Product Reality at This Synchronization Point
-
-The following are existing product reality, not future roadmap assumptions:
-
-- Reader-centered workbench and docked Companion
-- in-place Corpus Search, attention timeline, Field Notes, and bottom workstation
-- workspace lifecycle, isolated named workspaces, and WBS export/import/restore
-- Blueprint → Architect → Artist → Critic → Draft Preview → Ratify → Record chain
-- durable Reader annotations and explicit capture modes
-- question compass and question-relative Corpus/Lab framing
-- Perspective definitions/revisions and governed Perspective-run infrastructure
-- accessibility/focus/read-aloud work
-- provider registry, credential-source boundaries, model catalogs, and local-runtime foundations
-
-Do not schedule these as if they are unimplemented merely because an older roadmap says they are next.
+```text
+what the source says
+what a human notices
+what a machine proposes
+what a Perspective contributes
+what a steward accepts
+what a synthesis organizes
+what a projection renders
+what a Critic finds
+what a Steward decides
+```
 
 ---
 
-## Current High-Leverage Work
+## Cognitive responsibilities
 
-### Real-use Reader validation
+Stable responsibilities:
 
-Use real reading and editing sessions to discover friction. Important open work includes Reader projection/readability, meaningful structural checkpoints, trustworthy Reader position, workstation coherence, and sustained manuscript workflows.
+```text
+Explorer       candidate discovery
+Architect      semantic obligation reconstruction
+Artist         expression
+Critic         bounded evaluation
+Steward        human governance
+```
 
-### Whole-study synthesis
+`Witness` remains under investigation as attention-before-interpretation. Implementation or usefulness does not by itself make Witness canonical ontology.
 
-The accumulated study—not one observation at a time—should become the useful unit of synthesis. Evidence Board / true study lineage work is a major open product lane.
-
-### Connections execution control
-
-Issue #159 defines the accepted provider/runtime control-plane direction. Continue in bounded slices. Saved model configurations in draft PR #165 are **not on main** and should be reconciled against current main before landing.
-
-### Derived analytics later
-
-Issue #158 (Model Observatory) is a derived analytics/research surface over trustworthy run history. It must not become a substitute for improving the underlying Reader, lineage, execution receipts, or stewardship flows.
+These responsibilities are not merely software modules. Do not collapse them into one model call because a model can technically perform several tasks.
 
 ---
 
-## Original Exit Criteria — Current Interpretation
+## Product method
 
-- [x] Critic implemented
-- [x] Multi-profile Artist rendering
-- [x] End-to-end traceability
-- [x] Semantic fidelity reporting
-- [x] Reader-centered product direction embodied in working software
-- [x] Durable workspace lifecycle and preservation infrastructure
-- [ ] Whole-study synthesis validated through sustained use
-- [ ] Provider/runtime configuration path completed and integrated cleanly
-- [ ] Live demonstration video
-- [ ] Pitch deck / communication package
-- [ ] Stable v1.0 release candidate
+The Reader remains the center of gravity.
+
+The current workflow is an investigation loop, not merely a one-way pipeline:
+
+```text
+Question
+→ Read
+→ Notice / Mark / Ask
+→ Search / Group / Relate
+→ Perspective / Compare
+→ Steward
+→ Synthesize
+→ Architect
+→ Express
+→ Critique
+→ Ratify / Revise / Reject
+→ Preserve
+↺
+```
+
+The durable product rule is:
+
+> **The tools should unfold around the work.**
+
+The accumulated study record matters more than any single generated answer.
 
 ---
 
-## What the Freeze Accomplished
+## Current validation posture
 
-The freeze prevented architectural churn. More valuably, it forced discovery of the architecture rather than continuous redesign of it.
+Use real corpora and manuscripts before redesigning from imagination.
 
-The subsequent Reader/workbench phase demonstrated a second lesson: stable architecture does not remove the need for product discovery. It makes product discovery safer because observed friction can usually be solved without changing evidence identity, authority, provenance, or the canonical epistemic stack.
-
-The correct sequence now is:
+Default loop:
 
 ```text
 use
 → observe friction
-→ classify the problem
-→ implement the smallest bounded correction
+→ preserve the witness
+→ classify the failure
+→ make the smallest lawful correction
 → test
 → use again
 ```
 
-Not:
+Distinguish:
 
 ```text
-imagine feature
-→ expand architecture
-→ hope use justifies it later
+UX friction
+projection defect
+configuration problem
+provider/runtime problem
+derivation/function problem
+implementation defect
+specification gap
+architecture gap
+constitutional insufficiency
 ```
 
-Hermeneia remains a research environment whose architecture is allowed to change when evidence demands it. Preference alone is not sufficient evidence.
+Do not promote a UI inconvenience into ontology.
+
+Do not assume a recurring real-use failure is “just UX” when evidence shows a deeper architectural problem.
+
+---
+
+## Execution identity
+
+Keep these separate:
+
+```text
+Scope
+Perspective
+Connection
+Provider
+Model
+Model Version
+Configuration
+Investigation
+```
+
+Perspective is not model identity.
+
+Scope is not the entire workspace.
+
+Connection is not Provider.
+
+Provider is not Model.
+
+A model configuration is not epistemic identity.
+
+Exact nondeterministic execution should preserve enough run lineage for later audit and comparison.
+
+---
+
+## Current product reality and priorities
+
+Do not infer current completion from this file alone.
+
+Read `IMPLEMENTATION_STATUS.md` and current issues for dated operational state.
+
+Broadly, Hermeneia already has a Reader-centered workbench, persistent workspaces, provenance and constitutional infrastructure, Perspective machinery, Blueprint/Architect/Artist/Critic/Steward flows, preservation/export/restore, and provider/runtime foundations.
+
+Current validation pressure centers on sustained real use, whole-study synthesis, coherent workstation behavior, explicit Scope/execution boundaries, provider/model configuration, preservation confidence, and empirical evaluation.
+
+A v1.0 release candidate is a target, not a claimed completed release.
+
+---
+
+## Architecture changes
+
+You may:
+
+- identify architectural contradictions;
+- compare current implementation with constitutional intent;
+- propose better abstractions;
+- find evidence that an existing primitive is insufficient;
+- preserve negative results;
+- recommend constitutional review.
+
+You may not silently change constitutional ontology or authority merely because a different design looks cleaner.
+
+When a real problem appears, ask first whether it can be solved as:
+
+```text
+projection
+configuration
+function
+derived artifact
+UI/workflow
+relationship
+existing canonical object
+```
+
+If not, make the architectural pressure explicit.
+
+---
+
+## Historical discipline
+
+Hermeneia preserves its own development history.
+
+Do not infer:
+
+```text
+old file exists
+→ old claim still governs
+```
+
+Likewise, do not rewrite old Gatsby/Treasury or early architecture artifacts to make the current system look inevitable.
+
+The history is scientifically useful because it shows what pressure caused the architecture to evolve.
+
+---
+
+## Final rule
+
+Preserve the relationship among evidence, interpretation, authorship, provenance, plurality, expression, evaluation, and stewardship.
+
+Let product and architecture evolve when evidence requires it.
+
+Do not let convenience silently erase the history of understanding.
