@@ -2,51 +2,113 @@
 
 > **An operating environment for the disciplined evolution of understanding.**
 
-Hermeneia separates discovery, reconstruction, communication, verification, and governance into explicit cognitive responsibilities with inspectable evidence, provenance, and accountability.
+Hermeneia is a local-first, evidence-preserving, human-stewarded environment for inquiry. It keeps source evidence, human attention, questions, machine proposals, interpretations, Perspectives, synthesis, expression, evaluation, and governance distinguishable while preserving how they relate over time.
 
-It is not primarily an AI, a document analyzer, or a chatbot. It is a research environment and reference implementation for making inquiry itself inspectable, revisable, auditable, and preservable.
+It is not primarily an AI, chatbot, document analyzer, essay generator, or summarizer.
 
----
-
-## The Central Claim
-
-Reliable AI-assisted inquiry requires preserving the evolution of understanding by separating and governing the cognitive responsibilities through which understanding develops.
-
-When one model is asked to discover, interpret, communicate, evaluate, and govern simultaneously, intermediate reasoning becomes difficult to inspect, failures become difficult to diagnose, and the history of how understanding developed is easily lost.
-
-Hermeneia preserves that history by separating responsibilities, recording lineage, and keeping human authority explicit.
-
-**Models may participate in bounded cognitive roles. Model output is never authoritative merely because a model produced it.** Generated material must remain distinguishable from evidence, human interpretation, ratification, and stewardship.
+At the product level, Hermeneia is a **Reader-centered workbench for governed interpretation**: the work remains primary while tools unfold around it.
 
 ---
 
-## Cognitive Responsibilities
+## Origin and evolution
+
+Hermeneia began with a concrete Department of the Treasury hiring exercise involving essays on *The Great Gatsby*.
+
+The original challenge was not simply to produce good essays. It was to use AI tools while preserving a defensible record of human authorship and judgment, grounding claims in the source corpus, and examining the same text through different cultural and semantic lenses.
+
+That use case still applies. It no longer defines the limits of the system.
+
+The project evolved from:
+
+```text
+AI-assisted Gatsby essay provenance
+→ governed corpus interpretation
+→ constitutional epistemic architecture
+→ Reader-centered investigation workbench
+→ operating environment for disciplined understanding
+```
+
+See [`docs/ORIGIN_AND_EVOLUTION.md`](docs/ORIGIN_AND_EVOLUTION.md) for the full lineage.
+
+---
+
+## Core claim
+
+Reliable AI-assisted inquiry requires preserving the evolution of understanding by separating the cognitive responsibilities through which understanding develops.
+
+Hermeneia therefore preserves distinctions such as:
+
+```text
+what the source says
+!= what a machine proposes
+!= what a human notices
+!= what a steward accepts
+!= what a Perspective contributes
+!= what a projection renders
+```
+
+Generated content does not become authoritative merely because a model produced it.
+
+A polished projection does not become the evidentiary record merely because it is useful.
+
+---
+
+## Cognitive responsibilities
 
 ```text
 Explorer       surfaces candidate interpretations from evidence
-Architect      reconstructs semantic obligations from understanding
+Architect      reconstructs semantic obligations from stewarded understanding
 Artist         realizes understanding in a chosen expressive form
-Critic         evaluates whether expression preserved meaning
-Steward        exercises judgment that cannot be reduced to computation
+Critic         evaluates whether expression preserved declared obligations
+Steward        exercises human judgment and governance
 ```
 
 These are cognitive responsibilities, not merely software modules.
 
-**Explorer** may use a configured model to generate speculative candidates. Those candidates remain proposals for human review; they do not silently become ratified understanding.
-
-**Architect** compiles explicit semantic obligations into an inspectable contract.
-
-**Artist** is provider-independent by design and produces expression under those constraints.
-
-**Critic** applies bounded evaluation functions and produces findings rather than final authority.
-
-**Steward** remains human governance: acceptance, amendment, rejection, ratification, and release judgment cannot be delegated simply because automation is available.
-
-A candidate responsibility remains under active investigation: **Witness** — attention before interpretation. The repository contains Witness-oriented interfaces and experiments, but the role remains constitutionally non-canonical until practice justifies promotion.
+`Witness` remains under investigation as attention-before-interpretation. Witness-oriented interfaces and experiments may exist without promoting Witness into canonical ontology merely because it is useful.
 
 ---
 
-## The Epistemic Pipeline
+## Reader-centered investigation
+
+The original linear pipeline has matured into an investigation loop:
+
+```text
+Question
+  ↓
+Read
+  ↓
+Notice / Mark / Ask
+  ↓
+Search / Group / Relate
+  ↓
+Perspective / Compare
+  ↓
+Steward what survives
+  ↓
+Refine Blueprint
+  ↓
+Architect compiles semantic obligations
+  ↓
+Choose ExpressionProfile + execution configuration
+  ↓
+Artist renders
+  ↓
+Critic audits
+  ↓
+Ratify / Revise / Reject
+  ↓
+Record / Preserve
+  ↺
+```
+
+The accumulated study record—not merely the final answer—is a durable object of value.
+
+---
+
+## Constitutional evidence boundary
+
+The ratified evidence chain is:
 
 ```text
 SourceDocument
@@ -54,154 +116,101 @@ SourceDocument
 SourceExtraction
     ↓
 Observation
-    ↓
-Candidate Interpretation    ← Explorer may assist; candidate only
-    ↓
-Interpretation              ← human accept / amend / reject
-    ↓
-NarrativeBlueprint          ← human-governed understanding
-    ↓
-ArchitectPlan               ← deterministic semantic contract
-    ↓
-RenderedNarrative           ← Artist / configured provider
-    ↓
-Finding[]                   ← bounded Critic evaluation
-    ↓
-Validation / Stewardship    ← human governance
 ```
 
-The important boundary is not “AI in one box.” The boundary is **authority**: generated content, derived projections, deterministic evaluations, and human judgments remain distinguishable throughout the system.
+Evidence is preserved rather than silently repaired. Corrections, interpretations, readable projections, and other conveniences remain descendants of the preserved record.
+
+Current constitutional authority always resolves through [`docs/01_Authority_Index.md`](docs/01_Authority_Index.md).
 
 ---
 
-## Constitutional Authority
+## Repository map
 
-Hermeneia has an explicit authority hierarchy so that old files, generated artifacts, and implementation details cannot accidentally outrank governing decisions.
+| Surface | Role |
+|---|---|
+| [`docs/00_Constitution.md`](docs/00_Constitution.md) | Highest governing law |
+| [`docs/01_Authority_Index.md`](docs/01_Authority_Index.md) | Canonical authority / supersession routing |
+| [`docs/02_Constitutional_Invariants.md`](docs/02_Constitutional_Invariants.md) | Executable constitutional obligations |
+| [`docs/What_Hermeneia_Is.md`](docs/What_Hermeneia_Is.md) | Current project identity |
+| [`docs/ORIGIN_AND_EVOLUTION.md`](docs/ORIGIN_AND_EVOLUTION.md) | Founding Gatsby/Treasury lineage and system evolution |
+| [`docs/FROZEN_PRODUCT_DIRECTION.md`](docs/FROZEN_PRODUCT_DIRECTION.md) | Current Reader-centered product direction |
+| [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) | Dated operational snapshot |
+| [`AGENTS.md`](AGENTS.md) | General agent operating rules |
+| [`CLAUDE.md`](CLAUDE.md) | Claude-oriented validation-phase orientation |
+| [`docs/README.md`](docs/README.md) | Documentation classes and reading order |
 
-Current authority resolves in this order:
-
-1. [`docs/00_Constitution.md`](docs/00_Constitution.md)
-2. [`docs/01_Authority_Index.md`](docs/01_Authority_Index.md)
-3. ratified constitutional amendments
-4. [`docs/02_Constitutional_Invariants.md`](docs/02_Constitutional_Invariants.md)
-5. active Architecture Decision Records
-6. active implementation documents and specifications
-7. code
-8. generated artifacts
-
-Superseded material is preserved as history rather than deleted. Authority changes without erasing provenance.
-
----
-
-## What Is Implemented
-
-### Constitutional and provenance infrastructure
-
-- SourceDocument → SourceExtraction → Observation lineage
-- occurrence-aware observation identity and provenance records
-- constitutional authority, amendments, invariants, and compliance checks
-- deterministic hashing and integrity utilities
-- explicit human-only governance boundaries
-- preservation, release, and ratification artifacts
-- workspace identity plus export / restore infrastructure
-
-### Cognitive architecture
-
-- Explorer discovery and speculative interpretation workflows
-- deterministic Architect compilation of semantic obligations
-- provider-neutral Artist rendering
-- multi-profile expression and comparison
-- Critic evaluation across structural, semantic, provenance, observation-coverage, accessibility, and constitutional dimensions
-- human stewardship and ratification surfaces
-- interpretive-divergence and lineage projections
-
-### Reader and workspace experience
-
-- reading-centered workbench with tools unfolding around the source material
-- highlights, questions, observations, field notes, and attention history
-- corpus search beside the Reader
-- Companion, Blueprint, Render, Critic, Voice, Draft, Ratify, and Record workflows
-- durable named workspaces with CLI/runtime lifecycle support
-- workspace bundle export/import and restoration
-- provider connection settings, credential-source boundaries, and model-selection infrastructure
-
-### Publication and research infrastructure
-
-- publication build manifests
-- coverage evaluation
-- release recommendations
-- preservation verification and export
-- research experiments and comparative analyses
-- white paper, institutional brief, position papers, and architecture documentation
-
-The repository contains an **extensive automated test suite** covering constitutional invariants, provenance, semantic contracts, corpus boundaries, reader behavior, workspace lifecycle, provider behavior, preservation, and end-to-end traceability. The README intentionally does not hard-code a test count because the suite evolves with the system.
+Do not infer current authority from numeric filename order, document age, or detail level.
 
 ---
 
-## Governing Principles
+## Current product reality
 
-- **Immutable evidence:** source artifacts and observations preserve the record rather than being silently “improved.”
-- **Explicit provenance:** important artifacts retain inspectable ancestry and origin.
-- **Explicit semantic contracts:** expression is constrained by inspectable obligations rather than hidden intent alone.
-- **Bounded evaluation:** Critic functions produce findings from declared inputs; they do not become autonomous judges.
-- **Human stewardship:** machines may preserve, transform, propose, and evaluate; humans retain ratification and governance authority.
-- **Conservation of ontology:** no new ontological object should be introduced when established architectural primitives are sufficient.
-- **Regeneration:** derived views and projections should be reproducible from canonical knowledge rather than treated as irreplaceable truth.
-- **Provider independence:** models, providers, interfaces, and algorithms may change without becoming the identity of the system.
+Hermeneia currently includes, in bounded implemented forms:
+
+- Reader-centered workbench and persistent Companion;
+- corpus search, highlights, questions, notes, concepts, observations, buckets, and attention history;
+- durable named workspaces and Workspace Bundle export/import/restore;
+- Perspective definitions and governed Perspective-run infrastructure;
+- Blueprint → Architect → Artist → Critic → Steward workflows;
+- Draft Preview → Ratify → Record;
+- provider registry, model catalogs, local/cloud runtime foundations, and credential-source boundaries;
+- provenance, hashing, preservation, release, and constitutional compliance infrastructure;
+- research and evaluation infrastructure for real-corpus use.
+
+The exact dated operational state lives in [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md). Older roadmap checkboxes should not be used to reconstruct current completion.
 
 ---
 
-## Quick Start
+## Governing principles
+
+- **Evidence before interpretation.** Preserve the record before improving its readability or usefulness.
+- **Explicit provenance.** Important artifacts retain inspectable ancestry and origin.
+- **Human stewardship.** Machines may preserve, transform, propose, compare, and evaluate; human authority remains explicit.
+- **Plurality without forced consensus.** Perspectives and disagreement remain traceable.
+- **Canonical vs derived.** Projections may be regenerated; canonical evidence and governed history are not silently rewritten.
+- **Conservation of ontology.** Earn new ontological objects through demonstrated need.
+- **Provider independence.** Models and providers are participants and execution infrastructure, not the identity of the system.
+- **Real-use validation.** Prefer observed friction over imagined redesign.
+
+---
+
+## Quick start
 
 Hermeneia requires Python 3.11+.
 
 ```bash
-# Install the package in editable mode
 pip install -e .
-
-# Launch the Reader / web workbench
 herm serve
+```
 
-# Inspect the current pipeline state
-herm health
+Create and launch an isolated workspace:
 
-# Create an isolated named workspace
+```bash
 herm workspace create "The Second Sale"
-
-# Launch that workspace
 herm serve --workspace "The Second Sale"
 ```
 
-To reconstruct a blueprint from an existing report, essay, or analysis:
+Inspect current pipeline/runtime health:
 
 ```bash
-herm extract path/to/existing-report.md --provider anthropic
+herm health
 ```
 
-Once a workspace contains the relevant observations and blueprint, the cognitive pipeline can be exercised explicitly:
+Exercise the explicit cognitive pipeline when appropriate:
 
 ```bash
-# Surface speculative candidate interpretations
 herm explorer discover --limit 30 --provider anthropic
-
-# Compile the semantic contract for a blueprint citing an observation
 herm architect OBS-23
-
-# Render through the Artist
 herm artist OBS-23 --provider anthropic --all-profiles
-
-# Evaluate the rendered narrative
 herm critic OBS-23
-
-# Inspect lineage for an observation
 herm trace OBS-23
 ```
 
-Provider names and model availability are runtime concerns rather than constitutional facts. Use the configured Connections/model-selection surfaces or the relevant CLI options for the environment in which Hermeneia is running.
+Provider names and available models are runtime concerns, not constitutional facts.
 
 ---
 
-## Research Program
+## Research program
 
 | Work | Role |
 |---|---|
@@ -210,45 +219,52 @@ Provider names and model availability are runtime concerns rather than constitut
 | *Semantic Contract Fulfillment (SCF)* | Evaluation / benchmark methodology |
 | *Toward an Ecology of Intelligence* | Philosophical foundation |
 
-White paper: [`docs/papers/hermeneia_white_paper.md`](docs/papers/hermeneia_white_paper.md)
+Key papers:
 
-SCF position paper: [`docs/papers/scf_position_paper.md`](docs/papers/scf_position_paper.md)
+- [`docs/papers/hermeneia_white_paper.md`](docs/papers/hermeneia_white_paper.md)
+- [`docs/papers/scf_position_paper.md`](docs/papers/scf_position_paper.md)
 
-Research artifacts in this repository are evidence from an active program of inquiry. They should not be read as proof that Hermeneia's hypotheses generalize universally beyond the corpora, experiments, and implementation actually examined.
+Research artifacts are evidence from an active program of inquiry. They do not prove universal generalization beyond the corpora, experiments, and implementations actually examined.
 
 ---
 
-## Current Status
+## Current phase
 
 **Validation Phase — active development.**
 
-The original architecture freeze was lifted after the foundation demonstrated enough stability under implementation and repeated use to continue building without treating every new idea as an architectural rewrite. The foundation is therefore treated as stable **against preference, not against evidence**.
+The original architecture freeze has been lifted. The foundation is treated as stable against preference, not against evidence.
 
-Current work is concentrated on validating the architecture across more real use, improving the Reader/workspace experience, strengthening corpus and provider boundaries, refining semantic quality, and preparing a stable release path. A v1.0 release candidate remains a target rather than a claimed completed release.
+Current work emphasizes:
 
-For current direction:
-
-- [`docs/FROZEN_PRODUCT_DIRECTION.md`](docs/FROZEN_PRODUCT_DIRECTION.md) — canonical product direction
-- [`CLAUDE.md`](CLAUDE.md) — architecture and validation-phase orientation
-- [`docs/01_Authority_Index.md`](docs/01_Authority_Index.md) — canonical authority routing
-- [`docs/FUTURE_ARCHITECTURE_NOTES.md`](docs/FUTURE_ARCHITECTURE_NOTES.md) — ideas that have not earned architectural authority
-
----
-
-## Reading Order
-
-1. [`docs/What_Hermeneia_Is.md`](docs/What_Hermeneia_Is.md) — project identity
-2. [`docs/papers/hermeneia_white_paper.md`](docs/papers/hermeneia_white_paper.md) — core argument
-3. [`docs/00_Constitution.md`](docs/00_Constitution.md) — highest governing law
-4. [`docs/01_Authority_Index.md`](docs/01_Authority_Index.md) — which documents currently govern
-5. [`docs/02_Constitutional_Invariants.md`](docs/02_Constitutional_Invariants.md) — executable constitutional obligations
-6. [`docs/FROZEN_PRODUCT_DIRECTION.md`](docs/FROZEN_PRODUCT_DIRECTION.md) — product direction and workbench philosophy
-7. [`docs/Architecture_Patterns.md`](docs/Architecture_Patterns.md) — recurring architectural patterns
-8. [`docs/18_roadmap.md`](docs/18_roadmap.md) — roadmap context
+- sustained real-corpus and manuscript use;
+- whole-study synthesis from accumulated study records;
+- Reader/workstation coherence;
+- explicit Scope and provider/model/runtime boundaries;
+- preservation and restore confidence;
+- empirical evaluation and research instrumentation;
+- a stable release path only after demonstrated use warrants it.
 
 ---
 
-## License and Citation
+## Reading order
+
+For a fresh researcher or agent:
+
+1. [`README.md`](README.md)
+2. [`docs/What_Hermeneia_Is.md`](docs/What_Hermeneia_Is.md)
+3. [`docs/ORIGIN_AND_EVOLUTION.md`](docs/ORIGIN_AND_EVOLUTION.md)
+4. [`docs/FROZEN_PRODUCT_DIRECTION.md`](docs/FROZEN_PRODUCT_DIRECTION.md)
+5. [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md)
+6. [`docs/01_Authority_Index.md`](docs/01_Authority_Index.md)
+7. [`docs/00_Constitution.md`](docs/00_Constitution.md)
+8. [`docs/02_Constitutional_Invariants.md`](docs/02_Constitutional_Invariants.md)
+9. [`docs/README.md`](docs/README.md) for historical/current documentation routing
+
+For implementation, read [`AGENTS.md`](AGENTS.md) before modifying architecture-sensitive code.
+
+---
+
+## License and citation
 
 Hermeneia is distributed under the MIT License. See [`LICENSE`](LICENSE).
 
