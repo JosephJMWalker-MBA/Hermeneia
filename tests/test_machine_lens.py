@@ -68,12 +68,19 @@ def _run_lens(text, highlights, machine_obs):
         + _extract_fn(html, "_crSortedHighlightsForSegment")
         + _extract_fn(html, "_crHumanHighlightTitle")
         + _extract_fn(html, "_crHumanSegmentsFromRanges")
+        + _extract_fn(html, "_crSourceOffset")
+        + _extract_fn(html, "_crProjectSourceBoundary")
+        + _extract_fn(html, "_crWithoutWhitespace")
+        + _extract_fn(html, "_crMachineRangeForBlock")
         + _extract_fn(html, "_crRenderTextWithHighlights")
         + _extract_fn(html, "_crMachineHighlightClass")
-        + "const [t,h,m]=JSON.parse(process.argv[1]);\n"
-        "process.stdout.write(_crRenderTextWithHighlights(t,h,m));\n"
+        + "const [t,h,m,c]=JSON.parse(process.argv[1]);\n"
+        "process.stdout.write(_crRenderTextWithHighlights(t,h,m,c));\n"
     )
-    payload = json.dumps([text, highlights, machine_obs])
+    # The page is one unprojected block of SourceExtraction "e1"; machine marks
+    # are anchored by identity (see test_machine_lens_anchoring.py).
+    ctx = {"block_index": 0, "page": 1, "extraction_ids": ["e1"], "display_source_spans": []}
+    payload = json.dumps([text, highlights, machine_obs, ctx])
     out = subprocess.run(
         [node, "-e", harness, "--", payload],
         capture_output=True, text=True, timeout=30,
@@ -85,8 +92,18 @@ def _run_lens(text, highlights, machine_obs):
 TEXT = "Gatsby believed in the green light, the orgastic future that recedes."
 
 
+def _obs(obs_id, raw_text, review_status=None):
+    """Machine observation with the canonical_span the API supplies."""
+    o = {"id": obs_id, "page": 1, "raw_text": raw_text, "review_status": review_status}
+    if raw_text in TEXT:
+        start = TEXT.index(raw_text)
+        o["canonical_span"] = {"source_extraction_id": "e1", "start": start,
+                               "end": start + len(raw_text), "text": raw_text}
+    return o
+
+
 def test_lens_on_wraps_matching_machine_text():
-    obs = [{"id": "o1", "page": 1, "raw_text": "green light", "review_status": None}]
+    obs = [_obs("o1", "green light")]
     html = _run_lens(TEXT, [], obs)
     assert "cr-machine-hl" in html
     assert 'data-machine-obs="o1"' in html
@@ -102,7 +119,7 @@ def test_lens_off_produces_no_machine_markup():
 
 def test_user_highlight_stays_distinct_and_wins_overlap():
     user = [{"id": "u1", "page": 1, "selected_text": "green light", "status": "saved"}]
-    obs = [{"id": "o1", "page": 1, "raw_text": "green light", "review_status": None}]
+    obs = [_obs("o1", "green light")]
     html = _run_lens(TEXT, user, obs)
     # The overlapping span is the user's mark, not a machine highlight.
     assert "cr-inline-highlight" in html
@@ -111,14 +128,14 @@ def test_user_highlight_stays_distinct_and_wins_overlap():
 
 
 def test_rejected_observation_is_hidden():
-    obs = [{"id": "o1", "page": 1, "raw_text": "green light", "review_status": "rejected"}]
+    obs = [_obs("o1", "green light", "rejected")]
     html = _run_lens(TEXT, [], obs)
     assert "cr-machine-hl" not in html, "rejected observations must not appear as attention"
 
 
 def test_approved_and_deferred_states_are_distinct():
-    approved = _run_lens(TEXT, [], [{"id": "o1", "page": 1, "raw_text": "green light", "review_status": "approved"}])
-    deferred = _run_lens(TEXT, [], [{"id": "o2", "page": 1, "raw_text": "green light", "review_status": "unsure"}])
+    approved = _run_lens(TEXT, [], [_obs("o1", "green light", "approved")])
+    deferred = _run_lens(TEXT, [], [_obs("o2", "green light", "unsure")])
     assert "cr-machine-approved" in approved
     assert "cr-machine-deferred" not in approved
     assert "cr-machine-deferred" in deferred
@@ -126,7 +143,7 @@ def test_approved_and_deferred_states_are_distinct():
 
 
 def test_unmatched_observation_is_safely_not_drawn():
-    obs = [{"id": "o1", "page": 1, "raw_text": "a phrase that is not on this page", "review_status": None}]
+    obs = [_obs("o1", "a phrase that is not on this page")]
     html = _run_lens(TEXT, [], obs)
     assert "cr-machine-hl" not in html
 

@@ -52,12 +52,21 @@ def split_sentences(paragraph: str) -> list[str]:
     Does not normalize the paragraph before splitting. The returned strings are
     the raw_text selected for each Observation; normalization is derived later.
     """
+    return [paragraph[start:end] for start, end in sentence_spans(paragraph)]
+
+
+def sentence_spans(paragraph: str) -> list[tuple[int, int]]:
+    """Return the ``[start, end)`` offsets of each ``split_sentences`` result.
+
+    Sentence ``n`` (1-indexed) of an Observation is ``paragraph[start:end]`` of
+    span ``n - 1`` — the canonical occurrence, recoverable without text search.
+    """
     text = paragraph
 
     if not text or not text.strip():
         return []
 
-    sentences: list[str] = []
+    sentences: list[tuple[int, int]] = []
     current_start = 0
 
     for m in _BOUNDARY.finditer(text):
@@ -78,14 +87,12 @@ def split_sentences(paragraph: str) -> list[str]:
         if not (next_char.isupper() or next_char in '"\'('):
             continue
 
-        sentence = text[current_start:after_end]
-        if sentence.strip():
-            sentences.append(sentence)
+        if text[current_start:after_end].strip():
+            sentences.append((current_start, after_end))
         current_start = after_end
 
     # Append the final sentence
-    tail = text[current_start:]
-    if tail.strip():
-        sentences.append(tail)
+    if text[current_start:].strip():
+        sentences.append((current_start, len(text)))
 
     return sentences

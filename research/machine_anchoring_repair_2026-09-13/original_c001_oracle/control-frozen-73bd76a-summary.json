@@ -1,0 +1,630 @@
+{
+  "all_abstention_rejected": true,
+  "all_canonical_unchanged": true,
+  "all_database_bytes_unchanged": true,
+  "baseline_files_unchanged": true,
+  "commit": "73bd76abb83267216f5657861a1af0ed46f84c49",
+  "credential_environment_variable_names_removed": [],
+  "failed": 8,
+  "fixtures_sha256": "c021664efd1ca059eb7cd0ca090a0e0ab0857bdd24a6dd55a36007b145d92052",
+  "modes": {
+    "api": {
+      "failed": 5,
+      "total": 15
+    },
+    "renderer_boundary": {
+      "failed": 3,
+      "total": 3
+    }
+  },
+  "node": "v22.17.0",
+  "passed": 10,
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "positive_passed": 5,
+  "positive_total": 9,
+  "python": "3.13.5 (v3.13.5:6cb20a219a8, Jun 11 2025, 12:23:45) [Clang 16.0.0 (clang-1600.0.26.6)]",
+  "results": [
+    {
+      "actual_display": [
+        "The lamp glows."
+      ],
+      "actual_mark_count": 1,
+      "actual_marks": [
+        {
+          "block": 0,
+          "end": 15,
+          "observation": "o",
+          "start": 0,
+          "text": "The lamp glows."
+        }
+      ],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "The lamp glows."
+      ],
+      "expected_mark_count": 1,
+      "expected_marks": [
+        {
+          "block": 0,
+          "end": 15,
+          "observation": "o",
+          "start": 0,
+          "text": "The lamp glows."
+        }
+      ],
+      "family": "unique direct match",
+      "id": "direct_unique",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": true,
+      "mode": "api",
+      "passed": true,
+      "rationale": "One sentence, one extraction, one intended occurrence.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "Echo. Echo."
+      ],
+      "actual_mark_count": 1,
+      "actual_marks": [
+        {
+          "block": 0,
+          "end": 5,
+          "observation": "o",
+          "start": 0,
+          "text": "Echo."
+        }
+      ],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "Echo. Echo."
+      ],
+      "expected_mark_count": 1,
+      "expected_marks": [
+        {
+          "block": 0,
+          "end": 11,
+          "observation": "o",
+          "start": 6,
+          "text": "Echo."
+        }
+      ],
+      "family": "repeated identical text",
+      "id": "repeated_identical_second",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": false,
+      "mode": "api",
+      "passed": false,
+      "rationale": "Sentence 2 and provenance offsets [6,11) identify the second occurrence.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "The lamp glows.",
+        "The lamp glows."
+      ],
+      "actual_mark_count": 2,
+      "actual_marks": [
+        {
+          "block": 0,
+          "end": 15,
+          "observation": "o",
+          "start": 0,
+          "text": "The lamp glows."
+        },
+        {
+          "block": 1,
+          "end": 15,
+          "observation": "o",
+          "start": 0,
+          "text": "The lamp glows."
+        }
+      ],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "The lamp glows.",
+        "The lamp glows."
+      ],
+      "expected_mark_count": 1,
+      "expected_marks": [
+        {
+          "block": 1,
+          "end": 15,
+          "observation": "o",
+          "start": 0,
+          "text": "The lamp glows."
+        }
+      ],
+      "family": "same text from different SourceExtractions",
+      "id": "same_text_other_extraction",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": false,
+      "mode": "api",
+      "passed": false,
+      "rationale": "Only block 2 is the observation parent; equal text in block 1 is a different occurrence.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "The quiet river flows."
+      ],
+      "actual_mark_count": 0,
+      "actual_marks": [],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "The quiet river flows."
+      ],
+      "expected_mark_count": 1,
+      "expected_marks": [
+        {
+          "block": 0,
+          "end": 22,
+          "observation": "o",
+          "start": 0,
+          "text": "The quiet river flows."
+        }
+      ],
+      "family": "Reader projection transformation",
+      "id": "soft_wrap_sentence",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": false,
+      "mode": "api",
+      "passed": false,
+      "rationale": "A unique full sentence remains uniquely located after one layout newline becomes a space.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "Preface. The lamp glows."
+      ],
+      "actual_mark_count": 1,
+      "actual_marks": [
+        {
+          "block": 0,
+          "end": 24,
+          "observation": "o",
+          "start": 9,
+          "text": "The lamp glows."
+        }
+      ],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "Preface. The lamp glows."
+      ],
+      "expected_mark_count": 1,
+      "expected_marks": [
+        {
+          "block": 0,
+          "end": 24,
+          "observation": "o",
+          "start": 9,
+          "text": "The lamp glows."
+        }
+      ],
+      "family": "offset adjustment",
+      "id": "offset_shift_unaltered_substring",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": true,
+      "mode": "api",
+      "passed": true,
+      "rationale": "Leading/trailing layout whitespace changes offsets before the sentence; its words stay verbatim.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "The quiet river flows."
+      ],
+      "actual_mark_count": 0,
+      "actual_marks": [],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "The quiet river flows."
+      ],
+      "expected_mark_count": 1,
+      "expected_marks": [
+        {
+          "block": 0,
+          "end": 22,
+          "observation": "o",
+          "start": 0,
+          "text": "The quiet river flows."
+        }
+      ],
+      "family": "offset adjustment",
+      "id": "offset_adjustment_inside_sentence",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": false,
+      "mode": "api",
+      "passed": false,
+      "rationale": "The authored entire-source span maps to the entire unique display sentence after five layout characters collapse.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "The lamp glows.\n"
+      ],
+      "actual_mark_count": 1,
+      "actual_marks": [
+        {
+          "block": 0,
+          "end": 15,
+          "observation": "o",
+          "start": 1,
+          "text": "he lamp glows."
+        }
+      ],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "The lamp glows.\n"
+      ],
+      "expected_mark_count": 1,
+      "expected_marks": [
+        {
+          "block": 0,
+          "end": 15,
+          "observation": "o",
+          "start": 1,
+          "text": "he lamp glows."
+        }
+      ],
+      "family": "Reader projection transformation",
+      "id": "drop_cap_continuation",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": true,
+      "mode": "api",
+      "passed": true,
+      "rationale": "Exact continuation from the second extraction starts after the derived drop cap; its missing initial T is preserved canonically.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "The river keeps moving beyond the bend."
+      ],
+      "actual_mark_count": 1,
+      "actual_marks": [
+        {
+          "block": 0,
+          "end": 39,
+          "observation": "o",
+          "start": 23,
+          "text": "beyond the bend."
+        }
+      ],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "The river keeps moving beyond the bend."
+      ],
+      "expected_mark_count": 1,
+      "expected_marks": [
+        {
+          "block": 0,
+          "end": 39,
+          "observation": "o",
+          "start": 23,
+          "text": "beyond the bend."
+        }
+      ],
+      "family": "Reader projection transformation",
+      "id": "prose_merge_unique",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": true,
+      "mode": "api",
+      "passed": true,
+      "rationale": "The second extraction is joined with a separator; its unique verbatim span begins at display offset 23.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "The lamp glows."
+      ],
+      "actual_mark_count": 0,
+      "actual_marks": [],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "The lamp glows."
+      ],
+      "expected_mark_count": 0,
+      "expected_marks": [],
+      "family": "wrong-extraction negative",
+      "id": "wrong_document_api",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": true,
+      "mode": "api",
+      "passed": true,
+      "rationale": "The actual document-scoped API must exclude an observation belonging to document B.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "The lamp glows."
+      ],
+      "actual_mark_count": 0,
+      "actual_marks": [],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "The lamp glows."
+      ],
+      "expected_mark_count": 0,
+      "expected_marks": [],
+      "family": "wrong-extraction negative",
+      "id": "neighbor_page_api",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": true,
+      "mode": "api",
+      "passed": true,
+      "rationale": "The related API may return page 2, but the actual client current-page filter must exclude it on page 1.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "The lamp glows."
+      ],
+      "actual_mark_count": 0,
+      "actual_marks": [],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "The lamp glows."
+      ],
+      "expected_mark_count": 0,
+      "expected_marks": [],
+      "family": "stewardship control",
+      "id": "rejected_observation",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": true,
+      "mode": "api",
+      "passed": true,
+      "rationale": "Rejected machine observations are not rendered.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "The lamp glows."
+      ],
+      "actual_mark_count": 0,
+      "actual_marks": [],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "The lamp glows."
+      ],
+      "expected_mark_count": 0,
+      "expected_marks": [],
+      "family": "human precedence control",
+      "id": "human_overlap",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": true,
+      "mode": "api",
+      "passed": true,
+      "rationale": "An existing human highlight covers the intended machine occurrence.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "Echo. Echo."
+      ],
+      "actual_mark_count": 1,
+      "actual_marks": [
+        {
+          "block": 0,
+          "end": 11,
+          "observation": "o",
+          "start": 6,
+          "text": "Echo."
+        }
+      ],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "Echo. Echo."
+      ],
+      "expected_mark_count": 0,
+      "expected_marks": [],
+      "family": "repeated identical text",
+      "id": "human_overlap_relocates_machine",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": false,
+      "mode": "api",
+      "passed": false,
+      "rationale": "Human attention covers sentence 1; machine sentence 1 must not move to sentence 2.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "<tag> & text."
+      ],
+      "actual_mark_count": 1,
+      "actual_marks": [
+        {
+          "block": 0,
+          "end": 13,
+          "observation": "o",
+          "start": 0,
+          "text": "<tag> & text."
+        }
+      ],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "<tag> & text."
+      ],
+      "expected_mark_count": 1,
+      "expected_marks": [
+        {
+          "block": 0,
+          "end": 13,
+          "observation": "o",
+          "start": 0,
+          "text": "<tag> & text."
+        }
+      ],
+      "family": "unique direct match",
+      "id": "escaped_text_unique",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": true,
+      "mode": "api",
+      "passed": true,
+      "rationale": "HTML escaping must preserve display text and one exact mark.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        ""
+      ],
+      "actual_mark_count": 0,
+      "actual_marks": [],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        ""
+      ],
+      "expected_mark_count": 0,
+      "expected_marks": [],
+      "family": "safe abstention control",
+      "id": "whitespace_only_no_mark",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": true,
+      "mode": "api",
+      "passed": true,
+      "rationale": "An empty projected block must not fabricate a machine mark.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "The lamp glows."
+      ],
+      "actual_mark_count": 1,
+      "actual_marks": [
+        {
+          "block": 0,
+          "end": 15,
+          "observation": "o",
+          "start": 0,
+          "text": "The lamp glows."
+        }
+      ],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "The lamp glows."
+      ],
+      "expected_mark_count": 0,
+      "expected_marks": [],
+      "family": "wrong-extraction negative",
+      "id": "wrong_extraction_renderer",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": false,
+      "mode": "renderer_boundary",
+      "passed": false,
+      "rationale": "Boundary injection supplies the real B observation to A-only display with explicit B extraction identity; it must abstain.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "The lamp glows."
+      ],
+      "actual_mark_count": 1,
+      "actual_marks": [
+        {
+          "block": 0,
+          "end": 15,
+          "observation": "o",
+          "start": 0,
+          "text": "The lamp glows."
+        }
+      ],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "The lamp glows."
+      ],
+      "expected_mark_count": 0,
+      "expected_marks": [],
+      "family": "wrong-extraction negative",
+      "id": "wrong_source_renderer",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": false,
+      "mode": "renderer_boundary",
+      "passed": false,
+      "rationale": "Boundary injection supplies document B observation to A display with explicit B document/extraction identity.",
+      "source_artifacts_unchanged": true
+    },
+    {
+      "actual_display": [
+        "Echo. Echo."
+      ],
+      "actual_mark_count": 1,
+      "actual_marks": [
+        {
+          "block": 0,
+          "end": 5,
+          "observation": "o",
+          "start": 0,
+          "text": "Echo."
+        }
+      ],
+      "canonical_unchanged": true,
+      "database_unchanged": true,
+      "display_correct": true,
+      "expected_display": [
+        "Echo. Echo."
+      ],
+      "expected_mark_count": 0,
+      "expected_marks": [],
+      "family": "ambiguous reconstruction",
+      "id": "ambiguous_reconstruction_renderer",
+      "immutable": true,
+      "lens_toggle_reversible": true,
+      "marks_correct": false,
+      "mode": "renderer_boundary",
+      "passed": false,
+      "rationale": "Boundary injection removes occurrence locator; repeated equal text has no unique intended mark in the delivered record.",
+      "source_artifacts_unchanged": true
+    }
+  ],
+  "total": 18
+}

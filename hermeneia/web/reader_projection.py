@@ -512,6 +512,51 @@ def project_reader_extractions(
     return projected
 
 
+def observation_canonical_span(
+    extraction_raw_text: object,
+    observation_raw_text: object,
+    sentence: object,
+    char_offset_start: object = None,
+    char_offset_end: object = None,
+) -> dict[str, object] | None:
+    """Locate an Observation inside its parent SourceExtraction by identity.
+
+    Uses stored provenance char offsets when present, otherwise the compiler's
+    own deterministic sentence segmentation at the stored sentence index — never
+    a text search. The located slice must equal the Observation's raw_text
+    (edge whitespace aside); any disagreement returns ``None`` so the Reader
+    abstains instead of guessing. Offsets are trimmed to the non-whitespace
+    extent, in SourceExtraction coordinates.
+    """
+    from hermeneia.compiler.sentence_splitter import sentence_spans
+
+    if not isinstance(extraction_raw_text, str) or not isinstance(observation_raw_text, str):
+        return None
+    text = extraction_raw_text
+    if not observation_raw_text.strip():
+        return None
+    if isinstance(char_offset_start, int) and isinstance(char_offset_end, int):
+        start, end = char_offset_start, char_offset_end
+        basis = "provenance_char_offsets"
+        if not 0 <= start < end <= len(text):
+            return None
+    elif isinstance(sentence, int) and sentence >= 1:
+        spans = sentence_spans(text)
+        if sentence > len(spans):
+            return None
+        start, end = spans[sentence - 1]
+        basis = "sentence_segmentation"
+    else:
+        return None
+    if text[start:end].strip() != observation_raw_text.strip():
+        return None
+    while start < end and text[start].isspace():
+        start += 1
+    while end > start and text[end - 1].isspace():
+        end -= 1
+    return {"start": start, "end": end, "text": text[start:end], "basis": basis}
+
+
 def project_reader_page(
     extractions: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:

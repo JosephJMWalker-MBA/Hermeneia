@@ -1,0 +1,10 @@
+--- /private/tmp/claude-501/-Users-josephjmwalker-mba-Documents-GitHub-Hermeneia--claude-worktrees-hermeneia-api-anchoring-6bc251/1fae9c6a-cd3d-4fcd-bce7-43727cec4e60/scratchpad/c001-original/render_adapter.js	2026-09-13 15:53:47
++++ /private/tmp/claude-501/-Users-josephjmwalker-mba-Documents-GitHub-Hermeneia--claude-worktrees-hermeneia-api-anchoring-6bc251/1fae9c6a-cd3d-4fcd-bce7-43727cec4e60/scratchpad/run-B-adapter-names/render_adapter.js	2026-09-13 17:23:01
+@@ -24,6 +24,7 @@
+   '_crDisplaySourceSpanForPoint','_crSpanPointOffsetInBlock','_crSpanUsesProjectedOffsets',
+   '_crSpanRangeForBlock','_crPushNonOverlappingRange','_crHighlightSortKey',
+   '_crSortedHighlightsForSegment','_crHumanHighlightTitle','_crHumanSegmentsFromRanges',
++  '_crProjectSourceBoundary','_crWithoutWhitespace','_crMachineRangeForBlock',
+   '_crRenderTextWithHighlights','_crMachineHighlightClass','_crReflectLensToggle',
+   '_crApplyLens','_crLoadRelated'];
+ // x is a one-line top-level function in this baseline; preserve exact bytes.
