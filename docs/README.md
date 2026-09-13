@@ -1,0 +1,131 @@
+# Hermeneia Documentation Map
+
+Hermeneia contains documents from several development eras and with several different authority levels.
+
+Do not infer authority from filename age, numeric prefix, detail level, or proximity to the code.
+
+For constitutional conflicts, always resolve through:
+
+`01_Authority_Index.md`
+
+---
+
+## Start here
+
+For a capable fresh reader or agent, the recommended order is:
+
+1. `../README.md` — repository landing page and current identity
+2. `What_Hermeneia_Is.md` — project identity statement
+3. `ORIGIN_AND_EVOLUTION.md` — founding Gatsby/Treasury use case and how the system grew beyond it
+4. `FROZEN_PRODUCT_DIRECTION.md` — current product direction
+5. `../IMPLEMENTATION_STATUS.md` — dated operational state
+6. `01_Authority_Index.md` — canonical authority routing
+7. `00_Constitution.md` — highest governing law
+8. `02_Constitutional_Invariants.md` — executable constitutional obligations
+9. `05_Architecture.md` / `06_Ontology.md` / active ADRs and specifications as needed
+
+For implementation work, also read `../AGENTS.md`.
+
+For Claude-oriented work, also read `../CLAUDE.md`.
+
+---
+
+## Document classes
+
+### Constitutional authority
+
+These govern the system within their declared scope:
+
+- `00_Constitution.md`
+- `01_Authority_Index.md`
+- `02_Constitutional_Invariants.md`
+- `amendments/`
+- active ADRs under `adr/`
+- active implementation specifications under `specs/`
+
+The Authority Index is the routing table for determining what is active, superseded, retired, or draft.
+
+### Current identity and product orientation
+
+These explain what the system currently is and where the product is going, but do not outrank constitutional law:
+
+- `What_Hermeneia_Is.md`
+- `FROZEN_PRODUCT_DIRECTION.md`
+- `ORIGIN_AND_EVOLUTION.md`
+- `Architecture_Patterns.md`
+- `FUTURE_ARCHITECTURE_NOTES.md` — explicitly non-authoritative future ideas
+
+### Dated operational state
+
+- `../IMPLEMENTATION_STATUS.md`
+- `../CLAUDE.md`
+
+These are synchronization/orientation documents. They may become stale as code and issues advance. Do not treat an older implementation snapshot as stronger than current repository evidence or governing authority.
+
+### Historical / superseded constitutional material
+
+Examples include:
+
+- `03_Constitution.md`
+- `04_Invariants.md`
+- ADRs marked superseded or superseded-in-part in the Authority Index
+
+These are preserved for lineage. They must not silently regain authority because an agent discovers them first.
+
+### Early conceptual notes
+
+Several small numbered documents such as `01_problem_statement.md`, `02_core_thesis.md`, `08_epistemology.md`, `09_hermeneutic_field.md`, and related files preserve early conceptual development.
+
+They are useful historical orientation unless another active authority explicitly gives them current governing status.
+
+Do not read the numeric sequence as a modern canonical specification series.
+
+### Research and papers
+
+Material under `papers/`, research-oriented documents, and experimental notes may contain hypotheses, arguments, comparisons, and findings.
+
+Research evidence can pressure architecture. It does not silently amend constitutional authority.
+
+---
+
+## Identity distinction
+
+The repository has evolved materially from its founding use case.
+
+The original Gatsby/Treasury work remains valid lineage and a useful demonstration, but it is no longer the complete product definition.
+
+Current shorthand:
+
+```text
+origin
+= AI-assisted Gatsby essays with provenance, human authorship boundaries,
+  and culturally distinct interpretive lenses
+
+current system
+= operating environment for the disciplined evolution of understanding
+
+current product
+= Reader-centered workbench for governed interpretation
+```
+
+See `ORIGIN_AND_EVOLUTION.md` for the full relationship.
+
+---
+
+## Cleanup rule
+
+Prefer:
+
+- indexes;
+- explicit status banners;
+- authority routing;
+- supersession notices;
+- preserved lineage;
+
+before destructive renaming or deletion.
+
+A confusing historical document should normally be labeled and routed before it is removed.
+
+The goal is not to make the history look linear.
+
+The goal is to make current authority and historical evolution legible at the same time.
