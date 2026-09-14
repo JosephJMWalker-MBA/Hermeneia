@@ -194,6 +194,33 @@ class PreparationInProgress(AuthoringError):
         self.current = current
 
 
+class AuthoringOperationInProgress(AuthoringError):
+    def __init__(self, holder: dict):
+        kind = str(holder.get("kind") or "unknown")
+        super().__init__("AUTHORING_OPERATION_IN_PROGRESS",
+                         f"Another authoring operation ({kind}) holds this workspace; "
+                         "try again when it finishes.", 409)
+        self.holder_kind = kind
+
+
+def _conflict(db_path: str | Path) -> AuthoringError:
+    """The truthful refusal for whichever operation currently holds the lease."""
+    holder = _read_json(_workspace_dir(db_path) / LEASE_NAME) or {}
+    if holder.get("kind") == OPERATION_KIND:
+        return PreparationInProgress(status(db_path))
+    return AuthoringOperationInProgress(holder)
+
+
+def _joinable_preparation(db_path: str | Path) -> dict | None:
+    """The running preparation that holds the lease, if that is who holds it."""
+    holder = _read_json(_workspace_dir(db_path) / LEASE_NAME) or {}
+    current = status(db_path)
+    if (holder.get("kind") == OPERATION_KIND and current.get("state") == "running"
+            and current.get("operation_id") == holder.get("operation_id")):
+        return current
+    return None
+
+
 @contextmanager
 def exclusive(db_path: str | Path, kind: str) -> Iterator[None]:
     """Hold the workspace lease for a short synchronous authoring write (raw attach)."""
@@ -202,7 +229,7 @@ def exclusive(db_path: str | Path, kind: str) -> Iterator[None]:
     with _LOCK:
         if not _acquire_lease(workspace, {"operation_id": operation_id, "kind": kind, "pid": os.getpid(),
                                           "started_at": _now()}):
-            raise PreparationInProgress(status(db_path))
+            raise _conflict(db_path)
     try:
         yield
     finally:
@@ -217,13 +244,17 @@ def start(db_path: str | Path, *, document_id: str | None, actor: str,
     db_path = Path(db_path)
     workspace = _workspace_dir(db_path)
     with _LOCK:
-        running = status(db_path)
-        if running.get("state") == "running":
-            return {**running, "already_running": True}, 202
+        joinable = _joinable_preparation(db_path)
+        if joinable is not None:
+            return {**joinable, "already_running": True}, 202
         operation_id = f"prep-{uuid.uuid4().hex}"
         lease = {"operation_id": operation_id, "kind": OPERATION_KIND, "pid": os.getpid(), "started_at": _now()}
         if not _acquire_lease(workspace, lease):
-            return {**status(db_path), "already_running": True}, 202
+            # 202 only for the same running preparation; anything else is a truthful conflict.
+            joinable = _joinable_preparation(db_path)
+            if joinable is not None:
+                return {**joinable, "already_running": True}, 202
+            raise _conflict(db_path)
         try:
             _clean_orphans(db_path)
             chosen, source_path = service.resolve_preparation(db_path, document_id=document_id, config=config)

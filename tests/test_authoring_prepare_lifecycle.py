@@ -271,7 +271,8 @@ def test_interrupt_terminates_runner_records_interrupted_and_cleans(prepared_wor
 # ── Through the real supervisor and a real child process ────────────────────
 
 
-def _supervised(tmp_path: Path, monkeypatch, *, slow_seconds: float, request_timeout: float):
+def _supervised(tmp_path: Path, monkeypatch, *, slow_seconds: float, request_timeout: float,
+                cls=WorkspaceRuntimeSupervisor, drain_timeout: float | None = None):
     monkeypatch.chdir(tmp_path)
     for key, value in _slow_compositor(tmp_path, slow_seconds).items():
         monkeypatch.setenv(key, value)
@@ -280,14 +281,159 @@ def _supervised(tmp_path: Path, monkeypatch, *, slow_seconds: float, request_tim
     pdf = tmp_path / "source.pdf"
     _make_pdf(pdf, "The lamp glows.")
     _ingest(first.db_path.parent, pdf)
-    supervisor = WorkspaceRuntimeSupervisor(
+    supervisor = cls(
         initial_target=RuntimeTarget(first.db_path, first),
         startup_timeout=10,
         request_timeout=request_timeout,
+        drain_timeout=drain_timeout,
         child_grace_seconds=3,
     )
     supervisor.start()
     return supervisor, first, second
+
+
+class _SwitchPausesAfterOperationsCheck(WorkspaceRuntimeSupervisor):
+    """Deterministically opens the window between a switch's check and its handoff."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.checked = threading.Event()
+        self.resume = threading.Event()
+
+    def _active_long_running_operations(self, child):
+        operations = super()._active_long_running_operations(child)
+        self.checked.set()
+        assert self.resume.wait(15), "test did not resume the switch"
+        return operations
+
+
+def _in_thread(fn):
+    box: dict = {}
+    thread = threading.Thread(target=lambda: box.setdefault("result", fn()), daemon=True)
+    thread.start()
+    return thread, box
+
+
+def test_switch_that_crossed_its_boundary_refuses_a_new_preparation(tmp_path, monkeypatch):
+    """Switch wins: a preparation must not be accepted into a runtime about to drain."""
+    supervisor, first, second = _supervised(tmp_path, monkeypatch, slow_seconds=3.0, request_timeout=5,
+                                            cls=_SwitchPausesAfterOperationsCheck)
+    try:
+        with _Public(create_supervisor_app(supervisor)) as public:
+            switch, switch_box = _in_thread(
+                lambda: _json(public.port, "POST", f"/api/workspaces/{second.slug}/open", timeout=30))
+            assert supervisor.checked.wait(10)
+            prepare_code, prepare_body = _json(public.port, "POST", "/api/authoring/prepare", {})
+            supervisor.resume.set()
+            switch.join(30)
+            switch_code, switch_body = switch_box["result"]
+
+            assert prepare_code == 409 and prepare_body["code"] == "WORKSPACE_SWITCH_IN_PROGRESS", prepare_body
+            assert switch_code == 200 and switch_body["changed"] is True
+            assert preparation_job.status(first.db_path) == {"state": "idle"}, \
+                "no preparation may start in the runtime being drained"
+            assert _runner_pids(tmp_path) == []
+            code, runtime = _json(public.port, "GET", "/api/runtime/workspace")
+            assert runtime["workspace"]["slug"] == second.slug
+    finally:
+        supervisor.resume.set()
+        supervisor.shutdown()
+
+
+class _SwitchSignalsWaiting(WorkspaceRuntimeSupervisor):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.waiting = threading.Event()
+
+    def _on_switch_waiting_for_starts(self) -> None:  # fix hook; absent before the fix
+        self.waiting.set()
+
+
+def test_preparation_in_flight_wins_and_switch_is_refused(tmp_path, monkeypatch):
+    """Preparation wins: a start already crossing the proxy keeps the workspace; switch gets 409."""
+    import hermeneia.web.supervisor as supervisor_module
+
+    real_forward = supervisor_module._forward_request_to_child
+    entered, release = threading.Event(), threading.Event()
+
+    def forward(*, child, timeout):
+        from flask import request as flask_request
+
+        if flask_request.method == "POST" and flask_request.path == "/api/authoring/prepare":
+            entered.set()
+            assert release.wait(15), "test did not release the preparation start"
+        return real_forward(child=child, timeout=timeout)
+
+    monkeypatch.setattr(supervisor_module, "_forward_request_to_child", forward)
+    supervisor, first, second = _supervised(tmp_path, monkeypatch, slow_seconds=3.0, request_timeout=10,
+                                            cls=_SwitchSignalsWaiting, drain_timeout=10)
+    try:
+        with _Public(create_supervisor_app(supervisor)) as public:
+            prepare, prepare_box = _in_thread(lambda: _json(public.port, "POST", "/api/authoring/prepare", {}, timeout=30))
+            assert entered.wait(10)
+            switch, switch_box = _in_thread(
+                lambda: _json(public.port, "POST", f"/api/workspaces/{second.slug}/open", timeout=30))
+            _wait_until(lambda: supervisor.waiting.is_set() or not switch.is_alive(), timeout=10)
+            release.set()
+            prepare.join(30)
+            switch.join(30)
+            prepare_code, prepare_body = prepare_box["result"]
+            switch_code, switch_body = switch_box["result"]
+
+            assert prepare_code == 202, prepare_body
+            assert switch_code == 409, switch_body
+            assert switch_body["operations"][0]["operation_id"] == prepare_body["operation_id"]
+            code, runtime = _json(public.port, "GET", "/api/runtime/workspace")
+            assert runtime["workspace"]["slug"] == first.slug, "original workspace stays active"
+            _wait_until(lambda: preparation_job.status(first.db_path)["state"] != "running", timeout=20)
+            assert preparation_job.status(first.db_path)["state"] == "failed", "finished, not interrupted"
+    finally:
+        release.set()
+        supervisor.shutdown()
+
+
+def test_candidate_launch_failure_during_switch_leaves_preparation_available(tmp_path, monkeypatch):
+    """A failed switch releases its barrier: the original workspace can still prepare."""
+
+    class _FailingCandidate(WorkspaceRuntimeSupervisor):
+        def _launch_verified_child(self, target):
+            if self._active is not None:
+                from hermeneia.web.supervisor import SupervisorRuntimeError
+
+                raise SupervisorRuntimeError("candidate failed to start")
+            return super()._launch_verified_child(target)
+
+    supervisor, first, second = _supervised(tmp_path, monkeypatch, slow_seconds=3.0, request_timeout=5,
+                                            cls=_FailingCandidate)
+    try:
+        with _Public(create_supervisor_app(supervisor)) as public:
+            code, body = _json(public.port, "POST", f"/api/workspaces/{second.slug}/open")
+            assert code == 502 and "candidate failed" in body["error"]
+            code, runtime = _json(public.port, "GET", "/api/runtime/workspace")
+            assert runtime["workspace"]["slug"] == first.slug
+            code, started = _json(public.port, "POST", "/api/authoring/prepare", {})
+            assert code == 202 and started["state"] == "running"
+            _wait_until(lambda: preparation_job.status(first.db_path)["state"] != "running", timeout=20)
+    finally:
+        supervisor.shutdown()
+
+
+def test_start_refuses_truthfully_while_another_authoring_operation_holds_the_lease(prepared_workspace):
+    """Only the same running preparation is joinable; another lease holder is an explicit conflict."""
+    db, config = prepared_workspace
+    app = create_app(db_path=db)
+    app.config["HERMENEIA_COMPOSITOR_CONFIG"] = config
+    with preparation_job.exclusive(db, "authoring_attach"):
+        with pytest.raises(service.AuthoringError) as exc:
+            preparation_job.start(db, document_id=None, actor="author", config=config)
+        assert exc.value.code == "AUTHORING_OPERATION_IN_PROGRESS" and exc.value.status == 409
+        response = app.test_client().post("/api/authoring/prepare", json={})
+        assert response.status_code == 409
+        assert response.get_json()["code"] == "AUTHORING_OPERATION_IN_PROGRESS"
+        assert preparation_job.status(db) == {"state": "idle"}
+    started, code = preparation_job.start(db, document_id=None, actor="author", config=config)
+    assert code == 202 and started["state"] == "running"
+    preparation_job.wait(db, timeout=15)
 
 
 def test_supervised_prepare_outlives_request_window_without_502_or_race(tmp_path, monkeypatch):
