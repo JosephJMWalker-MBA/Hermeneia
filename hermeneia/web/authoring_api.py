@@ -45,6 +45,19 @@ def register_authoring_routes(app: Flask, db_path: Path) -> None:
         except AuthoringError as exc:
             return _error(exc)
 
+    @app.route("/api/authoring/prepare", methods=["POST"])
+    def api_authoring_prepare():
+        body = _body()
+        try:
+            return jsonify(service.prepare_primary_source(
+                db_path,
+                document_id=(str(body.get("document_id") or "").strip() or None),
+                actor=_actor(body),
+                config=_config(),
+            )), 201
+        except AuthoringError as exc:
+            return _error(exc)
+
     @app.route("/api/authoring/drafts", methods=["POST"])
     def api_authoring_draft():
         body = _body()

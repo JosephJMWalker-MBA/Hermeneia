@@ -47,8 +47,13 @@ class AuthoringError(Exception):
         self.status = status
         self.findings = findings or []
 
+    stage: str | None = None
+
     def payload(self) -> dict:
-        return {"error": self.message, "code": self.code, "findings": self.findings}
+        body = {"error": self.message, "code": self.code, "findings": self.findings}
+        if self.stage:
+            body["stage"] = self.stage
+        return body
 
 
 @dataclass(frozen=True)
@@ -57,6 +62,11 @@ class CompositorConfig:
     pythonpath: str | None
     typst: str | None
     timeout_s: float = 180.0
+    # In-workspace preparation: the saved publication profile and pinned font
+    # files are explicit layout decisions; preparation refuses without them.
+    profile: str | None = None
+    fonts: str | None = None
+    prepare_timeout_s: float = 3600.0
 
     @classmethod
     def from_env(cls) -> "CompositorConfig":
@@ -64,11 +74,23 @@ class CompositorConfig:
             python=os.environ.get("HERMENEIA_COMPOSITOR_PYTHON") or None,
             pythonpath=os.environ.get("HERMENEIA_COMPOSITOR_PATH") or None,
             typst=os.environ.get("HERMENEIA_TYPST") or None,
+            profile=os.environ.get("HERMENEIA_COMPOSITOR_PROFILE") or None,
+            fonts=os.environ.get("HERMENEIA_COMPOSITOR_FONTS") or None,
         )
 
     @property
     def configured(self) -> bool:
         return bool(self.python)
+
+    def missing_preparation_configuration(self) -> list[str]:
+        missing = []
+        if not self.python:
+            missing.append("HERMENEIA_COMPOSITOR_PYTHON")
+        if not self.profile or not Path(self.profile).is_file():
+            missing.append("HERMENEIA_COMPOSITOR_PROFILE")
+        if not self.fonts or not Path(self.fonts).is_dir():
+            missing.append("HERMENEIA_COMPOSITOR_FONTS")
+        return missing
 
 
 def _now() -> str:
@@ -93,7 +115,7 @@ def _child_env(config: CompositorConfig) -> dict[str, str]:
     return env
 
 
-def call_runner(config: CompositorConfig, request: dict) -> dict:
+def call_runner(config: CompositorConfig, request: dict, *, timeout_s: float | None = None) -> dict:
     """Invoke the runner with an argument array and a request file; verify the response binding."""
     if not config.configured:
         raise AuthoringError(
@@ -113,7 +135,7 @@ def call_runner(config: CompositorConfig, request: dict) -> dict:
                 env=_child_env(config),
                 capture_output=True,
                 text=True,
-                timeout=config.timeout_s,
+                timeout=timeout_s or config.timeout_s,
             )
         except subprocess.TimeoutExpired as exc:
             raise AuthoringError("COMPOSITOR_TIMEOUT", "The Compositor process timed out.", 504) from exc
@@ -265,6 +287,106 @@ def attach_work(db_path: str | Path, source_dir: str | Path, *, actor: str, conf
     return {"work_id": work_id, "work_root": work_root, "pin": result["pin"]}
 
 
+def preparation_candidates(conn: sqlite3.Connection) -> list[dict]:
+    """Active primary sources already ingested into this workspace (read-only)."""
+    return store.rows(
+        conn,
+        """SELECT id, original_filename, file_hash, total_pages
+           FROM source_documents
+           WHERE COALESCE(source_role, 'primary') = 'primary'
+             AND COALESCE(excluded_from_analysis, 0) = 0
+           ORDER BY registered_at, id""",
+    )
+
+
+def _source_bytes_path(db_path: Path, file_hash: str) -> Path | None:
+    """Locate the exact stored source bytes by SHA-256, never by filename."""
+    uploads = Path(db_path).parent / "uploads"
+    if not uploads.is_dir():
+        return None
+    for path in sorted(uploads.iterdir()):
+        if path.is_file() and not path.is_symlink() and store.sha256_bytes(path.read_bytes()) == file_hash:
+            return path
+    return None
+
+
+def prepare_primary_source(db_path: str | Path, *, document_id: str | None, actor: str,
+                           config: CompositorConfig) -> dict:
+    """Prepare the workspace's primary source with Compositor, then run the S1 attach path.
+
+    workspace source -> Compositor preparation -> verified prepared work -> S1 attach.
+    The source bytes and any authoring state are untouched on failure, and the
+    staging directory is always removed.
+    """
+    db_path = Path(db_path)
+    missing = config.missing_preparation_configuration()
+    if missing:
+        raise AuthoringError("PREPARATION_NOT_CONFIGURED",
+                             "Preparation needs a configured Compositor environment, saved profile and pinned fonts: "
+                             + ", ".join(missing) + ".", 503)
+    if not db_path.exists():
+        raise AuthoringError("NO_PRIMARY_SOURCE", "This workspace has no source to prepare.", 409)
+    conn = _conn_ro(db_path)
+    try:
+        if store.get_work(conn) is not None:
+            raise AuthoringError("WORK_ALREADY_ATTACHED", "This workspace already has an attached publication work.", 409)
+        candidates = preparation_candidates(conn)
+    finally:
+        conn.close()
+    if document_id:
+        chosen = next((c for c in candidates if c["id"] == document_id), None)
+        if chosen is None:
+            raise AuthoringError("NOT_A_PRIMARY_SOURCE", "That document is not an active primary source of this workspace.", 409)
+    elif len(candidates) == 1:
+        chosen = candidates[0]
+    elif not candidates:
+        raise AuthoringError("NO_PRIMARY_SOURCE", "This workspace has no active primary source to prepare.", 409)
+    else:
+        raise AuthoringError("AMBIGUOUS_PRIMARY_SOURCE", "Several primary sources exist; choose which one to prepare.", 409,
+                             [{"code": "CANDIDATE", "message": c["original_filename"], "ids": [c["id"]]} for c in candidates])
+    source_path = _source_bytes_path(db_path, chosen["file_hash"])
+    if source_path is None:
+        raise AuthoringError("SOURCE_BYTES_NOT_FOUND",
+                             "The stored bytes of this source were not found on the server; nothing was prepared.", 409)
+
+    staging = _publication_root(db_path).parent / f".publication-prepare-{uuid.uuid4().hex}"
+    try:
+        result = call_runner(config, {
+            "operation": "prepare",
+            "source_pdf": str(source_path),
+            "expected_source_sha256": chosen["file_hash"],
+            "profile_path": str(Path(config.profile).resolve()),
+            "fonts_dir": str(Path(config.fonts).resolve()),
+            "output_dir": str(staging),
+            "provenance": {
+                "workspace_source_document_id": chosen["id"],
+                "source_filename": chosen["original_filename"],
+                "prepared_by": actor,
+                "prepared_at": _now(),
+                "preparation": "hermeneia-in-workspace-preparation/0.1",
+            },
+        }, timeout_s=config.prepare_timeout_s)
+        if result.get("status") != "ok":
+            error = _refusal(result, "PREPARATION_REFUSED",
+                             "Publication Compositor could not prepare this source; nothing was attached.")
+            error.findings = [*error.findings]
+            error.stage = result.get("stage")
+            raise error
+        attached = attach_work(db_path, staging, actor=actor, config=config)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+        _remove_empty_publication_root(db_path)
+    if store.sha256_bytes(source_path.read_bytes()) != chosen["file_hash"]:
+        raise AuthoringError("SOURCE_CHANGED", "The workspace source bytes changed during preparation.", 500)
+    return {**attached, "prepared": True, "source_document_id": chosen["id"], "stages": result.get("stages") or []}
+
+
+def _remove_empty_publication_root(db_path: Path) -> None:
+    root = Path(db_path).parent / "publication"
+    if root.is_dir() and not any(root.iterdir()):
+        root.rmdir()
+
+
 def _publication_root(db_path: Path) -> Path:
     root = Path(db_path).parent / "publication"
     root.mkdir(parents=True, exist_ok=True)
@@ -344,12 +466,19 @@ def projection(db_path: str | Path, *, config: CompositorConfig) -> dict:
     """Read-only Authoring projection of the exact current Compositor version."""
     db_path = Path(db_path)
     if not db_path.exists():
-        return {"attached": False}
+        return {"attached": False, "compositor_configured": config.configured,
+                "preparation": {"missing_configuration": config.missing_preparation_configuration(), "candidates": []}}
     conn = _conn_ro(db_path)
     try:
         work = store.get_work(conn)
         if work is None:
-            return {"attached": False, "compositor_configured": config.configured}
+            candidates = [
+                {"id": c["id"], "filename": c["original_filename"], "pages": c["total_pages"]}
+                for c in preparation_candidates(conn)
+            ]
+            return {"attached": False, "compositor_configured": config.configured,
+                    "preparation": {"missing_configuration": config.missing_preparation_configuration(),
+                                    "candidates": candidates}}
         snapshot = _inspect(conn, db_path, work, config)
         chain = store.accepted_chain(conn, work["id"])
         versions = [{"version_ref": work["root_version_ref"], "label": "C0 (source-derived root)", "units": _version_units(conn, db_path, work, work["root_version_ref"])}]

@@ -10081,11 +10081,24 @@ function _crRenderAuthoring() {
     if (version) version.textContent = '';
     list.innerHTML = '';
     proof.innerHTML = '';
+    const prep = st?.preparation || { missing_configuration: [], candidates: [] };
+    const candidates = prep.candidates || [];
+    const preselect = candidates.find(c => c.id === _crDocId)?.id || (candidates[0]?.id || '');
+    const candidateHtml = candidates.length > 1
+      ? candidates.map(c => `<label class="cr-authoring-candidate"><input type="radio" name="cr-authoring-source" value="${x(c.id)}"${c.id === preselect ? ' checked' : ''}> ${x(c.filename)} · ${x(c.pages)} p.</label>`).join('')
+      : (candidates.length === 1 ? `<p>Primary source: <strong>${x(candidates[0].filename)}</strong> · ${x(candidates[0].pages)} p.</p>` : '<p class="cr-authoring-warn">This workspace has no active primary source to prepare.</p>');
+    const missing = prep.missing_configuration || [];
     detail.innerHTML = `<div class="cr-authoring-attach">
-        <p>No publication work is attached to this workspace. Attach one prepared, verified Publication Compositor work: a directory containing <code>compositor-work.json</code>.</p>
-        ${st && st.compositor_configured === false ? '<p class="cr-authoring-warn">No Publication Compositor environment is configured for this server.</p>' : ''}
-        <label>Prepared work directory <input id="cr-authoring-attach-dir" type="text" placeholder="/path/to/prepared-work"></label>
-        <button type="button" onclick="_crAuthoringAttach()">Attach work</button>
+        <p>No publication work is attached to this workspace. Publication Compositor can prepare the workspace's primary source for authoring. The original source evidence stays unchanged; Compositor builds and verifies the publication substrate, and anything it cannot resolve is shown for review.</p>
+        ${missing.length ? `<p class="cr-authoring-warn">Preparation is not configured on this server: ${missing.map(m => `<code>${x(m)}</code>`).join(', ')}.</p>` : ''}
+        ${candidateHtml}
+        <button type="button" onclick="_crAuthoringPrepare()"${!candidates.length || missing.length ? ' disabled' : ''}>Prepare current primary source for authoring</button>
+        <details class="cr-authoring-advanced">
+          <summary>Advanced: attach an already-prepared work by server path</summary>
+          <p class="cr-authoring-meta">Developer option. The directory must contain <code>compositor-work.json</code>; Compositor still verifies it before anything is attached.</p>
+          <label>Prepared work directory <input id="cr-authoring-attach-dir" type="text" placeholder="/path/to/prepared-work"></label>
+          <button type="button" onclick="_crAuthoringAttach()">Attach prepared work</button>
+        </details>
       </div>`;
     return;
   }
@@ -10188,6 +10201,21 @@ async function _crAuthoringAttach() {
   _crAuthoringSetNotice('info', 'Verifying the work with Publication Compositor…');
   const r = await _crAuthoringCall('POST', '/api/authoring/work/attach', { source_dir: dir });
   _crAuthoringSetNotice(r.ok ? 'ok' : 'error', r.ok ? 'Work attached and verified.' : (r.data?.error || 'Attach refused.'), r.data?.findings);
+  await _crLoadAuthoring();
+}
+
+async function _crAuthoringPrepare() {
+  const candidates = _crAuthoringState?.preparation?.candidates || [];
+  const chosen = document.querySelector('input[name="cr-authoring-source"]:checked')?.value
+    || (candidates.length === 1 ? candidates[0].id : '');
+  _crAuthoringSetNotice('info', 'Preparing with Publication Compositor… a long book can take several minutes. The source is not changed.');
+  const r = await _crAuthoringCall('POST', '/api/authoring/prepare', chosen ? { document_id: chosen } : {});
+  if (r.ok) {
+    _crAuthoringSetNotice('ok', 'Prepared and verified by Publication Compositor. Authoring is ready.');
+  } else {
+    const stage = r.data?.stage ? ` (stage: ${r.data.stage})` : '';
+    _crAuthoringSetNotice('warn', (r.data?.error || 'Preparation was refused; nothing was attached.') + stage, r.data?.findings);
+  }
   await _crLoadAuthoring();
 }
 
