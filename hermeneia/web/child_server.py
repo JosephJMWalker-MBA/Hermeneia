@@ -23,6 +23,11 @@ def main() -> None:
 
     app = create_app(db_path=Path(args.db))
     server = make_server(args.host, args.port, app, threaded=True)
+    # A drain/shutdown terminates this child: stop any running Authoring
+    # preparation and record it as interrupted instead of dying silently.
+    from ..authoring.preparation_job import install_signal_handler
+
+    install_signal_handler()
     host, port = server.socket.getsockname()[:2]
     print(
         json.dumps({"event": READY_EVENT, "host": host, "port": int(port)}),
@@ -30,7 +35,7 @@ def main() -> None:
     )
     try:
         server.serve_forever()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         pass
     finally:
         server.server_close()

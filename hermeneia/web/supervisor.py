@@ -36,6 +36,14 @@ _HOP_BY_HOP_HEADERS = {
 }
 
 
+# Requests that start a long-running, workspace-owned operation in the active
+# child. They pass through a barrier shared with workspace switching, so a switch
+# and such a start can never interleave: a start already in flight is waited for
+# (the switch then sees the operation and refuses), and a start arriving after a
+# switch crossed its boundary is refused instead of landing in a draining child.
+_LONG_RUNNING_START_ROUTES = frozenset({("POST", "/api/authoring/prepare")})
+
+
 class SupervisorRuntimeError(RuntimeError):
     """Raised when a candidate workspace runtime cannot become active."""
 
@@ -129,6 +137,10 @@ class WorkspaceRuntimeSupervisor:
         self._active: ChildRuntime | None = None
         self._draining: list[ChildRuntime] = []
         self._candidate: ChildRuntime | None = None
+        # Switch/long-running-start barrier (see _LONG_RUNNING_START_ROUTES).
+        self._start_gate = threading.Condition(threading.Lock())
+        self._switching = False
+        self._starts_in_flight = 0
 
     @property
     def active(self) -> ChildRuntime:
@@ -191,7 +203,24 @@ class WorkspaceRuntimeSupervisor:
             return {"error": "workspace switch already in progress"}, 409
 
         candidate: ChildRuntime | None = None
+        barrier = False
         try:
+            barrier = self._enter_switch_barrier()
+            if not barrier:
+                return {
+                    "error": "a long-running operation is still starting in the active workspace; "
+                             "switch after it finishes",
+                    "code": "LONG_RUNNING_OPERATION_STARTING",
+                }, 409
+            # Checked only after the barrier: no new long-running start can
+            # reach the active child between this check and the handoff.
+            operations = self._active_long_running_operations(active)
+            if operations:
+                return {
+                    "error": "the active workspace has a long-running operation in progress; "
+                             "switch after it finishes",
+                    "operations": operations,
+                }, 409
             candidate = self._launch_verified_child(target)
             self._handoff_to_candidate(candidate)
             candidate = None
@@ -206,21 +235,84 @@ class WorkspaceRuntimeSupervisor:
             with self._state_lock:
                 if self._candidate is candidate:
                     self._candidate = None
+            if barrier:
+                self._leave_switch_barrier()
             self._switch_lock.release()
 
-    def forward_current_request(self, *, workspace_switch_capability: bool = False) -> Response:
-        child = self.acquire_active()
-        try:
-            status, headers, body = _forward_request_to_child(
-                child=child,
+    def _enter_switch_barrier(self) -> bool:
+        """Close the gate to long-running starts, then wait for any start in flight.
+
+        Bounded by the ordinary request window; returns False (gate reopened) if
+        a start is still in flight after it.
+        """
+        with self._start_gate:
+            self._switching = True
+            if self._starts_in_flight:
+                self._on_switch_waiting_for_starts()
+            drained = self._start_gate.wait_for(
+                lambda: self._starts_in_flight == 0,
                 timeout=self._request_timeout,
             )
+            if not drained:
+                self._switching = False
+                self._start_gate.notify_all()
+            return drained
+
+    def _leave_switch_barrier(self) -> None:
+        with self._start_gate:
+            self._switching = False
+            self._start_gate.notify_all()
+
+    def _on_switch_waiting_for_starts(self) -> None:
+        """Observation hook: a switch is waiting for a long-running start in flight."""
+
+    def forward_current_request(self, *, workspace_switch_capability: bool = False) -> Response:
+        gated = (request.method, request.path) in _LONG_RUNNING_START_ROUTES
+        if gated:
+            with self._start_gate:
+                if self._switching:
+                    return Response(
+                        json.dumps({
+                            "error": "a workspace switch is in progress; start this operation "
+                                     "after it completes",
+                            "code": "WORKSPACE_SWITCH_IN_PROGRESS",
+                        }),
+                        status=409,
+                        content_type="application/json",
+                    )
+                self._starts_in_flight += 1
+        try:
+            child = self.acquire_active()
+            try:
+                status, headers, body = _forward_request_to_child(
+                    child=child,
+                    timeout=self._request_timeout,
+                )
+            finally:
+                self.release(child)
         finally:
-            self.release(child)
+            if gated:
+                with self._start_gate:
+                    self._starts_in_flight -= 1
+                    self._start_gate.notify_all()
 
         if workspace_switch_capability and status == 200:
             body, headers = _with_workspace_switch_capability(body, headers)
         return Response(body, status=status, headers=headers)
+
+    def _active_long_running_operations(self, child: ChildRuntime) -> list[dict]:
+        """Long-running work the active child reports; a switch must not drain it away.
+
+        Only an affirmative answer blocks a switch. A child that cannot answer
+        keeps the previous switch behavior; normal request proxying and its
+        timeout are unaffected.
+        """
+        try:
+            payload = _get_json(child, "/api/runtime/operations", timeout=self._startup_timeout)
+        except (OSError, http.client.HTTPException, SupervisorRuntimeError):
+            return []
+        operations = payload.get("long_running")
+        return [op for op in operations if isinstance(op, dict)] if isinstance(operations, list) else []
 
     def _launch_verified_child(self, target: RuntimeTarget) -> ChildRuntime:
         child = self._launch_child(target)

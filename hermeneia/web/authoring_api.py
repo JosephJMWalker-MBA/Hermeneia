@@ -10,7 +10,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from ..authoring import service
+from ..authoring import preparation_job, service
 from ..authoring.service import AuthoringError, CompositorConfig
 
 
@@ -41,22 +41,41 @@ def register_authoring_routes(app: Flask, db_path: Path) -> None:
         if not source_dir:
             return jsonify({"error": "source_dir is required", "code": "SOURCE_DIR_REQUIRED"}), 400
         try:
-            return jsonify(service.attach_work(db_path, Path(source_dir), actor=_actor(body), config=_config())), 201
+            # The raw attach shares the single workspace lease with preparation.
+            with preparation_job.exclusive(db_path, "authoring_attach"):
+                return jsonify(service.attach_work(db_path, Path(source_dir), actor=_actor(body), config=_config())), 201
         except AuthoringError as exc:
             return _error(exc)
 
     @app.route("/api/authoring/prepare", methods=["POST"])
     def api_authoring_prepare():
+        """Start one preparation, or identify the one already running (202).
+
+        Preparing a real book takes minutes, longer than the supervised proxy's
+        request window, so it runs as a workspace-owned operation. Poll
+        ``/api/authoring/prepare/status``; success still ends in the verified
+        S1 attach.
+        """
         body = _body()
         try:
-            return jsonify(service.prepare_primary_source(
+            payload, status = preparation_job.start(
                 db_path,
                 document_id=(str(body.get("document_id") or "").strip() or None),
                 actor=_actor(body),
                 config=_config(),
-            )), 201
+            )
+            return jsonify(payload), status
         except AuthoringError as exc:
             return _error(exc)
+
+    @app.route("/api/authoring/prepare/status")
+    def api_authoring_prepare_status():
+        return jsonify(preparation_job.status(db_path))
+
+    @app.route("/api/runtime/operations")
+    def api_runtime_operations():
+        """Long-running operations a workspace switch must not interrupt (read-only)."""
+        return jsonify({"long_running": preparation_job.active_operations(db_path)})
 
     @app.route("/api/authoring/drafts", methods=["POST"])
     def api_authoring_draft():
