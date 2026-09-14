@@ -1,6 +1,6 @@
 # Hermeneia and Publication Compositor: authoring architecture v0
 
-**Status:** Phase-1 architecture proposal; ready for coherence review, not ratified ontology or implemented behavior.
+**Status:** Phase-1 architecture proposal following #155's documented-blocker exit. Reviewable, but not ratified, implemented, or an implementation-ready Compositor interface.
 
 **Owner:** Astra. **Implementation handoff:** Claude, after review and approval of a bounded slice.
 
@@ -9,6 +9,8 @@
 **Inspected:** 2026-09-14 UTC, clean current-main checkouts: Hermeneia `82300fbed9d691c63e269896f2075bab3e322523`; Publication Compositor `7c671c7f1479d4d0c82e7e383b8bb6c00ae10dc2`.
 
 ## 1. Decision and scope
+
+**History is immutable. The current work is revisable.** Approved revisions advance the active manuscript while preserving earlier versions, source evidence and the investigation state attributable to them. Suggestion, revision, approval and truth remain distinct. A design that prevents normal author edits because history is immutable fails this requirement from the [steward clarification](https://github.com/JosephJMWalker-MBA/Hermeneia/issues/205#issuecomment-5657734017).
 
 Use **Compositor's existing source-derived `CanonicalPublication` plus its `EditorialCanonicalVersion` family as publication-content authority**. Hermeneia owns the Reader, author interaction, investigation records, approval/rationale, and links into that versioned work. Hermeneia must not maintain an independently editable copy of the publication semantic model.
 
@@ -40,6 +42,14 @@ Pinned source references are collected in section 15. “Present” means inspec
 | Source-derived output | Verified construction, profiles, font environment, Typst/PDF, DOCX, EPUB, HTML, source islands | Reuse rendering policy and assets. Source-derived multi-format support does not imply editorial multi-format support. DOCX edit reconciliation remains #107. [P8] |
 | Proof diagnostics | Source findings may identify block IDs; role-aware findings identify instruction IDs; general rendered findings may identify only a page | Reuse `TypstRenderProof` instruction locations and existing report identities. Universal canonical backlinks and an editorial proof verifier do not yet exist. [P9] |
 | CLI/package | Python package, JSON-capable models, `probe`, `extract-ir`, `verify-source`, `analyze`, `canonicalize`, `benchmark` | No existing general authoring/rebuild job command. Add a small Compositor-owned facade; do not pretend an analysis CLI already performs the full job. [P10] |
+
+### Phase-0 prerequisite and actual available interface
+
+The [sequencing correction in #205](https://github.com/JosephJMWalker-MBA/Hermeneia/issues/205#issuecomment-5657795468) arrived during this work. The initial draft commit preceded reading that correction; this revision consumes the [Compositor #155 readiness record][P11], committed at `71cd8dc82d881422561c3b5f884a2a03ced4c4ba`. That pass takes exit condition 2: precise unresolved blockers, **not** completed substrate. Its commit adds documentation only, so the inspected implementation SHA above remains the code baseline.
+
+The existing callable path is `build_editorial_revision_ledger(C0, records)` → `verify_editorial_revision_ledger(C0, ledger)` → `build_editorial_canonical_version(C0, ledger)` → `verify_editorial_canonical_version(C0, ledger, version)` → `build_editorial_construction_overlay(source, C0, ledger, version, base_plan)` and its independent verifier. Retrieve exact current artifact units from `CanonicalPublication.units` or `EditorialCanonicalVersion.units`; there is no persistent current-work API. These functions do not constitute a durable approve/commit/rebuild job, accept an editorial parent, or provide main's missing editorial PDF adapter.
+
+Readiness blockers B1–B3 are the editorial-parent schema/replay contract, editorial-aware render/proof closure including review of open #154, and a minimal local invocation/finding contract. Sections 4–7 below are recommendations to resolve those gaps, not interfaces produced by #155. Before implementation, Compositor must settle and test that surface; Hermeneia must consume it rather than silently implement its own version semantics. No product code was changed in either repository for these records.
 
 ### Observed verification
 
@@ -374,11 +384,11 @@ Reuse Compositor's existing destructive verifier tests and Hermeneia's `test_pub
 
 ## 14. Ordered Phase-2 tasks for Claude
 
-Phase 2 remains blocked until this artifact is reviewed for coherence and the first slice is explicitly approved. Re-inspect the exact referenced code at implementation time. The rows are bounded increments, ordered from contract checks toward progressively larger behavior. Complete S1 through task 8, then stop for live-use review; tasks 9–11 are not implicit permission to expand S1.
+Phase 2 remains blocked until the #155 B1–B3 substrate/interface blockers are resolved, this artifact is reviewed for coherence against that actual surface, and the first slice is explicitly approved. Re-inspect the exact referenced code at implementation time. The rows are bounded increments, ordered from contract checks toward progressively larger behavior. Complete S1 through task 8, then stop for live-use review; tasks 9–11 are not implicit permission to expand S1.
 
 | Order | Repository / issue | Exact task and acceptance boundary |
 |---|---|---|
-| 0 | Both; Hermeneia #205 | Review authority split, parent-version semantics, durable storage/transport treatment and S1 exclusions. Distill the accepted contract. Resolve the `.herm`/WBS wording conflict only in its necessary scope; no general storage rewrite. |
+| 0 | Both; Hermeneia #205 / Compositor #155 | Consume the readiness record and resolve B1–B3 through the scoped Compositor decisions/work below. Review authority split, parent-version semantics, durable storage/transport treatment and S1 exclusions. Distill the accepted contract. Resolve the `.herm`/WBS wording conflict only in its necessary scope; no general storage rewrite. |
 | 1 | Compositor #106; existing PR #154 | Inspect the pinned open adapter, reconcile with current main, run its existing unit and real Typst/PDF integration proof. Establish the supported text envelope and editorial-aware compile/proof path. Do not rebuild the adapter independently or treat an open PR as merged. Merge/release decisions require their own authorized review. |
 | 2 | Compositor #106 | Extend the existing ledger/version contracts for exact editorial parents and N→N+1→N+2 plain-text replay; retain original C0 and all decisions. Add schema compatibility, stale-target, same-unit second-edit and immutable-ancestor tests. No role, split/join or rich text yet. |
 | 3 | Compositor #106 / #109 | Extend the text-only overlay and editorial proof binding to the verified complete revision chain. Add a minimal versioned local job facade over existing builders/verifiers, declared file manifests, capability/refusal output, parent CAS and idempotent result receipt. Prove crash/retry behavior without Hermeneia or network service. |
@@ -393,6 +403,7 @@ Phase 2 remains blocked until this artifact is reviewed for coherence and the fi
 
 ### Cross-repository issue routing
 
+- [Compositor #155](https://github.com/JosephJMWalker-MBA/publication-compositor/issues/155): Phase-0 readiness record and precise-blocker handoff. Its documented-blocker exit permits architecture review; it does not establish a ready substrate or approve product implementation.
 - [Compositor #106](https://github.com/JosephJMWalker-MBA/publication-compositor/issues/106): parent-version replay, revision ancestry, text-overlay/proof continuation, later role/hierarchy/topology contracts. The open #154 is existing renderer prior art and a dependency to review.
 - [Compositor #109](https://github.com/JosephJMWalker-MBA/publication-compositor/issues/109): the narrow local artifact/job facade, capability envelope, same-session regeneration, typed proof finding/backlink contract. This is a bounded upstream consumer requirement, not implementation of its entire V1 inventory.
 - [Compositor #107](https://github.com/JosephJMWalker-MBA/publication-compositor/issues/107): DOCX edit/reimport remains a later optional editing surface that must enter the same revision/approval contract. It must not create a separate current manuscript.
@@ -421,6 +432,7 @@ All implementation links below identify the inspected main commits, so later cha
 [P8]: https://github.com/JosephJMWalker-MBA/publication-compositor/blob/7c671c7f1479d4d0c82e7e383b8bb6c00ae10dc2/README.md
 [P9]: https://github.com/JosephJMWalker-MBA/publication-compositor/blob/7c671c7f1479d4d0c82e7e383b8bb6c00ae10dc2/src/publication_compositor/renderers/typst/render_proof.py
 [P10]: https://github.com/JosephJMWalker-MBA/publication-compositor/blob/7c671c7f1479d4d0c82e7e383b8bb6c00ae10dc2/src/publication_compositor/cli.py
+[P11]: https://github.com/JosephJMWalker-MBA/publication-compositor/blob/71cd8dc82d881422561c3b5f884a2a03ced4c4ba/docs/integrations/hermeneia-authoring-readiness-v0.md
 
 Additional inspected implementation evidence:
 
