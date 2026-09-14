@@ -34,11 +34,18 @@ from ..study.evaluation import (
 
 
 WBS_VERSION = "1.1"
+# A workspace with an attached Publication Compositor work (issue #205, S1)
+# exports as 1.2 and declares a required capability, so a restorer that cannot
+# reconstruct the integrated authoring history refuses instead of dropping it.
+# Workspaces without an attached work still export as byte-identical 1.1.
+WBS_AUTHORING_VERSION = "1.2"
+PUBLICATION_CAPABILITY = "publication-authoring-v0"
 
 # Role of each file on restore (see spec §3).
 CANONICAL = "canonical"
 AUTHORED = "authored"
 DERIVED = "derived"
+MACHINE = "machine"
 
 
 def _dumps(obj: Any) -> bytes:
@@ -182,6 +189,7 @@ def build_bundle_files(
     workspace_id: str,
     upload_files: list[tuple[str, bytes]] | None = None,
     app_version: str = "",
+    publication: dict[str, Any] | None = None,
 ) -> dict[str, bytes]:
     """Build every bundle file (including manifest) as path → bytes.
 
@@ -263,13 +271,21 @@ def build_bundle_files(
         suffix = Path(filename).suffix
         content[f"corpus/uploads/{digest}{suffix}"] = (CANONICAL, data)
 
+    # Integrated authoring history (issue #205): authored decision rows plus the
+    # exact Compositor artifacts they reference, byte for byte.
+    if publication:
+        for table, table_rows in sorted(publication["tables"].items()):
+            content[f"publication/tables/{table}.json"] = (AUTHORED, _dumps(table_rows))
+        for relpath, (role, data) in sorted(publication["files"].items()):
+            content[f"publication/files/{relpath}"] = (role, data)
+
     # Manifest last — it describes every other file.
     files_manifest = [
         {"path": path, "role": role, "sha256": hashlib.sha256(data).hexdigest()}
         for path, (role, data) in sorted(content.items())
     ]
     manifest = {
-        "wbs_version": WBS_VERSION,
+        "wbs_version": WBS_AUTHORING_VERSION if publication else WBS_VERSION,
         "workspace_id": workspace_id,
         "created_at": generated_at,
         "updated_at": generated_at,
@@ -285,10 +301,44 @@ def build_bundle_files(
             "field_notes": len(field_notes),
         },
     }
+    if publication:
+        manifest["required_capabilities"] = [PUBLICATION_CAPABILITY]
+        manifest["counts"]["publication_works"] = len(publication["tables"].get("publication_works", []))
+        manifest["counts"]["authoring_accepted_versions"] = sum(
+            1 for row in publication["tables"].get("authoring_outcomes", []) if row.get("status") == "accepted"
+        )
 
     out: dict[str, bytes] = {path: data for path, (_role, data) in content.items()}
     out["manifest.json"] = _dumps(manifest)
     return out
+
+
+class PublicationExportError(RuntimeError):
+    """The integrated authoring history cannot be exported completely."""
+
+
+def _publication_component(conn: sqlite3.Connection, db_path: Path) -> dict[str, Any] | None:
+    """Authoring rows plus every referenced Compositor artifact, verified by hash.
+
+    Refuses rather than advertising a complete backup with a missing or
+    tampered artifact.
+    """
+    from ..authoring import store
+
+    tables = store.export_tables(conn)
+    if not tables or not tables.get("publication_works"):
+        return None
+    files: dict[str, tuple[str, bytes]] = {}
+    for artifact in tables["publication_artifacts"]:
+        path = store.work_dir(db_path, artifact["work_id"]) / artifact["relpath"]
+        if not path.is_file():
+            raise PublicationExportError(f"publication artifact missing: {artifact['relpath']}")
+        data = path.read_bytes()
+        if hashlib.sha256(data).hexdigest() != artifact["sha256"]:
+            raise PublicationExportError(f"publication artifact failed its hash check: {artifact['relpath']}")
+        role = CANONICAL if str(artifact["kind"]).startswith("input:") else MACHINE
+        files[f"{artifact['work_id']}/{artifact['relpath']}"] = (role, data)
+    return {"tables": tables, "files": files}
 
 
 def _read_upload_files(db_path: Path) -> list[tuple[str, bytes]]:
@@ -325,6 +375,7 @@ def build_workspace_zip(
             workspace_id=workspace_id,
             upload_files=_read_upload_files(db_path),
             app_version=app_version,
+            publication=_publication_component(conn, db_path),
         )
     finally:
         conn.close()
@@ -397,6 +448,7 @@ def export_workspace_bundle(
             workspace_id=workspace_id,
             upload_files=upload_files,
             app_version=app_version,
+            publication=_publication_component(conn, db_path),
         )
     finally:
         conn.close()

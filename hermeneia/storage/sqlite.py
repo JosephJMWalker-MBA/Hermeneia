@@ -1251,6 +1251,8 @@ class SQLiteStore:
         self._conn.executescript(_SUPERSESSION_TRIGGER_MIGRATION)
         self._apply_column_migrations()
         ensure_profile_tables(self._conn)
+        from ..authoring.store import ensure_authoring_schema
+        ensure_authoring_schema(self._conn)
         from datetime import datetime, timezone
         cur = self._conn.execute("SELECT version FROM schema_version")
         row = cur.fetchone()

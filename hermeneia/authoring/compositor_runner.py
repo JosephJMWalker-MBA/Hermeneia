@@ -1,0 +1,295 @@
+"""Child-process runner for Publication Compositor's ``EditorialLocalJob``.
+
+This file is executed by a *configured Publication Compositor Python*, not by
+Hermeneia's interpreter, and deliberately imports nothing from Hermeneia. It is
+an invocation adapter only: it marshals declared, hash-checked JSON artifacts
+into Compositor's own facade and marshals Compositor's own results back out.
+It holds no editorial policy of its own — every validation, replay, refusal and
+proof decision is made by Compositor code.
+
+Usage::
+
+    <compositor-python> compositor_runner.py REQUEST.json RESULT.json
+
+``EditorialLocalJob`` is an in-memory value rooted at C0. The runner rebuilds
+the exact current job by replaying the stored approved revision records in
+order through ``apply_approved`` and requiring every replayed receipt to equal
+the stored receipt byte for byte. History is never reconstructed any other way.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+RUNNER_PROTOCOL = "hermeneia-compositor-runner/0.1"
+OPERATIONS = ("inspect", "validate", "apply", "proof")
+
+# Compositor modules whose exact source bytes define the pinned facade.
+_PIN_MODULES = (
+    "editorial_job.py",
+    "editorial_revisions.py",
+    "editorial_versions.py",
+    "editorial_construction.py",
+    "renderers/typst/editorial_bundle.py",
+)
+
+
+class RunnerRefusal(Exception):
+    """A typed refusal returned to Hermeneia instead of a traceback."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _canonical(payload: object) -> str:
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _scoped(root: Path, relative: str) -> Path:
+    """Resolve ``relative`` inside ``root``; refuse absolute, traversal and symlink escape."""
+    if not relative or Path(relative).is_absolute():
+        raise RunnerRefusal("RUNNER_PATH_REFUSED", f"artifact path must be relative: {relative!r}")
+    candidate = (root / relative)
+    resolved = candidate.resolve()
+    if root.resolve() not in resolved.parents and resolved != root.resolve():
+        raise RunnerRefusal("RUNNER_PATH_REFUSED", f"artifact path escapes the work directory: {relative!r}")
+    if candidate.is_symlink():
+        raise RunnerRefusal("RUNNER_PATH_REFUSED", f"artifact path is a symlink: {relative!r}")
+    return resolved
+
+
+def _read_declared(root: Path, entry: dict) -> bytes:
+    path = _scoped(root, str(entry.get("path") or ""))
+    if not path.is_file():
+        raise RunnerRefusal("RUNNER_ARTIFACT_MISSING", f"declared artifact is missing: {entry.get('path')}")
+    data = path.read_bytes()
+    if _sha256(data) != entry.get("sha256"):
+        raise RunnerRefusal("RUNNER_ARTIFACT_HASH_MISMATCH", f"declared artifact hash differs: {entry.get('path')}")
+    return data
+
+
+def facade_pin() -> dict:
+    import publication_compositor
+    from publication_compositor.editorial_job import EDITORIAL_LOCAL_JOB_SCHEMA_VERSION
+
+    package_dir = Path(publication_compositor.__file__).resolve().parent
+    digests = {}
+    for relative in _PIN_MODULES:
+        digests[relative] = _sha256((package_dir / relative).read_bytes())
+    return {
+        "editorial_local_job_schema_version": EDITORIAL_LOCAL_JOB_SCHEMA_VERSION,
+        "module_sha256": digests,
+        "facade_sha256": _sha256(_canonical(digests).encode("utf-8")),
+    }
+
+
+def _load_job(request: dict, work_dir: Path):
+    from publication_compositor.canonical import CanonicalPublication
+    from publication_compositor.construction import ConstructionPlan
+    from publication_compositor.editorial_job import EditorialLocalJob
+    from publication_compositor.ir import DocumentIR
+    from publication_compositor.profiles import PublicationProfile, ResolvedLayoutPlan
+    from publication_compositor.renderers.typst import build_typst_renderer_environment
+    from publication_compositor.renderers.typst.fonts import hash_typst_renderer_environment
+
+    inputs = request.get("inputs") or {}
+    required = ("source_ir", "canonical_c0", "construction", "profile", "resolved_layout")
+    missing = [name for name in required if name not in inputs]
+    if missing:
+        raise RunnerRefusal("RUNNER_INPUT_MISSING", "missing work inputs: " + ", ".join(missing))
+
+    source = DocumentIR.model_validate_json(_read_declared(work_dir, inputs["source_ir"]))
+    c0 = CanonicalPublication.model_validate_json(_read_declared(work_dir, inputs["canonical_c0"]))
+    construction = ConstructionPlan.model_validate_json(_read_declared(work_dir, inputs["construction"]))
+    profile = PublicationProfile.model_validate_json(_read_declared(work_dir, inputs["profile"]))
+    resolved = ResolvedLayoutPlan.model_validate_json(_read_declared(work_dir, inputs["resolved_layout"]))
+
+    environment = None
+    fonts = inputs.get("fonts") or []
+    if fonts:
+        font_paths = []
+        for entry in fonts:
+            _read_declared(work_dir, entry)  # hash check before Compositor reads it
+            font_paths.append(_scoped(work_dir, entry["path"]))
+        environment = build_typst_renderer_environment(resolved, font_paths, profile=profile)
+        expected_env = request.get("expected_renderer_environment_sha256")
+        observed_env = hash_typst_renderer_environment(environment)
+        if expected_env and expected_env != observed_env:
+            raise RunnerRefusal(
+                "RUNNER_RENDERER_ENVIRONMENT_MISMATCH",
+                "rebuilt renderer environment differs from the attached work's environment",
+            )
+
+    try:
+        job = EditorialLocalJob.create(
+            source, c0, construction, profile, resolved, renderer_environment=environment
+        )
+    except ValueError as exc:
+        raise RunnerRefusal("RUNNER_WORK_NOT_VERIFIED", str(exc)) from exc
+    return job
+
+
+def _replay(job, request: dict, work_dir: Path):
+    from publication_compositor.editorial_revisions import EditorialRevisionRecord
+
+    for index, item in enumerate(request.get("history") or []):
+        record = EditorialRevisionRecord.model_validate_json(
+            _read_declared(work_dir, {"path": item["record_path"], "sha256": item["record_sha256"]})
+        )
+        try:
+            job, result = job.apply_approved(
+                record,
+                expected_parent_ref=item["expected_parent_ref"],
+                idempotency_key=item["idempotency_key"],
+            )
+        except ValueError as exc:
+            raise RunnerRefusal("RUNNER_HISTORY_REPLAY_REFUSED", f"history item {index}: {exc}") from exc
+        replayed = _sha256(result.receipt.model_dump_json().encode("utf-8"))
+        if replayed != item["receipt_sha256"]:
+            raise RunnerRefusal(
+                "RUNNER_HISTORY_DIVERGED",
+                f"history item {index}: replayed receipt differs from the stored receipt",
+            )
+    return job
+
+
+def _envelope(operation: str, payload) -> dict:
+    from publication_compositor.editorial_job import (
+        build_editorial_job_envelope,
+        verify_editorial_job_envelope,
+    )
+
+    envelope = build_editorial_job_envelope(operation, payload)
+    report = verify_editorial_job_envelope(envelope)
+    if not report.passed:
+        raise RunnerRefusal("RUNNER_ENVELOPE_INVALID", "Compositor refused its own envelope")
+    return json.loads(envelope.model_dump_json())
+
+
+def _findings(items) -> list[dict]:
+    return [{"code": f.code, "message": f.message, "ids": list(f.ids)} for f in items]
+
+
+def run(request: dict) -> dict:
+    from publication_compositor.editorial_revisions import (
+        EditorialRevisionDecision,
+        EditorialRevisionRecord,
+    )
+
+    operation = request.get("operation")
+    if request.get("protocol") != RUNNER_PROTOCOL:
+        raise RunnerRefusal("RUNNER_PROTOCOL_MISMATCH", f"unsupported protocol {request.get('protocol')!r}")
+    if operation not in OPERATIONS:
+        raise RunnerRefusal("RUNNER_OPERATION_UNSUPPORTED", f"unsupported operation {operation!r}")
+
+    pin = facade_pin()
+    expected_pin = request.get("expected_facade_sha256")
+    if expected_pin and expected_pin != pin["facade_sha256"]:
+        raise RunnerRefusal(
+            "RUNNER_FACADE_PIN_MISMATCH",
+            "configured Compositor facade differs from the one this work was attached with",
+        )
+
+    work_dir = Path(request["work_dir"])
+    job = _replay(_load_job(request, work_dir), request, work_dir)
+    snapshot = job.inspect()
+    out: dict = {"operation": operation, "pin": pin, "status": "ok", "findings": []}
+    out["snapshot"] = _envelope("inspect", snapshot)
+
+    if operation == "inspect":
+        return out
+
+    if operation in ("validate", "apply"):
+        record = EditorialRevisionRecord.model_validate(request["record"])
+        expected_parent = request["expected_parent_ref"]
+        key = request.get("idempotency_key")
+        if operation == "apply" and key and any(
+            prior.receipt.idempotency_key == key for prior in job.accepted_results
+        ):
+            # Compositor's own idempotency path: an identical retry returns the
+            # recorded result; a conflicting reuse of the key refuses.
+            try:
+                _same, prior = job.apply_approved(record, expected_parent_ref=expected_parent, idempotency_key=key)
+            except ValueError as exc:
+                out["status"] = "refused"
+                out["findings"] = [{"code": "EDITORIAL_JOB_IDEMPOTENCY_CONFLICT", "message": str(exc), "ids": [record.id]}]
+                return out
+            out["idempotent_replay"] = True
+            out["accepted"] = {
+                "receipt_json": prior.receipt.model_dump_json(),
+                "version_json": prior.version.model_dump_json(),
+            }
+            return out
+        validation = job.validate_proposal(record, expected_parent_ref=expected_parent)
+        out["validation"] = _envelope("validate_proposal", validation)
+        findings = _findings(validation.findings)
+        if validation.passed:
+            # Construction eligibility is only decided when Compositor builds the
+            # overlay, so run its own apply path on an approved copy and discard it.
+            probe = record
+            if record.decision is not EditorialRevisionDecision.APPROVED:
+                # Re-validate through Compositor's model so the decision fields are
+                # real typed values (model_copy(update=...) would skip validation).
+                probe = EditorialRevisionRecord.model_validate(
+                    {**record.model_dump(mode="json"), **(request.get("dry_run_approval") or {})}
+                )
+            try:
+                applied_job, result = job.apply_approved(
+                    probe,
+                    expected_parent_ref=expected_parent,
+                    idempotency_key=request.get("idempotency_key") or "hermeneia-dry-run",
+                )
+            except ValueError as exc:
+                findings.append({"code": "EDITORIAL_JOB_APPLY_REFUSED", "message": str(exc), "ids": [record.id]})
+            else:
+                if operation == "apply":
+                    out["accepted"] = {
+                        "receipt_json": result.receipt.model_dump_json(),
+                        "version_json": result.version.model_dump_json(),
+                        "ledger_json": applied_job.ledger.model_dump_json(),
+                        "overlay_json": applied_job.overlay.model_dump_json(),
+                    }
+                    out["snapshot"] = _envelope("inspect", applied_job.inspect())
+        out["findings"] = findings
+        if findings:
+            out["status"] = "refused"
+        return out
+
+    # proof
+    output_dir = Path(request["output_dir"])
+    output_dir.mkdir(parents=True, exist_ok=True)
+    _job, result = job.rebuild_proof(
+        output_dir, typst_executable=request.get("typst_executable") or "typst"
+    )
+    out["proof"] = _envelope("rebuild_proof", result)
+    out["proof_status"] = result.status
+    out["findings"] = _findings(result.findings)
+    return out
+
+
+def main(argv: list[str]) -> int:
+    request_path, result_path = Path(argv[1]), Path(argv[2])
+    raw = request_path.read_bytes()
+    try:
+        request = json.loads(raw)
+        result = run(request)
+    except RunnerRefusal as exc:
+        result = {"status": "refused", "findings": [{"code": exc.code, "message": exc.message, "ids": []}]}
+    except Exception as exc:  # surfaced as a typed error, never silently swallowed
+        result = {"status": "error", "findings": [{"code": "RUNNER_EXCEPTION", "message": f"{type(exc).__name__}: {exc}", "ids": []}]}
+    result["protocol"] = RUNNER_PROTOCOL
+    result["request_sha256"] = _sha256(raw)
+    result_path.write_text(_canonical(result), encoding="utf-8")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
