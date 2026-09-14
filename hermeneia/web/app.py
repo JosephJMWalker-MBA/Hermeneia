@@ -9677,4 +9677,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 
         return jsonify({"observations": [_anchored(r) for r in rows]})
 
+    from .authoring_api import register_authoring_routes
+    register_authoring_routes(app, db_path)
+
     return app

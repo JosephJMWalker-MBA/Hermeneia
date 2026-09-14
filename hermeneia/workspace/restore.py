@@ -14,6 +14,7 @@ truth. Reports/governance artifacts are not part of WBS v1.
 """
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import sqlite3
@@ -38,8 +39,13 @@ _TABLE_FILES: list[tuple[str, str]] = [
 
 _PERSPECTIVE_SUPERSESSION_FILE = "study/perspective_supersessions.json"
 
+# Required capabilities this restorer can reconstruct (see export.py).
+_PUBLICATION_CAPABILITY = "publication-authoring-v0"
+_PUBLICATION_PREFIX = "publication/"
+SUPPORTED_CAPABILITIES = frozenset({_PUBLICATION_CAPABILITY})
+
 # Tables whose presence means the workspace is not empty.
-_OCCUPANCY_TABLES = [table for table, _ in _TABLE_FILES] + ["workspace_investigation"]
+_OCCUPANCY_TABLES = [table for table, _ in _TABLE_FILES] + ["workspace_investigation", "publication_works"]
 
 
 class RestoreError(RuntimeError):
@@ -95,8 +101,14 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
         path = root / rel
         return json.loads(path.read_text()) if path.is_file() else None
 
+    unknown = sorted(set(manifest.get("required_capabilities") or []) - SUPPORTED_CAPABILITIES)
+    if unknown:
+        raise RestoreError(
+            "bundle requires capabilities this Hermeneia cannot restore: " + ", ".join(unknown)
+        )
     tables = {table: (_load(rel) or []) for table, rel in _TABLE_FILES}
     perspective_supersessions = _load(_PERSPECTIVE_SUPERSESSION_FILE) or []
+    publication = _read_publication_component(root, manifest)
     investigation = _load("investigation.json")
     uploads_dir = root / "corpus" / "uploads"
     uploads = sorted(
@@ -110,7 +122,109 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
         "perspective_supersessions": perspective_supersessions,
         "investigation": investigation,
         "uploads": uploads,
+        "publication": publication,
     }
+
+
+def _read_publication_component(root: Path, manifest: dict) -> dict[str, Any] | None:
+    """Load and verify the integrated authoring history, or refuse the bundle.
+
+    Every ``publication/`` file must be listed in the manifest with a matching
+    SHA-256, no unlisted file may appear, and the authored rows must close over
+    their referenced artifacts and accepted-version chain.
+    """
+    from ..authoring.store import AUTHORING_TABLES
+
+    listed = {
+        entry["path"]: entry["sha256"]
+        for entry in manifest.get("files") or []
+        if str(entry.get("path", "")).startswith(_PUBLICATION_PREFIX)
+    }
+    pub_dir = root / "publication"
+    present = {
+        path.relative_to(root).as_posix()
+        for path in pub_dir.rglob("*") if path.is_file()
+    } if pub_dir.is_dir() else set()
+    if not listed and not present:
+        if _PUBLICATION_CAPABILITY in (manifest.get("required_capabilities") or []):
+            raise RestoreError("bundle declares publication authoring but carries no publication component")
+        return None
+    if _PUBLICATION_CAPABILITY not in (manifest.get("required_capabilities") or []):
+        raise RestoreError("publication component present without its required capability declaration")
+    if present - set(listed):
+        raise RestoreError("publication component has unlisted files: " + ", ".join(sorted(present - set(listed))))
+    for rel, digest in listed.items():
+        path = root / rel
+        if not path.is_file():
+            raise RestoreError(f"publication component file missing: {rel}")
+        if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise RestoreError(f"publication component file failed its hash check: {rel}")
+
+    tables = {}
+    for table in AUTHORING_TABLES:
+        path = pub_dir / "tables" / f"{table}.json"
+        tables[table] = json.loads(path.read_text()) if path.is_file() else []
+    files: dict[str, Path] = {}
+    for rel in listed:
+        if rel.startswith("publication/files/"):
+            relpath = rel[len("publication/files/"):]
+            parts = Path(relpath).parts
+            if Path(relpath).is_absolute() or ".." in parts or len(parts) < 2:
+                raise RestoreError(f"unsafe publication artifact path: {rel}")
+            files[relpath] = root / rel
+    _validate_publication_closure(tables, files)
+    return {"tables": tables, "files": files}
+
+
+def _validate_publication_closure(tables: dict[str, list[dict]], files: dict[str, Path]) -> None:
+    works = tables["publication_works"]
+    if len(works) != 1:
+        raise RestoreError("publication component must contain exactly one attached work")
+    work_id = works[0]["id"]
+    artifacts = {row["sha256"]: row for row in tables["publication_artifacts"]}
+    for digest, row in artifacts.items():
+        path = files.get(f"{row['work_id']}/{row['relpath']}")
+        if path is None or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise RestoreError(f"publication artifact missing or altered: {row['relpath']}")
+
+    def _need(digest: str | None, label: str) -> None:
+        if not digest or digest not in artifacts:
+            raise RestoreError(f"authoring history references a missing {label} artifact")
+
+    proposals = {row["id"]: row for row in tables["authoring_proposals"]}
+    decisions = {row["id"]: row for row in tables["authoring_decisions"]}
+    requests = {row["id"]: row for row in tables["authoring_requests"]}
+    for decision in decisions.values():
+        if decision["proposal_id"] not in proposals:
+            raise RestoreError("authoring decision references a missing proposal")
+    for request in requests.values():
+        if request["decision_id"] not in decisions:
+            raise RestoreError("authoring request references a missing decision")
+        _need(request["record_artifact_sha256"], "revision record")
+    accepted = sorted(
+        (row for row in tables["authoring_outcomes"] if row["status"] == "accepted"),
+        key=lambda row: row["chain_index"],
+    )
+    if [row["chain_index"] for row in accepted] != list(range(len(accepted))):
+        raise RestoreError("accepted-version chain is not contiguous")
+    parent = works[0]["root_version_ref"]
+    for row in accepted:
+        request = requests.get(row["request_id"])
+        if request is None:
+            raise RestoreError("accepted outcome references a missing request")
+        if request["expected_parent_ref"] != parent:
+            raise RestoreError("accepted-version chain does not close over its parents")
+        for column, label in (("receipt_artifact_sha256", "receipt"), ("version_artifact_sha256", "version"),
+                              ("ledger_artifact_sha256", "ledger"), ("overlay_artifact_sha256", "overlay")):
+            _need(row[column], label)
+        if row["work_id"] != work_id:
+            raise RestoreError("accepted outcome belongs to a different work")
+        parent = row["result_version_ref"]
+    for proof in tables["authoring_proofs"]:
+        if proof["result_artifact_sha256"]:
+            _need(proof["result_artifact_sha256"], "proof result")
+        if proof["pdf_artifact_sha256"]:
+            _need(proof["pdf_artifact_sha256"], "proof PDF")
 
 
 def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
@@ -143,6 +257,10 @@ def preview_restore(db_path: str | Path, bundle_dir: str | Path) -> dict[str, An
     counts = {table: len(rows) for table, rows in bundle["tables"].items()}
     counts["perspective_supersessions"] = len(bundle["perspective_supersessions"])
     counts["uploads"] = len(bundle["uploads"])
+    if bundle["publication"] is not None:
+        for table, rows in bundle["publication"]["tables"].items():
+            counts[table] = len(rows)
+        counts["publication_files"] = len(bundle["publication"]["files"])
     return {
         "wbs_version": bundle["manifest"].get("wbs_version"),
         "workspace_id": bundle["manifest"].get("workspace_id"),
@@ -202,6 +320,15 @@ def restore_workspace(
             if investigation is not None:
                 _restore_investigation(conn, investigation)
                 restored["workspace_investigation"] = 1
+
+            publication = bundle["publication"]
+            if publication is not None:
+                from ..authoring.store import AUTHORING_TABLES
+
+                for table in AUTHORING_TABLES:
+                    restored[table] = _insert_rows(
+                        conn, table, publication["tables"][table], _table_columns(conn, table)
+                    )
             conn.commit()
         except sqlite3.Error as exc:
             conn.rollback()
@@ -217,7 +344,15 @@ def restore_workspace(
         conn.close()
 
     _restore_uploads(db_path, bundle["uploads"])
-    return {"restored": restored, "uploads": len(bundle["uploads"])}
+    publication_files = 0
+    if bundle["publication"] is not None:
+        publication_root = db_path.parent / "publication"
+        for relpath, src in sorted(bundle["publication"]["files"].items()):
+            dest = publication_root / relpath
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(src.read_bytes())
+            publication_files += 1
+    return {"restored": restored, "uploads": len(bundle["uploads"]), "publication_files": publication_files}
 
 
 def _insert_rows(

@@ -1589,6 +1589,30 @@ body.reader-active .cr-tool-drawer { max-width: none; }
 .cr-draft-ratify-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .cr-draft-ratified { margin-top: 12px; }
 /* Record — the ledger of durable narrative records (accountable artifacts, not a gallery). */
+/* Authoring (issue #205, S1): read-only projection + bounded plain-text unit editor. */
+.cr-authoring-status:empty { display: none; }
+.cr-authoring-notice { font-size: 12px; line-height: 1.5; padding: 8px 10px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 6px; }
+.cr-authoring-notice.ok { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.cr-authoring-notice.warn, .cr-authoring-notice.error { border-color: color-mix(in srgb, #c0392b 55%, var(--border)); }
+.cr-authoring-unit { display: block; width: 100%; text-align: left; padding: 9px 7px; border: 0; border-top: 1px solid var(--border); cursor: pointer; background: transparent; color: inherit; font: inherit; box-sizing: border-box; }
+.cr-authoring-unit:hover, .cr-authoring-unit.active { background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.cr-authoring-unit:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cr-authoring-role { display: block; font-size: 10px; color: var(--dim2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; }
+.cr-authoring-text { display: block; font-size: 13px; line-height: 1.4; }
+.cr-authoring-current { font-size: 14px; line-height: 1.5; padding: 8px 0; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.cr-authoring-bridge, .cr-authoring-meta { font-size: 11px; color: var(--dim2); line-height: 1.45; margin: 4px 0 8px; }
+.cr-authoring-detail label, #cr-authoring-detail label { display: block; font-size: 11px; color: var(--dim2); margin: 8px 0 3px; }
+#cr-authoring-detail textarea, #cr-authoring-detail input[type="text"], .cr-authoring-attach input[type="text"] { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; }
+.cr-authoring-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.cr-authoring-section { font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .05em; color: var(--dim2); margin: 14px 0 6px; }
+.cr-authoring-lineage { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.55; }
+.cr-authoring-proposal { border-top: 1px solid var(--border); padding: 8px 0; font-size: 12px; line-height: 1.5; }
+.cr-authoring-outcome { font-size: 12px; margin: 4px 0; }
+.cr-authoring-findings { margin: 4px 0; padding-left: 18px; font-size: 11px; }
+.cr-authoring-warn { font-size: 12px; line-height: 1.5; margin: 6px 0; color: var(--fg); border-left: 3px solid color-mix(in srgb, #c0392b 55%, var(--border)); padding-left: 8px; }
+.cr-authoring-proof { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 4px; font-size: 12px; line-height: 1.5; }
+.cr-authoring-proof-state.stale { border-left: 3px solid color-mix(in srgb, #c0392b 55%, var(--border)); padding-left: 8px; }
+.cr-authoring-refs { margin: 4px 0 8px; padding-left: 18px; }
 .cr-record-split { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
 @media (max-width: 820px) { .cr-record-split { grid-template-columns: 1fr; } }
 .cr-record-list { border-right: 1px solid var(--border); padding-right: 12px; max-height: 46vh; overflow-y: auto; }
@@ -3450,6 +3474,22 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
             <div style="font-size:12px;color:var(--dim2);line-height:1.5">Select a saved narrative record to inspect its Steward status, Critic audit, exact saved text, and lineage back to evidence.</div>
           </div>
         </div>
+      </div>
+    </aside>
+    <aside class="cr-authoring" id="cr-authoring" hidden aria-label="Authoring — revise the attached publication work">
+      <div class="cr-fln-bar">
+        <span class="cr-fln-bar-label">✍ Authoring</span>
+        <span class="cr-fln-count" id="cr-authoring-version"></span>
+        <span style="flex:1"></span>
+        <span class="cr-fln-hint">History is immutable; the current work is revisable. A draft is not an approval.</span>
+      </div>
+      <div class="cr-fln-body">
+        <div id="cr-authoring-status" class="cr-authoring-status" role="status" aria-live="polite"></div>
+        <div class="cr-record-split">
+          <div class="cr-record-list" id="cr-authoring-units"></div>
+          <div class="cr-record-detail" id="cr-authoring-detail"></div>
+        </div>
+        <div id="cr-authoring-proof" class="cr-authoring-proof"></div>
       </div>
     </aside>
   </div>
@@ -9754,6 +9794,7 @@ function _crRenderDocPicker(ws) {
       <button class="cr-rail-btn cr-rail-search" data-workstation-mode="search" onclick="openCorpusSearch()" title="Search the corpus without leaving the book">⌕ Search corpus</button>
       <button class="cr-rail-btn cr-rail-timeline" data-workstation-mode="timeline" onclick="openTimeline()" title="What have I discovered so far?">◷ Timeline</button>
       <button class="cr-rail-btn cr-rail-fieldnotes" data-workstation-mode="fieldnotes" onclick="_crRailGo('fieldnotes')" title="Open Field Notes">✎ Field Notes</button>
+      <button class="cr-rail-btn cr-rail-authoring" data-workstation-mode="authoring" onclick="_crOpenBottomWorkstation('authoring')" title="Revise the attached publication work and rebuild its proof">✍ Authoring</button>
       <span style="flex:1"></span>
       <button class="cr-rail-btn cr-rail-drawer-btn" type="button" onclick="_dockTogglePanel('guide')" title="Open workflow guide">? Guide</button>
       <button class="cr-rail-btn cr-rail-drawer-btn" id="cr-tool-drawer-btn" type="button" onclick="_dockTogglePanel('tools')" aria-expanded="false" aria-controls="cr-tool-drawer" title="Open tools dock">⚙ Tools</button>
@@ -9769,6 +9810,7 @@ function _crRenderDocPicker(ws) {
       <button class="cr-tool-row" onclick="_crRailGo('fieldnotes')"><span class="cr-tool-row-name">✎ Field Notes</span><span class="cr-tool-row-desc">Open Field Notes in the shared bottom workstation.</span></button>
       <button class="cr-tool-row" onclick="_crRailGo('highlights')"><span class="cr-tool-row-name">★ Saved Highlights</span><span class="cr-tool-row-desc">Review the highlights you have kept.</span></button>
       <button class="cr-tool-row" onclick="_crRailGo('observations')"><span class="cr-tool-row-name">◎ Machine Observations</span><span class="cr-tool-row-desc">Browse the full list of machine-observed passages.</span></button>
+      <button class="cr-tool-row" onclick="_crOpenBottomWorkstation('authoring')"><span class="cr-tool-row-name">✍ Authoring</span><span class="cr-tool-row-desc">Revise the attached publication work with explicit approval, then rebuild its 6×9 proof.</span></button>
     </div>
     <div class="cr-layout">
       <div>
@@ -9871,6 +9913,7 @@ function _crBottomPanels() {
     voice: document.getElementById('cr-voice-profile'),
     draft: document.getElementById('cr-artist-draft'),
     record: document.getElementById('cr-record-ledger'),
+    authoring: document.getElementById('cr-authoring'),
   };
 }
 function _crWorkstationResourceForMode(mode) {
@@ -9959,6 +10002,8 @@ async function _crOpenBottomWorkstation(mode) {
     _crLoadArtistDraft();
   } else if (mode === 'record') {
     _crLoadRecordLedger();
+  } else if (mode === 'authoring') {
+    _crLoadAuthoring();
   }
 }
 function _crCloseBottomWorkstation() {
@@ -9967,6 +10012,236 @@ function _crCloseBottomWorkstation() {
   shell.hidden = true;
   _crBottomMode = '';
   _crSyncBottomWorkstationState();
+}
+
+// ── Authoring (issue #205, S1) ───────────────────────────────────────────
+// A read-only projection of the attached Publication Compositor work plus a
+// bounded plain-text unit editor. The Reader DOM is never made editable: every
+// change is a proposal, an explicit human decision with rationale, and a
+// Compositor-accepted successor version. History is immutable; the current
+// work is revisable. Reader evidence stays attached to its original source.
+let _crAuthoringState = null;
+let _crAuthoringUnitId = '';
+let _crAuthoringNotice = null;
+
+async function _crAuthoringCall(method, url, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  let res;
+  try { res = await fetch(url, opts); } catch (err) { return { ok: false, status: 0, data: { error: String(err), code: 'NETWORK' } }; }
+  let data = {};
+  try { data = await res.json(); } catch { data = {}; }
+  return { ok: res.ok, status: res.status, data };
+}
+
+function _crAuthoringParse(value) {
+  try { return JSON.parse(value || '[]'); } catch { return []; }
+}
+
+function _crAuthoringFindings(findings) {
+  if (!findings || !findings.length) return '';
+  return `<ul class="cr-authoring-findings">${findings.map(f => `<li><code>${x(f.code || '')}</code> ${x(f.message || '')}</li>`).join('')}</ul>`;
+}
+
+function _crAuthoringSetNotice(kind, message, findings) {
+  _crAuthoringNotice = message ? { kind: kind || 'info', message, findings: findings || [] } : null;
+  const el = document.getElementById('cr-authoring-status');
+  if (!el) return;
+  el.innerHTML = _crAuthoringNotice
+    ? `<div class="cr-authoring-notice ${x(_crAuthoringNotice.kind)}">${x(_crAuthoringNotice.message)}${_crAuthoringFindings(_crAuthoringNotice.findings)}</div>`
+    : '';
+}
+
+async function _crLoadAuthoring() {
+  const list = document.getElementById('cr-authoring-units');
+  if (list) list.innerHTML = '<div style="font-size:12px;color:var(--dim2)">Loading the attached work…</div>';
+  const r = await _crAuthoringCall('GET', '/api/authoring/work');
+  if (!r.ok) {
+    _crAuthoringState = null;
+    _crAuthoringSetNotice('error', r.data?.error || 'Could not load the attached work.', r.data?.findings);
+  } else {
+    _crAuthoringState = r.data;
+  }
+  _crRenderAuthoring();
+}
+
+function _crAuthoringUnit(id) {
+  return (_crAuthoringState?.units || []).find(u => u.id === id) || null;
+}
+
+function _crRenderAuthoring() {
+  const st = _crAuthoringState;
+  const version = document.getElementById('cr-authoring-version');
+  const list = document.getElementById('cr-authoring-units');
+  const detail = document.getElementById('cr-authoring-detail');
+  const proof = document.getElementById('cr-authoring-proof');
+  if (!list || !detail || !proof) return;
+  _crAuthoringSetNotice(_crAuthoringNotice?.kind, _crAuthoringNotice?.message, _crAuthoringNotice?.findings);
+  if (!st || !st.attached) {
+    if (version) version.textContent = '';
+    list.innerHTML = '';
+    proof.innerHTML = '';
+    detail.innerHTML = `<div class="cr-authoring-attach">
+        <p>No publication work is attached to this workspace. Attach one prepared, verified Publication Compositor work: a directory containing <code>compositor-work.json</code>.</p>
+        ${st && st.compositor_configured === false ? '<p class="cr-authoring-warn">No Publication Compositor environment is configured for this server.</p>' : ''}
+        <label>Prepared work directory <input id="cr-authoring-attach-dir" type="text" placeholder="/path/to/prepared-work"></label>
+        <button type="button" onclick="_crAuthoringAttach()">Attach work</button>
+      </div>`;
+    return;
+  }
+  if (version) version.textContent = `${st.work.label || st.work.id} · current ${st.current_version_label}`;
+  list.innerHTML = st.units.map(u => `
+    <button type="button" class="cr-authoring-unit${u.id === _crAuthoringUnitId ? ' active' : ''}" data-authoring-unit="${x(u.id)}" onclick="_crAuthoringSelect('${x(u.id)}')">
+      <span class="cr-authoring-role">${x(u.semantic_role)}${u.editable ? '' : ' · locked'}</span>
+      <span class="cr-authoring-text">${x(u.text)}</span>
+    </button>`).join('');
+  const unit = _crAuthoringUnit(_crAuthoringUnitId);
+  detail.innerHTML = unit
+    ? _crAuthoringUnitDetail(unit)
+    : '<div style="font-size:12px;color:var(--dim2);line-height:1.5">Select a manuscript unit. The text shown is the exact current Publication Compositor version; the Reader keeps the original source evidence unchanged.</div>';
+  proof.innerHTML = _crAuthoringProofPanel();
+}
+
+function _crAuthoringProposalHtml(p) {
+  const st = _crAuthoringState;
+  const findings = (() => { try { return JSON.parse(p.validation_json || '{}').findings || []; } catch { return []; } })();
+  const stale = p.parent_version_ref !== st.current_version_ref;
+  let decision = '';
+  if (p.decision) {
+    const outs = (st.outcomes || []).filter(o => o.decision_id === p.decision_id);
+    const last = outs[outs.length - 1];
+    decision = `<div>Decision: <strong>${x(p.decision)}</strong> by ${x(p.decision_actor || '')} — ${x(p.decision_rationale || '')}</div>`
+      + outs.map(o => `<div class="cr-authoring-outcome ${x(o.status)}">Request attempt ${x(o.attempt)}: <strong>${x(o.status)}</strong>${o.result_version_ref ? ' → ' + x(o.result_version_ref.slice(0, 22)) + '…' : ''}${_crAuthoringFindings(_crAuthoringParse(o.findings_json))}</div>`).join('')
+      + (last && last.status !== 'accepted' && p.decision === 'approved'
+        ? `<button type="button" onclick="_crAuthoringRetry('${x(p.decision_id)}')">Retry request</button>` : '');
+  } else if (p.validation_status === 'valid' && !stale) {
+    decision = `<label>Decision rationale <input type="text" id="cr-authoring-dr-${x(p.id)}" placeholder="Why approve or reject?"></label>
+      <div class="cr-authoring-actions">
+        <button type="button" onclick="_crAuthoringDecide('${x(p.id)}','approved')">Approve revision</button>
+        <button type="button" onclick="_crAuthoringDecide('${x(p.id)}','rejected')">Reject</button>
+      </div>`;
+  } else if (p.validation_status === 'valid') {
+    decision = '<div class="cr-authoring-warn">Stale: this proposal\'s parent is no longer the current version. It is kept as history; propose again against the current text.</div>';
+  } else {
+    decision = `<div class="cr-authoring-warn">Refused by Publication Compositor; it cannot be approved.</div>
+      <label>Rationale <input type="text" id="cr-authoring-dr-${x(p.id)}" placeholder="Why reject?"></label>
+      <button type="button" onclick="_crAuthoringDecide('${x(p.id)}','rejected')">Record rejection</button>`;
+  }
+  return `<div class="cr-authoring-proposal">
+      <div><code>${x(p.operation)}</code> [${x(p.start_offset)}, ${x(p.end_offset)}) “${x(p.before_value)}” → “${x(p.after_value)}”</div>
+      <div class="cr-authoring-meta">Rationale: ${x(p.rationale)} · proposed by ${x(p.proposed_by)} · parent ${x(String(p.parent_version_ref).slice(0, 22))}…</div>
+      ${_crAuthoringFindings(findings)}
+      ${decision}
+    </div>`;
+}
+
+function _crAuthoringUnitDetail(u) {
+  const st = _crAuthoringState;
+  const lineageIds = new Set((u.lineage || []).map(l => l.unit_id));
+  const lineage = (u.lineage || []).map(l => `<li><strong>${x(l.label)}</strong> <span class="cr-authoring-hist">${x(l.text)}</span></li>`).join('');
+  const proposals = (st.proposals || []).filter(p => lineageIds.has(p.unit_id));
+  const editor = u.editable ? `
+    <label for="cr-authoring-editor">Plain-text revision against ${x(st.current_version_label)}</label>
+    <textarea id="cr-authoring-editor" rows="3">${x(u.draft != null ? u.draft : u.text)}</textarea>
+    <label>Rationale <input type="text" id="cr-authoring-rationale" placeholder="Why this revision?"></label>
+    <div class="cr-authoring-actions">
+      <button type="button" onclick="_crAuthoringSaveDraft()">Save draft</button>
+      <button type="button" onclick="_crAuthoringPropose()">Propose revision</button>
+    </div>` : `<div class="cr-authoring-warn">${x(u.not_editable_reason || 'Not editable in this slice.')}</div>`;
+  return `
+    <div class="cr-authoring-current"><div class="cr-authoring-role">${x(u.semantic_role)} · unit <code>${x(u.id)}</code></div><div>${x(u.text)}</div></div>
+    <div class="cr-authoring-bridge">Reader correspondence: <strong>${x(u.reader_correspondence?.status || '')}</strong> — ${x(u.reader_correspondence?.note || '')}</div>
+    ${editor}
+    <div class="cr-authoring-section">History of this unit</div>
+    <ol class="cr-authoring-lineage">${lineage}</ol>
+    ${proposals.length ? '<div class="cr-authoring-section">Proposals and decisions</div>' + proposals.map(_crAuthoringProposalHtml).join('') : ''}`;
+}
+
+function _crAuthoringProofPanel() {
+  const st = _crAuthoringState;
+  const ps = st.proof_state || {};
+  const last = [...(st.proofs || [])].reverse().find(p => p.status === 'verified');
+  const refs = last ? _crAuthoringParse(last.references_json) : [];
+  const refHtml = refs.map(r => {
+    const current = (st.units || []).find(u => (u.lineage || []).some(l => l.unit_id === r.editorial_content_id));
+    const moved = current && current.id !== r.editorial_content_id;
+    return `<li>Unit <code>${x(r.editorial_content_id)}</code> · ${x((r.revision_record_ids || []).length)} revision(s)
+      ${current ? `<button type="button" onclick="_crAuthoringSelect('${x(current.id)}')">Open unit</button>` : ''}
+      ${moved ? '<span class="cr-authoring-meta">revised since this proof; opens the current successor through verified lineage</span>' : ''}</li>`;
+  }).join('');
+  const attempt = ps.last_attempt ? `<div class="cr-authoring-warn">${x(ps.last_attempt.message)}${_crAuthoringFindings(ps.last_attempt.findings)}</div>` : '';
+  return `<div class="cr-authoring-section">6×9 proof</div>
+    <div class="cr-authoring-proof-state ${x(ps.status || '')}">${x(ps.message || '')}</div>
+    ${attempt}
+    ${last ? `<div>Last verified proof: <a href="/api/authoring/proofs/${encodeURIComponent(last.id)}/pdf" target="_blank" rel="noopener">open PDF</a> · version ${x(String(last.version_ref).slice(0, 22))}…</div><ul class="cr-authoring-refs">${refHtml}</ul>` : ''}
+    <button type="button" onclick="_crAuthoringProof()">${ps.last_attempt ? 'Retry proof' : 'Generate 6×9 proof'}</button>`;
+}
+
+function _crAuthoringSelect(id) {
+  _crAuthoringUnitId = id;
+  _crRenderAuthoring();
+}
+
+async function _crAuthoringAttach() {
+  const dir = document.getElementById('cr-authoring-attach-dir')?.value?.trim();
+  if (!dir) { _crAuthoringSetNotice('warn', 'Enter the prepared work directory.'); return; }
+  _crAuthoringSetNotice('info', 'Verifying the work with Publication Compositor…');
+  const r = await _crAuthoringCall('POST', '/api/authoring/work/attach', { source_dir: dir });
+  _crAuthoringSetNotice(r.ok ? 'ok' : 'error', r.ok ? 'Work attached and verified.' : (r.data?.error || 'Attach refused.'), r.data?.findings);
+  await _crLoadAuthoring();
+}
+
+async function _crAuthoringSaveDraft() {
+  const u = _crAuthoringUnit(_crAuthoringUnitId);
+  const text = document.getElementById('cr-authoring-editor')?.value ?? '';
+  if (!u) return;
+  const r = await _crAuthoringCall('POST', '/api/authoring/drafts', { unit_id: u.id, parent_version_ref: _crAuthoringState.current_version_ref, text });
+  _crAuthoringSetNotice(r.ok ? 'info' : 'error', r.ok ? 'Draft saved. A draft is not an approval.' : (r.data?.error || 'Draft not saved.'), r.data?.findings);
+  await _crLoadAuthoring();
+}
+
+async function _crAuthoringPropose() {
+  const u = _crAuthoringUnit(_crAuthoringUnitId);
+  if (!u) return;
+  const text = document.getElementById('cr-authoring-editor')?.value ?? '';
+  const rationale = document.getElementById('cr-authoring-rationale')?.value ?? '';
+  _crAuthoringSetNotice('info', 'Validating the proposal with Publication Compositor…');
+  const r = await _crAuthoringCall('POST', '/api/authoring/proposals', { unit_id: u.id, parent_version_ref: _crAuthoringState.current_version_ref, text, rationale });
+  if (!r.ok) _crAuthoringSetNotice('error', r.data?.error || 'Proposal not recorded.', r.data?.findings);
+  else if (r.data.validation_status !== 'valid') _crAuthoringSetNotice('warn', 'Publication Compositor refused this proposal. It is kept as history and cannot be approved.', r.data.findings);
+  else _crAuthoringSetNotice('ok', 'Proposal recorded. Review the exact change below, then approve or reject it.');
+  await _crLoadAuthoring();
+}
+
+async function _crAuthoringDecide(proposalId, decision) {
+  const rationale = document.getElementById(`cr-authoring-dr-${proposalId}`)?.value ?? '';
+  _crAuthoringSetNotice('info', decision === 'approved' ? 'Recording approval and submitting it to Publication Compositor…' : 'Recording rejection…');
+  const r = await _crAuthoringCall('POST', `/api/authoring/proposals/${encodeURIComponent(proposalId)}/decision`, { decision, rationale });
+  if (!r.ok) {
+    _crAuthoringSetNotice('error', r.data?.error || 'Decision not recorded.', r.data?.findings);
+  } else if (decision === 'rejected') {
+    _crAuthoringSetNotice('info', 'Rejection recorded. The manuscript is unchanged.');
+  } else if (r.data.outcome?.status === 'accepted') {
+    _crAuthoringSetNotice('ok', 'Revision accepted by Publication Compositor as a new version. The previous proof now shows an earlier version.');
+  } else {
+    _crAuthoringSetNotice('warn', 'Approval recorded, but Publication Compositor refused the request. Nothing changed.', _crAuthoringParse(r.data.outcome?.findings_json));
+  }
+  await _crLoadAuthoring();
+}
+
+async function _crAuthoringRetry(decisionId) {
+  const r = await _crAuthoringCall('POST', `/api/authoring/decisions/${encodeURIComponent(decisionId)}/retry`);
+  const ok = r.ok && r.data?.status === 'accepted';
+  _crAuthoringSetNotice(ok ? 'ok' : 'warn', ok ? 'Request accepted.' : (r.data?.error || 'Publication Compositor refused the retried request.'), r.data?.findings || _crAuthoringParse(r.data?.findings_json));
+  await _crLoadAuthoring();
+}
+
+async function _crAuthoringProof() {
+  _crAuthoringSetNotice('info', 'Building the 6×9 proof from the current accepted version…');
+  const r = await _crAuthoringCall('POST', '/api/authoring/proofs');
+  if (r.ok && r.data?.status === 'verified') _crAuthoringSetNotice('ok', 'Proof verified for the current accepted version.');
+  else _crAuthoringSetNotice('warn', r.data?.message || r.data?.error || 'Manuscript saved; proof not updated', r.data?.findings);
+  await _crLoadAuthoring();
 }
 
 // ── Perspective Run (Reader workstation) ─────────────────────────────────
