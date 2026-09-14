@@ -438,6 +438,46 @@ def test_restore_refuses_missing_or_tampered_authoring_artifacts(attached, tmp_p
 
 
 @needs_compositor
+def test_restore_publication_write_failure_leaves_no_active_state_and_retry_succeeds(attached, tmp_path, monkeypatch):
+    """A destination write failure mid-install must not orphan accepted authoring rows."""
+    import hermeneia.workspace.restore as restore_module
+
+    p0 = service.projection(attached, config=COMPOSITOR)
+    _edit(attached, p0["units"][2], p0["current_version_ref"], "The lamp glows brightly.", "first")
+    head = service.projection(attached, config=COMPOSITOR)["current_version_ref"]
+    bundle = tmp_path / "bundle"
+    export_workspace_bundle(attached, bundle, generated_at=NOW, workspace_id="w")
+
+    real_copy = restore_module._copy_publication_file
+    calls = {"n": 0}
+
+    def failing_copy(src, dest):
+        calls["n"] += 1
+        if calls["n"] == 3:  # fail after some files were already written
+            raise OSError(28, "No space left on device (injected)")
+        return real_copy(src, dest)
+
+    monkeypatch.setattr(restore_module, "_copy_publication_file", failing_copy)
+    target = tmp_path / "restored" / "hermeneia.db"
+    with pytest.raises(RestoreError, match="publication"):
+        restore_workspace(target, bundle)
+    assert calls["n"] == 3
+
+    conn = sqlite3.connect(target)
+    assert conn.execute("SELECT COUNT(*) FROM publication_works").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM authoring_outcomes").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM source_documents").fetchone()[0] == 0
+    conn.close()
+    leftovers = sorted(p.name for p in target.parent.iterdir())
+    assert not any("publication" in name for name in leftovers), leftovers
+
+    monkeypatch.setattr(restore_module, "_copy_publication_file", real_copy)
+    restore_workspace(target, bundle)
+    assert service.verify_history(target, config=COMPOSITOR)["current_version_ref"] == head
+    assert service.projection(target, config=COMPOSITOR)["current_version_ref"] == head
+
+
+@needs_compositor
 def test_export_refuses_incomplete_integrated_backup(attached, tmp_path):
     p0 = service.projection(attached, config=COMPOSITOR)
     _edit(attached, p0["units"][2], p0["current_version_ref"], "The lamp glows brightly.", "first")

@@ -17,7 +17,10 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
+import shutil
 import sqlite3
+import uuid
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -289,12 +292,20 @@ def restore_workspace(
 
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    staging: Path | None = None
+    installed: list[Path] = []
     try:
         if not overwrite and not _workspace_is_empty(conn):
             raise RestoreError(
                 "target workspace is not empty; refusing to restore (WBS v1 has "
                 "no merge). Pass overwrite=True to restore into a fresh database."
             )
+
+        # Publication artifacts are staged and hash-verified before any row is
+        # inserted, installed before the commit, and discarded on any failure,
+        # so accepted authoring rows never become active without their files.
+        if bundle["publication"] is not None:
+            staging = _stage_publication(db_path, bundle["publication"])
 
         restored: dict[str, int] = {}
         # Insert in FK order; disable FK enforcement during the bulk load so a
@@ -329,13 +340,20 @@ def restore_workspace(
                     restored[table] = _insert_rows(
                         conn, table, publication["tables"][table], _table_columns(conn, table)
                     )
+            if staging is not None:
+                installed = _install_publication(db_path, staging)
             conn.commit()
         except sqlite3.Error as exc:
             conn.rollback()
+            _discard_publication(db_path, staging, installed)
             raise RestoreError(str(exc)) from exc
         except Exception:
             conn.rollback()
+            _discard_publication(db_path, staging, installed)
             raise
+    except RestoreError:
+        _discard_publication(db_path, staging, installed)
+        raise
     finally:
         try:
             conn.execute("PRAGMA foreign_keys=ON")
@@ -343,16 +361,67 @@ def restore_workspace(
             pass
         conn.close()
 
+    if staging is not None:
+        shutil.rmtree(staging, ignore_errors=True)
     _restore_uploads(db_path, bundle["uploads"])
-    publication_files = 0
-    if bundle["publication"] is not None:
-        publication_root = db_path.parent / "publication"
-        for relpath, src in sorted(bundle["publication"]["files"].items()):
-            dest = publication_root / relpath
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(src.read_bytes())
-            publication_files += 1
+    publication_files = len(bundle["publication"]["files"]) if bundle["publication"] is not None else 0
     return {"restored": restored, "uploads": len(bundle["uploads"]), "publication_files": publication_files}
+
+
+def _copy_publication_file(src: Path, dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, dest)
+
+
+def _stage_publication(db_path: Path, publication: dict[str, Any]) -> Path:
+    """Copy and hash-verify every publication file into a sibling staging area."""
+    root = db_path.parent / "publication"
+    work_ids = sorted({relpath.split("/", 1)[0] for relpath in publication["files"]})
+    for work_id in work_ids:
+        if (root / work_id).exists():
+            raise RestoreError(f"publication area for {work_id} already exists; refusing to overwrite it")
+    staging = db_path.parent / f".publication-restore-{uuid.uuid4().hex}"
+    try:
+        for relpath, src in sorted(publication["files"].items()):
+            dest = staging / relpath
+            _copy_publication_file(src, dest)
+            if hashlib.sha256(dest.read_bytes()).hexdigest() != hashlib.sha256(src.read_bytes()).hexdigest():
+                raise RestoreError(f"staged publication file failed its hash check: {relpath}")
+    except OSError as exc:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise RestoreError(f"publication component could not be staged: {exc}") from exc
+    except RestoreError:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return staging
+
+
+def _install_publication(db_path: Path, staging: Path) -> list[Path]:
+    """Move each staged work directory into place; returns what was installed."""
+    root = db_path.parent / "publication"
+    installed: list[Path] = []
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        for work_dir in sorted(p for p in staging.iterdir() if p.is_dir()):
+            final = root / work_dir.name
+            os.replace(work_dir, final)
+            installed.append(final)
+    except OSError as exc:
+        for path in installed:
+            shutil.rmtree(path, ignore_errors=True)
+        raise RestoreError(f"publication component could not be installed: {exc}") from exc
+    return installed
+
+
+def _discard_publication(db_path: Path, staging: Path | None, installed: list[Path]) -> None:
+    """Remove a staged or installed publication component after a failed restore."""
+    for path in installed:
+        shutil.rmtree(path, ignore_errors=True)
+    if staging is not None:
+        shutil.rmtree(staging, ignore_errors=True)
+    root = db_path.parent / "publication"
+    if root.is_dir() and not any(root.iterdir()):
+        root.rmdir()
 
 
 def _insert_rows(
