@@ -10083,6 +10083,8 @@ function _crRenderAuthoring() {
     proof.innerHTML = '';
     const prep = st?.preparation || { missing_configuration: [], candidates: [] };
     const candidates = prep.candidates || [];
+    if (prep.operation?.state === 'running') _crAuthoringWatchPreparation();
+    else if (!_crAuthoringNotice) _crAuthoringPreparationNotice(prep.operation);
     const preselect = candidates.find(c => c.id === _crDocId)?.id || (candidates[0]?.id || '');
     const candidateHtml = candidates.length > 1
       ? candidates.map(c => `<label class="cr-authoring-candidate"><input type="radio" name="cr-authoring-source" value="${x(c.id)}"${c.id === preselect ? ' checked' : ''}> ${x(c.filename)} · ${x(c.pages)} p.</label>`).join('')
@@ -10204,19 +10206,56 @@ async function _crAuthoringAttach() {
   await _crLoadAuthoring();
 }
 
+// Preparation is a workspace-owned operation (it can take minutes): POST
+// starts or identifies it (202), then the panel polls its status until a
+// terminal state. Reloading the page resumes polling a running preparation.
+let _crAuthoringPrepPoll = null;
+
 async function _crAuthoringPrepare() {
   const candidates = _crAuthoringState?.preparation?.candidates || [];
   const chosen = document.querySelector('input[name="cr-authoring-source"]:checked')?.value
     || (candidates.length === 1 ? candidates[0].id : '');
   _crAuthoringSetNotice('info', 'Preparing with Publication Compositor… a long book can take several minutes. The source is not changed.');
   const r = await _crAuthoringCall('POST', '/api/authoring/prepare', chosen ? { document_id: chosen } : {});
-  if (r.ok) {
-    _crAuthoringSetNotice('ok', 'Prepared and verified by Publication Compositor. Authoring is ready.');
+  if (r.status === 202) {
+    _crAuthoringWatchPreparation();
   } else {
     const stage = r.data?.stage ? ` (stage: ${r.data.stage})` : '';
-    _crAuthoringSetNotice('warn', (r.data?.error || 'Preparation was refused; nothing was attached.') + stage, r.data?.findings);
+    _crAuthoringSetNotice('warn', (r.data?.error || 'Preparation could not start; nothing was attached.') + stage, r.data?.findings);
+    await _crLoadAuthoring();
   }
-  await _crLoadAuthoring();
+}
+
+function _crAuthoringPreparationNotice(op) {
+  if (!op || op.state === 'idle') return false;
+  const stage = op.stage ? ` (stage: ${op.stage})` : '';
+  if (op.state === 'running') {
+    _crAuthoringSetNotice('info', `Preparing ${op.source_filename || 'the primary source'} with Publication Compositor since ${String(op.started_at || '').slice(11, 19)} UTC… The source is not changed.`);
+  } else if (op.state === 'succeeded') {
+    _crAuthoringSetNotice('ok', 'Prepared and verified by Publication Compositor. Authoring is ready.');
+  } else if (op.state === 'interrupted') {
+    _crAuthoringSetNotice('warn', op.message || 'Preparation was interrupted; nothing was attached.');
+  } else {
+    _crAuthoringSetNotice('warn', (op.message || 'Preparation was refused; nothing was attached.') + stage, op.findings);
+  }
+  return true;
+}
+
+function _crAuthoringWatchPreparation() {
+  if (_crAuthoringPrepPoll) return;
+  const tick = async () => {
+    const r = await _crAuthoringCall('GET', '/api/authoring/prepare/status');
+    const op = r.ok ? r.data : null;
+    _crAuthoringPreparationNotice(op);
+    if (op && op.state === 'running') {
+      _crAuthoringPrepPoll = setTimeout(tick, 2000);
+      return;
+    }
+    _crAuthoringPrepPoll = null;
+    await _crLoadAuthoring();
+    _crAuthoringPreparationNotice(op);
+  };
+  _crAuthoringPrepPoll = setTimeout(tick, 250);
 }
 
 async function _crAuthoringSaveDraft() {

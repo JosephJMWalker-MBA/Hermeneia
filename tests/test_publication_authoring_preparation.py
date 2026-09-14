@@ -257,16 +257,26 @@ def test_compositor_refusal_surfaces_findings_and_leaves_state_unchanged(tmp_pat
 
 
 @needs_real
-def test_prepare_route_returns_refusal_with_stage_and_findings(tmp_path, operator_config):
+def test_prepare_route_reports_refusal_with_stage_and_findings(tmp_path, operator_config):
+    """The route starts a single-flight operation (202); its status carries Compositor's verdict."""
+    from hermeneia.authoring import preparation_job
+
     db = _workspace_with_primary_source(tmp_path, operator_config["pdf"])
     app = create_app(db_path=db)
+    client = app.test_client()
     app.config["HERMENEIA_COMPOSITOR_CONFIG"] = _config(operator_config, profile=operator_config["profile_body_only"])
-    response = app.test_client().post("/api/authoring/prepare", json={})
-    assert response.status_code == 409
-    body = response.get_json()
-    assert body["code"] == "PREPARATION_PROFILE_REFUSED" and body["stage"] == "profile"
+    response = client.post("/api/authoring/prepare", json={})
+    assert response.status_code == 202
+    preparation_job.wait(db, timeout=300)
+    refused = client.get("/api/authoring/prepare/status").get_json()
+    assert refused["state"] == "refused"
+    assert refused["code"] == "PREPARATION_PROFILE_REFUSED" and refused["stage"] == "profile"
+    assert "MISSING_PROFILE_STYLE_TOKEN" in {f["code"] for f in refused["findings"]}
 
     app.config["HERMENEIA_COMPOSITOR_CONFIG"] = _config(operator_config)
-    ok = app.test_client().post("/api/authoring/prepare", json={})
-    assert ok.status_code == 201 and ok.get_json()["prepared"] is True
-    assert app.test_client().get("/api/authoring/work").get_json()["attached"] is True
+    ok = client.post("/api/authoring/prepare", json={})
+    assert ok.status_code == 202
+    preparation_job.wait(db, timeout=300)
+    done = client.get("/api/authoring/prepare/status").get_json()
+    assert done["state"] == "succeeded" and done["work_id"]
+    assert client.get("/api/authoring/work").get_json()["attached"] is True

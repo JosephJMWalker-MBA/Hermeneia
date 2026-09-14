@@ -16,6 +16,7 @@ import shutil
 import sqlite3
 import subprocess
 import tempfile
+import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -115,6 +116,24 @@ def _child_env(config: CompositorConfig) -> dict[str, str]:
     return env
 
 
+_ACTIVE_RUNNERS: set[subprocess.Popen] = set()
+_ACTIVE_RUNNERS_LOCK = threading.Lock()
+
+
+def terminate_active_runners(grace_seconds: float = 1.0) -> None:
+    """Stop Compositor processes started by this process (child SIGTERM handler)."""
+    with _ACTIVE_RUNNERS_LOCK:
+        running = list(_ACTIVE_RUNNERS)
+    for proc in running:
+        if proc.poll() is None:
+            proc.terminate()
+    for proc in running:
+        try:
+            proc.wait(timeout=grace_seconds)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
 def call_runner(config: CompositorConfig, request: dict, *, timeout_s: float | None = None) -> dict:
     """Invoke the runner with an argument array and a request file; verify the response binding."""
     if not config.configured:
@@ -130,23 +149,32 @@ def call_runner(config: CompositorConfig, request: dict, *, timeout_s: float | N
         raw = canonical_json(request).encode("utf-8")
         request_path.write_bytes(raw)
         try:
-            proc = subprocess.run(
+            proc = subprocess.Popen(
                 [config.python, str(RUNNER_PATH), str(request_path), str(result_path)],
                 env=_child_env(config),
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=timeout_s or config.timeout_s,
             )
-        except subprocess.TimeoutExpired as exc:
-            raise AuthoringError("COMPOSITOR_TIMEOUT", "The Compositor process timed out.", 504) from exc
         except OSError as exc:
             raise AuthoringError("COMPOSITOR_UNAVAILABLE", f"Could not start Compositor: {exc}", 503) from exc
+        with _ACTIVE_RUNNERS_LOCK:
+            _ACTIVE_RUNNERS.add(proc)
+        try:
+            _stdout, stderr = proc.communicate(timeout=timeout_s or config.timeout_s)
+        except subprocess.TimeoutExpired as exc:
+            proc.kill()
+            proc.communicate()
+            raise AuthoringError("COMPOSITOR_TIMEOUT", "The Compositor process timed out.", 504) from exc
+        finally:
+            with _ACTIVE_RUNNERS_LOCK:
+                _ACTIVE_RUNNERS.discard(proc)
         if proc.returncode != 0 or not result_path.is_file():
             raise AuthoringError(
                 "COMPOSITOR_PROCESS_FAILED",
                 "The Compositor process failed before returning a result.",
                 502,
-                [{"code": "RUNNER_STDERR", "message": (proc.stderr or "")[-2000:], "ids": []}],
+                [{"code": "RUNNER_STDERR", "message": (stderr or "")[-2000:], "ids": []}],
             )
         result = json.loads(result_path.read_text(encoding="utf-8"))
     if result.get("protocol") != RUNNER_PROTOCOL or result.get("request_sha256") != sha256_bytes(raw):
@@ -279,8 +307,15 @@ def attach_work(db_path: str | Path, source_dir: str | Path, *, actor: str, conf
                     (item["sha256"], work_id, f"input:{key}", item["path"], len(data), now),
                 )
         conn.commit()
+    except sqlite3.IntegrityError as exc:
+        # Lost an attach race: nothing activated, and no unreferenced area left behind.
+        conn.rollback()
+        shutil.rmtree(final_dir, ignore_errors=True)
+        raise AuthoringError("WORK_ALREADY_ATTACHED",
+                             "This workspace already has an attached publication work.", 409) from exc
     except Exception:
         conn.rollback()
+        shutil.rmtree(final_dir, ignore_errors=True)
         raise
     finally:
         conn.close()
@@ -316,8 +351,16 @@ def prepare_primary_source(db_path: str | Path, *, document_id: str | None, acto
 
     workspace source -> Compositor preparation -> verified prepared work -> S1 attach.
     The source bytes and any authoring state are untouched on failure, and the
-    staging directory is always removed.
+    staging directory is always removed. Synchronous; the web route runs the
+    same two steps as a single-flight background operation (``preparation_job``).
     """
+    chosen, source_path = resolve_preparation(db_path, document_id=document_id, config=config)
+    return run_preparation(Path(db_path), chosen=chosen, source_path=source_path, actor=actor, config=config)
+
+
+def resolve_preparation(db_path: str | Path, *, document_id: str | None,
+                        config: CompositorConfig) -> tuple[dict, Path]:
+    """Quick checks before a long preparation: configuration, attachment, source identity."""
     db_path = Path(db_path)
     missing = config.missing_preparation_configuration()
     if missing:
@@ -348,7 +391,12 @@ def prepare_primary_source(db_path: str | Path, *, document_id: str | None, acto
     if source_path is None:
         raise AuthoringError("SOURCE_BYTES_NOT_FOUND",
                              "The stored bytes of this source were not found on the server; nothing was prepared.", 409)
+    return chosen, source_path
 
+
+def run_preparation(db_path: Path, *, chosen: dict, source_path: Path, actor: str,
+                    config: CompositorConfig) -> dict:
+    """The long part: Compositor preparation into staging, then the unchanged S1 attach."""
     staging = _publication_root(db_path).parent / f".publication-prepare-{uuid.uuid4().hex}"
     try:
         result = call_runner(config, {
@@ -464,10 +512,13 @@ def verify_history(db_path: str | Path, *, config: CompositorConfig) -> dict:
 
 def projection(db_path: str | Path, *, config: CompositorConfig) -> dict:
     """Read-only Authoring projection of the exact current Compositor version."""
+    from . import preparation_job
+
     db_path = Path(db_path)
     if not db_path.exists():
         return {"attached": False, "compositor_configured": config.configured,
-                "preparation": {"missing_configuration": config.missing_preparation_configuration(), "candidates": []}}
+                "preparation": {"missing_configuration": config.missing_preparation_configuration(), "candidates": [],
+                                "operation": {"state": "idle"}}}
     conn = _conn_ro(db_path)
     try:
         work = store.get_work(conn)
@@ -478,7 +529,8 @@ def projection(db_path: str | Path, *, config: CompositorConfig) -> dict:
             ]
             return {"attached": False, "compositor_configured": config.configured,
                     "preparation": {"missing_configuration": config.missing_preparation_configuration(),
-                                    "candidates": candidates}}
+                                    "candidates": candidates,
+                                    "operation": preparation_job.status(db_path)}}
         snapshot = _inspect(conn, db_path, work, config)
         chain = store.accepted_chain(conn, work["id"])
         versions = [{"version_ref": work["root_version_ref"], "label": "C0 (source-derived root)", "units": _version_units(conn, db_path, work, work["root_version_ref"])}]

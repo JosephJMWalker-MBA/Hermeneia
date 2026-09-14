@@ -187,6 +187,14 @@ class WorkspaceRuntimeSupervisor:
             if _same_workspace(active.target.workspace, record):
                 return {"changed": False, "workspace": _workspace_payload(record, is_active=True)}, 200
 
+        operations = self._active_long_running_operations(active)
+        if operations:
+            return {
+                "error": "the active workspace has a long-running operation in progress; "
+                         "switch after it finishes",
+                "operations": operations,
+            }, 409
+
         if not self._switch_lock.acquire(blocking=False):
             return {"error": "workspace switch already in progress"}, 409
 
@@ -221,6 +229,20 @@ class WorkspaceRuntimeSupervisor:
         if workspace_switch_capability and status == 200:
             body, headers = _with_workspace_switch_capability(body, headers)
         return Response(body, status=status, headers=headers)
+
+    def _active_long_running_operations(self, child: ChildRuntime) -> list[dict]:
+        """Long-running work the active child reports; a switch must not drain it away.
+
+        Only an affirmative answer blocks a switch. A child that cannot answer
+        keeps the previous switch behavior; normal request proxying and its
+        timeout are unaffected.
+        """
+        try:
+            payload = _get_json(child, "/api/runtime/operations", timeout=self._startup_timeout)
+        except (OSError, http.client.HTTPException, SupervisorRuntimeError):
+            return []
+        operations = payload.get("long_running")
+        return [op for op in operations if isinstance(op, dict)] if isinstance(operations, list) else []
 
     def _launch_verified_child(self, target: RuntimeTarget) -> ChildRuntime:
         child = self._launch_child(target)
