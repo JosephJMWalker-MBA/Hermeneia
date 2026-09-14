@@ -45,7 +45,7 @@ Pinned source references are collected in section 15. “Present” means inspec
 
 ### Phase-0 prerequisite and actual available interface
 
-The [sequencing correction in #205](https://github.com/JosephJMWalker-MBA/Hermeneia/issues/205#issuecomment-5657795468) arrived during this work. The initial draft commit preceded reading that correction; this revision consumes the [Compositor #155 readiness record][P11], committed at `71cd8dc82d881422561c3b5f884a2a03ced4c4ba`. That pass takes exit condition 2: precise unresolved blockers, **not** completed substrate. Its commit adds documentation only, so the inspected implementation SHA above remains the code baseline.
+The [sequencing correction in #205](https://github.com/JosephJMWalker-MBA/Hermeneia/issues/205#issuecomment-5657795468) arrived during this work. The initial draft commit preceded reading that correction; this revision consumes the [Compositor #155 readiness record][P11], committed at `ba4864031f25e2a9d12d89b958f5a2d73c9ca5ee`. That pass takes exit condition 2: precise unresolved blockers, **not** completed substrate. Its commit adds documentation only, so the inspected implementation SHA above remains the code baseline.
 
 The existing callable path is `build_editorial_revision_ledger(C0, records)` → `verify_editorial_revision_ledger(C0, ledger)` → `build_editorial_canonical_version(C0, ledger)` → `verify_editorial_canonical_version(C0, ledger, version)` → `build_editorial_construction_overlay(source, C0, ledger, version, base_plan)` and its independent verifier. Retrieve exact current artifact units from `CanonicalPublication.units` or `EditorialCanonicalVersion.units`; there is no persistent current-work API. These functions do not constitute a durable approve/commit/rebuild job, accept an editorial parent, or provide main's missing editorial PDF adapter.
 
@@ -384,7 +384,7 @@ Reuse Compositor's existing destructive verifier tests and Hermeneia's `test_pub
 
 ## 14. Ordered Phase-2 tasks for Claude
 
-Phase 2 remains blocked until the #155 B1–B3 substrate/interface blockers are resolved, this artifact is reviewed for coherence against that actual surface, and the first slice is explicitly approved. Re-inspect the exact referenced code at implementation time. The rows are bounded increments, ordered from contract checks toward progressively larger behavior. Complete S1 through task 8, then stop for live-use review; tasks 9–11 are not implicit permission to expand S1.
+Phase 2 remains blocked until the #155 B1–B3 substrate/interface blockers are resolved, this artifact is reviewed for coherence against that actual surface, and the first slice is explicitly approved. Re-inspect the exact referenced code at implementation time. Rows 0–4 describe the Compositor prerequisite continuation under #155/#106/#109, before Hermeneia implementation may begin. They require their own scoped contract review and authorization; listing them here does not authorize execution. Rows 5–8 are the first Hermeneia integration slice after those prerequisites. The rows are bounded increments, ordered from contract checks toward progressively larger behavior. Complete S1 through task 8, then stop for live-use review; tasks 9–11 are not implicit permission to expand S1.
 
 | Order | Repository / issue | Exact task and acceptance boundary |
 |---|---|---|
@@ -432,7 +432,7 @@ All implementation links below identify the inspected main commits, so later cha
 [P8]: https://github.com/JosephJMWalker-MBA/publication-compositor/blob/7c671c7f1479d4d0c82e7e383b8bb6c00ae10dc2/README.md
 [P9]: https://github.com/JosephJMWalker-MBA/publication-compositor/blob/7c671c7f1479d4d0c82e7e383b8bb6c00ae10dc2/src/publication_compositor/renderers/typst/render_proof.py
 [P10]: https://github.com/JosephJMWalker-MBA/publication-compositor/blob/7c671c7f1479d4d0c82e7e383b8bb6c00ae10dc2/src/publication_compositor/cli.py
-[P11]: https://github.com/JosephJMWalker-MBA/publication-compositor/blob/71cd8dc82d881422561c3b5f884a2a03ced4c4ba/docs/integrations/hermeneia-authoring-readiness-v0.md
+[P11]: https://github.com/JosephJMWalker-MBA/publication-compositor/blob/ba4864031f25e2a9d12d89b958f5a2d73c9ca5ee/docs/integrations/hermeneia-authoring-readiness-v0.md
 
 Additional inspected implementation evidence:
 
