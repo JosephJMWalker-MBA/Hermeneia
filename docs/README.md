@@ -74,6 +74,8 @@ These are synchronization/orientation documents. They may become stale as code a
   — interrupted record writes, private staging, atomic replacement, and failure evidence.
 - [`2026-09-22 — Preservation compiled bytes`](verification/2026-09-22-preservation-compiled-bytes.md)
   — missing compiled-artifact comparison, tampering refusal, and read-only verification evidence.
+- [`2026-09-22 — Build reproducibility boundary`](verification/2026-09-22-build-reproducibility-boundary.md)
+  — controlled clock/path divergence, byte-equality controls, and the unresolved steward decision.
 
 These records describe bounded implementation evidence; they do not amend authority.
 
