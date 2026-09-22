@@ -20,8 +20,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -35,7 +37,7 @@ console = Console()
 # ── Failure conditions ────────────────────────────────────────────────────────
 
 class BuildError(Exception):
-    """Raised when the build cannot proceed. No outputs are written."""
+    """Raised when the build cannot complete; already published outputs may remain."""
 
 
 class BuildWarning:
@@ -151,19 +153,47 @@ def _stage_coverage(
     return results, warnings
 
 
+def _verify_compiled_artifact(path: Path, expected_hash: str) -> str:
+    """Require the published file bytes to match the compile record."""
+    try:
+        actual_hash = _sha256(path)
+    except OSError as exc:
+        raise BuildError(f"Cannot verify compiled artifact {path}: {exc}") from exc
+    if actual_hash != expected_hash:
+        raise BuildError(
+            f"Compiled artifact hash mismatch: {path}\n"
+            f"Expected: {expected_hash}\nObserved: {actual_hash}"
+        )
+    return actual_hash
+
+
 def _stage_compile(
     manifest: dict, project_root: Path, output_dir: Path
 ) -> dict:
-    """v0.1: copy existing compiled_artifact; hash and record it."""
+    """v0.1: stage exact bytes, publish atomically, and verify their digest."""
     src = project_root / manifest["compiled_artifact"]
     if not src.exists():
         raise BuildError(f"Compiled artifact not found: {src}")
 
     dest = output_dir / "white_paper.md"
-    shutil.copy2(src, dest)
+    try:
+        # Preserve copy2's refusal to overwrite the input through an alias.
+        if dest.exists() and src.samefile(dest):
+            raise BuildError(f"Compiled source and destination are the same file: {src}")
+        # Keeping staging on the destination filesystem makes replace atomic.
+        # Hash the copied file, never a second read of the mutable source path.
+        with tempfile.TemporaryDirectory(prefix=".herm-build-", dir=output_dir) as staging:
+            staged = Path(staging) / "white_paper.md"
+            shutil.copy2(src, staged)
+            staged_hash = _sha256(staged)
+            os.replace(staged, dest)
+            emitted_hash = _verify_compiled_artifact(dest, staged_hash)
+    except OSError as exc:
+        raise BuildError(f"Cannot publish compiled artifact {dest}: {exc}") from exc
+
     return {
         "source": str(src),
-        "sha256": _sha256(src),
+        "sha256": emitted_hash,
         "method": "copy",  # v0.1 scaffold; future: artist_render
         "note": "v0.1 copies existing compiled artifact. Future versions drive Artist.",
     }
@@ -263,6 +293,8 @@ def _emit_build_json(
         },
     }
 
+    # Later stages must not silently leave this record describing stale bytes.
+    _verify_compiled_artifact(output_dir / "white_paper.md", compile_record["sha256"])
     (output_dir / "build.json").write_text(
         json.dumps(build, indent=2, ensure_ascii=False)
     )
@@ -421,7 +453,7 @@ def cmd_build(
         console.print(Rule(style="red"))
         console.print(f"\n  [bold red]Build failed[/]\n")
         console.print(f"  [red]ERROR:[/] {exc}\n")
-        console.print("  [dim]No outputs written. Authoritative artifacts unchanged.[/]")
+        console.print("  [dim]Build did not complete. Output files may need to be rebuilt.[/]")
         console.print()
         console.print(Rule(style="red"))
         sys.exit(1)

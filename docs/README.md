@@ -66,6 +66,8 @@ These are synchronization/orientation documents. They may become stale as code a
 
 - [`2026-09-22 — Preservation build digests`](verification/2026-09-22-preservation-build-digests.md)
   — demonstrated missing-digest bypass, verifier correction, tests, and remaining limits.
+- [`2026-09-22 — Compile emitted bytes`](verification/2026-09-22-compile-emitted-bytes.md)
+  — output/hash race, atomic artifact replacement, refusal checks, and regression evidence.
 
 These records describe bounded implementation evidence; they do not amend authority.
 
