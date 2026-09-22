@@ -62,6 +62,13 @@ These explain what the system currently is and where the product is going, but d
 
 These are synchronization/orientation documents. They may become stale as code and issues advance. Do not treat an older implementation snapshot as stronger than current repository evidence or governing authority.
 
+### Implementation verification records
+
+- [`2026-09-22 — Preservation build digests`](verification/2026-09-22-preservation-build-digests.md)
+  — demonstrated missing-digest bypass, verifier correction, tests, and remaining limits.
+
+These records describe bounded implementation evidence; they do not amend authority.
+
 ### Ratification-era root artifacts
 
 The following root files preserve the architecture-discovery / ratification process:

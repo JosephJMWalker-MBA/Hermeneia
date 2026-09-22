@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -97,8 +98,17 @@ def _verify_reconstruction(
     def _check(name: str, path: Path | None, expected_hash: str | None) -> dict:
         if path is None or not path.exists():
             return {"name": name, "status": "FAIL", "note": "Artifact not found"}
+        # These inputs are hashed by herm build. Observing a digest now cannot
+        # replace the recorded build-time provenance needed for comparison.
+        if not isinstance(expected_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_hash):
+            return {
+                "name": name,
+                "status": "FAIL",
+                "path": str(path),
+                "note": "Missing or invalid build-time SHA-256 — integrity cannot be verified",
+            }
         actual_hash = _sha256(path)
-        if expected_hash and actual_hash != expected_hash:
+        if actual_hash != expected_hash:
             return {
                 "name": name,
                 "status": "FAIL",

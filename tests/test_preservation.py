@@ -27,6 +27,7 @@ from hermeneia.cli.preserve_cmd import (
     _sha256,
     _verify_continuation,
     _verify_reconstruction,
+    cmd_preserve_verify,
 )
 
 
@@ -208,6 +209,91 @@ def test_reconstruction_hash_mismatch(tmp_path):
     mismatch = [r for r in results if r["status"] == "FAIL" and "mismatch" in r.get("note", "")]
     assert len(mismatch) == 1
     assert "experiment_001.md" in mismatch[0]["name"]
+
+
+def _recorded_digest(build, target):
+    """Locate the existing build-time digest, without inventing a new record."""
+    if target == "blueprint":
+        return build["blueprint"], "sha256", "Blueprint"
+    if target == "manifest":
+        return build, "manifest_hash", "Compile Manifest"
+    artifact = build["source_artifacts"][1]
+    return artifact, "sha256", f"Source: {artifact['path']}"
+
+
+@pytest.mark.parametrize("target", ["blueprint", "manifest", "source"])
+@pytest.mark.parametrize("digest", [None, "", False, 0, [], {}, "bad", "g" * 64])
+def test_reconstruction_invalid_build_digest_fails(tmp_path, target, digest):
+    root = _make_corpus(tmp_path)
+    build, coverage, release, _ = _load_inputs(root / "publication" / "build.json", root)
+    record, key, name = _recorded_digest(build, target)
+    record[key] = digest
+
+    checks = _verify_reconstruction(build, coverage, release, root)
+    check = next(r for r in checks if r["name"] == name)
+
+    assert check["status"] == "FAIL"
+    assert "build-time SHA-256" in check["note"]
+    assert "sha256" not in check, "Observed bytes must not substitute for missing provenance"
+
+
+@pytest.mark.parametrize("target", ["blueprint", "manifest", "source"])
+def test_verify_missing_digest_cannot_hide_modified_artifact(tmp_path, monkeypatch, target):
+    """Deleting a build digest must not turn a tampered artifact into a verified one."""
+    root = _make_corpus(tmp_path)
+    build_path = root / "publication" / "build.json"
+    build = json.loads(build_path.read_text())
+    record, key, name = _recorded_digest(build, target)
+    del record[key]
+    artifact_path = root / (build["manifest_path"] if target == "manifest" else record["path"])
+    artifact_path.write_text(artifact_path.read_text() + "\n# Modified after build\n")
+    if target == "blueprint":
+        # The Blueprint is also listed as a source; remove that comparison too.
+        del build["source_artifacts"][0]["sha256"]
+    build_path.write_text(json.dumps(build, indent=2))
+    before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    reports = tmp_path / "reports"
+    monkeypatch.chdir(root)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_preserve_verify(build_path=str(build_path), output_dir=str(reports))
+
+    assert exc.value.code == 1
+    report = json.loads((reports / "preservation_report.json").read_text())
+    assert report["overall_outcome"] == "fail"
+    assert report["reconstruction"]["summary"]["outcome"] == "fail"
+    check = next(r for r in report["reconstruction"]["checks"] if r["name"] == name)
+    assert check["status"] == "FAIL"
+    assert "build-time SHA-256" in check["note"]
+    assert "## Overall: FAIL" in (reports / "preservation_report.md").read_text()
+    after = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    assert after == before, "Verification must not repair inputs or alter steward history"
+
+
+def test_reconstruction_empty_artifact_without_digest_fails(tmp_path):
+    root = _make_corpus(tmp_path)
+    build, coverage, release, _ = _load_inputs(root / "publication" / "build.json", root)
+    artifact, key, name = _recorded_digest(build, "source")
+    del artifact[key]
+    (root / artifact["path"]).write_bytes(b"")
+
+    checks = _verify_reconstruction(build, coverage, release, root)
+    check = next(r for r in checks if r["name"] == name)
+    assert check["status"] == "FAIL", "Empty-content warnings require verified provenance first"
+
+
+def test_verify_matching_digests_preserves_inputs(tmp_path, monkeypatch):
+    root = _make_corpus(tmp_path)
+    before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    reports = tmp_path / "reports"
+    monkeypatch.chdir(root)
+
+    cmd_preserve_verify(output_dir=str(reports))
+
+    report = json.loads((reports / "preservation_report.json").read_text())
+    assert report["overall_outcome"] == "pass"
+    after = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    assert after == before
 
 
 def test_reconstruction_unsigned_release_is_advisory(tmp_path):
