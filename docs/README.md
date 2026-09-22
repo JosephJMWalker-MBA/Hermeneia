@@ -68,6 +68,8 @@ These are synchronization/orientation documents. They may become stale as code a
   — demonstrated missing-digest bypass, verifier correction, tests, and remaining limits.
 - [`2026-09-22 — Compile emitted bytes`](verification/2026-09-22-compile-emitted-bytes.md)
   — output/hash race, atomic artifact replacement, refusal checks, and regression evidence.
+- [`2026-09-22 — Manifest captured bytes`](verification/2026-09-22-manifest-captured-bytes.md)
+  — parse/hash divergence, shared byte capture, later drift refusal, and regression evidence.
 
 These records describe bounded implementation evidence; they do not amend authority.
 

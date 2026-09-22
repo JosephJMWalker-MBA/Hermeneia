@@ -297,3 +297,221 @@ def test_dry_run_creates_no_staging_or_output(publication, monkeypatch):
     build_cmd.cmd_build(str(manifest_path), str(output), dry_run=True)
 
     assert not output.exists()
+
+
+@pytest.mark.parametrize("mutation_point", ["after_capture", "before_parse", "after_parse"])
+def test_manifest_snapshot_keeps_captured_interpretation_and_digest(publication, monkeypatch, mutation_point):
+    _, _, manifest, manifest_path, _ = publication
+    captured = manifest_path.read_bytes()
+    replacement = captured.replace(b"compile-byte-provenance", b"replacement-build")
+    real_read = Path.read_bytes
+    real_parse = build_cmd.yaml.safe_load
+    reads = []
+
+    def capture_then_mutate(path):
+        data = real_read(path)
+        if path == manifest_path:
+            reads.append(data)
+            if mutation_point == "after_capture":
+                manifest_path.write_bytes(replacement)
+        return data
+
+    def parse_then_mutate(stream):
+        if mutation_point == "before_parse":
+            manifest_path.write_bytes(replacement)
+        parsed = real_parse(stream)
+        if mutation_point == "after_parse":
+            manifest_path.write_bytes(replacement)
+        return parsed
+
+    monkeypatch.setattr(Path, "read_bytes", capture_then_mutate)
+    monkeypatch.setattr(build_cmd.yaml, "safe_load", parse_then_mutate)
+
+    interpreted, digest = build_cmd._stage_load_manifest(manifest_path)
+
+    assert interpreted == manifest
+    assert digest == hashlib.sha256(captured).hexdigest()
+    assert reads == [captured], "Interpretation and identity must use one capture"
+    assert real_read(manifest_path) == replacement
+
+
+@pytest.mark.parametrize("payload", [
+    b"broken: [unclosed",
+    b"build_id: \xff\n",
+    b"build_id: bad\x00value\n",
+    b"[]\n",
+    b"build_id: missing-required-fields\n",
+])
+def test_invalid_captured_manifest_cannot_be_replaced_by_valid_reread(publication, monkeypatch, payload):
+    _, _, _, manifest_path, _ = publication
+    valid = manifest_path.read_bytes()
+    manifest_path.write_bytes(payload)
+    real_read = Path.read_bytes
+    reads = []
+
+    def capture_invalid_then_replace(path):
+        data = real_read(path)
+        if path == manifest_path:
+            reads.append(data)
+            manifest_path.write_bytes(valid)
+        return data
+
+    monkeypatch.setattr(Path, "read_bytes", capture_invalid_then_replace)
+
+    with pytest.raises(build_cmd.BuildError):
+        build_cmd._stage_load_manifest(manifest_path)
+
+    assert reads == [payload]
+    assert real_read(manifest_path) == valid
+
+
+def test_manifest_read_failure_is_not_retried(publication, monkeypatch):
+    _, _, _, manifest_path, _ = publication
+    reads = []
+
+    def fail_read(path):
+        reads.append(path)
+        raise PermissionError("injected manifest read failure")
+
+    monkeypatch.setattr(Path, "read_bytes", fail_read)
+
+    with pytest.raises(build_cmd.BuildError, match="injected manifest read failure"):
+        build_cmd._stage_load_manifest(manifest_path)
+
+    assert reads == [manifest_path]
+
+
+def test_manifest_capture_preserves_existing_text_decoding(publication):
+    _, _, _, manifest_path, _ = publication
+    # Passing these bytes directly to PyYAML would newly accept UTF-16.
+    # The existing open(path) text-decoding contract rejects this input.
+    manifest_path.write_bytes(manifest_path.read_text().encode("utf-16"))
+    with pytest.raises((UnicodeError, yaml.YAMLError)):
+        with open(manifest_path) as stream:
+            yaml.safe_load(stream)
+
+    with pytest.raises(build_cmd.BuildError, match="Manifest YAML malformed"):
+        build_cmd._stage_load_manifest(manifest_path)
+
+
+@pytest.mark.parametrize("change", ["replace", "remove", "comment_only"])
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_manifest_drift_before_outputs_fails_closed(publication, monkeypatch, change, dry_run):
+    root, _, _, manifest_path, output = publication
+    original = manifest_path.read_bytes()
+    real_coverage = build_cmd._stage_coverage
+
+    def coverage_then_change_manifest(*args):
+        result = real_coverage(*args)
+        if change == "remove":
+            manifest_path.unlink()
+        elif change == "comment_only":
+            manifest_path.write_bytes(original + b"# different bytes, same meaning\n")
+        else:
+            replacement = manifest_path.with_suffix(".replacement")
+            replacement.write_bytes(original.replace(b"compile-byte-provenance", b"new-build"))
+            os.replace(replacement, manifest_path)
+        return result
+
+    monkeypatch.setattr(build_cmd, "_stage_coverage", coverage_then_change_manifest)
+    monkeypatch.chdir(root)
+    new_output = output / "not-created"
+
+    with pytest.raises(SystemExit) as exc:
+        build_cmd.cmd_build(str(manifest_path), str(new_output), dry_run=dry_run)
+
+    assert exc.value.code == 1
+    assert not new_output.exists()
+
+
+@pytest.mark.parametrize("change", ["replace", "remove", "unreadable"])
+def test_manifest_drift_before_record_preserves_previous_record(publication, monkeypatch, capsys, change):
+    root, _, _, manifest_path, output = publication
+    original = manifest_path.read_bytes()
+    previous = b'{"previous_build":"preserve existing provenance"}'
+    (output / "build.json").write_bytes(previous)
+    real_report = build_cmd._stage_steward_report
+    real_hash = build_cmd._sha256
+
+    def fail_manifest_verification(path):
+        if path == manifest_path:
+            raise PermissionError("injected manifest verification failure")
+        return real_hash(path)
+
+    def report_then_change_manifest(*args):
+        real_report(*args)
+        if change == "remove":
+            manifest_path.unlink()
+        elif change == "unreadable":
+            monkeypatch.setattr(build_cmd, "_sha256", fail_manifest_verification)
+        else:
+            manifest_path.write_bytes(original.replace(b"compile-byte-provenance", b"replacement-build"))
+
+    monkeypatch.setattr(build_cmd, "_stage_steward_report", report_then_change_manifest)
+    monkeypatch.chdir(root)
+
+    with pytest.raises(SystemExit) as exc:
+        build_cmd.cmd_build(str(manifest_path), str(output))
+
+    assert exc.value.code == 1
+    assert (output / "build.json").read_bytes() == previous
+    assert "Publication Build Complete" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("line_ending", ["\n", "\r\n"])
+def test_manifest_hash_is_exact_capture_not_yaml_reserialization(publication, monkeypatch, line_ending):
+    root, _, _, manifest_path, output = publication
+    text = manifest_path.read_text() + "# Spacing, comments, and Unicode: café\n\n"
+    captured = b"\xef\xbb\xbf" + text.replace("\n", line_ending).encode("utf-8")
+    manifest_path.write_bytes(captured)
+    monkeypatch.chdir(root)
+
+    build_cmd.cmd_build(str(manifest_path), str(output))
+
+    record = json.loads((output / "build.json").read_text())
+    assert record["manifest_hash"] == hashlib.sha256(captured).hexdigest()
+    assert manifest_path.read_bytes() == captured
+    assert record["build_id"] == "compile-byte-provenance"
+
+
+def test_downstream_paths_and_metadata_use_captured_manifest(publication, monkeypatch):
+    root, source, manifest, manifest_path, output = publication
+    manifest.update(status="RC-original", ratification="pending")
+    captured = yaml.safe_dump(manifest).encode()
+    manifest_path.write_bytes(captured)
+    alternate = dict(manifest, build_id="wrong-build", compiled_artifact="wrong-paper.md",
+                     blueprint="wrong-blueprint.md", blueprint_id="wrong-id",
+                     status="wrong-status", ratification="wrong-ratification",
+                     source_artifacts=[], sections=[])
+    replacement = yaml.safe_dump(alternate).encode()
+    real_parse = build_cmd.yaml.safe_load
+    real_blueprint = build_cmd._stage_resolve_blueprint
+
+    def change_during_parse(stream):
+        manifest_path.write_bytes(replacement)
+        return real_parse(stream)
+
+    def resolve_captured_then_restore(interpreted, project_root):
+        assert interpreted == manifest
+        # The current file remains divergent while this stage resolves paths.
+        assert manifest_path.read_bytes() == replacement
+        result = real_blueprint(interpreted, project_root)
+        manifest_path.write_bytes(captured)
+        return result
+
+    monkeypatch.setattr(build_cmd.yaml, "safe_load", change_during_parse)
+    monkeypatch.setattr(build_cmd, "_stage_resolve_blueprint", resolve_captured_then_restore)
+    monkeypatch.chdir(root)
+
+    build_cmd.cmd_build(str(manifest_path), str(output))
+
+    record = json.loads((output / "build.json").read_text())
+    assert record["manifest_hash"] == hashlib.sha256(captured).hexdigest()
+    assert record["build_id"] == manifest["build_id"]
+    assert record["compile"]["source"] == str(source)
+    assert record["blueprint"]["id"] == manifest["blueprint_id"]
+    assert record["blueprint"]["path"] == str(root / manifest["blueprint"])
+    assert record["source_artifacts"][0]["path"] == manifest["source_artifacts"][0]["path"]
+    assert record["coverage"]["section_detail"][0]["section"] == "abstract"
+    assert record["release_status"] == "RC-original"
+    assert record["release_ratification"] == "pending"

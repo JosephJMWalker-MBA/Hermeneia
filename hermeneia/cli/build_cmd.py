@@ -19,6 +19,7 @@ Build Invariants (from spec):
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import shutil
@@ -55,13 +56,21 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def _stage_load_manifest(manifest_path: Path) -> dict:
+def _stage_load_manifest(manifest_path: Path) -> tuple[dict, str]:
+    """Interpret and identify one byte capture, never separate path reads."""
     if not manifest_path.exists():
         raise BuildError(f"Manifest not found: {manifest_path}")
     try:
-        with open(manifest_path) as f:
+        captured = manifest_path.read_bytes()
+    except OSError as exc:
+        raise BuildError(f"Cannot read manifest {manifest_path}: {exc}") from exc
+    captured_hash = hashlib.sha256(captured).hexdigest()
+    try:
+        # Match open(path)'s existing text decoding and universal newlines;
+        # the digest still binds the original bytes, including BOM and CRLF.
+        with io.TextIOWrapper(io.BytesIO(captured)) as f:
             data = yaml.safe_load(f)
-    except yaml.YAMLError as exc:
+    except (yaml.YAMLError, UnicodeError) as exc:
         raise BuildError(f"Manifest YAML malformed: {exc}") from exc
     if not isinstance(data, dict):
         raise BuildError("Manifest must be a YAML mapping")
@@ -70,7 +79,20 @@ def _stage_load_manifest(manifest_path: Path) -> dict:
     missing = [k for k in required if k not in data]
     if missing:
         raise BuildError(f"Manifest missing required keys: {missing}")
-    return data
+    return data, captured_hash
+
+
+def _verify_manifest(manifest_path: Path, captured_hash: str) -> None:
+    """Compare the current file with the capture; never adopt a replacement."""
+    try:
+        actual_hash = _sha256(manifest_path)
+    except OSError as exc:
+        raise BuildError(f"Cannot verify manifest {manifest_path}: {exc}") from exc
+    if actual_hash != captured_hash:
+        raise BuildError(
+            f"Manifest hash mismatch: {manifest_path}\n"
+            f"Captured: {captured_hash}\nObserved: {actual_hash}"
+        )
 
 
 def _stage_resolve_blueprint(manifest: dict, project_root: Path) -> dict:
@@ -243,6 +265,7 @@ def _stage_steward_report(
 def _emit_build_json(
     manifest: dict,
     manifest_path: Path,
+    manifest_hash: str,
     blueprint: dict,
     resolved_artifacts: list[dict],
     coverage_results: list[dict],
@@ -262,7 +285,7 @@ def _emit_build_json(
         "hermeneia_version": hermeneia_version,
         "blueprint": blueprint,
         "manifest_path": str(manifest_path),
-        "manifest_hash": _sha256(manifest_path),
+        "manifest_hash": manifest_hash,
         "source_artifacts": resolved_artifacts,
         "coverage": {
             "sections_evaluated": len(coverage_results),
@@ -295,6 +318,7 @@ def _emit_build_json(
 
     # Later stages must not silently leave this record describing stale bytes.
     _verify_compiled_artifact(output_dir / "white_paper.md", compile_record["sha256"])
+    _verify_manifest(manifest_path, manifest_hash)
     (output_dir / "build.json").write_text(
         json.dumps(build, indent=2, ensure_ascii=False)
     )
@@ -334,7 +358,7 @@ def cmd_build(
         console.print(Rule(style="dim"))
 
         # Stage 1 — Load Manifest
-        manifest = _stage_load_manifest(manifest_path_)
+        manifest, manifest_hash = _stage_load_manifest(manifest_path_)
         build_id = manifest["build_id"]
         console.print(f"\n  [bold]herm build[/]  [cyan]{build_id}[/]\n")
         _record("load_manifest", "pass")
@@ -376,6 +400,9 @@ def cmd_build(
                 f"[dim][{n_pass} PASS  {n_warn} WARN  {n_fail} FAIL][/]"
             )
 
+        # Refuse detected input drift before creating any publication output,
+        # including before claiming that a dry run resolved the current file.
+        _verify_manifest(manifest_path_, manifest_hash)
         if dry_run:
             console.print("\n  [dim]Dry run — no outputs written.[/]")
             console.print(Rule(style="dim"))
@@ -411,6 +438,7 @@ def cmd_build(
         build_json = _emit_build_json(
             manifest=manifest,
             manifest_path=manifest_path_,
+            manifest_hash=manifest_hash,
             blueprint=blueprint,
             resolved_artifacts=resolved,
             coverage_results=coverage_results,
