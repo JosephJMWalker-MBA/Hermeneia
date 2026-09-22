@@ -72,6 +72,8 @@ These are synchronization/orientation documents. They may become stale as code a
   — parse/hash divergence, shared byte capture, later drift refusal, and regression evidence.
 - [`2026-09-22 — Atomic build record`](verification/2026-09-22-atomic-build-record.md)
   — interrupted record writes, private staging, atomic replacement, and failure evidence.
+- [`2026-09-22 — Preservation compiled bytes`](verification/2026-09-22-preservation-compiled-bytes.md)
+  — missing compiled-artifact comparison, tampering refusal, and read-only verification evidence.
 
 These records describe bounded implementation evidence; they do not amend authority.
 

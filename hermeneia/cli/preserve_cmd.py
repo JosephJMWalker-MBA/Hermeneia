@@ -98,7 +98,7 @@ def _verify_reconstruction(
     def _check(name: str, path: Path | None, expected_hash: str | None) -> dict:
         if path is None or not path.exists():
             return {"name": name, "status": "FAIL", "note": "Artifact not found"}
-        # These inputs are hashed by herm build. Observing a digest now cannot
+        # These artifacts are hashed by herm build. Observing a digest now cannot
         # replace the recorded build-time provenance needed for comparison.
         if not isinstance(expected_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_hash):
             return {
@@ -155,7 +155,31 @@ def _verify_reconstruction(
             artifact.get("sha256"),
         ))
 
-    # Pipeline outputs — these are checked for existence only (no hash in build.json for them)
+    # Verify the emitted bytes, never the original compile source or a guessed
+    # conventional path. Both the output path and digest come from build.json.
+    outputs = build.get("outputs")
+    compiled_path = outputs.get("white_paper") if isinstance(outputs, dict) else None
+    compile_record = build.get("compile")
+    compiled_hash = compile_record.get("sha256") if isinstance(compile_record, dict) else None
+    if not isinstance(compiled_path, str) or not compiled_path:
+        results.append({
+            "name": "Compiled Artifact",
+            "status": "FAIL",
+            "note": "Missing or invalid outputs.white_paper in build.json — emitted artifact cannot be verified",
+        })
+    else:
+        path = project_root / compiled_path
+        try:
+            results.append(_check("Compiled Artifact", path, compiled_hash))
+        except OSError as exc:
+            results.append({
+                "name": "Compiled Artifact",
+                "status": "FAIL",
+                "path": str(path),
+                "note": f"Cannot read compiled artifact: {exc}",
+            })
+
+    # Other pipeline outputs — existence only (no build-time hash recorded).
     for label, path_str in [
         ("Build Record (build.json)", None),  # it's the entry point; already loaded
         ("Coverage Record", "publication/coverage.json"),

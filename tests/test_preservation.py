@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from hermeneia.cli import build_cmd, preserve_cmd
 from hermeneia.cli.preserve_cmd import (
     PreservationError,
     _load_inputs,
@@ -110,6 +111,12 @@ def _make_corpus(tmp: Path) -> Path:
     manifest_path.write_text(yaml.dump(manifest_data))
     manifest_hash = _sha256(manifest_path)
 
+    # The emitted bytes and their provenance are part of a current build.
+    manuscript = docs / "hermeneia_white_paper.md"
+    manuscript.write_bytes(b"# White paper\n\nDisciplined revision preserves understanding.\n")
+    compiled = pub / "white_paper.md"
+    compiled.write_bytes(manuscript.read_bytes())
+
     # build.json
     build_data = {
         "build_id": "white-paper-test",
@@ -123,6 +130,8 @@ def _make_corpus(tmp: Path) -> Path:
         },
         "manifest_path": "docs/builds/white_paper.compile.yaml",
         "manifest_hash": manifest_hash,
+        "compile": {"source": str(manuscript), "sha256": _sha256(compiled), "method": "copy"},
+        "outputs": {"white_paper": "publication/white_paper.md"},
         "source_artifacts": [
             {
                 "path": "docs/papers/blueprint_000001.md",
@@ -375,3 +384,207 @@ def test_load_inputs_malformed_build_json(tmp_path):
     (pub / "build.json").write_text("not json {{{{")
     with pytest.raises(PreservationError, match="malformed"):
         _load_inputs(pub / "build.json", root)
+
+
+def _snapshot_preserved_files(root):
+    return {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+
+
+def _compiled_report(reports):
+    report = json.loads((reports / "preservation_report.json").read_text())
+    check = next(r for r in report["reconstruction"]["checks"] if r["name"] == "Compiled Artifact")
+    return report, check
+
+
+def test_preserve_compiled_artifact_rejects_tampering_after_passing_build(tmp_path, monkeypatch):
+    root = _make_corpus(tmp_path)
+    monkeypatch.chdir(root)
+    build_cmd.cmd_build()
+    # Preserve an existing package as well as all build/steward input files.
+    preserved = root / "preservation" / "preservation_package"
+    preserved.mkdir(parents=True)
+    (preserved / "manifest.json").write_bytes(b'{"retained_package":"unchanged"}')
+    before = _snapshot_preserved_files(root)
+    valid_reports = tmp_path / "valid-reports"
+    cmd_preserve_verify(output_dir=str(valid_reports))
+    valid_report = json.loads((valid_reports / "preservation_report.json").read_text())
+    assert valid_report["overall_outcome"] == "pass"
+    assert _snapshot_preserved_files(root) == before
+
+    build_path = root / "publication" / "build.json"
+    build_bytes = build_path.read_bytes()
+    build = json.loads(build_bytes)
+    paper = Path(build["outputs"]["white_paper"])
+    original_source = Path(build["compile"]["source"]).read_bytes()
+    paper.write_bytes(paper.read_bytes() + b"\n<!-- changed after build -->\n")
+    before_verification = _snapshot_preserved_files(root)
+    failed_reports = tmp_path / "failed-reports"
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_preserve_verify(output_dir=str(failed_reports))
+
+    assert exc.value.code == 1
+    report, check = _compiled_report(failed_reports)
+    assert report["overall_outcome"] == "fail"
+    assert report["continuation"]["summary"]["outcome"] == "pass"
+    assert [r["name"] for r in report["reconstruction"]["checks"] if r["status"] == "FAIL"] == ["Compiled Artifact"]
+    assert check["hash_at_build"] == build["compile"]["sha256"]
+    assert check["hash_now"] == hashlib.sha256(paper.read_bytes()).hexdigest()
+    assert check["hash_now"] != check["hash_at_build"]
+    assert "## Overall: FAIL" in (failed_reports / "preservation_report.md").read_text()
+    assert build_path.read_bytes() == build_bytes
+    assert Path(build["compile"]["source"]).read_bytes() == original_source
+    assert _snapshot_preserved_files(root) == before_verification
+
+
+@pytest.mark.parametrize("payload", [b"", b"# Compiled paper\n", b"\xef\xbb\xbfcaf\xc3\xa9\r\n\x00\xff" * 7000], ids=["empty", "text", "binary-multiple-chunks"])
+def test_preserve_compiled_artifact_checks_exact_bytes_without_mutation(tmp_path, monkeypatch, payload):
+    root = _make_corpus(tmp_path)
+    build_path = root / "publication" / "build.json"
+    build = json.loads(build_path.read_text())
+    paper = root / build["outputs"]["white_paper"]
+    paper.write_bytes(payload)
+    build["compile"]["sha256"] = hashlib.sha256(payload).hexdigest()
+    build_path.write_text(json.dumps(build))
+    # Source content is irrelevant to the emitted-byte comparison.
+    Path(build["compile"]["source"]).write_bytes(b"Different source; emitted bytes remain intact")
+    before = _snapshot_preserved_files(root)
+    reports = tmp_path / "reports"
+    monkeypatch.chdir(root)
+
+    cmd_preserve_verify(output_dir=str(reports))
+
+    report, check = _compiled_report(reports)
+    assert check["status"] == ("PASS" if payload else "WARN")
+    assert check["sha256"] == hashlib.sha256(payload).hexdigest()
+    assert report["overall_outcome"] == ("pass" if payload else "warn")
+    assert _snapshot_preserved_files(root) == before
+
+
+@pytest.mark.parametrize("digest", ["missing", None, "", False, 0, [], {}, "bad", "g" * 64, "A" * 64, "0" * 63, "0" * 65, "0" * 64 + "\n"])
+def test_preserve_compiled_artifact_invalid_digest_fails_closed(tmp_path, monkeypatch, digest):
+    root = _make_corpus(tmp_path)
+    build_path = root / "publication" / "build.json"
+    build = json.loads(build_path.read_text())
+    if digest == "missing":
+        del build["compile"]["sha256"]
+    else:
+        build["compile"]["sha256"] = digest
+    build_path.write_text(json.dumps(build))
+    before = _snapshot_preserved_files(root)
+    reports = tmp_path / "reports"
+    monkeypatch.chdir(root)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_preserve_verify(output_dir=str(reports))
+
+    assert exc.value.code == 1
+    report, check = _compiled_report(reports)
+    assert report["overall_outcome"] == "fail"
+    assert check["status"] == "FAIL"
+    assert "build-time SHA-256" in check["note"]
+    assert "sha256" not in check, "Present bytes cannot supply missing build-time provenance"
+    assert _snapshot_preserved_files(root) == before
+
+
+@pytest.mark.parametrize("field", ["compile", "outputs"])
+@pytest.mark.parametrize("value", ["missing", None, [], "wrong", False])
+def test_preserve_compiled_artifact_invalid_provenance_container_fails(tmp_path, monkeypatch, field, value):
+    root = _make_corpus(tmp_path)
+    build_path = root / "publication" / "build.json"
+    build = json.loads(build_path.read_text())
+    if value == "missing":
+        del build[field]
+    else:
+        build[field] = value
+    build_path.write_text(json.dumps(build))
+    before = _snapshot_preserved_files(root)
+    reports = tmp_path / "reports"
+    monkeypatch.chdir(root)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_preserve_verify(output_dir=str(reports))
+
+    assert exc.value.code == 1
+    _, check = _compiled_report(reports)
+    assert check["status"] == "FAIL"
+    assert _snapshot_preserved_files(root) == before
+
+
+@pytest.mark.parametrize("path_value", ["missing", None, "", [], {}, False, 42])
+def test_preserve_compiled_artifact_requires_recorded_output_path(tmp_path, monkeypatch, path_value):
+    root = _make_corpus(tmp_path)
+    build_path = root / "publication" / "build.json"
+    build = json.loads(build_path.read_text())
+    if path_value == "missing":
+        del build["outputs"]["white_paper"]
+    else:
+        build["outputs"]["white_paper"] = path_value
+    build_path.write_text(json.dumps(build))
+    before = _snapshot_preserved_files(root)
+    reports = tmp_path / "reports"
+    monkeypatch.chdir(root)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_preserve_verify(output_dir=str(reports))
+
+    assert exc.value.code == 1
+    _, check = _compiled_report(reports)
+    assert check["status"] == "FAIL"
+    assert "outputs.white_paper" in check["note"]
+    assert _snapshot_preserved_files(root) == before
+
+
+@pytest.mark.parametrize("absolute", [False, True])
+def test_preserve_compiled_artifact_uses_declared_output_path(tmp_path, monkeypatch, absolute):
+    root = _make_corpus(tmp_path)
+    build_path = root / "publication" / "build.json"
+    build = json.loads(build_path.read_text())
+    conventional = root / "publication" / "white_paper.md"
+    declared = root / "custom" / "white_paper.md"
+    declared.parent.mkdir()
+    declared.write_bytes(conventional.read_bytes())
+    conventional.write_bytes(b"Wrong conventional output")
+    build["outputs"]["white_paper"] = str(declared if absolute else declared.relative_to(root))
+    build_path.write_text(json.dumps(build))
+    before = _snapshot_preserved_files(root)
+    reports = tmp_path / "reports"
+    monkeypatch.chdir(root)
+
+    cmd_preserve_verify(output_dir=str(reports))
+
+    _, check = _compiled_report(reports)
+    assert check["status"] == "PASS"
+    assert check["path"] == str(declared)
+    assert _snapshot_preserved_files(root) == before
+
+
+@pytest.mark.parametrize("failure", ["missing", "directory", "unreadable"])
+def test_preserve_compiled_artifact_unavailable_fails_with_report(tmp_path, monkeypatch, failure):
+    root = _make_corpus(tmp_path)
+    paper = root / "publication" / "white_paper.md"
+    if failure in {"missing", "directory"}:
+        paper.unlink()
+    if failure == "directory":
+        paper.mkdir()
+    before = _snapshot_preserved_files(root)
+    reports = tmp_path / "reports"
+    real_hash = preserve_cmd._sha256
+
+    def fail_paper_hash(path):
+        if path == paper:
+            raise PermissionError("injected compiled artifact read failure")
+        return real_hash(path)
+
+    if failure == "unreadable":
+        monkeypatch.setattr(preserve_cmd, "_sha256", fail_paper_hash)
+    monkeypatch.chdir(root)
+    with pytest.raises(SystemExit) as exc:
+        cmd_preserve_verify(output_dir=str(reports))
+
+    assert exc.value.code == 1
+    report, check = _compiled_report(reports)
+    assert report["overall_outcome"] == "fail"
+    assert check["status"] == "FAIL"
+    assert check.get("note")
+    assert _snapshot_preserved_files(root) == before
