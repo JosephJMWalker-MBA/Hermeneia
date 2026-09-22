@@ -316,12 +316,33 @@ def _emit_build_json(
         },
     }
 
-    # Later stages must not silently leave this record describing stale bytes.
-    _verify_compiled_artifact(output_dir / "white_paper.md", compile_record["sha256"])
-    _verify_manifest(manifest_path, manifest_hash)
-    (output_dir / "build.json").write_text(
-        json.dumps(build, indent=2, ensure_ascii=False)
-    )
+    # Finish serialization and encoding before opening any output file.
+    try:
+        serialized = json.dumps(build, indent=2, ensure_ascii=False).encode("utf-8")
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise BuildError(f"Cannot serialize build record: {exc}") from exc
+
+    destination = output_dir / "build.json"
+    try:
+        # A private directory on the destination filesystem keeps incomplete
+        # bytes out of the published path and makes replacement atomic.
+        with tempfile.TemporaryDirectory(prefix=".herm-build-record-", dir=output_dir) as staging:
+            staged = Path(staging) / "build.json"
+            with staged.open("wb") as stream:
+                stream.write(serialized)
+                stream.flush()
+            if staged.read_bytes() != serialized:
+                raise BuildError("Staged build record bytes do not match serialized bytes")
+
+            # Preparation must not move the final input checks earlier than
+            # the point at which the new record becomes visible.
+            _verify_compiled_artifact(output_dir / "white_paper.md", compile_record["sha256"])
+            _verify_manifest(manifest_path, manifest_hash)
+            os.replace(staged, destination)
+            if destination.read_bytes() != serialized:
+                raise BuildError("Installed build record bytes do not match serialized bytes")
+    except OSError as exc:
+        raise BuildError(f"Cannot publish build record {destination}: {exc}") from exc
     return build
 
 

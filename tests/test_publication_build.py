@@ -4,6 +4,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -515,3 +517,357 @@ def test_downstream_paths_and_metadata_use_captured_manifest(publication, monkey
     assert record["coverage"]["section_detail"][0]["section"] == "abstract"
     assert record["release_status"] == "RC-original"
     assert record["release_ratification"] == "pending"
+
+
+@pytest.fixture
+def record_emission(publication):
+    root, _, manifest, manifest_path, output = publication
+    resolved, tag_index, warnings = build_cmd._stage_resolve_tags(manifest, root)
+    coverage, _ = build_cmd._stage_coverage(manifest, tag_index)
+    arguments = dict(
+        manifest=manifest, manifest_path=manifest_path,
+        manifest_hash=hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+        blueprint=build_cmd._stage_resolve_blueprint(manifest, root),
+        resolved_artifacts=resolved, coverage_results=coverage,
+        compile_record=build_cmd._stage_compile(manifest, root, output),
+        warnings=warnings, output_dir=output,
+    )
+
+    def emit(**changes):
+        return build_cmd._emit_build_json(**(arguments | changes))
+
+    emit()
+    destination = output / "build.json"
+    return emit, destination, destination.read_bytes()
+
+
+@pytest.mark.parametrize("failure", ["unsupported", "circular", "encoding"])
+@pytest.mark.parametrize("prior_record", [False, True])
+def test_build_record_serialization_failure_preserves_prior(record_emission, monkeypatch, failure, prior_record):
+    emit, destination, previous = record_emission
+    if not prior_record:
+        destination.unlink()
+    value = object()
+    if failure == "circular":
+        value = []
+        value.append(value)
+    elif failure == "encoding":
+        value = "\ud800"
+
+    def no_staging(*args, **kwargs):
+        pytest.fail("Serialization must finish before staging or touching the destination")
+
+    monkeypatch.setattr(build_cmd.tempfile, "TemporaryDirectory", no_staging)
+    with pytest.raises(build_cmd.BuildError):
+        emit(hermeneia_version=value)
+
+    assert (destination.read_bytes() if destination.exists() else None) == (previous if prior_record else None)
+
+
+@pytest.mark.parametrize("prior_record", [False, True])
+@pytest.mark.parametrize("failure", ["staging", "open", "write", "partial", "short", "corrupt", "flush", "close", "read", "replace"])
+def test_build_record_pre_replace_failure_preserves_prior(record_emission, monkeypatch, prior_record, failure):
+    emit, destination, previous = record_emission
+    if not prior_record:
+        destination.unlink()
+    expected = previous if prior_record else None
+    real_open = Path.open
+    real_read = Path.read_bytes
+    observations = []
+
+    def observe():
+        observed = destination.read_bytes() if destination.exists() else None
+        observations.append(observed)
+
+    class FailingWriter:
+        def __init__(self, stream):
+            self.stream = stream
+
+        def __enter__(self):
+            self.stream.__enter__()
+            return self
+
+        def write(self, data):
+            observe()
+            if failure == "write":
+                raise OSError("injected write failure")
+            if failure in {"partial", "short"}:
+                count = self.stream.write(data[:16])
+                self.stream.flush()
+                observe()
+                if failure == "partial":
+                    raise OSError("injected partial write failure")
+                return count
+            if failure == "corrupt":
+                return self.stream.write(b" " * len(data))
+            return self.stream.write(data)
+
+        def flush(self):
+            if failure == "flush":
+                raise OSError("injected flush failure")
+            return self.stream.flush()
+
+        def __exit__(self, *args):
+            result = self.stream.__exit__(*args)
+            if failure in {"flush", "close"}:
+                raise OSError(f"injected {failure} failure")
+            return result
+
+    def failing_open(path, mode="r", *args, **kwargs):
+        if path.name == "build.json" and "w" in mode:
+            if failure == "open":
+                raise OSError("injected open failure")
+            return FailingWriter(real_open(path, mode, *args, **kwargs))
+        return real_open(path, mode, *args, **kwargs)
+
+    def fail_staging(*args, **kwargs):
+        raise OSError("injected staging failure")
+
+    def fail_replace(*args):
+        observe()
+        raise OSError("injected replacement failure")
+
+    def fail_staged_read(path):
+        if path.name == "build.json" and path != destination:
+            raise OSError("injected staged read failure")
+        return real_read(path)
+
+    monkeypatch.setattr(Path, "open", failing_open)
+    if failure == "staging":
+        monkeypatch.setattr(build_cmd.tempfile, "TemporaryDirectory", fail_staging)
+    if failure == "replace":
+        monkeypatch.setattr(os, "replace", fail_replace)
+    if failure == "read":
+        monkeypatch.setattr(Path, "read_bytes", fail_staged_read)
+
+    with pytest.raises(build_cmd.BuildError):
+        emit()
+
+    observe()
+    assert observations and all(observed == expected for observed in observations)
+    assert not list(destination.parent.glob(".herm-build-*"))
+
+
+def test_build_record_complete_bytes_visible_only_after_replace(record_emission, monkeypatch):
+    emit, destination, previous = record_emission
+    real_open = Path.open
+    real_replace = os.replace
+    real_dumps = json.dumps
+    intended = []
+    writers = []
+    events = []
+
+    def capture_serialization(value, **kwargs):
+        text = real_dumps(value, **kwargs)
+        intended.append(text.encode("utf-8"))
+        events.append("serialize")
+        return text
+
+    def checked_open(path, mode="r", *args, **kwargs):
+        if path.name == "build.json" and "w" in mode:
+            assert intended, "Serialization must precede every destination or staging write"
+            assert path != destination
+            assert path.parent.parent == destination.parent
+            assert path.parent.stat().st_mode & 0o077 == 0
+            assert destination.read_bytes() == previous
+            stream = real_open(path, mode, *args, **kwargs)
+            writers.append(stream)
+            events.append("stage")
+            return stream
+        return real_open(path, mode, *args, **kwargs)
+
+    def checked_replace(source, target):
+        assert Path(target) == destination
+        assert all(stream.closed for stream in writers)
+        assert Path(source).read_bytes() == intended[0]
+        assert destination.read_bytes() == previous
+        result = real_replace(source, target)
+        assert destination.read_bytes() == intended[0]
+        events.append("replace")
+        return result
+
+    monkeypatch.setattr(build_cmd.json, "dumps", capture_serialization)
+    monkeypatch.setattr(Path, "open", checked_open)
+    monkeypatch.setattr(os, "replace", checked_replace)
+    with destination.open("rb") as prior_reader:
+        record = emit(hermeneia_version="test-café")
+        assert prior_reader.read() == previous
+
+    assert events == ["serialize", "stage", "replace"]
+    assert destination.read_bytes() == intended[0]
+    assert json.loads(intended[0]) == record
+    assert not intended[0].endswith(b"\n")
+    assert not list(destination.parent.glob(".herm-build-*"))
+
+
+@pytest.mark.parametrize("failure", ["corrupt", "unreadable", "replace_then_raise"])
+def test_build_record_installed_verification_fails_closed(record_emission, monkeypatch, failure):
+    emit, destination, previous = record_emission
+    real_replace = os.replace
+    real_read = Path.read_bytes
+    installed = []
+    replacement_record = b'{"another_complete_record":true}'
+
+    def replace_then_fault(source, target):
+        result = real_replace(source, target)
+        installed.append(real_read(destination))
+        if failure == "replace_then_raise":
+            raise OSError("injected error after replacement")
+        if failure == "corrupt":
+            # Model an external writer replacing the record with other valid JSON.
+            destination.write_bytes(replacement_record)
+        return result
+
+    def unreadable_installed(path):
+        if path == destination and installed:
+            raise OSError("injected installed read failure")
+        return real_read(path)
+
+    monkeypatch.setattr(os, "replace", replace_then_fault)
+    if failure == "unreadable":
+        monkeypatch.setattr(Path, "read_bytes", unreadable_installed)
+    with pytest.raises(build_cmd.BuildError):
+        emit(hermeneia_version="new-record")
+
+    assert len(installed) == 1
+    assert installed[0] != previous
+    assert json.loads(installed[0])["build_id"] == "compile-byte-provenance"
+    assert real_read(destination) == (replacement_record if failure == "corrupt" else installed[0])
+    assert not list(destination.parent.glob(".herm-build-*"))
+
+
+@pytest.mark.parametrize("artifact", ["manifest.yaml", "white_paper.md"])
+@pytest.mark.parametrize("mutation_point", ["serialization", "staging"])
+def test_build_record_rechecks_input_provenance_after_preparation(record_emission, publication, monkeypatch, artifact, mutation_point):
+    emit, destination, previous = record_emission
+    root, _, _, manifest_path, _ = publication
+    target = manifest_path if artifact == "manifest.yaml" else destination.parent / artifact
+    real_dumps = json.dumps
+    real_read = Path.read_bytes
+
+    def serialize_then_change_input(*args, **kwargs):
+        text = real_dumps(*args, **kwargs)
+        target.write_bytes(b"Changed during record preparation")
+        return text
+
+    def read_staging_then_change_input(path):
+        data = real_read(path)
+        if path.name == "build.json" and path != destination:
+            target.write_bytes(b"Changed during record preparation")
+        return data
+
+    if mutation_point == "serialization":
+        monkeypatch.setattr(build_cmd.json, "dumps", serialize_then_change_input)
+    else:
+        monkeypatch.setattr(Path, "read_bytes", read_staging_then_change_input)
+    with pytest.raises(build_cmd.BuildError, match="[Hh]ash mismatch"):
+        emit()
+    assert destination.read_bytes() == previous
+    assert not list(destination.parent.glob(".herm-build-*"))
+
+
+@pytest.mark.parametrize("alias", ["symlink", "hardlink"])
+def test_build_record_replacement_leaves_linked_target_untouched(record_emission, alias):
+    emit, destination, previous = record_emission
+    target = destination.parent / "linked-record.json"
+    target.write_bytes(previous)
+    destination.unlink()
+    if alias == "symlink":
+        destination.symlink_to(target)
+    else:
+        destination.hardlink_to(target)
+
+    emit(hermeneia_version="new-record")
+
+    assert target.read_bytes() == previous
+    assert not destination.is_symlink()
+    assert json.loads(destination.read_bytes())["hermeneia_version"] == "new-record"
+
+
+@pytest.mark.parametrize("prior_record", [False, True])
+def test_build_record_process_interruption_never_exposes_partial_bytes(record_emission, publication, prior_record):
+    _, destination, previous = record_emission
+    root, _, _, manifest_path, output = publication
+    if not prior_record:
+        destination.unlink()
+    script = '''
+import os
+from pathlib import Path
+from hermeneia.cli import build_cmd
+real_open = Path.open
+class InterruptedWriter:
+    def __init__(self, stream): self.stream = stream
+    def __enter__(self): return self
+    def __exit__(self, *args): return self.stream.__exit__(*args)
+    def write(self, data):
+        self.stream.write(data[:16])
+        self.stream.flush()
+        os._exit(73)
+def interrupt_open(path, mode="r", *args, **kwargs):
+    stream = real_open(path, mode, *args, **kwargs)
+    if path.name == "build.json" and "w" in mode:
+        return InterruptedWriter(stream)
+    return stream
+Path.open = interrupt_open
+build_cmd.cmd_build("manifest.yaml", "publication")
+'''
+    environment = dict(os.environ, PYTHONPATH=str(Path(build_cmd.__file__).resolve().parents[2]))
+    result = subprocess.run([sys.executable, "-c", script], cwd=root, env=environment,
+                            capture_output=True, text=True, timeout=15)
+
+    assert result.returncode == 73, result.stderr
+    assert (destination.read_bytes() if destination.exists() else None) == (previous if prior_record else None)
+    partial_staging = list(output.glob(".herm-build-*/build.json"))
+    assert len(partial_staging) == 1
+    assert len(partial_staging[0].read_bytes()) == 16
+
+
+@pytest.mark.parametrize("failure", ["serialization", "open", "replace", "readback"])
+def test_build_record_failure_never_announces_cli_success(record_emission, publication, monkeypatch, capsys, failure):
+    _, destination, previous = record_emission
+    root, _, _, manifest_path, output = publication
+    real_open = Path.open
+    real_replace = os.replace
+    real_read = Path.read_bytes
+
+    def fail_serialization(*args, **kwargs):
+        raise TypeError("injected record serialization failure")
+
+    def fail_open(path, mode="r", *args, **kwargs):
+        if path.name == "build.json" and "w" in mode:
+            raise OSError("injected record open failure")
+        return real_open(path, mode, *args, **kwargs)
+
+    def fail_replace(source, target):
+        if Path(target) == destination:
+            raise OSError("injected record replacement failure")
+        return real_replace(source, target)
+
+    def fail_readback(path):
+        if path == destination:
+            raise OSError("injected record readback failure")
+        return real_read(path)
+
+    if failure == "serialization":
+        monkeypatch.setattr(build_cmd.json, "dumps", fail_serialization)
+    elif failure == "open":
+        monkeypatch.setattr(Path, "open", fail_open)
+    elif failure == "replace":
+        monkeypatch.setattr(os, "replace", fail_replace)
+    else:
+        monkeypatch.setattr(Path, "read_bytes", fail_readback)
+    monkeypatch.chdir(root)
+
+    with pytest.raises(SystemExit) as exc:
+        build_cmd.cmd_build(str(manifest_path), str(output))
+
+    assert exc.value.code == 1
+    stdout = capsys.readouterr().out
+    assert "Publication Build Complete" not in stdout
+    assert "Build failed" in stdout
+    assert "injected record" in stdout
+    if failure != "readback":
+        assert real_read(destination) == previous
+    else:
+        assert json.loads(real_read(destination))["build_id"] == "compile-byte-provenance"
+    assert not list(output.glob(".herm-build-*"))

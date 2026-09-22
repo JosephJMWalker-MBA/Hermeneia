@@ -70,6 +70,8 @@ These are synchronization/orientation documents. They may become stale as code a
   — output/hash race, atomic artifact replacement, refusal checks, and regression evidence.
 - [`2026-09-22 — Manifest captured bytes`](verification/2026-09-22-manifest-captured-bytes.md)
   — parse/hash divergence, shared byte capture, later drift refusal, and regression evidence.
+- [`2026-09-22 — Atomic build record`](verification/2026-09-22-atomic-build-record.md)
+  — interrupted record writes, private staging, atomic replacement, and failure evidence.
 
 These records describe bounded implementation evidence; they do not amend authority.
 
