@@ -263,15 +263,23 @@ def _verify_binding(binding: dict, raw: bytes, build_path: Path, captures: _Capt
     return core
 
 
-def _verified(build_path: Path, project_root: Path) -> tuple[dict, _Captures]:
-    captures = _Captures(project_root)
+def validate_captured_build(build_path: Path, captures: _Captures) -> dict:
+    """Validate a build using the caller's byte captures, never a second snapshot."""
     raw = captures.read(build_path)
     binding_path = build_path.with_name(BINDING_NAME)
-    if not captures.location(binding_path)[1].exists():
-        raise UnsupportedProfile("Insufficient evidence: legacy/missing build-result binding; no historical backfill")
-    binding = strict_json_loads(captures.read(binding_path))
+    try:
+        binding_raw = captures.read(binding_path)
+    except FileNotFoundError as exc:
+        raise UnsupportedProfile("Insufficient evidence: legacy/missing build-result binding; no historical backfill") from exc
+    binding = strict_json_loads(binding_raw)
     core = _verify_binding(binding, raw, build_path, captures)
     captures.unchanged()
+    return core
+
+
+def _verified(build_path: Path, project_root: Path) -> tuple[dict, _Captures]:
+    captures = _Captures(project_root)
+    core = validate_captured_build(build_path, captures)
     return core, captures
 
 

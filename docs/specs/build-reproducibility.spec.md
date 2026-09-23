@@ -190,7 +190,8 @@ and recomputation of hashes is outside unsigned digest integrity. Release signin
 preservation-package completeness/equivalence, historical adapters, power-loss
 durability and whole-publication transactions remain separate work.
 
-The next bounded packet is to bind preservation **verification reports** to an
-already validated build core while retaining all existing negative findings and
-read-only artifact behavior. Do not introduce preservation-package or release
-equivalence in that packet.
+The subsequent bounded packet implements
+[preservation verification input provenance](preservation-verification-provenance.spec.md):
+reports reference an already validated build core and exact captured verification
+inputs while retaining all existing negative findings and read-only artifact
+behavior. This does not introduce preservation-package or release equivalence.

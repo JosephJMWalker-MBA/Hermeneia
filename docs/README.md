@@ -79,6 +79,9 @@ These are synchronization/orientation documents. They may become stale as code a
 - [`2026-09-23 — First build-result profile`](verification/2026-09-23-build-result-profile.md)
   — implemented core/binding comparison, adversarial checks, actual-input witness,
   compatibility and bounded regression evidence.
+- [`2026-09-23 — Preservation report binding`](verification/2026-09-23-preservation-report-binding.md)
+  — exact captured-input/core association, retained negative findings, read-only
+  safeguards and independently checked regression evidence.
 
 These records describe bounded implementation evidence; they do not amend authority.
 
@@ -88,6 +91,8 @@ These records describe bounded implementation evidence; they do not amend author
   — records the steward's core/envelope decision, inventories existing fields,
   and preserves the original design evidence. The accepted first build-result
   profile is implemented under [`Build-result reproducibility v1`](specs/build-reproducibility.spec.md).
+  [`Preservation verification input provenance`](specs/preservation-verification-provenance.spec.md)
+  adds exact report-to-build/input association without changing historical findings.
   Historical records retain their contracts; package/release equivalence remains
   outside this profile.
 

@@ -31,16 +31,22 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import secrets
 import shutil
 import sys
+import tempfile
 from datetime import datetime, timezone
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import yaml
 from rich.console import Console
 from rich.rule import Rule
+
+from hermeneia.preservation_provenance import VerificationInputs
 
 console = Console()
 
@@ -61,22 +67,24 @@ def _sha256(path: Path) -> str:
 
 # ── Loaders ───────────────────────────────────────────────────────────────────
 
-def _load_json(path: Path, label: str) -> dict:
-    if not path.exists():
+def _load_json(path: Path, label: str, inputs: VerificationInputs | None = None,
+               role: str = "json") -> dict:
+    if not (inputs.exists(path, role) if inputs else path.exists()):
         return {}
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(inputs.text(path, role) if inputs else path.read_text())
     except json.JSONDecodeError as exc:
         raise PreservationError(f"{label} malformed: {exc}") from exc
     return data if isinstance(data, dict) else {}
 
 
-def _load_manifest(manifest_rel: str, project_root: Path) -> dict:
+def _load_manifest(manifest_rel: str, project_root: Path,
+                   inputs: VerificationInputs | None = None) -> dict:
     path = project_root / manifest_rel
-    if not path.exists():
+    if not (inputs.exists(path, "manifest-interpretation") if inputs else path.exists()):
         return {}
     try:
-        data = yaml.safe_load(path.read_text())
+        data = yaml.safe_load(inputs.text(path, "manifest-interpretation") if inputs else path.read_text())
     except yaml.YAMLError:
         return {}
     return data if isinstance(data, dict) else {}
@@ -89,6 +97,7 @@ def _verify_reconstruction(
     coverage: dict,
     release: dict,
     project_root: Path,
+    inputs: VerificationInputs | None = None,
 ) -> list[dict]:
     """Verify the lineage chain. Returns list of check results."""
     results: list[dict] = []
@@ -96,7 +105,8 @@ def _verify_reconstruction(
     _EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
     def _check(name: str, path: Path | None, expected_hash: str | None) -> dict:
-        if path is None or not path.exists():
+        role = "reconstruction:" + name
+        if path is None or not (inputs.exists(path, role) if inputs else path.exists()):
             return {"name": name, "status": "FAIL", "note": "Artifact not found"}
         # These artifacts are hashed by herm build. Observing a digest now cannot
         # replace the recorded build-time provenance needed for comparison.
@@ -107,7 +117,7 @@ def _verify_reconstruction(
                 "path": str(path),
                 "note": "Missing or invalid build-time SHA-256 — integrity cannot be verified",
             }
-        actual_hash = _sha256(path)
+        actual_hash = inputs.sha256(path, role) if inputs else _sha256(path)
         if actual_hash != expected_hash:
             return {
                 "name": name,
@@ -188,12 +198,14 @@ def _verify_reconstruction(
         if path_str is None:
             continue
         p = project_root / path_str
+        role = "reconstruction:" + label
+        present = inputs.exists(p, role) if inputs else p.exists()
         results.append({
             "name": label,
-            "status": "PASS" if p.exists() else "FAIL",
+            "status": "PASS" if present else "FAIL",
             "path": str(p),
-            "sha256": _sha256(p) if p.exists() else None,
-            **({"note": "Artifact not found"} if not p.exists() else {}),
+            "sha256": (inputs.sha256(p, role) if inputs else _sha256(p)) if present else None,
+            **({"note": "Artifact not found"} if not present else {}),
         })
 
     # F01: Coverage build_id cross-check — coverage must attest to the same build
@@ -250,6 +262,7 @@ def _verify_continuation(
     manifest: dict,
     release: dict,
     project_root: Path,
+    inputs: VerificationInputs | None = None,
 ) -> list[dict]:
     """Verify continuation prerequisites. Returns list of check results."""
     results: list[dict] = []
@@ -263,11 +276,12 @@ def _verify_continuation(
     # Blueprint (already checked in reconstruction; here we check intent hypothesis)
     bp_path_str = build.get("blueprint", {}).get("path")
     bp_path = Path(bp_path_str) if bp_path_str else None
-    has_blueprint = bool(bp_path and bp_path.exists())
+    has_blueprint = bool(bp_path and (
+        inputs.exists(bp_path, "continuation:Blueprint") if inputs else bp_path.exists()))
     results.append(_present("Blueprint", has_blueprint))
 
     if has_blueprint and bp_path:
-        text = bp_path.read_text()
+        text = inputs.text(bp_path, "continuation:Blueprint") if inputs else bp_path.read_text()
         has_intent = (
             "intent" in text.lower()
             or "hypothesis" in text.lower()
@@ -361,6 +375,70 @@ def _verify_continuation(
 
 # ── Report emission ───────────────────────────────────────────────────────────
 
+@contextmanager
+def _report_directory(path: Path):
+    """Pin the checked output directory against later parent/symlink redirection."""
+    resolved = path.resolve(strict=True)
+    if (os.open not in os.supports_dir_fd or not hasattr(os, "O_NOFOLLOW")
+            or not hasattr(os, "O_DIRECTORY")):
+        # Such platforms cannot claim supported build-core provenance either.
+        yield resolved, None
+        return
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    descriptor = os.open(resolved.anchor, flags)
+    try:
+        for component in resolved.parts[1:]:
+            child = os.open(component, flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+        yield resolved, descriptor
+    finally:
+        os.close(descriptor)
+
+
+def _write_report(path: Path, content: str, directory_fd: int | None = None) -> None:
+    """Replace the report entry, never truncate a linked verification input."""
+    raw = content.encode("utf-8")
+    if directory_fd is not None:
+        staged_name = ".herm-report-" + secrets.token_hex(16)
+
+        def read_at(name):
+            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory_fd)
+            with os.fdopen(fd, "rb") as stream:
+                return stream.read()
+
+        fd = os.open(staged_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=directory_fd)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(raw)
+                stream.flush()
+            if read_at(staged_name) != raw:
+                raise PreservationError("Staged preservation report differs from intended bytes")
+            os.replace(staged_name, path.name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
+            if read_at(path.name) != raw:
+                raise PreservationError("Installed preservation report differs from intended bytes")
+        finally:
+            try:
+                os.unlink(staged_name, dir_fd=directory_fd)
+            except FileNotFoundError:
+                pass
+        return
+    staged = None
+    try:
+        with tempfile.NamedTemporaryFile(prefix=".herm-report-", dir=path.parent, delete=False) as stream:
+            staged = Path(stream.name)
+            stream.write(raw)
+            stream.flush()
+        if staged.read_bytes() != raw:
+            raise PreservationError("Staged preservation report differs from intended bytes")
+        os.replace(staged, path)
+        if path.read_bytes() != raw:
+            raise PreservationError("Installed preservation report differs from intended bytes")
+    finally:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+
+
 def _summarize(results: list[dict]) -> dict:
     n_pass = sum(1 for r in results if r["status"] == "PASS")
     n_warn = sum(1 for r in results if r["status"] == "WARN")
@@ -382,6 +460,8 @@ def _emit_report_json(
     reconstruction: list[dict],
     continuation: list[dict],
     output_dir: Path,
+    provenance: dict | None = None,
+    directory_fd: int | None = None,
 ) -> dict:
     r_summary = _summarize(reconstruction)
     c_summary = _summarize(continuation)
@@ -406,13 +486,13 @@ def _emit_report_json(
             "This report verifies lineage and continuation prerequisites only."
         ),
     }
-    (output_dir / "preservation_report.json").write_text(
-        json.dumps(doc, indent=2, ensure_ascii=False)
-    )
+    if provenance is not None:
+        doc["provenance"] = provenance
+    _write_report(output_dir / "preservation_report.json", json.dumps(doc, indent=2, ensure_ascii=False), directory_fd)
     return doc
 
 
-def _emit_report_md(doc: dict, output_dir: Path) -> None:
+def _emit_report_md(doc: dict, output_dir: Path, directory_fd: int | None = None) -> None:
     build_id = doc["build_id"]
     r = doc["reconstruction"]
     c = doc["continuation"]
@@ -430,6 +510,15 @@ def _emit_report_md(doc: dict, output_dir: Path) -> None:
         f"|------|------|------|----------|\n",
         f"| {rs['pass']} | {rs['warn']} | {rs['fail']} | {rs['advisory']} |\n\n",
     ]
+
+    if "provenance" in doc:
+        provenance = doc["provenance"]
+        claim = provenance.get("build_core")
+        detail = (f"{claim['profile']} `{claim['sha256']}`" if claim else
+                  f"{provenance['integrity']} — {provenance['reason']}")
+        lines.insert(3, f"**Build provenance:** {detail}  \n"
+                     f"**Verification inputs:** `{provenance['inputs_sha256']}`  \n"
+                     "_Exact input observations are recorded in preservation_report.json._\n\n")
 
     for check in r["checks"]:
         icon = {"PASS": "✓", "WARN": "⚠", "FAIL": "✗", "ADVISORY": "·"}.get(check["status"], "?")
@@ -462,7 +551,7 @@ def _emit_report_md(doc: dict, output_dir: Path) -> None:
         "_This report verifies lineage and continuation prerequisites only._\n",
     ]
 
-    (output_dir / "preservation_report.md").write_text("".join(lines))
+    _write_report(output_dir / "preservation_report.md", "".join(lines), directory_fd)
 
 
 # ── Export ────────────────────────────────────────────────────────────────────
@@ -579,25 +668,35 @@ def _run_export(
 # ── CLI entry points ──────────────────────────────────────────────────────────
 
 def _load_inputs(
-    build_path: Path, project_root: Path
+    build_path: Path, project_root: Path, inputs: VerificationInputs | None = None,
 ) -> tuple[dict, dict, dict, dict]:
-    if not build_path.exists():
+    if not (inputs.exists(build_path, "build-record") if inputs else build_path.exists()):
         raise PreservationError(f"build.json not found: {build_path}")
-    build = _load_json(build_path, "build.json")
+    build = _load_json(build_path, "build.json", inputs, "build-record")
     if not build:
         raise PreservationError(f"build.json is empty or malformed: {build_path}")
 
     build_dir = build_path.parent
     coverage_path = build_dir / "coverage.json"
-    coverage = _load_json(coverage_path, "coverage.json")
+    coverage = _load_json(coverage_path, "coverage.json", inputs, "coverage-interpretation")
 
     release_path = build_dir / "release_recommendation.json"
-    release = _load_json(release_path, "release_recommendation.json")
+    release = _load_json(release_path, "release_recommendation.json", inputs, "release-interpretation")
 
     manifest_rel = build.get("manifest_path", "")
-    manifest = _load_manifest(manifest_rel, project_root)
+    manifest = _load_manifest(manifest_rel, project_root, inputs)
 
     return build, coverage, release, manifest
+
+
+def _evaluate_verification(build_path: Path, project_root: Path,
+                           inputs: VerificationInputs | None = None) -> tuple[dict, list, list, dict]:
+    """Read-only evaluation shared by report generation and association checks."""
+    inputs = inputs if inputs is not None else VerificationInputs(project_root)
+    build, coverage, release, manifest = _load_inputs(build_path, project_root, inputs)
+    reconstruction = _verify_reconstruction(build, coverage, release, project_root, inputs)
+    continuation = _verify_continuation(build, manifest, release, project_root, inputs)
+    return build, reconstruction, continuation, inputs.receipt(build_path)
 
 
 def cmd_preserve_verify(
@@ -611,14 +710,13 @@ def cmd_preserve_verify(
 
     try:
         console.print(Rule(style="dim"))
-        build, coverage, release, manifest = _load_inputs(build_path_, project_root)
+        build, reconstruction, continuation, provenance = _evaluate_verification(build_path_, project_root)
         build_id = build.get("build_id", "unknown")
         console.print(f"\n  [bold]herm preserve verify[/]  [cyan]{build_id}[/]\n")
 
         console.print("  Reading build.json...          [green]PASS[/]")
 
         console.print("\n  Verifying lineage (Reconstruction)...\n")
-        reconstruction = _verify_reconstruction(build, coverage, release, project_root)
         for r in reconstruction:
             icon = {"PASS": "[green]✓[/]", "WARN": "[yellow]⚠[/]",
                     "FAIL": "[red]✗[/]", "ADVISORY": "[dim]·[/]"}.get(r["status"], "?")
@@ -628,7 +726,6 @@ def cmd_preserve_verify(
                 console.print(f"       [dim]{r['note']}[/]")
 
         console.print("\n  Checking continuation prerequisites...\n")
-        continuation = _verify_continuation(build, manifest, release, project_root)
         for r in continuation:
             icon = {"PASS": "[green]✓[/]", "WARN": "[yellow]⚠[/]",
                     "FAIL": "[red]✗[/]", "ADVISORY": "[dim]·[/]"}.get(r["status"], "?")
@@ -637,9 +734,16 @@ def cmd_preserve_verify(
             if r.get("note") and (verbose or r["status"] in ("FAIL", "WARN")):
                 console.print(f"       [dim]{r['note']}[/]")
 
+        # A requested report destination must not overwrite evidence it evaluated.
+        evidence_paths = {item["resolved_path"] for item in provenance["inputs"]}
         output_dir_.mkdir(parents=True, exist_ok=True)
-        doc = _emit_report_json(build, reconstruction, continuation, output_dir_)
-        _emit_report_md(doc, output_dir_)
+        with _report_directory(output_dir_) as (report_dir, directory_fd):
+            for name in ("preservation_report.json", "preservation_report.md"):
+                target = report_dir / name
+                if str(target) in evidence_paths or str(target.resolve()) in evidence_paths:
+                    raise PreservationError("Report destination aliases a verification input")
+            doc = _emit_report_json(build, reconstruction, continuation, report_dir, provenance, directory_fd)
+            _emit_report_md(doc, report_dir, directory_fd)
 
         r_sum = doc["reconstruction"]["summary"]
         c_sum = doc["continuation"]["summary"]

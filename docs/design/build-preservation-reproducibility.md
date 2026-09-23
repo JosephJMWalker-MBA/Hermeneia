@@ -212,6 +212,31 @@ continue to gate successful verification under the existing rules.
 | `/overall_outcome` | E | Derived assessment for this execution; validate against both summaries. |
 | `/note` | E | Scope limitation: restoration remains deferred. Retain verbatim. |
 
+The following additive fields were implemented on 2026-09-23 under the steward's
+subsequent report-binding packet. They are observation receipts, not the earlier
+proposal's report-custody sidecar; see the
+[active report provenance contract](../specs/preservation-verification-provenance.spec.md).
+The original inventory and historical records above retain their meaning.
+
+| Field | Class | Reason / implemented treatment |
+|---|---|---|
+| `/provenance` | container | Separate binding integrity from historical findings. |
+| `/provenance/schema` | E | Version of the observation receipt contract. |
+| `/provenance/integrity` | E | Valid, invalid or unsupported capture/binding observation. |
+| `/provenance/reason` | E | Refusal diagnostic; no inferred core claim. |
+| `/provenance/build_core` | container | Present only after supported successful core validation. |
+| `/provenance/build_core/profile` | C | References the existing validated build-result profile/version. |
+| `/provenance/build_core/sha256` | C | References its exact validated core digest; no new identity. |
+| `/provenance/inputs` | E | Ordered receipts of exact verification inputs, including absences. |
+| `/provenance/inputs/[]/path` | E | Actual lookup locator, never used as content equivalence. |
+| `/provenance/inputs/[]/resolved_path` | E | Observed target location for drift checks, or null when a malformed locator cannot resolve. |
+| `/provenance/inputs/[]/roles` | E | All interpretation/check roles consuming this capture. |
+| `/provenance/inputs/[]/state` | E | Present, missing or unreadable at capture. |
+| `/provenance/inputs/[]/sha256` | E | SHA-256 of exact captured bytes; not fabricated build-time evidence. |
+| `/provenance/inputs/[]/size_bytes` | E | Exact captured byte count. |
+| `/provenance/inputs/[]/error` | E | Unreadable input diagnostic, never a success. |
+| `/provenance/inputs_sha256` | E | Domain-separated digest of the canonical input receipts; not package or report identity. |
+
 Conditional reconstruction checks cover missing/invalid expected hashes, empty
 artifacts, mismatches, invalid compiled-output paths and read errors; coverage
 build-ID/corpus warnings; and the signature advisory. Continuation covers Blueprint

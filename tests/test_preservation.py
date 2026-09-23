@@ -535,6 +535,28 @@ def test_preserve_compiled_artifact_requires_recorded_output_path(tmp_path, monk
     assert _snapshot_preserved_files(root) == before
 
 
+def test_preserve_nul_compiled_locator_retains_historical_failed_check(tmp_path, monkeypatch):
+    root = _make_corpus(tmp_path)
+    path = root / "publication/build.json"
+    build = json.loads(path.read_bytes())
+    build["outputs"]["white_paper"] = "invalid\x00locator.md"
+    path.write_text(json.dumps(build))
+    loaded, coverage, release, _ = _load_inputs(path, root)
+    old_checks = _verify_reconstruction(loaded, coverage, release, root)
+    before = _snapshot_preserved_files(root)
+    reports = tmp_path / "reports"
+    monkeypatch.chdir(root)
+    with pytest.raises(SystemExit) as exc:
+        cmd_preserve_verify(output_dir=str(reports))
+    assert exc.value.code == 1
+    report, check = _compiled_report(reports)
+    assert check == {"name": "Compiled Artifact", "status": "FAIL", "note": "Artifact not found"}
+    assert report["reconstruction"]["checks"] == old_checks
+    assert report["provenance"]["integrity"] == "invalid"
+    assert "build_core" not in report["provenance"]
+    assert _snapshot_preserved_files(root) == before
+
+
 @pytest.mark.parametrize("absolute", [False, True])
 def test_preserve_compiled_artifact_uses_declared_output_path(tmp_path, monkeypatch, absolute):
     root = _make_corpus(tmp_path)
@@ -569,15 +591,15 @@ def test_preserve_compiled_artifact_unavailable_fails_with_report(tmp_path, monk
         paper.mkdir()
     before = _snapshot_preserved_files(root)
     reports = tmp_path / "reports"
-    real_hash = preserve_cmd._sha256
+    real_read = preserve_cmd.VerificationInputs._read_confined
 
-    def fail_paper_hash(path):
+    def fail_paper_read(self, path):
         if path == paper:
             raise PermissionError("injected compiled artifact read failure")
-        return real_hash(path)
+        return real_read(self, path)
 
     if failure == "unreadable":
-        monkeypatch.setattr(preserve_cmd, "_sha256", fail_paper_hash)
+        monkeypatch.setattr(preserve_cmd.VerificationInputs, "_read_confined", fail_paper_read)
     monkeypatch.chdir(root)
     with pytest.raises(SystemExit) as exc:
         cmd_preserve_verify(output_dir=str(reports))

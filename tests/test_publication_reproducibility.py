@@ -143,11 +143,20 @@ def test_clean_builds_differ_only_in_execution_time_and_its_downstream_hash(tmp_
     assert _changed_files(first, second) == {
         build_name, "publication/coverage.md", copied_name, manifest_name,
         "publication/build.reproducibility.json",
+        "publication/preservation_report.json", "publication/preservation_report.md",
     }
     first_build, second_build = json.loads(first[build_name]), json.loads(second[build_name])
     assert _changed_fields(first_build, second_build) == {"/build_timestamp"}
     assert first_build["build_timestamp"] == EARLIER
     assert second_build["build_timestamp"] == LATER
+    report_name = "publication/preservation_report.json"
+    first_report, second_report = json.loads(first[report_name]), json.loads(second[report_name])
+    changed_inputs = {i for i, item in enumerate(first_report["provenance"]["inputs"])
+                      if item["path"].endswith(("/build.json", "/build.reproducibility.json"))}
+    assert _changed_fields(first_report, second_report) == {
+        "/provenance/inputs_sha256", *(f"/provenance/inputs/{i}/sha256" for i in changed_inputs),
+    }
+    assert first_report["provenance"]["build_core"] == second_report["provenance"]["build_core"]
     first_package = json.loads(first[manifest_name])
     second_package = json.loads(second[manifest_name])
     build_index = next(i for i, item in enumerate(first_package["artifacts"])
@@ -214,6 +223,7 @@ def test_identical_inputs_at_different_roots_record_local_paths(tmp_path, monkey
         build_name, report_name, package_name,
         "preservation/preservation_package/artifacts/build.json",
         "publication/build.reproducibility.json",
+        "publication/preservation_report.md",
     }
     first_build, second_build = json.loads(first[build_name]), json.loads(second[build_name])
     assert _changed_fields(first_build, second_build) == {
@@ -222,9 +232,16 @@ def test_identical_inputs_at_different_roots_record_local_paths(tmp_path, monkey
     }
     first_report, second_report = json.loads(first[report_name]), json.loads(second[report_name])
     assert _changed_fields(first_report, second_report) == {
-        f"/reconstruction/checks/{index}/path"
-        for index, check in enumerate(first_report["reconstruction"]["checks"]) if "path" in check
+        *(f"/reconstruction/checks/{index}/path"
+          for index, check in enumerate(first_report["reconstruction"]["checks"]) if "path" in check),
+        "/provenance/inputs_sha256",
+        *(f"/provenance/inputs/{i}/{field}"
+          for i in range(len(first_report["provenance"]["inputs"])) for field in ("path", "resolved_path")),
+        *(f"/provenance/inputs/{i}/sha256"
+          for i, item in enumerate(first_report["provenance"]["inputs"])
+          if item["path"].endswith(("/build.json", "/build.reproducibility.json"))),
     }
+    assert first_report["provenance"]["build_core"] == second_report["provenance"]["build_core"]
     first_package, second_package = json.loads(first[package_name]), json.loads(second[package_name])
     expected = {f"/artifacts/{index}/original_path" for index in range(len(first_package["artifacts"]))}
     for index, entry in enumerate(first_package["artifacts"]):
