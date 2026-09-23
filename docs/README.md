@@ -79,6 +79,15 @@ These are synchronization/orientation documents. They may become stale as code a
 
 These records describe bounded implementation evidence; they do not amend authority.
 
+### Bounded architecture proposals
+
+- [`Build result identity and execution provenance`](design/build-preservation-reproducibility.md)
+  — records the steward's core/envelope decision, inventories existing fields,
+  and proposes digest, comparison and compatibility rules. Detailed profile is
+  proposed; production formats and historical records remain unchanged. Authored
+  local references and mixed coverage/release identity retain explicit decision
+  boundaries.
+
 ### Ratification-era root artifacts
 
 The following root files preserve the architecture-discovery / ratification process:

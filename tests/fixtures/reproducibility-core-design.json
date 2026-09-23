@@ -1,0 +1,110 @@
+{
+  "status": "Synthetic proposal fixtures only; not production schema or historical migration",
+  "canonical_vectors": [
+    {
+      "value": {
+        "z": [
+          "\u00e9",
+          "e\u0301",
+          "\ud834\udd1e",
+          "line\r\n",
+          "line\n",
+          true,
+          null
+        ],
+        "a": {
+          "\\quote\"": "\t\b\f\r\n"
+        }
+      },
+      "canonical_ascii": "{\"a\":{\"\\\\quote\\\"\":\"\\t\\b\\f\\r\\n\"},\"z\":[\"\\u00e9\",\"e\\u0301\",\"\\ud834\\udd1e\",\"line\\r\\n\",\"line\\n\",true,null]}",
+      "domain_sha256": "ca6f2cd0358f51e3671326dbe259b77082543e9b4d6a6a2b9fecad1c8144b23a"
+    },
+    {
+      "value": {
+        "limits": [
+          -9007199254740991,
+          0,
+          9007199254740991
+        ],
+        "empty": {},
+        "list": []
+      },
+      "canonical_ascii": "{\"empty\":{},\"limits\":[-9007199254740991,0,9007199254740991],\"list\":[]}",
+      "domain_sha256": "2eaf84504e7d7213ab0bc9942902505605ef4714341d91d62683ae04fa8416b9"
+    }
+  ],
+  "build_binding_example": {
+    "canonical_ascii": "{\"result\":{\"blueprint\":{\"id\":\"fixture-blueprint\",\"sha256\":\"8bb674605861ccf365bf8f2a1e5b697545481ffb143024bb62eb03b02c6d2fcd\",\"status\":\"ratified\"},\"build_id\":\"reproducibility-fixture\",\"compile\":{\"method\":\"copy\",\"sha256\":\"6d5003d666e5a73a72d981ed12840099901a75a46f1cbdf24282a86368c65ecc\"},\"coverage\":[{\"claims_checked\":false,\"missing_tags\":[],\"required_claims\":[],\"required_tags\":[\"thesis\"],\"section\":\"abstract\",\"status\":\"PASS\"},{\"claims_checked\":false,\"missing_tags\":[],\"required_claims\":[],\"required_tags\":[\"evidence\"],\"section\":\"discussion\",\"status\":\"PASS\"}],\"critic\":{\"enabled\":false},\"historical_outputs\":{\"rc_log_sha256\":\"3a0384870699f97cf2d83c837a06e3e1e779c7f7e1d1530eb56500bd659a89f2\",\"release_decision_sha256\":\"9bd7dca0f04d1953032673fac29a48c481a807c5fefecdb2c3306fc086ed3e70\"},\"manifest_hash\":\"39f5fba10642cc228b3e3477a98b257e83b6ee9d54bfcaf8d8d383cc1da88644\",\"release_ratification\":\"pending\",\"release_status\":\"RC-fixture\",\"source_artifacts\":[{\"path\":\"docs/blueprint.md\",\"role\":\"primary-contract\",\"sha256\":\"8bb674605861ccf365bf8f2a1e5b697545481ffb143024bb62eb03b02c6d2fcd\",\"status\":\"ratified\",\"tags\":[\"thesis\",\"blueprint\"]},{\"path\":\"docs/evidence.md\",\"role\":\"evidence\",\"sha256\":\"3fa173e201d80933f550ff018daa71627ec7cdcc0003a8f2327592a2e1ad2c1a\",\"status\":\"complete\",\"tags\":[\"evidence\",\"hypothesis\"]}]},\"schema\":\"hermeneia.build-result/v1\"}",
+    "domain_sha256": "4461dd5d721e892b1e2a3a1a6ae29de310d0a36348270a15aa85f14991a39cad",
+    "core": {
+      "schema": "hermeneia.build-result/v1",
+      "result": {
+        "build_id": "reproducibility-fixture",
+        "manifest_hash": "39f5fba10642cc228b3e3477a98b257e83b6ee9d54bfcaf8d8d383cc1da88644",
+        "blueprint": {
+          "id": "fixture-blueprint",
+          "status": "ratified",
+          "sha256": "8bb674605861ccf365bf8f2a1e5b697545481ffb143024bb62eb03b02c6d2fcd"
+        },
+        "source_artifacts": [
+          {
+            "path": "docs/blueprint.md",
+            "sha256": "8bb674605861ccf365bf8f2a1e5b697545481ffb143024bb62eb03b02c6d2fcd",
+            "tags": [
+              "thesis",
+              "blueprint"
+            ],
+            "status": "ratified",
+            "role": "primary-contract"
+          },
+          {
+            "path": "docs/evidence.md",
+            "sha256": "3fa173e201d80933f550ff018daa71627ec7cdcc0003a8f2327592a2e1ad2c1a",
+            "tags": [
+              "evidence",
+              "hypothesis"
+            ],
+            "status": "complete",
+            "role": "evidence"
+          }
+        ],
+        "coverage": [
+          {
+            "section": "abstract",
+            "status": "PASS",
+            "required_tags": [
+              "thesis"
+            ],
+            "missing_tags": [],
+            "required_claims": [],
+            "claims_checked": false
+          },
+          {
+            "section": "discussion",
+            "status": "PASS",
+            "required_tags": [
+              "evidence"
+            ],
+            "missing_tags": [],
+            "required_claims": [],
+            "claims_checked": false
+          }
+        ],
+        "compile": {
+          "sha256": "6d5003d666e5a73a72d981ed12840099901a75a46f1cbdf24282a86368c65ecc",
+          "method": "copy"
+        },
+        "critic": {
+          "enabled": false
+        },
+        "release_status": "RC-fixture",
+        "release_ratification": "pending",
+        "historical_outputs": {
+          "rc_log_sha256": "3a0384870699f97cf2d83c837a06e3e1e779c7f7e1d1530eb56500bd659a89f2",
+          "release_decision_sha256": "9bd7dca0f04d1953032673fac29a48c481a807c5fefecdb2c3306fc086ed3e70"
+        }
+      }
+    },
+    "legacy_record_utf8": "{\n  \"build_id\": \"reproducibility-fixture\",\n  \"build_timestamp\": \"2026-09-22T12:00:00+00:00\",\n  \"hermeneia_version\": \"0.1.0\",\n  \"blueprint\": {\n    \"path\": \"/private/tmp/herm-design-vector-jtk3tj_2/project/docs/blueprint.md\",\n    \"id\": \"fixture-blueprint\",\n    \"status\": \"ratified\",\n    \"sha256\": \"8bb674605861ccf365bf8f2a1e5b697545481ffb143024bb62eb03b02c6d2fcd\"\n  },\n  \"manifest_path\": \"/private/tmp/herm-design-vector-jtk3tj_2/project/docs/builds/white_paper.compile.yaml\",\n  \"manifest_hash\": \"39f5fba10642cc228b3e3477a98b257e83b6ee9d54bfcaf8d8d383cc1da88644\",\n  \"source_artifacts\": [\n    {\n      \"path\": \"docs/blueprint.md\",\n      \"sha256\": \"8bb674605861ccf365bf8f2a1e5b697545481ffb143024bb62eb03b02c6d2fcd\",\n      \"tags\": [\n        \"thesis\",\n        \"blueprint\"\n      ],\n      \"status\": \"ratified\",\n      \"role\": \"primary-contract\",\n      \"resolved\": true\n    },\n    {\n      \"path\": \"docs/evidence.md\",\n      \"sha256\": \"3fa173e201d80933f550ff018daa71627ec7cdcc0003a8f2327592a2e1ad2c1a\",\n      \"tags\": [\n        \"evidence\",\n        \"hypothesis\"\n      ],\n      \"status\": \"complete\",\n      \"role\": \"evidence\",\n      \"resolved\": true\n    }\n  ],\n  \"coverage\": {\n    \"sections_evaluated\": 2,\n    \"sections_pass\": 2,\n    \"sections_warn\": 0,\n    \"sections_fail\": 0,\n    \"section_detail\": [\n      {\n        \"section\": \"abstract\",\n        \"status\": \"PASS\",\n        \"required_tags\": [\n          \"thesis\"\n        ],\n        \"missing_tags\": [],\n        \"required_claims\": [],\n        \"claims_checked\": false\n      },\n      {\n        \"section\": \"discussion\",\n        \"status\": \"PASS\",\n        \"required_tags\": [\n          \"evidence\"\n        ],\n        \"missing_tags\": [],\n        \"required_claims\": [],\n        \"claims_checked\": false\n      }\n    ]\n  },\n  \"compile\": {\n    \"source\": \"/private/tmp/herm-design-vector-jtk3tj_2/project/docs/paper.md\",\n    \"sha256\": \"6d5003d666e5a73a72d981ed12840099901a75a46f1cbdf24282a86368c65ecc\",\n    \"method\": \"copy\",\n    \"note\": \"v0.1 copies existing compiled artifact. Future versions drive Artist.\"\n  },\n  \"critic\": {\n    \"enabled\": false,\n    \"note\": \"v0.1: critic pass is manual; future versions integrate programmatic critic\"\n  },\n  \"warnings\": [],\n  \"outcome\": \"pass\",\n  \"blueprint_status\": \"ratified\",\n  \"has_draft_artifacts\": false,\n  \"release_status\": \"RC-fixture\",\n  \"release_ratification\": \"pending\",\n  \"outputs\": {\n    \"white_paper\": \"/private/tmp/herm-design-vector-jtk3tj_2/project/publication/white_paper.md\",\n    \"coverage\": \"/private/tmp/herm-design-vector-jtk3tj_2/project/publication/coverage.md\",\n    \"rc_log\": \"/private/tmp/herm-design-vector-jtk3tj_2/project/publication/rc_log.md\",\n    \"release_decision\": \"/private/tmp/herm-design-vector-jtk3tj_2/project/publication/release_decision.md\",\n    \"build_json\": \"/private/tmp/herm-design-vector-jtk3tj_2/project/publication/build.json\"\n  }\n}"
+  }
+}
