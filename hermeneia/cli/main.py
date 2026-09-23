@@ -33,6 +33,7 @@ from hermeneia.cli.bootstrap_cmd import cmd_bootstrap
 from hermeneia.cli.extract_cmd import cmd_extract
 from hermeneia.cli.explorer_cmd import cmd_explorer_discover
 from hermeneia.cli.build_cmd import cmd_build
+from hermeneia.cli.build_compare_cmd import cmd_build_compare
 from hermeneia.cli.coverage_cmd import cmd_coverage
 from hermeneia.cli.release_cmd import cmd_release
 from hermeneia.cli.preserve_cmd import cmd_preserve_verify, cmd_preserve_export
@@ -209,6 +210,12 @@ def main() -> None:
     p_build.add_argument("--verbose", action="store_true",
                          help="Print per-stage detail")
 
+    p_build_compare = sub.add_parser("build-compare", help="Read-only comparison of supported build results")
+    p_build_compare.add_argument("left", help="First build.json")
+    p_build_compare.add_argument("right", help="Second build.json")
+    p_build_compare.add_argument("--left-root", required=True, help="Explicit artifact root for first build")
+    p_build_compare.add_argument("--right-root", required=True, help="Explicit artifact root for second build")
+
     p_extract = sub.add_parser("extract", help="Extract a Blueprint Intent Hypothesis from an existing document")
     p_extract.add_argument("input", nargs="?", default=None, help="Path to input file (or omit with --stdin)")
     p_extract.add_argument("--stdin", action="store_true", help="Read document text from stdin")
@@ -375,6 +382,8 @@ def main() -> None:
             output_dir=args.output,
             verbose=args.verbose,
         )
+    elif args.command == "build-compare":
+        cmd_build_compare(args.left, args.right, left_root=args.left_root, right_root=args.right_root)
     elif args.command == "build":
         cmd_build(
             manifest_path=args.manifest,

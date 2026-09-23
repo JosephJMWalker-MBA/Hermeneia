@@ -185,9 +185,11 @@ def test_legacy_producers_have_proposed_equal_cores_and_distinct_bound_envelopes
     _check_example_binding(binding_a, first[BUILD], core_a)
     _check_example_binding(binding_b, second[BUILD], core_b)
 
-    # No candidate binding/schema was written into either production output tree.
-    assert not list(tmp_path.rglob("*.reproducibility.json"))
+    # Production now implements the accepted proposal additively. Its core must
+    # agree with this independently committed design oracle; old JSON is intact.
+    assert len(list(tmp_path.rglob("*.reproducibility.json"))) == 2
     for outputs, core in [(first, core_a), (second, core_b)]:
+        assert json.loads(outputs["publication/build.reproducibility.json"])["core"] == core
         assert "schema" not in json.loads(outputs[BUILD])
         assert core["result"]["compile"]["sha256"] == _sha(outputs["publication/white_paper.md"])
         # Keep transitive custody hashes truthful; do not make a package core.

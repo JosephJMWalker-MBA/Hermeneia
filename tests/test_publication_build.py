@@ -286,7 +286,7 @@ def test_build_preserves_provenance_and_output_contract(publication, monkeypatch
     assert record["manifest_hash"] == hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     assert record["outcome"] == "pass"
     assert record["release_ratification"] == "pending"
-    assert sorted(p.name for p in output.iterdir()) == ["build.json", "coverage.md", "rc_log.md", "release_decision.md", "white_paper.md"]
+    assert sorted(p.name for p in output.iterdir()) == ["build.json", "build.reproducibility.json", "coverage.md", "rc_log.md", "release_decision.md", "white_paper.md"]
     assert record["outputs"]["white_paper"] == str(output / "white_paper.md")
     assert {p.name: p.read_bytes() for p in root.iterdir() if p.is_file()} == before
 

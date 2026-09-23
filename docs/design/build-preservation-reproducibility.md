@@ -8,6 +8,13 @@
 
 **Scope:** Build/preservation compiler outputs; no new canonical objects.
 
+**Implementation follow-up (2026-09-23):** The steward accepted the first
+build-result profile with conditional locator equivalence and strict historical
+coverage refusal. The implemented scope and CLI contract are in
+[`build-reproducibility.spec.md`](../specs/build-reproducibility.spec.md).
+This dated proposal and its original design-packet evidence remain below;
+preservation-package and release profiles remain outside the implementation.
+
 ## Decision and authority
 
 The steward's decision for this packet is:

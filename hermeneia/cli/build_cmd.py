@@ -33,6 +33,9 @@ import yaml
 from rich.console import Console
 from rich.rule import Rule
 
+from hermeneia.build_core import InvalidRecord, UnsupportedProfile
+from hermeneia.build_reproducibility import prepare_binding, publish_binding
+
 console = Console()
 
 # ── Failure conditions ────────────────────────────────────────────────────────
@@ -223,8 +226,8 @@ def _stage_compile(
 
 def _stage_steward_report(
     manifest: dict, project_root: Path, output_dir: Path, coverage_results: list[dict]
-) -> None:
-    """Copy or generate release_decision.md, rc_log.md, coverage.md."""
+) -> dict[str, str]:
+    """Emit reports and capture each historical output's exact emitted digest."""
     builds_dir = project_root / "docs" / "builds"
 
     # coverage.md
@@ -249,6 +252,7 @@ def _stage_steward_report(
             f"# RC Log\n\n**Build:** {manifest['build_id']}\n\n"
             "_RC log not yet written. See steward for history._\n"
         )
+    rc_log_hash = _sha256(output_dir / "rc_log.md")
 
     # release_decision.md — copy existing if present, else generate stub
     rd_src = builds_dir / "white_paper_release_decision.md"
@@ -260,6 +264,10 @@ def _stage_steward_report(
             "**Status:** Pending steward review  \n\n"
             "_No release decision has been recorded for this build._\n"
         )
+    return {
+        "rc_log_sha256": rc_log_hash,
+        "release_decision_sha256": _sha256(output_dir / "release_decision.md"),
+    }
 
 
 def _emit_build_json(
@@ -273,6 +281,8 @@ def _emit_build_json(
     warnings: list[BuildWarning],
     output_dir: Path,
     hermeneia_version: str = "0.1.0",
+    historical_outputs: dict[str, str] | None = None,
+    project_root: Path | None = None,
 ) -> dict:
     n_pass = sum(1 for r in coverage_results if r["status"] == "PASS")
     n_warn = sum(1 for r in coverage_results if r["status"] == "WARN")
@@ -323,6 +333,17 @@ def _emit_build_json(
         raise BuildError(f"Cannot serialize build record: {exc}") from exc
 
     destination = output_dir / "build.json"
+    binding_bytes = None
+    if historical_outputs is not None and project_root is not None:
+        try:
+            binding_bytes = prepare_binding(build, serialized, historical_outputs,
+                                            destination, project_root)
+        except UnsupportedProfile as exc:
+            # Legacy build semantics remain available. Never synthesize a partial
+            # core; an older surviving sidecar cannot validate new record bytes.
+            console.print(f"  Reproducibility unsupported: {exc}", markup=False)
+        except (InvalidRecord, OSError, RuntimeError) as exc:
+            raise BuildError(f"Cannot establish build-result provenance: {exc}") from exc
     try:
         # A private directory on the destination filesystem keeps incomplete
         # bytes out of the published path and makes replacement atomic.
@@ -341,6 +362,10 @@ def _emit_build_json(
             os.replace(staged, destination)
             if destination.read_bytes() != serialized:
                 raise BuildError("Installed build record bytes do not match serialized bytes")
+        if binding_bytes is not None:
+            publish_binding(binding_bytes, serialized, destination, project_root)
+    except (InvalidRecord, UnsupportedProfile, RuntimeError) as exc:
+        raise BuildError(f"Cannot publish build-result binding: {exc}") from exc
     except OSError as exc:
         raise BuildError(f"Cannot publish build record {destination}: {exc}") from exc
     return build
@@ -448,7 +473,10 @@ def cmd_build(
             )
 
         # Stage 7 — Steward Report
-        _stage_steward_report(manifest, project_root, output_dir_, coverage_results)
+        try:
+            historical_outputs = _stage_steward_report(manifest, project_root, output_dir_, coverage_results)
+        except OSError as exc:
+            raise BuildError(f"Cannot emit and capture historical outputs: {exc}") from exc
         _record("steward_report", "pending")
         if not verbose:
             console.print(
@@ -466,6 +494,8 @@ def cmd_build(
             compile_record=compile_record,
             warnings=all_warnings,
             output_dir=output_dir_,
+            historical_outputs=historical_outputs,
+            project_root=project_root,
         )
 
         # ── Summary ───────────────────────────────────────────────────────────

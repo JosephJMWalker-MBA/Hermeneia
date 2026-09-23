@@ -76,6 +76,9 @@ These are synchronization/orientation documents. They may become stale as code a
   — missing compiled-artifact comparison, tampering refusal, and read-only verification evidence.
 - [`2026-09-22 — Build reproducibility boundary`](verification/2026-09-22-build-reproducibility-boundary.md)
   — controlled clock/path divergence, byte-equality controls, and the unresolved steward decision.
+- [`2026-09-23 — First build-result profile`](verification/2026-09-23-build-result-profile.md)
+  — implemented core/binding comparison, adversarial checks, actual-input witness,
+  compatibility and bounded regression evidence.
 
 These records describe bounded implementation evidence; they do not amend authority.
 
@@ -83,10 +86,10 @@ These records describe bounded implementation evidence; they do not amend author
 
 - [`Build result identity and execution provenance`](design/build-preservation-reproducibility.md)
   — records the steward's core/envelope decision, inventories existing fields,
-  and proposes digest, comparison and compatibility rules. Detailed profile is
-  proposed; production formats and historical records remain unchanged. Authored
-  local references and mixed coverage/release identity retain explicit decision
-  boundaries.
+  and preserves the original design evidence. The accepted first build-result
+  profile is implemented under [`Build-result reproducibility v1`](specs/build-reproducibility.spec.md).
+  Historical records retain their contracts; package/release equivalence remains
+  outside this profile.
 
 ### Ratification-era root artifacts
 

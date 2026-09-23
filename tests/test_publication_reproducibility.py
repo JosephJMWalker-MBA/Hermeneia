@@ -142,6 +142,7 @@ def test_clean_builds_differ_only_in_execution_time_and_its_downstream_hash(tmp_
     manifest_name = "preservation/preservation_package/manifest.json"
     assert _changed_files(first, second) == {
         build_name, "publication/coverage.md", copied_name, manifest_name,
+        "publication/build.reproducibility.json",
     }
     first_build, second_build = json.loads(first[build_name]), json.loads(second[build_name])
     assert _changed_fields(first_build, second_build) == {"/build_timestamp"}
@@ -174,7 +175,7 @@ def test_identical_execution_context_is_byte_reproducible_despite_different_stag
     _archive_outputs(root, tmp_path / "first")
     second = _run_clean(root, monkeypatch)
 
-    assert len(staging_paths) == len(set(staging_paths)) == 4
+    assert len(staging_paths) == len(set(staging_paths)) == 6
     assert first == second, "Compare all raw output bytes without stripping any provenance"
     assert all(b".distinct-stage-" not in content for content in first.values())
     assert all(not Path(path).exists() for path in staging_paths)
@@ -212,6 +213,7 @@ def test_identical_inputs_at_different_roots_record_local_paths(tmp_path, monkey
     assert _changed_files(first, second) == {
         build_name, report_name, package_name,
         "preservation/preservation_package/artifacts/build.json",
+        "publication/build.reproducibility.json",
     }
     first_build, second_build = json.loads(first[build_name]), json.loads(second[build_name])
     assert _changed_fields(first_build, second_build) == {
