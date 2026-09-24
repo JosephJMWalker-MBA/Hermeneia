@@ -46,6 +46,8 @@ import yaml
 from rich.console import Console
 from rich.rule import Rule
 
+from hermeneia.build_core import InvalidRecord
+from hermeneia.build_reproducibility import BINDING_NAME
 from hermeneia.preservation_provenance import VerificationInputs
 
 console = Console()
@@ -98,6 +100,8 @@ def _verify_reconstruction(
     release: dict,
     project_root: Path,
     inputs: VerificationInputs | None = None,
+    *,
+    build_dir: Path | None = None,
 ) -> list[dict]:
     """Verify the lineage chain. Returns list of check results."""
     results: list[dict] = []
@@ -190,14 +194,12 @@ def _verify_reconstruction(
             })
 
     # Other pipeline outputs — existence only (no build-time hash recorded).
-    for label, path_str in [
-        ("Build Record (build.json)", None),  # it's the entry point; already loaded
-        ("Coverage Record", "publication/coverage.json"),
-        ("Release Recommendation", "publication/release_recommendation.json"),
+    build_dir = build_dir if build_dir is not None else project_root / "publication"
+    for label, filename in [
+        ("Coverage Record", "coverage.json"),
+        ("Release Recommendation", "release_recommendation.json"),
     ]:
-        if path_str is None:
-            continue
-        p = project_root / path_str
+        p = build_dir / filename
         role = "reconstruction:" + label
         present = inputs.exists(p, role) if inputs else p.exists()
         results.append({
@@ -693,8 +695,18 @@ def _evaluate_verification(build_path: Path, project_root: Path,
                            inputs: VerificationInputs | None = None) -> tuple[dict, list, list, dict]:
     """Read-only evaluation shared by report generation and association checks."""
     inputs = inputs if inputs is not None else VerificationInputs(project_root)
-    build, coverage, release, manifest = _load_inputs(build_path, project_root, inputs)
-    reconstruction = _verify_reconstruction(build, coverage, release, project_root, inputs)
+    build_path = build_path if build_path.is_absolute() else inputs.root / build_path
+    build_dir = build_path.parent
+    try:
+        namespace = build_dir.resolve()
+        for path in (build_path, build_dir / BINDING_NAME, build_dir / "coverage.json",
+                     build_dir / "release_recommendation.json"):
+            inputs.require_sibling(path, namespace)
+        build, coverage, release, manifest = _load_inputs(build_path, project_root, inputs)
+        reconstruction = _verify_reconstruction(
+            build, coverage, release, project_root, inputs, build_dir=build_dir)
+    except (InvalidRecord, OSError, RuntimeError, ValueError) as exc:
+        raise PreservationError(str(exc)) from exc
     continuation = _verify_continuation(build, manifest, release, project_root, inputs)
     return build, reconstruction, continuation, inputs.receipt(build_path)
 

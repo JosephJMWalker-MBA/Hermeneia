@@ -147,7 +147,7 @@ def test_binding_changes_after_capture_are_never_adopted(tmp_path, monkeypatch, 
     assert "build_core" not in report["provenance"]
 
 
-def test_custom_build_records_both_interpreted_and_conventional_pipeline_inputs(tmp_path, monkeypatch):
+def test_custom_build_records_only_selected_pipeline_inputs(tmp_path, monkeypatch):
     from hermeneia.cli import build_cmd
     root = tmp_path / "project"
     _ready(root, monkeypatch)
@@ -164,8 +164,8 @@ def test_custom_build_records_both_interpreted_and_conventional_pipeline_inputs(
     for name, role in [("coverage.json", "coverage-interpretation"),
                        ("release_recommendation.json", "release-interpretation")]:
         assert role in receipts[str(custom / name)]["roles"]
-        assert receipts[str(custom / name)]["sha256"] != receipts[str(root / "publication" / name)]["sha256"]
-    assert "reconstruction:Coverage Record" in receipts[str(root / "publication/coverage.json")]["roles"]
+        assert str(root / "publication" / name) not in receipts
+    assert "reconstruction:Coverage Record" in receipts[str(custom / "coverage.json")]["roles"]
 
 
 def test_association_rechecks_inputs_after_comparing_findings(tmp_path, monkeypatch):

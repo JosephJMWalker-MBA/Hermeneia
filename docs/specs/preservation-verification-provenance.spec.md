@@ -1,6 +1,7 @@
 # Preservation verification input provenance
 
-**Status:** Implemented additive integrity contract, 2026-09-23.
+**Status:** Implemented additive integrity contract; VS001-F02 sibling-resolution
+completion and historical association compatibility authorized 2026-09-23.
 
 **Authority:** Steward authorization to bind verification reports to the validated
 [build-result v1 core](build-reproducibility.spec.md) they actually evaluated.
@@ -10,10 +11,11 @@ artifact authority is defined here.
 
 ## Existing findings and new binding integrity
 
-`herm preserve verify` keeps its reconstruction and continuation checks, summaries,
-overall outcome, and exit behavior. Reports add a `provenance` object with schema
-`hermeneia.preservation-verification-inputs/v1`. Binding integrity is independent
-of the preservation outcome: a correctly bound report can contain `FAIL`, and a
+`herm preserve verify` retains its check definitions, summary algorithm and exit
+status rules. Corrected sibling resolution can change which inputs and findings
+those rules evaluate. Reports carry a `provenance` object with schema
+`hermeneia.preservation-verification-inputs/v2`. Version 2 completes VS001-F02
+sibling resolution. Binding integrity is independent of the preservation outcome: a correctly bound report can contain `FAIL`, and a
 legacy `PASS` report can lack sufficient evidence to claim a validated core.
 
 | Integrity | Core claim | Meaning |
@@ -53,7 +55,7 @@ permitted. Its bytes are not historical build-time evidence.
 
 ```text
 inputs_sha256 = lower_hex(SHA256(
-    b"Hermeneia preservation verification inputs v1\n"
+    b"Hermeneia preservation verification inputs v2\n"
     + canonical_json(provenance.inputs)
 ))
 ```
@@ -69,10 +71,22 @@ execution observation, **not** report identity or preservation-package identity.
 The machine report carries both in one complete JSON record. Markdown adds the
 core claim/refusal and input digest while retaining every existing finding.
 
-With a custom `--build`, existing preservation behavior interprets coverage/release
-beside that build but checks the conventional `publication/` files separately.
-This packet records **both** locations and roles. It does not silently change that
-resolution contract or claim that these distinct files are interchangeable.
+With `--build`, the selected build's parent establishes one resolved namespace
+for the build, its adjacent build binding, `coverage.json` and
+`release_recommendation.json`. Coverage/release interpretation and reconstruction
+presence/hash checks use the same sibling lookup paths and byte captures. There
+is no conventional `publication/` fallback. Missing siblings retain FAIL presence
+findings even when other copies exist; malformed sibling JSON still aborts.
+
+The namespace is pinned before reading and checked when capturing and rechecking
+these inputs. Leaf redirection into another namespace is refused, including when
+the other bytes are identical. Directory aliases are permitted only when these
+lookups resolve consistently to the selected parent. Later drift invalidates the
+core claim. Declared manifest, source, compile source and historical/output paths
+retain their existing project-root/recorded semantics: they are not relocated
+under the selected build. The original 13-path witness now has 11 distinct inputs,
+as the two coverage and two release observations share their respective captures.
+Sibling selection neither authenticates a signature nor defines release identity.
 
 ## Read-only report association check
 
@@ -80,7 +94,8 @@ The Python API `hermeneia.preservation_provenance.verify_report_binding` accepts
 machine-report path, build-record path and explicit `project_root`. It reads the
 report once, evaluates the current inputs using shared captures, and checks:
 
-1. Supported report receipt and verifier versions; an actual validated core claim.
+1. Supported report receipt and verifier versions; unambiguous sibling association
+   evidence and an actual validated core claim.
 2. Successful current validation of the complete build core and exact record.
 3. Exact agreement of the core claim and all input receipts/digests/roles/locations.
 4. Agreement of original checks, summaries and outcome with those captured inputs,
@@ -97,8 +112,39 @@ after the underlying problem is fixed; its association to the changed inputs is
 refused. Historical reports without receipts remain readable under their original
 contract but have insufficient evidence for this association check.
 
+### Historical association compatibility
+
+Version 1 receipts are immutable observations of the old verifier. Before current
+input evaluation, the association API inspects only their recorded lookup paths,
+resolved paths and roles, without resolving historical locators on today's disk.
+Exactly one selected-build observation and one observation per coverage/release
+interpretation/reconstruction role must establish the same sibling paths in both
+lookup and resolved namespaces. Missing, null, duplicate or mixed association
+evidence returns:
+
+```json
+{"integrity": "unsupported", "compatibility": "legacy-unsupported-association", "reason": "..."}
+```
+
+This result carries neither a core claim nor a reevaluated finding outcome. It
+never promotes an old PASS, FAIL or WARN into a corrected-contract success. Current
+files with matching names, locations or bytes cannot fill that historical gap.
+Version 2 namespace inconsistencies are invalid, not eligible for legacy fallback.
+
+A fully unmixed v1 receipt (including the conventional default) remains eligible
+for exact association. The current captured receipt is encoded **in memory** under
+v1's original schema and `Hermeneia preservation verification inputs v1\n` domain,
+then compared to the entire recorded receipt. All original findings and summaries
+must still match. No old bytes, paths, digests or findings are rewritten. Reports
+without supported receipts remain unsupported; no historical backfill is allowed.
+The engine label `0.1.0` and build-core profile remain unchanged; receipt v2 marks
+the corrected input-resolution contract.
+
 No new CLI command or preservation exit status is introduced. Existing CLI users
 must inspect the additive provenance field when they need a validated core claim.
+Custom builds can now correctly exit 1 for missing siblings that previously passed
+using unrelated conventional files. A valid association of a negative report still
+returns its negative `findings_outcome`; provenance is not preservation approval.
 
 ## Emission and limits
 
@@ -118,7 +164,9 @@ digests is outside unsigned integrity. The existing edition advisory printed by
 the CLI is not a report finding or input to this receipt. Export/package and release
 behavior are unchanged; old reports and records are not migrated.
 
-The next bounded investigation is the existing custom-`--build` split between
-interpreted and conventionally checked coverage/release inputs. Establish its
-intended resolution contract before changing that behavior; no custody or
-preservation-package identity decision is implied.
+The [F02 completion evidence](../verification/2026-09-23-F02-sibling-resolution.md)
+records the steward decision, immutable old witness and current validation.
+Report generation retains its explicit output/replacement behavior; use a fresh
+`--output` directory when retaining historical reports. Association never writes.
+No retention, report custody or migration policy is introduced. Export, edition
+advisories, producer defaults and package/release equivalence remain outside F02.

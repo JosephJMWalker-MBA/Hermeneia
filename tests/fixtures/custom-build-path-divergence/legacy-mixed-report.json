@@ -1,0 +1,271 @@
+{
+  "preservation_engine_version": "0.1.0",
+  "generated_at": "2026-09-23T12:00:00+00:00",
+  "build_id": "reproducibility-fixture",
+  "reconstruction": {
+    "summary": {
+      "pass": 7,
+      "warn": 2,
+      "fail": 0,
+      "advisory": 1,
+      "outcome": "warn"
+    },
+    "checks": [
+      {
+        "name": "Blueprint",
+        "status": "PASS",
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/docs/blueprint.md",
+        "sha256": "8bb674605861ccf365bf8f2a1e5b697545481ffb143024bb62eb03b02c6d2fcd"
+      },
+      {
+        "name": "Compile Manifest",
+        "status": "PASS",
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/docs/builds/white_paper.compile.yaml",
+        "sha256": "39f5fba10642cc228b3e3477a98b257e83b6ee9d54bfcaf8d8d383cc1da88644"
+      },
+      {
+        "name": "Source: docs/blueprint.md",
+        "status": "PASS",
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/docs/blueprint.md",
+        "sha256": "8bb674605861ccf365bf8f2a1e5b697545481ffb143024bb62eb03b02c6d2fcd"
+      },
+      {
+        "name": "Source: docs/evidence.md",
+        "status": "PASS",
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/docs/evidence.md",
+        "sha256": "3fa173e201d80933f550ff018daa71627ec7cdcc0003a8f2327592a2e1ad2c1a"
+      },
+      {
+        "name": "Compiled Artifact",
+        "status": "PASS",
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/white_paper.md",
+        "sha256": "6d5003d666e5a73a72d981ed12840099901a75a46f1cbdf24282a86368c65ecc"
+      },
+      {
+        "name": "Coverage Record",
+        "status": "PASS",
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/publication/coverage.json",
+        "sha256": "4f4d7c074481035f23e03d001615c59c8a1f68f2143467c9a2fb9424fa49b397"
+      },
+      {
+        "name": "Release Recommendation",
+        "status": "PASS",
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/publication/release_recommendation.json",
+        "sha256": "866b34e476e419c6f3385143d292755b32dfc54a32ca72dff0b88272de72a9bc"
+      },
+      {
+        "name": "Coverage Build ID",
+        "status": "WARN",
+        "note": "coverage.json was generated for build 'adjacent-other-build' but build.json identifies this build as 'reproducibility-fixture'. Re-run herm coverage to generate coverage for the current build."
+      },
+      {
+        "name": "Coverage Corpus Integrity",
+        "status": "WARN",
+        "note": "coverage.json attests to artifact(s) not declared in build.json: docs/adjacent-only.md. Coverage may have been generated from a different corpus than this build."
+      },
+      {
+        "name": "Steward Signature",
+        "status": "ADVISORY",
+        "note": "Release recommendation has not been signed by a human Steward. Reconstruction chain is complete but canonical publication requires signature.",
+        "value": null
+      }
+    ]
+  },
+  "continuation": {
+    "summary": {
+      "pass": 6,
+      "warn": 1,
+      "fail": 0,
+      "advisory": 1,
+      "outcome": "warn"
+    },
+    "checks": [
+      {
+        "name": "Blueprint",
+        "status": "PASS"
+      },
+      {
+        "name": "Intent Hypothesis",
+        "status": "PASS"
+      },
+      {
+        "name": "Evidence Trail",
+        "status": "PASS"
+      },
+      {
+        "name": "Section Requirements",
+        "status": "PASS"
+      },
+      {
+        "name": "Research Hypotheses",
+        "status": "PASS"
+      },
+      {
+        "name": "Blueprint Ratification",
+        "status": "PASS"
+      },
+      {
+        "name": "Release Recommendation",
+        "status": "WARN",
+        "outcome": "WITHHOLD",
+        "note": "Release recommendation outcome is 'WITHHOLD', not RECOMMEND_RELEASE. A future steward should review before continuing."
+      },
+      {
+        "name": "Steward Notes",
+        "status": "ADVISORY",
+        "note": "No steward notes recorded in release_recommendation.json. A future steward will not have context on why this recommendation was made."
+      }
+    ]
+  },
+  "overall_outcome": "warn",
+  "note": "Restoration is constitutionally deferred in v0.1. This report verifies lineage and continuation prerequisites only.",
+  "provenance": {
+    "schema": "hermeneia.preservation-verification-inputs/v1",
+    "integrity": "valid",
+    "inputs": [
+      {
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/build.json",
+        "resolved_path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/build.json",
+        "roles": [
+          "build-core-validation",
+          "build-record"
+        ],
+        "state": "present",
+        "sha256": "4de3cfb91d6f427eade0bfe8cd501e7b55afaf6668e7afad252e335b16e839ef",
+        "size_bytes": 2866
+      },
+      {
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/build.reproducibility.json",
+        "resolved_path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/build.reproducibility.json",
+        "roles": [
+          "build-core-validation"
+        ],
+        "state": "present",
+        "sha256": "48e464279585232f73371ba9110f71ec4eef467df5cb7ed5c3560f53883891fc",
+        "size_bytes": 1693
+      },
+      {
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/coverage.json",
+        "resolved_path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/coverage.json",
+        "roles": [
+          "coverage-interpretation"
+        ],
+        "state": "present",
+        "sha256": "97b23c9b0cdcb9b0a4d4120ef8029feac5f0ab551636f88a7305a1e0f80d5959",
+        "size_bytes": 103
+      },
+      {
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/rc_log.md",
+        "resolved_path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/rc_log.md",
+        "roles": [
+          "build-core-validation"
+        ],
+        "state": "present",
+        "sha256": "3a0384870699f97cf2d83c837a06e3e1e779c7f7e1d1530eb56500bd659a89f2",
+        "size_bytes": 54
+      },
+      {
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/release_decision.md",
+        "resolved_path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/release_decision.md",
+        "roles": [
+          "build-core-validation"
+        ],
+        "state": "present",
+        "sha256": "9bd7dca0f04d1953032673fac29a48c481a807c5fefecdb2c3306fc086ed3e70",
+        "size_bytes": 42
+      },
+      {
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/release_recommendation.json",
+        "resolved_path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/release_recommendation.json",
+        "roles": [
+          "release-interpretation"
+        ],
+        "state": "present",
+        "sha256": "862680af17d7200fa3e558bacdb09d652905f75da76e4a1eb6751cc2555bb8bb",
+        "size_bytes": 103
+      },
+      {
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/white_paper.md",
+        "resolved_path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/custom/white_paper.md",
+        "roles": [
+          "build-core-validation",
+          "reconstruction:Compiled Artifact"
+        ],
+        "state": "present",
+        "sha256": "6d5003d666e5a73a72d981ed12840099901a75a46f1cbdf24282a86368c65ecc",
+        "size_bytes": 27
+      },
+      {
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/docs/blueprint.md",
+        "resolved_path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/docs/blueprint.md",
+        "roles": [
+          "build-core-validation",
+          "continuation:Blueprint",
+          "reconstruction:Blueprint",
+          "reconstruction:Source: docs/blueprint.md"
+        ],
+        "state": "present",
+        "sha256": "8bb674605861ccf365bf8f2a1e5b697545481ffb143024bb62eb03b02c6d2fcd",
+        "size_bytes": 59
+      },
+      {
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/docs/builds/white_paper.compile.yaml",
+        "resolved_path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/docs/builds/white_paper.compile.yaml",
+        "roles": [
+          "build-core-validation",
+          "manifest-interpretation",
+          "reconstruction:Compile Manifest"
+        ],
+        "state": "present",
+        "sha256": "39f5fba10642cc228b3e3477a98b257e83b6ee9d54bfcaf8d8d383cc1da88644",
+        "size_bytes": 534
+      },
+      {
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/docs/evidence.md",
+        "resolved_path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/docs/evidence.md",
+        "roles": [
+          "build-core-validation",
+          "reconstruction:Source: docs/evidence.md"
+        ],
+        "state": "present",
+        "sha256": "3fa173e201d80933f550ff018daa71627ec7cdcc0003a8f2327592a2e1ad2c1a",
+        "size_bytes": 68
+      },
+      {
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/docs/paper.md",
+        "resolved_path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/docs/paper.md",
+        "roles": [
+          "build-core-validation"
+        ],
+        "state": "present",
+        "sha256": "6d5003d666e5a73a72d981ed12840099901a75a46f1cbdf24282a86368c65ecc",
+        "size_bytes": 27
+      },
+      {
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/publication/coverage.json",
+        "resolved_path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/publication/coverage.json",
+        "roles": [
+          "reconstruction:Coverage Record"
+        ],
+        "state": "present",
+        "sha256": "4f4d7c074481035f23e03d001615c59c8a1f68f2143467c9a2fb9424fa49b397",
+        "size_bytes": 71
+      },
+      {
+        "path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/publication/release_recommendation.json",
+        "resolved_path": "/private/tmp/herm-f02-baseline-aqubn50j/witness-project/publication/release_recommendation.json",
+        "roles": [
+          "reconstruction:Release Recommendation"
+        ],
+        "state": "present",
+        "sha256": "866b34e476e419c6f3385143d292755b32dfc54a32ca72dff0b88272de72a9bc",
+        "size_bytes": 188
+      }
+    ],
+    "inputs_sha256": "71f86124921912cb403b2ee60a436c9400db4792fd2aa8a8c0e3d3655ad5eea5",
+    "build_core": {
+      "profile": "hermeneia.build-result/v1",
+      "sha256": "4461dd5d721e892b1e2a3a1a6ae29de310d0a36348270a15aa85f14991a39cad"
+    }
+  }
+}
