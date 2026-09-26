@@ -9389,6 +9389,30 @@ Return ONLY valid JSON, no markdown, no explanation:
             "empty": len(active_hl) == 0 and total_pages_read == 0,
         })
 
+    @app.route("/api/study-lineage")
+    @app.route("/api/study-lineage/export")
+    def api_study_lineage():
+        """Disposable study history from one read-only workspace snapshot."""
+        from ..study_lineage import project_study_lineage, serialize_projection
+
+        if not db_path.exists():
+            return jsonify({"error": "database not found; no study history initialized"}), 404
+        conn = _conn()
+        try:
+            conn.execute("BEGIN")
+            payload = serialize_projection(project_study_lineage(conn))
+        except sqlite3.Error:
+            # Do not return a partial chronology as if the read had completed.
+            return jsonify({"error": "Study history could not be read from this workspace"}), 409
+        finally:
+            conn.close()
+        response = make_response(payload)
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        response.headers["Cache-Control"] = "no-store"
+        if request.path.endswith("/export"):
+            response.headers["Content-Disposition"] = 'attachment; filename="study-lineage-v1.json"'
+        return response
+
     @app.route("/api/evidence-board")
     def api_evidence_board():
         """Read-only study inventory projection for the Reader workstation."""

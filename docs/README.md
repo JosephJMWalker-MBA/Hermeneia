@@ -64,6 +64,9 @@ These are synchronization/orientation documents. They may become stale as code a
 
 ### Implementation verification records
 
+- [`2026-09-25 — Study Lineage v1`](verification/2026-09-25-study-lineage-v1.md)
+  — storage inventory, typed identities and provenance, read-only projection,
+  synthetic browser witness, and independently checked Reader baseline.
 - [`2026-09-22 — Preservation build digests`](verification/2026-09-22-preservation-build-digests.md)
   — demonstrated missing-digest bypass, verifier correction, tests, and remaining limits.
 - [`2026-09-22 — Compile emitted bytes`](verification/2026-09-22-compile-emitted-bytes.md)
@@ -87,6 +90,9 @@ These records describe bounded implementation evidence; they do not amend author
 
 ### Bounded architecture proposals
 
+- [`Study Lineage v1 storage inventory and projection boundary`](design/study-lineage-v1.md)
+  — reconstructable, partial, and unsupported #111 history categories; a derived
+  Evidence Board view over existing records, with no new authoritative store.
 - [`Build result identity and execution provenance`](design/build-preservation-reproducibility.md)
   — records the steward's core/envelope decision, inventories existing fields,
   and preserves the original design evidence. The accepted first build-result

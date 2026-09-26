@@ -49,6 +49,7 @@ def _evidence_board_js() -> str:
     source = _index()
     signatures = [
         "function _crResetEvidenceBoardForReaderContextChange(",
+        "function _studyLineageReset(",
         "async function _evidenceBoardLoad(",
         "function _evidenceBoardCountsHtml(",
         "function _evidenceBoardNormalizeBucketValue(",
@@ -140,6 +141,13 @@ def _base_script(extra: str) -> str:
     let _evidenceBoardActiveBucket = null;
     let _evidenceBoardLoadSeq = 0;
     let _evidenceBoardEpoch = 0;
+    let _evidenceBoardView = 'inventory';
+    let _studyLineageData = null;
+    let _studyLineageLoadSeq = 0;
+    let _studyLineageContextSeq = 0;
+    let _studyLineageType = '';
+    let _studyLineageAuthorship = '';
+    let _studyLineagePage = 0;
     function _crReaderBlockContext() {{ return {{ source_locators: [], extraction_ids: [] }}; }}
     function _crUniqueStringList(values) {{ return Array.from(new Set((values || []).filter(Boolean))); }}
     function _crGetReaderSelection() {{

@@ -1457,6 +1457,13 @@ body.reader-active .cr-tool-drawer { max-width: none; }
   font-size: 11px;
   line-height: 1.45;
 }
+.study-lineage-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin:12px 0; }
+.study-lineage-controls label { display:flex; flex-direction:column; gap:4px; font-size:12px; }
+.study-lineage-controls select { max-width:240px; color:var(--fg); background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:5px; }
+.study-lineage-record summary { cursor:pointer; }
+.study-lineage-record summary > .evidence-board-meta { display:block; }
+.study-lineage-record pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px; max-height:360px; overflow:auto; }
+.study-lineage-heading { font-size:13px; margin:16px 0 8px; }
 @media (max-width: 760px) {
   .evidence-board-grid { grid-template-columns: 1fr; }
 }
@@ -3233,7 +3240,11 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
         <span class="cr-fln-bar-label">▥ Evidence Board</span>
         <span class="cr-fln-count" id="evidence-board-meta"></span>
         <span style="flex:1"></span>
-        <button class="cr-bottom-workstation-tab" type="button" onclick="_evidenceBoardLoad()">Refresh</button>
+        <button class="cr-bottom-workstation-tab" type="button" onclick="_evidenceBoardRefresh()">Refresh</button>
+      </div>
+      <div class="cr-workstation-subtabs" aria-label="Evidence Board views">
+        <button class="cr-bottom-workstation-tab active" id="evidence-board-view-inventory" type="button" aria-pressed="true" onclick="_evidenceBoardSetView('inventory')">Inventory</button>
+        <button class="cr-bottom-workstation-tab" id="evidence-board-view-lineage" type="button" aria-pressed="false" onclick="_evidenceBoardSetView('lineage')">Lineage</button>
       </div>
       <div class="evidence-board-body" id="evidence-board-body">
         <div class="attn-hint">Open the board to inspect accumulated study material.</div>
@@ -9984,7 +9995,7 @@ async function _crOpenBottomWorkstation(mode) {
     cmpMarkOnboardingStep('timeline', { keepPaused: true });
     await _attnLoad();
   } else if (mode === 'evidence') {
-    await _evidenceBoardLoad();
+    await _evidenceBoardRefresh();
   } else if (mode === 'fieldnotes') {
     document.getElementById('cr-fln-tray')?.classList.remove('cr-fln-glow');
     _flnLoadEntries();
@@ -13173,9 +13184,11 @@ let _evidenceBoardAppliedScopeDocId = '';
 let _evidenceBoardActiveBucket = null;
 let _evidenceBoardLoadSeq = 0;
 let _evidenceBoardEpoch = 0;
+let _evidenceBoardView = 'inventory';
 
 function _crResetEvidenceBoardForReaderContextChange() {
   _evidenceBoardEpoch += 1;
+  _studyLineageReset();
   _evidenceBoardSelectedHighlightIds = new Set();
   _evidenceBoardSelectionDocId = '';
   _evidenceBoardAppliedScopeHighlightIds = [];
@@ -13200,13 +13213,14 @@ async function _evidenceBoardLoad() {
   if (_crPage) params.set('current_page', String(_crPage));
   try {
     const data = await get(`/api/evidence-board${params.toString() ? '?' + params.toString() : ''}`);
-    if (seq !== _evidenceBoardLoadSeq || epoch !== _evidenceBoardEpoch) return;
+    if (seq !== _evidenceBoardLoadSeq || epoch !== _evidenceBoardEpoch || _evidenceBoardView !== 'inventory') return;
     _evidenceBoardData = data;
     _evidenceBoardSelectedHighlightIds = new Set();
     _evidenceBoardSelectionDocId = '';
     _evidenceBoardActiveBucket = null;
-    _evidenceBoardRender();
+    if (_evidenceBoardView === 'inventory') _evidenceBoardRender();
   } catch (e) {
+    if (_evidenceBoardView !== 'inventory') return;
     if (seq !== _evidenceBoardLoadSeq || epoch !== _evidenceBoardEpoch) return;
     if (body) body.innerHTML = `<div class="attn-hint" style="color:var(--red)">${x(e.message)}</div>`;
   }
@@ -13416,6 +13430,7 @@ function _evidenceBoardObservationRow(row) {
 }
 
 function _evidenceBoardRender() {
+  if (_evidenceBoardView !== 'inventory') return;
   const body = document.getElementById('evidence-board-body');
   const meta = document.getElementById('evidence-board-meta');
   if (!body) return;
@@ -13464,6 +13479,206 @@ function _evidenceBoardRender() {
         <div class="evidence-board-list" style="margin-top:8px">${(data.observations || []).map(_evidenceBoardObservationRow).join('') || '<div class="attn-hint">No canonical observations yet.</div>'}</div>
       </div>
     </div>`;
+}
+
+// Study Lineage is a read-only view over durable records, separate from the
+// Inventory's candidate selection and applied Perspective Scope.
+let _studyLineageData = null;
+let _studyLineageLoadSeq = 0;
+let _studyLineageContextSeq = 0;
+let _studyLineageOrder = 'oldest';
+let _studyLineageType = '';
+let _studyLineageAuthorship = '';
+let _studyLineagePage = 0;
+
+function _studyLineageReset() {
+  _studyLineageData = null;
+  _studyLineageLoadSeq += 1;
+  _studyLineageContextSeq += 1;
+  _studyLineageType = '';
+  _studyLineageAuthorship = '';
+  _studyLineagePage = 0;
+}
+
+async function _evidenceBoardSetView(view) {
+  if (!['inventory', 'lineage'].includes(view)) return;
+  _evidenceBoardView = view;
+  _studyLineageContextSeq += 1;
+  for (const name of ['inventory', 'lineage']) {
+    const tab = document.getElementById('evidence-board-view-' + name);
+    if (tab) {
+      tab.classList.toggle('active', name === view);
+      tab.setAttribute('aria-pressed', name === view ? 'true' : 'false');
+    }
+  }
+  if (view === 'lineage') {
+    if (_studyLineageData) _studyLineageRender();
+    else await _studyLineageLoad();
+  } else if (_evidenceBoardData) {
+    _evidenceBoardRender();
+  } else {
+    await _evidenceBoardLoad();
+  }
+}
+
+async function _evidenceBoardRefresh() {
+  if (_evidenceBoardView === 'lineage') await _studyLineageLoad();
+  else await _evidenceBoardLoad();
+}
+
+async function _studyLineageLoad() {
+  const seq = ++_studyLineageLoadSeq;
+  _studyLineageContextSeq += 1;
+  const epoch = _evidenceBoardEpoch;
+  const body = document.getElementById('evidence-board-body');
+  if (body) body.innerHTML = '<div class="attn-hint">Loading recorded study history…</div>';
+  try {
+    const data = await get('/api/study-lineage');
+    if (seq !== _studyLineageLoadSeq || epoch !== _evidenceBoardEpoch) return;
+    if (data.schema !== 'hermeneia.study-lineage/v1' || !Array.isArray(data.items)) {
+      throw new Error('Unsupported study lineage projection.');
+    }
+    _studyLineageData = data;
+    _studyLineagePage = 0;
+    if (_evidenceBoardView === 'lineage') _studyLineageRender();
+  } catch (e) {
+    if (seq !== _studyLineageLoadSeq || epoch !== _evidenceBoardEpoch || _evidenceBoardView !== 'lineage') return;
+    _studyLineageData = null;
+    if (body) body.innerHTML = `<div class="attn-hint" style="color:var(--red)">${x(e.message)}</div>`;
+  }
+}
+
+function _studyLineageKey(item) {
+  const key = item.record?.key || {};
+  return JSON.stringify([item.record?.table, Object.keys(key).sort().map(k => [k, key[k]]), item.event]);
+}
+
+function _studyLineageContextKey(context) {
+  return JSON.stringify(Object.keys(context).sort().map(k => [k, context[k]]));
+}
+
+function _studyLineageAuthorshipLabel(value) {
+  return ({human: 'Human-authored', model: 'Model-authored', accepted_model: 'Accepted model contribution',
+    derived: 'Derived material', unknown: 'Authorship unknown'})[value] || 'Authorship unknown';
+}
+
+function _studyLineageVisibleItems() {
+  const items = (_studyLineageData?.items || []).filter(item =>
+    (!_studyLineageType || item.record_type === _studyLineageType) &&
+    (!_studyLineageAuthorship || item.authorship === _studyLineageAuthorship));
+  const ordered = items.filter(item => item.timestamp?.status === 'ordered' && item.timestamp.sort_key);
+  const uncertain = items.filter(item => item.timestamp?.status !== 'ordered' || !item.timestamp.sort_key);
+  const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  const byIdentity = (a, b) => compare(_studyLineageKey(a), _studyLineageKey(b));
+  ordered.sort((a, b) => {
+    const time = compare(a.timestamp.sort_key, b.timestamp.sort_key);
+    return (_studyLineageOrder === 'newest' ? -time : time) || byIdentity(a, b);
+  });
+  uncertain.sort(byIdentity);
+  return { ordered, uncertain };
+}
+
+function _studyLineageFilter(name, value) {
+  if (name === 'order' && ['oldest', 'newest'].includes(value)) _studyLineageOrder = value;
+  if (name === 'type') _studyLineageType = value;
+  if (name === 'authorship') _studyLineageAuthorship = value;
+  _studyLineagePage = 0;
+  _studyLineageRender();
+}
+
+function _studyLineageChangePage(delta) {
+  _studyLineagePage = Math.max(0, _studyLineagePage + delta);
+  _studyLineageRender();
+}
+
+function _studyLineageItemHTML(item, tied) {
+  const key = _studyLineageKey(item);
+  const timestamp = item.timestamp || {};
+  const event = item.event === 'current_snapshot' ? 'Current snapshot — earlier values are not recorded here'
+    : item.event === 'decision' ? 'Recorded decision' : 'Recorded item';
+  const time = timestamp.value === null || timestamp.value === undefined || timestamp.value === ''
+    ? 'Time unknown' : `${timestamp.field || 'Recorded time'}: ${timestamp.value}`;
+  const contexts = (item.contexts || []).filter(context => ['reader', 'lineage'].includes(context.kind));
+  const preview = String(item.content ?? '');
+  return `<details class="evidence-board-row study-lineage-record" data-study-lineage-key="${x(key)}">
+    <summary>
+      <span class="evidence-board-row-title">${x(item.title || item.record_type)} · ${x(_studyLineageAuthorshipLabel(item.authorship))}</span>
+      <span class="evidence-board-meta">${x(time)}${timestamp.status !== 'ordered' ? ' · Chronological position unknown' : ''}${tied ? ' · Same recorded time; sequence unknown' : ''}</span>
+      <span class="evidence-board-meta">${x(item.record_type)} · ${x(event)}</span>
+      <span class="evidence-board-row-text">${x(preview.slice(0, 220))}${preview.length > 220 ? '…' : ''}</span>
+    </summary>
+    <div class="evidence-board-row-text">${x(item.content ?? '')}</div>
+    <div class="evidence-board-meta"><strong>Durable identity</strong> ${x(item.record?.table)} · ${x(JSON.stringify(item.record?.key || {}))}</div>
+    <div class="evidence-board-meta">Authorship is shown only as supported by the stored provenance. A current snapshot does not establish when its present text was written.</div>
+    <div class="study-lineage-controls">${contexts.map(context => `<button class="cr-bottom-workstation-tab" type="button" onclick="_studyLineageOpenContext(${x(JSON.stringify(key))}, ${x(JSON.stringify(_studyLineageContextKey(context)))})"${context.kind === 'reader' ? ' title="Open the recorded source page; Reader navigation updates reading position"' : ''}>${context.kind === 'reader' ? 'Open source page in Reader' : 'Open object lineage'}</button>`).join('') || '<span class="evidence-board-meta">No stable context link recorded.</span>'}</div>
+    <details><summary>Recorded provenance</summary><pre>${x(JSON.stringify(item.provenance || {}, null, 2))}</pre></details>
+    <details><summary>Original stored record</summary><pre>${x(JSON.stringify(item.record_data || {}, null, 2))}</pre></details>
+  </details>`;
+}
+
+function _studyLineageRender() {
+  if (_evidenceBoardView !== 'lineage') return;
+  _studyLineageContextSeq += 1;
+  const body = document.getElementById('evidence-board-body');
+  const meta = document.getElementById('evidence-board-meta');
+  if (!body) return;
+  const data = _studyLineageData || { items: [] };
+  const { ordered, uncertain } = _studyLineageVisibleItems();
+  const all = [...ordered, ...uncertain];
+  const pageCount = Math.max(1, Math.ceil(all.length / 100));
+  _studyLineagePage = Math.min(_studyLineagePage, pageCount - 1);
+  const visible = all.slice(_studyLineagePage * 100, (_studyLineagePage + 1) * 100);
+  const timeCounts = new Map();
+  for (const item of data.items) {
+    if (item.timestamp?.status === 'ordered') timeCounts.set(item.timestamp.sort_key, (timeCounts.get(item.timestamp.sort_key) || 0) + 1);
+  }
+  const types = [...new Set(data.items.map(item => item.record_type))].sort();
+  const option = (value, label, selected) => `<option value="${x(value)}"${value === selected ? ' selected' : ''}>${x(label)}</option>`;
+  const group = (label, items) => items.length ? `<h3 class="study-lineage-heading">${x(label)}</h3><div class="evidence-board-list">${items.map(item => _studyLineageItemHTML(item, timeCounts.get(item.timestamp?.sort_key) > 1)).join('')}</div>` : '';
+  if (meta) meta.textContent = `${all.length} matching recorded items · ${data.workspace?.name || 'Current workspace'}`;
+  body.innerHTML = `<div class="evidence-board-card">
+    <div class="cr-fln-hint">Study Lineage shows existing durable records. Gaps are not evidence that an action never occurred. Unknown times have no inferred chronological position; equal times have no inferred sequence.</div>
+    <div class="study-lineage-controls">
+      <label>Chronology<select aria-label="Lineage chronology" onchange="_studyLineageFilter('order', this.value)">${option('oldest', 'Oldest first', _studyLineageOrder)}${option('newest', 'Newest first', _studyLineageOrder)}</select></label>
+      <label>Record type<select aria-label="Lineage record type" onchange="_studyLineageFilter('type', this.value)">${option('', 'All record types', _studyLineageType)}${types.map(type => option(type, type.replaceAll('_', ' '), _studyLineageType)).join('')}</select></label>
+      <label>Authorship / origin<select aria-label="Lineage authorship" onchange="_studyLineageFilter('authorship', this.value)">${option('', 'All recorded origins', _studyLineageAuthorship)}${['human', 'model', 'accepted_model', 'derived', 'unknown'].map(value => option(value, _studyLineageAuthorshipLabel(value), _studyLineageAuthorship)).join('')}</select></label>
+      <a class="cr-bottom-workstation-tab" href="/api/study-lineage/export" download="study-lineage.json">Export full lineage JSON</a>
+    </div>
+    <details><summary>Coverage and limitations</summary><ul>${(data.coverage?.limitations || []).map(text => `<li>${x(text)}</li>`).join('') || '<li>No additional coverage detail recorded.</li>'}</ul><pre class="evidence-board-meta">${x(JSON.stringify(data.coverage || {}, null, 2))}</pre></details>
+    ${group('Recorded chronological positions', visible.filter(item => item.timestamp?.status === 'ordered' && item.timestamp.sort_key))}
+    ${group('Chronological position unknown', visible.filter(item => item.timestamp?.status !== 'ordered' || !item.timestamp.sort_key))}
+    ${!all.length ? '<div class="attn-hint">No recorded items match these filters.</div>' : ''}
+    <div class="study-lineage-controls">
+      <button class="cr-bottom-workstation-tab" type="button" onclick="_studyLineageChangePage(-1)"${_studyLineagePage === 0 ? ' disabled' : ''}>Previous</button>
+      <span class="evidence-board-meta">Page ${_studyLineagePage + 1} of ${pageCount} · ${ordered.length} with ordered times · ${uncertain.length} with unknown chronology</span>
+      <button class="cr-bottom-workstation-tab" type="button" onclick="_studyLineageChangePage(1)"${_studyLineagePage + 1 >= pageCount ? ' disabled' : ''}>Next</button>
+    </div>
+    <div id="study-lineage-context" aria-live="polite"></div>
+  </div>`;
+}
+
+async function _studyLineageOpenContext(itemKey, contextKey) {
+  const item = (_studyLineageData?.items || []).find(row => _studyLineageKey(row) === itemKey);
+  const context = item?.contexts?.find(row => _studyLineageContextKey(row) === contextKey);
+  if (!context) return;
+  if (context.kind === 'reader' && typeof context.document_id === 'string' && Number.isInteger(context.page) && context.page > 0) {
+    _attnOpen(context.document_id, context.page);
+    return;
+  }
+  if (context.kind !== 'lineage' || typeof context.epistemic_class !== 'string' || typeof context.object_id !== 'string') return;
+  const epoch = _evidenceBoardEpoch;
+  const seq = ++_studyLineageContextSeq;
+  const panel = document.getElementById('study-lineage-context');
+  if (!panel) return;
+  panel.innerHTML = '<div class="attn-hint">Loading object lineage…</div>';
+  try {
+    const graph = await get(`/api/lineage/${encodeURIComponent(context.epistemic_class)}/${encodeURIComponent(context.object_id)}`);
+    if (epoch !== _evidenceBoardEpoch || seq !== _studyLineageContextSeq || _evidenceBoardView !== 'lineage') return;
+    panel.innerHTML = lineageHTML(graph);
+  } catch (e) {
+    if (epoch !== _evidenceBoardEpoch || seq !== _studyLineageContextSeq || _evidenceBoardView !== 'lineage') return;
+    panel.innerHTML = `<div class="attn-hint" style="color:var(--red)">${x(e.message)}</div>`;
+  }
 }
 
 async function _crOpenDoc(docId) {

@@ -6,6 +6,15 @@
 
 > This file is an operational status summary, not constitutional authority. When a status statement conflicts with governing architecture, resolve authority through `docs/01_Authority_Index.md`.
 
+**Bounded update — 2026-09-25:** Evidence Board → Lineage now projects existing
+durable study records with typed identities, recorded provenance, chronological
+and origin/type filters, existing-context links, and deterministic JSON export.
+It does not reconstruct missing history or implement whole-study synthesis.
+See the [inventory](docs/design/study-lineage-v1.md) and
+[verification record](docs/verification/2026-09-25-study-lineage-v1.md).
+The earlier synchronization date and other status entries below remain dated
+context, not a claim of fresh validation across every subsystem.
+
 ---
 
 ## Current Product Reality
@@ -176,7 +185,7 @@ Issue #160 records a product-level human Developer channel for support, feedback
 | Explorer / Architect / Artist / Critic / Steward chain | Implemented in bounded forms |
 | Perspective infrastructure | Implemented and evolving under explicit identity rules |
 | Provider/runtime control plane | Partially implemented; active work |
-| Evidence Board / whole-study synthesis | Open |
+| Evidence Board / whole-study synthesis | Inventory and read-only Study Lineage v1 implemented; wider #111 synthesis/history work remains open |
 | Live demonstration video | Pending |
 | Pitch deck | Pending |
 | Stable v1.0 release candidate | Target, not yet claimed |
