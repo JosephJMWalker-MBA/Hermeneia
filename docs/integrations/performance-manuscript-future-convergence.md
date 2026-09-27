@@ -1,9 +1,11 @@
 # Performance Manuscript — Future Convergence Note
 
-**Status:** Deferred integration hypothesis  
+**Status:** Historical convergence hypothesis; one seam activated  
 **Captured:** 2026-09-27  
-**Implementation authority:** None  
-**Current rule:** Hermeneia and Performance Manuscript remain independent until each works as intended on its own terms.
+**Activated seam:** human-attention bridge  
+**Current rule:** Repositories, canonical ontologies, and execution pipelines remain independent. The bounded observation ↔ attention handoff is now an active integration experiment.
+
+The active bridge specification is [`performance-manuscript-human-attention-bridge.md`](performance-manuscript-human-attention-bridge.md). This note remains the broader convergence record.
 
 ## Working hypothesis
 
@@ -97,9 +99,9 @@ A generated podcast may express the current investigation. It does not become th
 
 An audiobook render may reveal an attribution problem. It does not silently repair the manuscript.
 
-## Why this remains deferred
+## What remains deferred
 
-The systems should not be joined merely because the interface opportunity is now visible.
+The broader systems should not be joined merely because one integration seam has become useful.
 
 Independent development currently has higher research value:
 
@@ -108,24 +110,24 @@ Independent development currently has higher research value:
 - Failures remain attributable to the project that owns them.
 - Schemas and ontologies are less likely to be distorted around premature integration.
 
-The correct sequence is:
+The sequence has now advanced one step:
 
 ~~~text
 Hermeneia works independently
 +
 Performance Manuscript works independently
 ↓
-define explicit handoff contract
+define explicit handoff contract          ← active now
 ↓
-test combined workflow
+test combined proofreading/listening workflow
 ↓
 integrate only what measurably improves the work
 ~~~
 
 ## Current decision
 
-Preserve this convergence as a future product/architecture direction.
+Preserve the broader convergence as a future product/architecture direction, while actively testing the narrow human-attention bridge.
 
-Do **not** merge repositories, ontologies, or execution pipelines yet.
+Do **not** merge repositories, ontologies, or execution pipelines.
 
-When both projects have stronger independent product evidence, revisit a governed integration contract for write/read/listen workflows, living podcast projections, and continuous audiobook production.
+The currently authorized bridge is explicit sidecar exchange between Performance Manuscript machine observations and Hermeneia human-attention events, with a Reader-first path toward proof-listening, touch highlighting, and voice annotation. Broader write/read/listen, living-podcast, and continuous-audiobook convergence remains deferred until the bounded bridge earns it through real use.
