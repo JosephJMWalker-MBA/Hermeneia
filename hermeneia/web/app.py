@@ -21,7 +21,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, jsonify, make_response, request, send_from_directory
+from flask import Flask, g, has_request_context, jsonify, make_response, request, send_from_directory
 
 from ..concordance import (
     MATCHING_MODE,
@@ -207,7 +207,37 @@ def create_app(
     from ..narrative.profiles import list_profiles as _list_profiles
     from ..narrative.artist_providers import DEFAULT_PROVIDER_REGISTRY
 
-    active_provider_registry = provider_registry or DEFAULT_PROVIDER_REGISTRY
+    from ..integrations.pm_human_gold import GoldGatedRegistry, ProviderExecutionBlocked
+
+    # Every model execution in this app resolves through this registry. While a PM
+    # human-gold pass is open it refuses all providers except the deterministic null one.
+    def _note_provider_block(exc: ProviderExecutionBlocked) -> None:
+        if has_request_context():
+            g.pm_provider_blocked = exc
+
+    active_provider_registry = GoldGatedRegistry(
+        provider_registry or DEFAULT_PROVIDER_REGISTRY, db_path, on_block=_note_provider_block
+    )
+    app.extensions["hermeneia.provider_registry"] = active_provider_registry
+
+    def _provider_blocked_response(exc: ProviderExecutionBlocked):
+        response = jsonify({"error": str(exc), "error_type": "ProviderExecutionBlocked"})
+        response.status_code = 409
+        return response
+
+    @app.errorhandler(ProviderExecutionBlocked)
+    def _provider_execution_blocked(exc):
+        return _provider_blocked_response(exc)
+
+    @app.after_request
+    def _normalize_provider_block(response):
+        # A deliberate gold-pass refusal is a 409, never an internal error, even when a
+        # route's own broad exception handler caught it. A route that recovered with the
+        # deterministic null provider and succeeded is left as it is.
+        exc = g.pop("pm_provider_blocked", None)
+        if exc is not None and response.status_code >= 400 and response.status_code != 409:
+            return _provider_blocked_response(exc)
+        return response
     active_credential_store = credential_store or default_credential_store()
     runtime_provider_keys: dict[str, str] = {}
     runtime_credential_sources: dict[str, str] = {}
@@ -6500,7 +6530,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 }}"""
 
             provider_kwargs = _provider_kwargs(provider)
-            prov = get_provider(provider, **provider_kwargs)
+            prov = get_provider(provider, registry=active_provider_registry, **provider_kwargs)
             raw = prov.render(prompt)
 
             # ── Parse AI response ──────────────────────────────────────────
@@ -7202,7 +7232,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 
         try:
             kwargs = _provider_kwargs(provider)
-            prov = get_provider(provider, **kwargs)
+            prov = get_provider(provider, registry=active_provider_registry, **kwargs)
             proposed = extract_blueprint_from_text(text, prov)
         except BlueprintExtractionError as exc:
             return jsonify({"error": str(exc), "error_type": "BlueprintExtractionError"}), 422
@@ -7329,6 +7359,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                     provider_name=provider,
                     profile_slug=profile,
                     provider_kwargs=provider_kwargs,
+                    registry=active_provider_registry,
                 )
             else:
                 result = render_for_observation(
@@ -7337,6 +7368,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                     provider_name=provider,
                     profile_slug=profile,
                     provider_kwargs=provider_kwargs,
+                    registry=active_provider_registry,
                 )
             status_code = 201 if result.created else 200
             return jsonify({
@@ -7396,6 +7428,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                 profile_slug=profile,
                 provider_kwargs=provider_kwargs,
                 persist=False,
+                registry=active_provider_registry,
             )
             prof = result.profile
             return jsonify({
@@ -7535,6 +7568,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                         provider_name=provider,
                         profile_slug=slug,
                         provider_kwargs=provider_kwargs,
+                        registry=active_provider_registry,
                     )
                     results.append({
                         "profile_slug": slug,
@@ -9703,5 +9737,14 @@ Return ONLY valid JSON, no markdown, no explanation:
 
     from .authoring_api import register_authoring_routes
     register_authoring_routes(app, db_path)
+
+    from .pm_bridge_api import register_pm_bridge_routes
+    register_pm_bridge_routes(
+        app,
+        db_path,
+        require_active_document=require_active_document,
+        scope_error_type=_ScopeAccessError,
+        scope_error_response=_scope_error_response,
+    )
 
     return app

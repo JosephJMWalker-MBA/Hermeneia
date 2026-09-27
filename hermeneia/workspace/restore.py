@@ -45,10 +45,14 @@ _PERSPECTIVE_SUPERSESSION_FILE = "study/perspective_supersessions.json"
 # Required capabilities this restorer can reconstruct (see export.py).
 _PUBLICATION_CAPABILITY = "publication-authoring-v0"
 _PUBLICATION_PREFIX = "publication/"
-SUPPORTED_CAPABILITIES = frozenset({_PUBLICATION_CAPABILITY})
+_PM_BRIDGE_CAPABILITY = "pm-human-gold-v1"
+_PM_BRIDGE_PASSES_FILE = "study/pm_gold_passes.json"
+_PM_BRIDGE_EVENTS_FILE = "study/pm_human_attention_events.json"
+SUPPORTED_CAPABILITIES = frozenset({_PUBLICATION_CAPABILITY, _PM_BRIDGE_CAPABILITY})
 
 # Tables whose presence means the workspace is not empty.
-_OCCUPANCY_TABLES = [table for table, _ in _TABLE_FILES] + ["workspace_investigation", "publication_works"]
+_OCCUPANCY_TABLES = [table for table, _ in _TABLE_FILES] + [
+    "workspace_investigation", "publication_works", "pm_gold_pass_events", "pm_human_attention_events"]
 
 
 class RestoreError(RuntimeError):
@@ -111,6 +115,7 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
         )
     tables = {table: (_load(rel) or []) for table, rel in _TABLE_FILES}
     perspective_supersessions = _load(_PERSPECTIVE_SUPERSESSION_FILE) or []
+    pm_bridge = {"passes": _load(_PM_BRIDGE_PASSES_FILE) or [], "events": _load(_PM_BRIDGE_EVENTS_FILE) or []}
     publication = _read_publication_component(root, manifest)
     investigation = _load("investigation.json")
     uploads_dir = root / "corpus" / "uploads"
@@ -126,6 +131,7 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
         "investigation": investigation,
         "uploads": uploads,
         "publication": publication,
+        "pm_bridge": pm_bridge,
     }
 
 
@@ -260,6 +266,9 @@ def preview_restore(db_path: str | Path, bundle_dir: str | Path) -> dict[str, An
     counts = {table: len(rows) for table, rows in bundle["tables"].items()}
     counts["perspective_supersessions"] = len(bundle["perspective_supersessions"])
     counts["uploads"] = len(bundle["uploads"])
+    if bundle["pm_bridge"]["passes"] or bundle["pm_bridge"]["events"]:
+        counts["pm_gold_pass_events"] = len(bundle["pm_bridge"]["passes"])
+        counts["pm_human_attention_events"] = len(bundle["pm_bridge"]["events"])
     if bundle["publication"] is not None:
         for table, rows in bundle["publication"]["tables"].items():
             counts[table] = len(rows)
@@ -326,6 +335,16 @@ def restore_workspace(
                 columns,
             )
             _validate_restored_perspective_graph(conn)
+
+            # PM bridge history is replayed in time order after its highlights, so the
+            # append-only lifecycle triggers re-validate every restored event.
+            pm = bundle["pm_bridge"]
+            if pm["passes"] or pm["events"]:
+                from ..integrations.pm_human_gold import replay_bundle_rows
+
+                restored["pm_gold_pass_events"], restored["pm_human_attention_events"] = replay_bundle_rows(
+                    conn, pm["passes"], pm["events"]
+                )
 
             investigation = bundle["investigation"]
             if investigation is not None:

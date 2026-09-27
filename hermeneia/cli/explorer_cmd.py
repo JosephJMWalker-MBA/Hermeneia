@@ -106,6 +106,8 @@ def cmd_explorer_discover(
     if model:
         provider_kwargs["model"] = model
     try:
+        from ..integrations.pm_human_gold import refuse_if_gold_open
+        refuse_if_gold_open(db_path, provider_name)
         provider = get_provider(provider_name, **provider_kwargs)
     except Exception as exc:
         console.print(f"[red]Provider error:[/] {exc}")
