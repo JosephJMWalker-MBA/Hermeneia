@@ -21,7 +21,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, jsonify, make_response, request, send_from_directory
+from flask import Flask, g, has_request_context, jsonify, make_response, request, send_from_directory
 
 from ..concordance import (
     MATCHING_MODE,
@@ -211,11 +211,33 @@ def create_app(
 
     # Every model execution in this app resolves through this registry. While a PM
     # human-gold pass is open it refuses all providers except the deterministic null one.
-    active_provider_registry = GoldGatedRegistry(provider_registry or DEFAULT_PROVIDER_REGISTRY, db_path)
+    def _note_provider_block(exc: ProviderExecutionBlocked) -> None:
+        if has_request_context():
+            g.pm_provider_blocked = exc
+
+    active_provider_registry = GoldGatedRegistry(
+        provider_registry or DEFAULT_PROVIDER_REGISTRY, db_path, on_block=_note_provider_block
+    )
+    app.extensions["hermeneia.provider_registry"] = active_provider_registry
+
+    def _provider_blocked_response(exc: ProviderExecutionBlocked):
+        response = jsonify({"error": str(exc), "error_type": "ProviderExecutionBlocked"})
+        response.status_code = 409
+        return response
 
     @app.errorhandler(ProviderExecutionBlocked)
     def _provider_execution_blocked(exc):
-        return jsonify({"error": str(exc), "error_type": "ProviderExecutionBlocked"}), 409
+        return _provider_blocked_response(exc)
+
+    @app.after_request
+    def _normalize_provider_block(response):
+        # A deliberate gold-pass refusal is a 409, never an internal error, even when a
+        # route's own broad exception handler caught it. A route that recovered with the
+        # deterministic null provider and succeeded is left as it is.
+        exc = g.pop("pm_provider_blocked", None)
+        if exc is not None and response.status_code >= 400 and response.status_code != 409:
+            return _provider_blocked_response(exc)
+        return response
     active_credential_store = credential_store or default_credential_store()
     runtime_provider_keys: dict[str, str] = {}
     runtime_credential_sources: dict[str, str] = {}

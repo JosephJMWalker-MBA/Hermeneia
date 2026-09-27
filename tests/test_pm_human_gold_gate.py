@@ -6,6 +6,7 @@ null provider stays available; local models are refused too. Synthetic fixtures 
 """
 from __future__ import annotations
 
+import inspect
 import json
 import re
 from pathlib import Path
@@ -15,6 +16,7 @@ import pytest
 from hermeneia.integrations import pm_human_gold as G
 from hermeneia.narrative.artist_providers import DEFAULT_PROVIDER_REGISTRY
 from hermeneia.narrative.provider_registry import ProviderRegistration, ProviderRegistry
+from hermeneia.web.app import create_app
 from test_pm_human_gold_bridge import _client, _db, _open, _seal
 
 
@@ -74,3 +76,56 @@ def test_no_web_path_bypasses_the_gated_registry():
     assert all("registry=registry" in call for call in re.findall(r"get_provider\([^)]*\)", service))
 
 
+
+
+def test_every_blocked_web_path_answers_409_not_500(tmp_path, monkeypatch):
+    """A deliberate gold-pass refusal is a clean 409 on every path, whatever the route's own error handling."""
+    for var in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "XAI_API_KEY"):
+        monkeypatch.setenv(var, "synthetic-test-key")
+    db = _db(tmp_path)
+    spy = _Spy()
+    app = create_app(db_path=db, provider_registry=spy.registry())
+    registry = app.extensions["hermeneia.provider_registry"]
+
+    @app.route("/_test/broad-except", methods=["POST"])
+    def _broad_except():
+        try:
+            registry.create("anthropic")
+        except Exception as exc:                       # a route that hides every error as a 500
+            return {"error": str(exc)}, 500
+        return {"ok": True}
+
+    @app.route("/_test/null-fallback", methods=["POST"])
+    def _null_fallback():
+        try:
+            registry.create("anthropic")
+        except Exception:
+            registry.create("null")                    # recovered deterministically: not an error
+        return {"ok": True}
+
+    c = app.test_client()
+    _open(c)
+    assert c.post("/_test/broad-except").status_code == 409
+    assert c.post("/_test/broad-except").get_json()["error_type"] == "ProviderExecutionBlocked"
+    assert c.post("/_test/null-fallback").status_code == 200
+
+    blocked = 0
+    body = {"provider": "anthropic", "message": "x", "text": "synthetic", "prompt": "x", "profile": "x"}
+    for rule in app.url_map.iter_rules():
+        view = app.view_functions[rule.endpoint]
+        if "POST" not in rule.methods or rule.rule.startswith("/_test"):
+            continue
+        try:
+            src = inspect.getsource(view)
+        except (OSError, TypeError):
+            continue
+        if "active_provider_registry" not in src and "registry=active_provider_registry" not in src:
+            continue
+        url = re.sub(r"<(?:[^:>]+:)?[^>]+>", "x", rule.rule)
+        r = c.post(url, json=body)
+        text = json.dumps(r.get_json(silent=True) or {})
+        if "model execution is blocked" in text:
+            blocked += 1
+            assert r.status_code == 409, (rule.rule, r.status_code)
+        assert r.status_code < 500 or "blocked" not in text, rule.rule
+    assert blocked >= 2 and [p for p in spy.created if p != "null"] == []   # null is deterministic, allowed

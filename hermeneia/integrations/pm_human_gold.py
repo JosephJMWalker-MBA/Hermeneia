@@ -578,12 +578,18 @@ class GoldGatedRegistry:
     the pass must be independent of any machine proposal, not merely private.
     """
 
-    def __init__(self, inner: Any, db_path: str | Path):
+    def __init__(self, inner: Any, db_path: str | Path, on_block: Any = None):
         self._inner = inner
         self._db_path = Path(db_path)
+        self._on_block = on_block
 
     def create(self, provider_id: str, **kwargs: object) -> Any:
-        refuse_if_gold_open(self._db_path, provider_id)
+        try:
+            refuse_if_gold_open(self._db_path, provider_id)
+        except ProviderExecutionBlocked as exc:
+            if self._on_block is not None:
+                self._on_block(exc)     # lets the web layer report a clean refusal
+            raise
         return self._inner.create(provider_id, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
