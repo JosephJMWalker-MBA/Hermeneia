@@ -1194,6 +1194,11 @@ CREATE TABLE IF NOT EXISTS workspace_identity (
 """)
     conn.commit()
 
+    # PM human-attention bridge (docs/integrations/performance-manuscript-human-attention-bridge.md):
+    # bridge-local, append-only sidecar tables. Not constitutional ontology.
+    from ..integrations.pm_human_gold import ensure_pm_bridge_schema
+    ensure_pm_bridge_schema(conn)
+
 
 # Backwards-compat alias used by CLI commands written before v9
 ensure_artist_tables = ensure_profile_tables
@@ -1253,6 +1258,8 @@ class SQLiteStore:
         ensure_profile_tables(self._conn)
         from ..authoring.store import ensure_authoring_schema
         ensure_authoring_schema(self._conn)
+        from ..integrations.pm_human_gold import ensure_pm_bridge_schema
+        ensure_pm_bridge_schema(self._conn)
         from datetime import datetime, timezone
         cur = self._conn.execute("SELECT version FROM schema_version")
         row = cur.fetchone()

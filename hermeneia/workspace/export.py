@@ -48,6 +48,11 @@ DERIVED = "derived"
 MACHINE = "machine"
 
 
+
+PM_BRIDGE_CAPABILITY = "pm-human-gold-v1"
+PM_BRIDGE_PASSES_FILE = "study/pm_gold_passes.json"
+PM_BRIDGE_EVENTS_FILE = "study/pm_human_attention_events.json"
+
 def _dumps(obj: Any) -> bytes:
     """Deterministic JSON: sorted keys, stable indent, trailing newline."""
     return (
@@ -279,6 +284,14 @@ def build_bundle_files(
         for relpath, (role, data) in sorted(publication["files"].items()):
             content[f"publication/files/{relpath}"] = (role, data)
 
+    # PM human-attention bridge (bridge-local, append-only): present only when the
+    # workspace holds bridge records, so other bundles are unchanged byte for byte.
+    from ..integrations.pm_human_gold import bundle_rows as _pm_bundle_rows
+    pm_passes, pm_events = _pm_bundle_rows(conn)
+    if pm_passes or pm_events:
+        content[PM_BRIDGE_PASSES_FILE] = (AUTHORED, _dumps(pm_passes))
+        content[PM_BRIDGE_EVENTS_FILE] = (AUTHORED, _dumps(pm_events))
+
     # Manifest last — it describes every other file.
     files_manifest = [
         {"path": path, "role": role, "sha256": hashlib.sha256(data).hexdigest()}
@@ -307,6 +320,12 @@ def build_bundle_files(
         manifest["counts"]["authoring_accepted_versions"] = sum(
             1 for row in publication["tables"].get("authoring_outcomes", []) if row.get("status") == "accepted"
         )
+
+    if pm_passes or pm_events:
+        # An older restorer must refuse this bundle rather than silently drop human gold.
+        manifest["required_capabilities"] = sorted(set(manifest.get("required_capabilities", [])) | {PM_BRIDGE_CAPABILITY})
+        manifest["counts"]["pm_gold_pass_events"] = len(pm_passes)
+        manifest["counts"]["pm_human_attention_events"] = len(pm_events)
 
     out: dict[str, bytes] = {path: data for path, (_role, data) in content.items()}
     out["manifest.json"] = _dumps(manifest)

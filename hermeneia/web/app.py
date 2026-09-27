@@ -9704,4 +9704,13 @@ Return ONLY valid JSON, no markdown, no explanation:
     from .authoring_api import register_authoring_routes
     register_authoring_routes(app, db_path)
 
+    from .pm_bridge_api import register_pm_bridge_routes
+    register_pm_bridge_routes(
+        app,
+        db_path,
+        require_active_document=require_active_document,
+        scope_error_type=_ScopeAccessError,
+        scope_error_response=_scope_error_response,
+    )
+
     return app
