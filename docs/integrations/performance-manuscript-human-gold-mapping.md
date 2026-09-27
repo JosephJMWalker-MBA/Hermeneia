@@ -46,6 +46,7 @@ machine-shaped routing decision.
 | --- | --- |
 | `mode = human-gold` and a `gold_pass_id` | blind first-pass human gold: no machine proposal was visible and no model could run |
 | `mode = unblinded` | human attention recorded outside a blind pass, or after sealing; **never** counted as independent gold |
+| derived `phase` (export only, never stored) | `blind-gold` (inside an open pass); `post-gold` (after a seal on that document, or a successor of a gold annotation); `no-gold-pass` (no gold pass, including workspaces not eligible for one). All three are useful supervision with different provenance |
 | first event of a chain (`action = annotate`) | the **first-pass value** |
 | later `revise` / `withdraw` | reconsideration, reported separately and never silently replacing the first pass |
 | `modality`, `device_class`, `actor`, `created_at` | capture provenance |

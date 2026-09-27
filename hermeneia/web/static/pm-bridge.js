@@ -5,6 +5,7 @@
  * panel; nothing navigates away. While a human-gold pass is open, machine surfaces
  * (Companion, Ask, Perspective runs, the machine-observation lens and panel) are hidden
  * here and model execution is refused by the server. Every field is optional.
+ * Sealing ends only the blind phase; annotating continues afterwards as post-gold.
  *
  * The bridge UI appears when a pass exists or after opening the Reader once with
  * ?pm-bridge=1 (remembered in this browser).
@@ -74,24 +75,27 @@
     if (!PM.enabled || !docId()) { slot.innerHTML = ''; return; }
     const p = passForDoc(docId());
     if (PM.open && PM.open.source_document_id !== docId()) {
-      slot.innerHTML = '<span class="pm-chip pm-chip-open">Human-gold pass open on another document</span>';
+      slot.innerHTML = '<span class="pm-chip pm-chip-open">Blind gold pass open on another document</span>';
     } else if (p && p.status === 'GOLD_OPEN') {
-      slot.innerHTML = '<span class="pm-chip pm-chip-open" title="Machine proposals, confidence and model execution are off until you seal this pass">Human-gold pass open</span>'
-        + '<button type="button" class="pm-btn" onclick="_pmSealPass()">Seal pass…</button>';
+      slot.innerHTML = '<span class="pm-chip pm-chip-open" title="Machine proposals, confidence and model execution are off until you seal the blind phase">Blind gold pass open</span>'
+        + '<button type="button" class="pm-btn" onclick="_pmSealPass()">Seal blind phase…</button>';
     } else if (p) {
-      slot.innerHTML = `<span class="pm-chip">Human-gold pass sealed ${esc((p.seal && p.seal.at || '').slice(0, 10))}</span>`;
+      slot.innerHTML = `<span class="pm-chip" title="Blind gold is sealed. Keep annotating: new annotations are recorded as post-gold.">Blind gold sealed ${esc((p.seal && p.seal.at || '').slice(0, 10))}</span>`
+        + '<span class="pm-chip">Annotations continue · post-gold</span>';
     } else if (!PM.open) {
-      slot.innerHTML = '<button type="button" class="pm-btn" onclick="_pmOpenPass()">Open human-gold pass</button>';
+      slot.innerHTML = '<span class="pm-chip" title="Annotations are recorded; they are not blind gold">Annotations · unblinded</span>'
+        + '<button type="button" class="pm-btn" onclick="_pmOpenPass()">Open blind gold pass</button>';
     } else {
       slot.innerHTML = '';
     }
   }
 
   window._pmOpenPass = async function () {
-    const ok = confirm('Open a human-gold pass on this document?\n\n'
+    const ok = confirm('Open a blind gold pass on this document?\n\n'
       + '• Machine proposals, confidence, Companion and Perspective runs are hidden.\n'
       + '• All model execution in this workspace is refused, local models included.\n'
-      + '• It stays open until you seal it; sealing cannot be undone.\n\n'
+      + '• The blind phase lasts until you seal it. Sealing ends only the blind phase:\n'
+      + '  you can keep annotating afterwards; those notes are recorded as post-gold.\n\n'
       + 'Use a dedicated workspace in which no model has produced output.');
     if (!ok) return;
     try {
@@ -102,8 +106,11 @@
 
   window._pmSealPass = async function () {
     if (!PM.open) return;
-    const typed = prompt('Seal this human-gold pass? After sealing, no new first-pass gold can be added to it; '
-      + 'later changes are recorded as revisions, and machine-assisted work may follow.\n\nType SEAL to confirm.');
+    const typed = prompt('Seal the blind phase of this gold pass?\n\n'
+      + 'This ends only the blind, independent-gold phase. Your gold annotations are kept as they are. '
+      + 'You can keep reading and annotating new passages afterwards; those annotations are recorded as '
+      + 'post-gold (unblinded), and changes to gold ones become revisions. Machine-assisted work may follow.\n\n'
+      + 'Type SEAL to confirm.');
     if ((typed || '').trim().toUpperCase() !== 'SEAL') return;
     try {
       await requestJSON(`/api/bridge/pm/gold-passes/${encodeURIComponent(PM.open.gold_pass_id)}/seal`,
@@ -128,7 +135,7 @@
     const list = v => (v || []).join('; ');
     return `
       <div class="pm-panel" role="form" aria-label="${esc(title)}">
-        <div class="pm-panel-title">${esc(title)}${PM.open ? ' <span class="pm-chip pm-chip-open">blind</span>' : ''}</div>
+        <div class="pm-panel-title">${esc(title)} ${phaseChip()}</div>
         <div class="pm-help">Fill only what you noticed. Every field is optional.</div>
         <div class="pm-grid">
           <label class="pm-field"><span>Textual form</span>${select('pm-form', FORMS, j.target_form)}</label>
@@ -155,6 +162,12 @@
         </div>
         <div id="pm-msg" class="pm-msg" aria-live="polite"></div>
       </div>`;
+  }
+
+  function phaseChip() {
+    if (PM.open) return '<span class="pm-chip pm-chip-open">blind gold</span>';
+    const p = passForDoc(docId());
+    return `<span class="pm-chip">${p ? 'post-gold' : 'unblinded'}</span>`;
   }
 
   function readJudgment() {
@@ -264,7 +277,7 @@
     const div = document.createElement('div');
     div.className = 'pm-detail';
     div.innerHTML = `
-      <div class="pm-panel-title">PM annotation <span class="pm-chip${first.mode === 'human-gold' ? ' pm-chip-open' : ''}">${first.mode === 'human-gold' ? 'human gold' : 'unblinded'}</span></div>
+      <div class="pm-panel-title">PM annotation <span class="pm-chip${first.phase === 'blind-gold' ? ' pm-chip-open' : ''}">${esc({ 'blind-gold': 'blind gold', 'post-gold': 'post-gold', 'no-gold-pass': 'unblinded' }[first.phase] || first.mode)}</span></div>
       ${a.withdrawn ? '<div class="pm-help">Withdrawn — kept in history.</div>' : `
         ${line('Form', LABEL[j.target_form])}${line('Source', LABEL[j.source_class])}${line('Who / what', j.source_identity)}
         ${line('Point of view', j.point_of_view)}${line('Tone', perf.tone)}${line('Pace', perf.pace)}${line('Intensity', perf.intensity)}

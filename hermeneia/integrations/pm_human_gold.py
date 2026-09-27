@@ -9,8 +9,16 @@ Lifecycle of a gold pass (one document, one workspace):
 
     GOLD_OPEN    no provider/model execution (local models included); machine
                  proposals and confidence hidden; first-pass human-gold events only
-    GOLD_SEALED  explicit append-only human act; no new first-pass gold for the pass;
-                 later reconsiderations are successor events in ``unblinded`` mode
+    GOLD_SEALED  explicit append-only human act; ends the blind phase only: no new
+                 first-pass gold for the pass, but new annotations on new passages
+                 keep being accepted as ``unblinded`` (phase ``post-gold``), and
+                 reconsiderations of gold are successor events
+
+Sealing never closes human-attention collection:
+
+    human attention collection   continuously open
+    blind independent gold       bounded and sealable
+    model training / promotion   separately gated and versioned (outside Hermeneia)
 
 Every record is append-only. The database enforces the lifecycle with triggers,
 so the rules hold for any writer, not only this module. Human judgments are kept
@@ -428,6 +436,15 @@ def _row(r: sqlite3.Row) -> dict:
     return d
 
 
+def event_phase(e: Mapping, seal_times: list[str]) -> str:
+    """Derived provenance phase (never stored): blind-gold, post-gold or no-gold-pass."""
+    if e["mode"] == "human-gold":
+        return "blind-gold"
+    if e["gold_pass_id"] or any(t <= e["created_at"] for t in seal_times):
+        return "post-gold"
+    return "no-gold-pass"
+
+
 def event(conn: sqlite3.Connection, event_id: str) -> dict:
     return _row(conn.execute("SELECT * FROM pm_human_attention_events WHERE id = ?", (event_id,)).fetchone())
 
@@ -450,6 +467,12 @@ def annotations(conn: sqlite3.Connection, source_document_id: str | None = None)
         sql += " WHERE source_document_id = ?"
         args = (source_document_id,)
     rows = [_row(r) for r in conn.execute(sql + " ORDER BY created_at, id", args)]
+    seals: dict[str, list[str]] = {}
+    for p in gold_passes(conn):
+        if p["seal"]:
+            seals.setdefault(p["source_document_id"], []).append(p["seal"]["at"])
+    for r in rows:
+        r["phase"] = event_phase(r, seals.get(r["source_document_id"], []))
     by_id = {r["id"]: r for r in rows}
     successor = {r["supersedes"]: r["id"] for r in rows if r["supersedes"]}
     out = []
@@ -468,7 +491,7 @@ def annotations(conn: sqlite3.Connection, source_document_id: str | None = None)
 
 # ── Exports ──────────────────────────────────────────────────────────────────
 
-_EVENT_EXPORT_FIELDS = ("id", "mode", "action", "supersedes", "gold_pass_id", "modality", "device_class",
+_EVENT_EXPORT_FIELDS = ("id", "mode", "phase", "action", "supersedes", "gold_pass_id", "modality", "device_class",
                         "judgment", "actor", "created_at")
 
 

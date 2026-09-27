@@ -173,6 +173,47 @@ def test_revise_and_withdraw_preserve_first_pass_and_chain_is_linear(tmp_path):
     assert [e["action"] for e in ann["history"]] == ["annotate", "revise", "withdraw"]
 
 
+def test_sealing_ends_only_the_blind_phase_new_passages_keep_being_annotated(tmp_path):
+    """GOLD_SEALED closes blind gold, never human-attention collection."""
+    db = _db(tmp_path)
+    c = _client(db)
+    pass_id = _open(c)
+    gold = _annotate(c, _highlight(c)).get_json()
+    assert _seal(c, pass_id).status_code == 200
+
+    fresh = _annotate(c, _highlight(c, locator="p.2.s.4.§.1"), judgment=J2, modality="touch").get_json()
+    assert (fresh["mode"], fresh["action"], fresh["gold_pass_id"], fresh["supersedes"]) == ("unblinded", "annotate",
+                                                                                          None, None)
+    rev = c.post(f"/api/bridge/pm/annotations/{fresh['id']}/revise", json={"judgment": J1})
+    assert rev.status_code == 201 and rev.get_json()["mode"] == "unblinded"
+
+    anns = {a["annotation_id"]: a for a in c.get("/api/bridge/pm/export").get_json()["annotations"]}
+    assert anns[gold["id"]]["first_pass"]["phase"] == "blind-gold"
+    assert anns[fresh["id"]]["first_pass"]["phase"] == "post-gold" and anns[fresh["id"]]["current"]["phase"] == "post-gold"
+    assert anns[fresh["id"]]["first_pass"]["judgment"] == J2 and anns[fresh["id"]]["current"]["judgment"] == J1
+    assert anns[gold["id"]]["current"]["judgment"] == J1                   # the gold record is untouched
+
+
+def test_workspace_ineligible_for_blind_gold_still_collects_human_attention(tmp_path):
+    db = _db(tmp_path)
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "INSERT INTO ai_provenance (id, staged_object_id, generating_model, generation_timestamp, prompt_reference,"
+        " prompt_reference_type, created_at) VALUES ('aip-1', 'pi-1', 'synthetic-model', ?, 'h', 'hash', ?)",
+        (_now(), _now()))
+    conn.commit()
+    conn.close()
+    c = _client(db)
+    assert c.post("/api/bridge/pm/gold-passes", json={"source_document_id": DOC}).status_code == 409
+
+    e = _annotate(c, _highlight(c)).get_json()
+    assert (e["mode"], e["gold_pass_id"]) == ("unblinded", None)
+    c.post(f"/api/bridge/pm/annotations/{e['id']}/revise", json={"judgment": J2})
+    ann = c.get("/api/bridge/pm/export").get_json()["annotations"][0]
+    assert ann["first_pass"]["phase"] == "no-gold-pass" and ann["first_pass"]["judgment"] == J1
+    assert [h["action"] for h in ann["history"]] == ["annotate", "revise"]
+
+
 # ── Append-only and gold semantics in the database ──────────────────────────
 
 def test_bridge_records_are_append_only(tmp_path):

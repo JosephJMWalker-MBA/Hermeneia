@@ -171,12 +171,20 @@ GOLD_OPEN
 `ai_provenance`, proposed interpretations, renders, Critic reports, findings or
 authoring proposals.
 
+A workspace that is **not** eligible for blind gold still collects human
+attention. Annotations there are `unblinded`, with derived phase
+`no-gold-pass`.
+
 **While `GOLD_OPEN`:**
 
 - **All provider / model execution is refused, local models included.** The
   web app's provider registry refuses everything but the deterministic `null`
   provider. Every web call site resolves through it, and so do the CLI
   commands that call providers.
+- **A refusal is always a clean HTTP 409** (`error_type: ProviderExecutionBlocked`),
+  never an internal error, even where a route's own broad error handling
+  catches it. A route that recovers deterministically with the `null` provider
+  still succeeds.
 - Machine proposals, the machine-observation lens and panel, the page brief,
   Companion, Ask and Perspective runs are hidden. No machine suggestion is
   preselected, and confidence and validation-set membership are never shown.
@@ -186,9 +194,21 @@ authoring proposals.
   proposal. No other document may be annotated, and no unblinded event may
   be written.
 
-**Sealing** is an explicit, append-only human act (`{"confirm": "seal"}`).
+**Sealing** is an explicit, append-only human act (`{"confirm": "seal"}`). It ends
+**only the blind, independent-gold phase**. It never closes the human-attention
+or data-collection relationship:
+
+```text
+human attention collection   = continuously open
+blind independent gold       = bounded and sealable
+model training / promotion   = separately gated and versioned (outside Hermeneia)
+```
 
 **After `GOLD_SEALED`:**
+
+- **new annotations on new passages keep being accepted.** They are
+  `unblinded`, with derived phase `post-gold`, and remain valuable supervision
+  with different provenance;
 
 - no new first-pass gold can be created for that pass;
 - prior gold records stay immutable;
