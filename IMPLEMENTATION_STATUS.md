@@ -15,6 +15,19 @@ See the [inventory](docs/design/study-lineage-v1.md) and
 The earlier synchronization date and other status entries below remain dated
 context, not a claim of fresh validation across every subsystem.
 
+**Bounded update — 2026-09-27:** The Performance Manuscript human-attention
+bridge has its first slice: a blind **human-gold pass**. Components:
+
+- a bridge-local, append-only event store with a database-enforced
+  open → sealed lifecycle;
+- a Reader "Annotate" intent, with every field optional;
+- refusal of all provider execution while a pass is open;
+- a human-only export and bundle round trip.
+
+PM overlay import, review mode and the validation-completion pass are not
+built. See
+[the bridge](docs/integrations/performance-manuscript-human-attention-bridge.md).
+
 ---
 
 ## Current Product Reality

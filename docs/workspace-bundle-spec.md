@@ -207,6 +207,8 @@ Git history becomes an **intellectual** history, not a binary snapshot.
 | `perspectives` | `study/perspectives.json` | authored |
 | Perspective `supersession_relations` | `study/perspective_supersessions.json` | authored |
 | `investigation_log` | `study/field_notes.json` | authored |
+| `pm_gold_pass_events` (PM bridge) | `study/pm_gold_passes.json` | authored — present only when the workspace holds bridge records |
+| `pm_human_attention_events` (PM bridge) | `study/pm_human_attention_events.json` | authored — same |
 | `observation_reviews`, `inquiry_notes` | `study/reviews.json` | authored |
 | `proposed_interpretations`, `interpretations` | `reports/interpretations.json` | machine / authored-on-adopt |
 | `rendered_narratives`, `critic_reports` | `reports/*` | machine |
@@ -215,6 +217,15 @@ Git history becomes an **intellectual** history, not a binary snapshot.
 | lineage (#62, runtime) | `lineage/lineage.json` | derived |
 | evaluation scorers (runtime) | `evaluation/report.json` | derived |
 | `localStorage` UI state | — (**not** in the bundle; device-local preference) | excluded |
+
+**PM human-attention bridge records.**
+
+- **Export.** When present, the bundle's `required_capabilities` includes
+  `pm-human-gold-v1`, so an older restorer refuses the bundle rather than
+  silently dropping human gold. Workspaces without bridge records export
+  byte-identically to before.
+- **Restore** replays both files in time order, so the append-only lifecycle
+  triggers re-validate the history. A tampered history is refused.
 
 **Excluded by design:** browser UI preferences (theme, focus-scroll, dismissed
 banners) and provider API keys (secrets never enter the bundle — audit #69 §4).

@@ -129,6 +129,88 @@ Minimum shape:
 
 This is a bridge contract to test through use. It should not be promoted into the constitutional ontology merely because the UI needs it.
 
+**As implemented (2026-09-27).**
+
+- **Storage.** Two bridge-local, append-only tables in `hermeneia.db`:
+  `pm_gold_pass_events` and `pm_human_attention_events`. Database triggers
+  forbid `UPDATE` and `DELETE` and enforce the gold lifecycle below.
+- **Why not a JSONL sidecar.** The active storage specification allows JSONL
+  only as a labelled derived export. Human gold is irreducible, so it lives in
+  the authoritative store, and JSONL is produced only as an export.
+- **Vocabulary.** The PM vocabulary is kept under `domain = performance-manuscript`,
+  `annotation_schema = pm-human-gold/1`: 7 target forms and 6 source classes,
+  every field optional. It is not promoted into Hermeneia's general
+  annotation ontology.
+- **What an event stores.** The source fingerprint, the durable Reader anchor
+  (the highlight and its locator), the human judgment and provenance —
+  actor, timestamp, modality, device class. No manuscript prose: the
+  existing highlight already anchors the exact span.
+- **Revisions.** A revision or withdrawal is a successor event. The first
+  pass is never overwritten.
+- **Implementation:** `hermeneia/integrations/pm_human_gold.py`; HTTP in
+  `hermeneia/web/pm_bridge_api.py`; Reader surface in
+  `hermeneia/web/static/pm-bridge.js`. Field mapping to PM in
+  [`performance-manuscript-human-gold-mapping.md`](performance-manuscript-human-gold-mapping.md).
+
+## Human-gold pass — gold first, machine comparison after (amendment 2026-09-27)
+
+Independent human observation comes **before** any machine comparison.
+
+- **Gold pass.** A blind, bounded pass over one document, with a stable
+  `gold_pass_id` and recorded open / seal provenance (actor, time, note).
+- **Review workflow.** The overlay of machine observations described above
+  follows only **after** the gold pass is sealed.
+
+```text
+GOLD_OPEN
+→ GOLD_SEALED
+→ machine-assisted review may occur afterward
+```
+
+**Opening.** Only in a workspace in which no model has produced output: no
+`ai_provenance`, proposed interpretations, renders, Critic reports, findings or
+authoring proposals.
+
+**While `GOLD_OPEN`:**
+
+- **All provider / model execution is refused, local models included.** The
+  web app's provider registry refuses everything but the deterministic `null`
+  provider. Every web call site resolves through it, and so do the CLI
+  commands that call providers.
+- Machine proposals, the machine-observation lens and panel, the page brief,
+  Companion, Ask and Perspective runs are hidden. No machine suggestion is
+  preselected, and confidence and validation-set membership are never shown.
+- Only first-pass human-gold events (`annotate`, `revise`, `withdraw`) on the
+  pass's document are accepted. They carry no machine reference. `ratify`,
+  `correct` and `reject` are refused, because there is no visible machine
+  proposal. No other document may be annotated, and no unblinded event may
+  be written.
+
+**Sealing** is an explicit, append-only human act (`{"confirm": "seal"}`).
+
+**After `GOLD_SEALED`:**
+
+- no new first-pass gold can be created for that pass;
+- prior gold records stay immutable;
+- later reconsiderations are successor events in `unblinded` mode, linked to
+  the pass, never edits;
+- machine-assisted comparison / review may then be enabled without changing
+  the gold record.
+
+### Two gold products
+
+1. **Organic human gold** — annotations produced naturally while reading,
+   proofreading or listening. Human attention decides what is annotated. The
+   owner is never asked to annotate every passage.
+2. **Validation gold** — complete labels for a preregistered PM sample (the
+   160 random + 40 challenge items of the third-source design).
+
+Organic gold is selected by attention, so it is not a random sample, and it is
+never substituted for validation gold. A later **blind validation-completion
+pass** may present sampled items still lacking required fields, after the
+ordinary proofread and before any machine comparison. It shows no machine
+answer, no confidence and no sample stratum. (Not yet implemented.)
+
 ## Field Notes proofread
 
 The first intended real-use case is the owner's first full proofread of *Field Notes From Beneath the Soil*.
@@ -136,13 +218,15 @@ The first intended real-use case is the owner's first full proofread of *Field N
 The workflow should eventually allow:
 
 ```text
-read manuscript
-→ encounter PM observation
+open a human-gold pass (dedicated workspace, no machine output)
+→ read manuscript — no PM observation visible
 → keep reading if nothing deserves attention
-→ highlight when something does
-→ correct identity / add Perspective / add tone or pacing
-→ preserve event
+→ select and Annotate when something does
+   (form / source / identity / point of view / tone / pace / pauses / uncertainty / note)
+→ preserve first-pass event
 → continue reading
+→ seal the pass
+→ only then: load PM observations for comparison / review
 ```
 
 Validation-set membership, when present for Performance Manuscript research, must remain invisible to the Reader.
@@ -196,6 +280,15 @@ Attention events should be queueable locally and export/synchronize later. A con
 6. **Governed PM adapter.** PM validates those events and routes eligible changes through its existing correction/ratification machinery.
 7. **Proof-listening alignment.** Audio playback and Reader selections share anchors.
 8. **Tablet pass.** Touch-first selection, contextual controls, voice notes, local queue.
+
+Status (2026-09-27):
+
+- **Done, for the human-gold pass only:** 1 (synthetic fixtures and tests),
+  3 (selection → event), 4 (performance annotation) and 5 (export: a JSON
+  export of human annotations only; a private JSONL export that can resolve
+  span text for cross-extraction matching).
+- **Deliberately not yet:** 2 (PM overlay import), 6, 7 and 8, and the
+  validation-completion pass.
 
 ## Success criteria
 
