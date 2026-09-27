@@ -97,6 +97,7 @@ def render_for_plan(
     provider_kwargs: dict[str, Any] | None = None,
     recursive: bool = False,
     persist: bool = True,
+    registry: Any = None,
 ) -> ArtistRenderResult:
     """Render a RenderedNarrative directly from an ArchitectPlan ID.
 
@@ -128,7 +129,7 @@ def render_for_plan(
     kwargs: dict[str, Any] = dict(provider_kwargs or {})
     if model:
         kwargs["model"] = model
-    provider = get_provider(provider_name, **kwargs)
+    provider = get_provider(provider_name, registry=registry, **kwargs)
 
     expression_profile_id = profile["id"] if profile else None
     narrative_id = make_rendered_narrative_id(
@@ -206,6 +207,7 @@ def render_for_observation(
     model: str | None = None,
     provider_kwargs: dict[str, Any] | None = None,
     recursive: bool = False,
+    registry: Any = None,
 ) -> ArtistRenderResult:
     """Render and persist a RenderedNarrative for an observation's plan.
 
@@ -254,7 +256,7 @@ def render_for_observation(
     kwargs: dict[str, Any] = dict(provider_kwargs or {})
     if model:
         kwargs["model"] = model
-    provider = get_provider(provider_name, **kwargs)
+    provider = get_provider(provider_name, registry=registry, **kwargs)
 
     expression_profile_id = profile["id"] if profile else None
     narrative_id = make_rendered_narrative_id(

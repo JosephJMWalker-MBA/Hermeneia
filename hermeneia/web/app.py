@@ -207,7 +207,15 @@ def create_app(
     from ..narrative.profiles import list_profiles as _list_profiles
     from ..narrative.artist_providers import DEFAULT_PROVIDER_REGISTRY
 
-    active_provider_registry = provider_registry or DEFAULT_PROVIDER_REGISTRY
+    from ..integrations.pm_human_gold import GoldGatedRegistry, ProviderExecutionBlocked
+
+    # Every model execution in this app resolves through this registry. While a PM
+    # human-gold pass is open it refuses all providers except the deterministic null one.
+    active_provider_registry = GoldGatedRegistry(provider_registry or DEFAULT_PROVIDER_REGISTRY, db_path)
+
+    @app.errorhandler(ProviderExecutionBlocked)
+    def _provider_execution_blocked(exc):
+        return jsonify({"error": str(exc), "error_type": "ProviderExecutionBlocked"}), 409
     active_credential_store = credential_store or default_credential_store()
     runtime_provider_keys: dict[str, str] = {}
     runtime_credential_sources: dict[str, str] = {}
@@ -6500,7 +6508,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 }}"""
 
             provider_kwargs = _provider_kwargs(provider)
-            prov = get_provider(provider, **provider_kwargs)
+            prov = get_provider(provider, registry=active_provider_registry, **provider_kwargs)
             raw = prov.render(prompt)
 
             # ── Parse AI response ──────────────────────────────────────────
@@ -7202,7 +7210,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 
         try:
             kwargs = _provider_kwargs(provider)
-            prov = get_provider(provider, **kwargs)
+            prov = get_provider(provider, registry=active_provider_registry, **kwargs)
             proposed = extract_blueprint_from_text(text, prov)
         except BlueprintExtractionError as exc:
             return jsonify({"error": str(exc), "error_type": "BlueprintExtractionError"}), 422
@@ -7329,6 +7337,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                     provider_name=provider,
                     profile_slug=profile,
                     provider_kwargs=provider_kwargs,
+                    registry=active_provider_registry,
                 )
             else:
                 result = render_for_observation(
@@ -7337,6 +7346,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                     provider_name=provider,
                     profile_slug=profile,
                     provider_kwargs=provider_kwargs,
+                    registry=active_provider_registry,
                 )
             status_code = 201 if result.created else 200
             return jsonify({
@@ -7396,6 +7406,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                 profile_slug=profile,
                 provider_kwargs=provider_kwargs,
                 persist=False,
+                registry=active_provider_registry,
             )
             prof = result.profile
             return jsonify({
@@ -7535,6 +7546,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                         provider_name=provider,
                         profile_slug=slug,
                         provider_kwargs=provider_kwargs,
+                        registry=active_provider_registry,
                     )
                     results.append({
                         "profile_slug": slug,

@@ -36,13 +36,16 @@ from ..compiler.architect import compile_architect_plan
 console = Console()
 
 
-def _open_db(bundle_or_db: str | None) -> tuple[Path, sqlite3.Connection]:
+def _db_path_for(bundle_or_db: str | None) -> Path:
     default = "build/hermeneia.db"
     if bundle_or_db is None:
-        db_path = Path(default)
-    else:
-        p = Path(bundle_or_db)
-        db_path = p if (p.suffix == ".db" or "hermeneia.db" in p.name) else Path(default)
+        return Path(default)
+    p = Path(bundle_or_db)
+    return p if (p.suffix == ".db" or "hermeneia.db" in p.name) else Path(default)
+
+
+def _open_db(bundle_or_db: str | None) -> tuple[Path, sqlite3.Connection]:
+    db_path = _db_path_for(bundle_or_db)
 
     if not db_path.exists():
         console.print(f"[red]Database not found:[/] {db_path}")
@@ -124,6 +127,12 @@ def cmd_extract(
     console.print(f"[dim]Provider: {provider_name}[/dim]")
     console.print("[cyan]Extracting Intent Hypothesis…[/cyan]")
 
+    from ..integrations.pm_human_gold import ProviderExecutionBlocked, refuse_if_gold_open
+    try:
+        refuse_if_gold_open(_db_path_for(bundle_or_db), provider_name)
+    except ProviderExecutionBlocked as exc:
+        console.print(f"[red]Provider error:[/] {exc}")
+        sys.exit(1)
     provider = _get_provider(provider_name, model, api_key)
 
     try:
