@@ -1,0 +1,31 @@
+{
+  "browser_observation": {
+    "error_message": "Cannot set properties of null (setting 'innerHTML')",
+    "error_type": "TypeError",
+    "requested_page": 1,
+    "settled_page": 62,
+    "stack_functions": [
+      "_crRenderPage",
+      "_crGoToPage",
+      "_attnOpen",
+      "_studyLineageOpenContext"
+    ]
+  },
+  "context": {
+    "document_id": "311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44",
+    "highlight_id": "6932bf50-8517-4440-ac87-b128d033b81f",
+    "kind": "reader",
+    "page": 1
+  },
+  "record": {
+    "key": {
+      "id": "6932bf50-8517-4440-ac87-b128d033b81f"
+    },
+    "table": "reader_highlights"
+  },
+  "saved_last_page": 62,
+  "source_content_included": false,
+  "starting_commit": "a9739ba",
+  "total_pages": 85,
+  "workspace_id": "50a8d313f4394b4b9f39714201ae5e7d"
+}

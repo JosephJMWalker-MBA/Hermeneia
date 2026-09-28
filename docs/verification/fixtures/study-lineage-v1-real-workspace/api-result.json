@@ -1,0 +1,268 @@
+{
+  "api_statuses": [
+    200,
+    200,
+    200
+  ],
+  "authorship_counts": {
+    "derived": 4107,
+    "unknown": 396
+  },
+  "chain_validation": "requires_manual_durable_reference_trace_no_association_inferred",
+  "chronology_counts": {
+    "ordered": 4503
+  },
+  "coverage": {
+    "limitations": [
+      "This is a derived projection of extant records, not a complete event log.",
+      "Current mutable records retain only their latest stored state; original timestamps do not date later text.",
+      "Unknown, naive and malformed timestamps are not chronologically ordered; equal times use identity order only.",
+      "Excluded evidence, unavailable or ambiguous parents, non-corpus notes and unbound publication works are omitted.",
+      "Unknown authorship remains unknown. Artifact references are recorded metadata, not a fresh integrity verification."
+    ],
+    "missing_columns": {},
+    "missing_tables": [
+      "authoring_decisions",
+      "authoring_drafts",
+      "authoring_outcomes",
+      "authoring_proofs",
+      "authoring_proposals",
+      "authoring_requests",
+      "publication_artifacts",
+      "publication_works"
+    ],
+    "omitted": {
+      "architect_plans": 0,
+      "authoring_decisions": 0,
+      "authoring_drafts": 0,
+      "authoring_outcomes": 0,
+      "authoring_proofs": 0,
+      "authoring_proposals": 0,
+      "authoring_requests": 0,
+      "critic_reports": 0,
+      "findings": 0,
+      "inquiry_notes": 0,
+      "interpretations": 0,
+      "investigation_log": 0,
+      "narrative_blueprints": 0,
+      "observation_reviews": 0,
+      "observations": 0,
+      "perspectives": 0,
+      "proposed_interpretations": 0,
+      "publication_artifacts": 0,
+      "publication_works": 0,
+      "ratification_records": 0,
+      "reader_highlights": 0,
+      "rendered_narratives": 0,
+      "source_documents": 0,
+      "source_extractions": 0,
+      "steward_decisions": 0,
+      "supersession_relations": 0,
+      "validation_reports": 0,
+      "witness_sessions": 0,
+      "workspace_investigation": 0
+    },
+    "unsupported_categories": [
+      "Transient Perspective and Room runs",
+      "Overwritten annotation and governing-question revisions",
+      "Deleted inquiry questions",
+      "Unrecorded workspace exports and CLI publication events",
+      "Reading sessions and page traversal history",
+      "Bucket and motif creation or revision history"
+    ]
+  },
+  "excluded_document_count": 0,
+  "excluded_evidence_validation": "not_exercised_no_excluded_documents",
+  "export_sha256": "2fdf336b84b52b6c729e986b1afb8da2f42143f47e363fa8e1742e34a66497bc",
+  "observation_context_samples": [
+    {
+      "document_id": "311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44",
+      "extraction_id": "724955b944e5de6886eec0620652c9fd262f3c0d663b0e007cdfcfd610bc175b",
+      "id": "001028d602daa25b871aac5493891f57e89f0960a95e09ecf5638a5dfb66cd7a",
+      "status": "verified"
+    },
+    {
+      "document_id": "311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44",
+      "extraction_id": "2e0bcae5ffa79a64b35ebfbdede022a1fba0ac1bcad3f25cb8e79be401cff149",
+      "id": "001c71e334d50edcd96437d9b57d233cbbd7629c67e1794b598b12654a62d0f0",
+      "status": "verified"
+    },
+    {
+      "document_id": "311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44",
+      "extraction_id": "a4285edaea4bc03ae19cfaf21e9c85b2025e02359dd307bc797c15d4ba3c4cb7",
+      "id": "00325e239cf8e5e419cbe18878b6b4dfd433f68fc532b5f6e1d1e3ef1595cb42",
+      "status": "verified"
+    }
+  ],
+  "observation_sampling": "verified",
+  "projected_counts": {
+    "observations": 2369,
+    "reader_highlights": 395,
+    "source_documents": 1,
+    "source_extractions": 1738
+  },
+  "raw_rows_and_recorded_times": "verified",
+  "reader_samples": [
+    {
+      "document_id": "311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44",
+      "id": "6932bf50-8517-4440-ac87-b128d033b81f",
+      "observation_id": null,
+      "page": 1,
+      "status": "verified",
+      "timestamp": {
+        "field": "updated_at",
+        "sort_key": "2026-08-13T13:58:23.226477+00:00",
+        "status": "ordered",
+        "value": "2026-08-13T13:58:23.226477+00:00"
+      }
+    },
+    {
+      "document_id": "311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44",
+      "id": "05da9585-915c-4a1b-81a7-98a4d8e41893",
+      "observation_id": null,
+      "page": 1,
+      "status": "verified",
+      "timestamp": {
+        "field": "updated_at",
+        "sort_key": "2026-08-13T13:58:38.888295+00:00",
+        "status": "ordered",
+        "value": "2026-08-13T13:58:38.888295+00:00"
+      }
+    },
+    {
+      "document_id": "311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44",
+      "id": "dfb19e19-6e51-473a-849c-c986491731da",
+      "observation_id": null,
+      "page": 1,
+      "status": "verified",
+      "timestamp": {
+        "field": "updated_at",
+        "sort_key": "2026-08-13T13:59:07.256617+00:00",
+        "status": "ordered",
+        "value": "2026-08-13T13:59:07.256617+00:00"
+      }
+    }
+  ],
+  "reader_sampling": "verified",
+  "result_scope": "API and captured-row checks passed; later browser source-context check failed; not full Study Lineage acceptance",
+  "schema": "hermeneia.study-lineage.real-workspace-validation/v1",
+  "scope": "existing records; private snapshot; no migrations; API reads only",
+  "snapshot_files_after": {
+    "-shm": {
+      "exists": true,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+      "size": 32768
+    },
+    "-wal": {
+      "exists": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "database": {
+      "exists": true,
+      "sha256": "562a1991a4c0f19e078f46d5234a1fd17bad71a027cc56f405acd7f33e46bee5",
+      "size": 13115392
+    }
+  },
+  "snapshot_files_before": {
+    "-shm": {
+      "exists": true,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+      "size": 32768
+    },
+    "-wal": {
+      "exists": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "database": {
+      "exists": true,
+      "sha256": "562a1991a4c0f19e078f46d5234a1fd17bad71a027cc56f405acd7f33e46bee5",
+      "size": 13115392
+    }
+  },
+  "snapshot_logical_sha256_after": "f95c9193e675f99a2a4a032e795ef151748b71b5380b4475a8668f7393e4197d",
+  "snapshot_unchanged": true,
+  "source_files_after": {
+    "-shm": {
+      "exists": true,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+      "size": 32768
+    },
+    "-wal": {
+      "exists": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "database": {
+      "exists": true,
+      "sha256": "d2139970ed4ee29ea413f1301fd4f035bea9037590e8d8a02e7bd385846d7c81",
+      "size": 13115392
+    }
+  },
+  "source_files_before": {
+    "-shm": {
+      "exists": true,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+      "size": 32768
+    },
+    "-wal": {
+      "exists": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "database": {
+      "exists": true,
+      "sha256": "d2139970ed4ee29ea413f1301fd4f035bea9037590e8d8a02e7bd385846d7c81",
+      "size": 13115392
+    }
+  },
+  "source_integrity_checks": {
+    "database_bytes_equal": true,
+    "logical_records_equal": true,
+    "shm_presence_and_bytes_equal": true,
+    "wal_presence_and_bytes_equal": true
+  },
+  "source_logical_sha256_after": "f95c9193e675f99a2a4a032e795ef151748b71b5380b4475a8668f7393e4197d",
+  "source_logical_sha256_before": "f95c9193e675f99a2a4a032e795ef151748b71b5380b4475a8668f7393e4197d",
+  "source_unchanged": true,
+  "starting_commit": "a9739ba",
+  "status": "completed_bounded_checks",
+  "stored_counts": {
+    "ai_provenance": 0,
+    "architect_plan_paragraphs": 0,
+    "architect_plans": 0,
+    "blueprint_interpretation_links": 0,
+    "blueprint_observation_links": 0,
+    "critic_reports": 0,
+    "expression_profiles": 9,
+    "findings": 0,
+    "inquiry_notes": 0,
+    "interpretations": 0,
+    "investigation_log": 0,
+    "narrative_blueprints": 0,
+    "observation_derived": 2369,
+    "observation_reviews": 0,
+    "observation_terms": 15847,
+    "observations": 2369,
+    "perspectives": 0,
+    "proposed_interpretations": 0,
+    "provenance": 2369,
+    "ratification_records": 0,
+    "reader_highlights": 395,
+    "reading_progress": 1,
+    "rendered_narratives": 0,
+    "schema_version": 1,
+    "source_documents": 1,
+    "source_extractions": 1738,
+    "steward_decisions": 0,
+    "supersession_relations": 0,
+    "terms": 3320,
+    "validation_reports": 0,
+    "witness_sessions": 0,
+    "workspace_identity": 1,
+    "workspace_investigation": 0
+  },
+  "validation_date": "2026-09-28",
+  "workspace_id": "50a8d313f4394b4b9f39714201ae5e7d"
+}

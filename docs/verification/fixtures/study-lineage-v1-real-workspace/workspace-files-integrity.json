@@ -1,0 +1,64 @@
+{
+  "after": {
+    "benchmark02-attribution-packet__2o12fqh.herm/context.json": {
+      "sha256": "9c095d338518fe4b976fc9bfc36ad7aa0b42fcd622fdcff25b594915f90ae740",
+      "size": 372
+    },
+    "benchmark02-attribution-packet__2o12fqh.herm/hermeneia.db": {
+      "sha256": "5f682cfe6390deb58ee704d0dc53405fcbf25d1762907db287dcfe878d5e5c63",
+      "size": 12816384
+    },
+    "calibration.json": {
+      "sha256": "7922e0701ece110e7b8c22a3367c1ef1567b9bf4dded9db6746bc57d7ce05a02",
+      "size": 51
+    },
+    "hermeneia.db": {
+      "sha256": "d2139970ed4ee29ea413f1301fd4f035bea9037590e8d8a02e7bd385846d7c81",
+      "size": 13115392
+    },
+    "hermeneia.db-shm": {
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+      "size": 32768
+    },
+    "hermeneia.db-wal": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "uploads/benchmark02-attribution-packet.pdf": {
+      "sha256": "311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44",
+      "size": 225118
+    }
+  },
+  "all_seven_files_equal": true,
+  "before": {
+    "benchmark02-attribution-packet__2o12fqh.herm/context.json": {
+      "sha256": "9c095d338518fe4b976fc9bfc36ad7aa0b42fcd622fdcff25b594915f90ae740",
+      "size": 372
+    },
+    "benchmark02-attribution-packet__2o12fqh.herm/hermeneia.db": {
+      "sha256": "5f682cfe6390deb58ee704d0dc53405fcbf25d1762907db287dcfe878d5e5c63",
+      "size": 12816384
+    },
+    "calibration.json": {
+      "sha256": "7922e0701ece110e7b8c22a3367c1ef1567b9bf4dded9db6746bc57d7ce05a02",
+      "size": 51
+    },
+    "hermeneia.db": {
+      "sha256": "d2139970ed4ee29ea413f1301fd4f035bea9037590e8d8a02e7bd385846d7c81",
+      "size": 13115392
+    },
+    "hermeneia.db-shm": {
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+      "size": 32768
+    },
+    "hermeneia.db-wal": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "uploads/benchmark02-attribution-packet.pdf": {
+      "sha256": "311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44",
+      "size": 225118
+    }
+  },
+  "source": "~/Hermeneia/workspaces/benchmark-02-attribution-audit"
+}

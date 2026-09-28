@@ -1,0 +1,218 @@
+{
+  "files_after": {
+    "-shm": {
+      "exists": true,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+      "size": 32768
+    },
+    "-wal": {
+      "exists": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "database": {
+      "exists": true,
+      "sha256": "562a1991a4c0f19e078f46d5234a1fd17bad71a027cc56f405acd7f33e46bee5",
+      "size": 13115392
+    }
+  },
+  "files_before": {
+    "-shm": {
+      "exists": true,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+      "size": 32768
+    },
+    "-wal": {
+      "exists": true,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "database": {
+      "exists": true,
+      "sha256": "562a1991a4c0f19e078f46d5234a1fd17bad71a027cc56f405acd7f33e46bee5",
+      "size": 13115392
+    }
+  },
+  "guard": "private snapshot; allowlisted GETs; mode=ro and query_only",
+  "logical_sha256_after": "f95c9193e675f99a2a4a032e795ef151748b71b5380b4475a8668f7393e4197d",
+  "logical_sha256_before": "f95c9193e675f99a2a4a032e795ef151748b71b5380b4475a8668f7393e4197d",
+  "requests": [
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/api/health"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/e10/observations"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/e10/findings"
+    },
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/api/project/summary"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/investigation"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/edition/cycles"
+    },
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/api/project/summary"
+    },
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/api/reader/documents"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/runtime/workspace"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/workspaces"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/favicon.ico"
+    },
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/api/project/summary"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/investigation-log"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/e10/providers"
+    },
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/pages"
+    },
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/highlights"
+    },
+    {
+      "allowed": false,
+      "method": "POST",
+      "path": "/api/reader/progress"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/related-observations"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/summary"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/summary"
+    },
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/api/evidence-board"
+    },
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/api/study-lineage"
+    },
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/api/project/summary"
+    },
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/api/reader/documents"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/investigation-log"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/e10/providers"
+    },
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/pages"
+    },
+    {
+      "allowed": true,
+      "method": "GET",
+      "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/highlights"
+    },
+    {
+      "allowed": false,
+      "method": "POST",
+      "path": "/api/reader/progress"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/related-observations"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/summary"
+    },
+    {
+      "allowed": false,
+      "method": "GET",
+      "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/summary"
+    }
+  ],
+  "starting_commit": "a9739ba",
+  "ui_observations": {
+    "all_items": 4503,
+    "browser_export": "not_exercised_stopped_at_context_failure",
+    "newest_first_filter": "not_exercised_stopped_at_context_failure",
+    "object_context_browser": "not_exercised_API_context_checks_passed",
+    "reader_highlight_unknown_filter_items": 395,
+    "reader_identity_opened": "6932bf50-8517-4440-ac87-b128d033b81f",
+    "source_context_result": "failed_requested_page_1_settled_page_62"
+  },
+  "unchanged": true,
+  "validation_date": "2026-09-28"
+}
