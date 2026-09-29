@@ -1,0 +1,430 @@
+{
+  "html": {
+    "column_zero_const_let_declarations": 166,
+    "column_zero_named_functions": 686,
+    "named_function_prefix_counts": {
+      "_cmp": 20,
+      "_cr": 296,
+      "_evidenceBoard": 22,
+      "_studyLineage": 11,
+      "cmp": 8,
+      "e10": 62
+    },
+    "physical_lines": 17922,
+    "quoted_inline_event_attribute_tokens": 405
+  },
+  "largest_python_files": [
+    {
+      "file": "hermeneia/web/app.py",
+      "physical_lines": 9707
+    },
+    {
+      "file": "hermeneia/storage/sqlite.py",
+      "physical_lines": 2774
+    },
+    {
+      "file": "hermeneia/authoring/service.py",
+      "physical_lines": 918
+    },
+    {
+      "file": "hermeneia/narrative/artist_providers.py",
+      "physical_lines": 892
+    },
+    {
+      "file": "hermeneia/cli/preserve_cmd.py",
+      "physical_lines": 864
+    },
+    {
+      "file": "hermeneia/perspective_runs.py",
+      "physical_lines": 660
+    },
+    {
+      "file": "hermeneia/web/supervisor.py",
+      "physical_lines": 627
+    },
+    {
+      "file": "hermeneia/cli/inspector.py",
+      "physical_lines": 608
+    },
+    {
+      "file": "hermeneia/web/reader_projection.py",
+      "physical_lines": 568
+    },
+    {
+      "file": "hermeneia/scope_resolution.py",
+      "physical_lines": 561
+    },
+    {
+      "file": "hermeneia/study/synthesis_packet.py",
+      "physical_lines": 550
+    },
+    {
+      "file": "hermeneia/cli/build_cmd.py",
+      "physical_lines": 538
+    }
+  ],
+  "largest_python_functions_including_enclosing_factories": [
+    {
+      "file": "hermeneia/web/app.py",
+      "line": 188,
+      "name": "create_app",
+      "physical_lines": 9520
+    },
+    {
+      "file": "hermeneia/cli/main.py",
+      "line": 50,
+      "name": "main",
+      "physical_lines": 363
+    },
+    {
+      "file": "hermeneia/web/app.py",
+      "line": 9051,
+      "name": "api_reader_investigation_summary",
+      "physical_lines": 340
+    },
+    {
+      "file": "hermeneia/study_lineage.py",
+      "line": 143,
+      "name": "project_study_lineage",
+      "physical_lines": 297
+    },
+    {
+      "file": "hermeneia/storage/sqlite.py",
+      "line": 916,
+      "name": "ensure_profile_tables",
+      "physical_lines": 280
+    },
+    {
+      "file": "hermeneia/web/app.py",
+      "line": 8782,
+      "name": "api_reader_document_summary",
+      "physical_lines": 267
+    },
+    {
+      "file": "hermeneia/web/app.py",
+      "line": 6357,
+      "name": "api_architect_generate",
+      "physical_lines": 258
+    },
+    {
+      "file": "hermeneia/web/app.py",
+      "line": 3375,
+      "name": "api_trace",
+      "physical_lines": 254
+    },
+    {
+      "file": "hermeneia/web/app.py",
+      "line": 9417,
+      "name": "api_evidence_board",
+      "physical_lines": 222
+    },
+    {
+      "file": "hermeneia/web/app.py",
+      "line": 2949,
+      "name": "_workspace_projection",
+      "physical_lines": 218
+    },
+    {
+      "file": "hermeneia/web/app.py",
+      "line": 2303,
+      "name": "_trust_summary",
+      "physical_lines": 211
+    },
+    {
+      "file": "hermeneia/web/app.py",
+      "line": 6142,
+      "name": "api_architect_blueprint_detail",
+      "physical_lines": 211
+    },
+    {
+      "file": "hermeneia/web/app.py",
+      "line": 2087,
+      "name": "_lineage_graph",
+      "physical_lines": 204
+    },
+    {
+      "file": "hermeneia/cli/inspector.py",
+      "line": 371,
+      "name": "cmd_trace",
+      "physical_lines": 197
+    },
+    {
+      "file": "hermeneia/cli/explorer_cmd.py",
+      "line": 39,
+      "name": "cmd_explorer_discover",
+      "physical_lines": 196
+    }
+  ],
+  "lexical_internal_import_cycles": [
+    [
+      "hermeneia.authoring.preparation_job",
+      "hermeneia.authoring.service"
+    ],
+    [
+      "hermeneia.cli.preserve_cmd",
+      "hermeneia.preservation_provenance"
+    ]
+  ],
+  "literal_sql_table_consumers": {
+    "ai_provenance": [
+      "hermeneia/storage/sqlite.py",
+      "hermeneia/web/app.py"
+    ],
+    "interpretations": [
+      "hermeneia/cli/blueprinter.py",
+      "hermeneia/cli/bootstrap_cmd.py",
+      "hermeneia/cli/comparer.py",
+      "hermeneia/cli/health.py",
+      "hermeneia/cli/inspector.py",
+      "hermeneia/cli/interpreter.py",
+      "hermeneia/compiler/architect.py",
+      "hermeneia/compiler/evaluation_functions/semantic.py",
+      "hermeneia/compiler/projections/interpretive_divergence.py",
+      "hermeneia/storage/sqlite.py",
+      "hermeneia/web/app.py"
+    ],
+    "narrative_blueprints": [
+      "hermeneia/cli/architect_cmd.py",
+      "hermeneia/cli/blueprinter.py",
+      "hermeneia/cli/bootstrap_cmd.py",
+      "hermeneia/cli/extract_cmd.py",
+      "hermeneia/cli/health.py",
+      "hermeneia/cli/inspector.py",
+      "hermeneia/compiler/architect.py",
+      "hermeneia/compiler/critic/narrative_fidelity.py",
+      "hermeneia/narrative/artist_service.py",
+      "hermeneia/storage/sqlite.py",
+      "hermeneia/web/app.py"
+    ],
+    "observations": [
+      "hermeneia/cli/architect_cmd.py",
+      "hermeneia/cli/blueprinter.py",
+      "hermeneia/cli/bootstrap_cmd.py",
+      "hermeneia/cli/comparer.py",
+      "hermeneia/cli/critic_cmd.py",
+      "hermeneia/cli/explorer_cmd.py",
+      "hermeneia/cli/health.py",
+      "hermeneia/cli/inspector.py",
+      "hermeneia/cli/interpreter.py",
+      "hermeneia/compiler/evaluation_functions/observation_coverage.py",
+      "hermeneia/compiler/evaluation_functions/provenance.py",
+      "hermeneia/compiler/evaluation_functions/semantic.py",
+      "hermeneia/compiler/projections/critic_queue.py",
+      "hermeneia/compiler/projections/interpretive_divergence.py",
+      "hermeneia/compiler/staging/interpretation.py",
+      "hermeneia/explorer/__init__.py",
+      "hermeneia/narrative/artist_providers.py",
+      "hermeneia/narrative/artist_service.py",
+      "hermeneia/storage/sqlite.py",
+      "hermeneia/web/app.py",
+      "hermeneia/workspace/export.py"
+    ],
+    "perspectives": [
+      "hermeneia/cli/bootstrap_cmd.py",
+      "hermeneia/cli/health.py",
+      "hermeneia/cli/interpreter.py",
+      "hermeneia/compiler/projections/interpretive_divergence.py",
+      "hermeneia/storage/sqlite.py",
+      "hermeneia/web/app.py",
+      "hermeneia/workspace/export.py",
+      "hermeneia/workspace/restore.py"
+    ],
+    "proposed_interpretations": [
+      "hermeneia/cli/explorer_cmd.py",
+      "hermeneia/compiler/projections/critic_queue.py",
+      "hermeneia/explorer/interpreter.py",
+      "hermeneia/storage/sqlite.py",
+      "hermeneia/web/app.py"
+    ],
+    "provenance": [
+      "hermeneia/cli/inspector.py",
+      "hermeneia/compiler/evaluation_functions/provenance.py",
+      "hermeneia/storage/sqlite.py",
+      "hermeneia/web/app.py"
+    ],
+    "reader_highlights": [
+      "hermeneia/scope_resolution.py",
+      "hermeneia/storage/sqlite.py",
+      "hermeneia/web/app.py",
+      "hermeneia/workspace/export.py"
+    ],
+    "supersession_relations": [
+      "hermeneia/storage/sqlite.py",
+      "hermeneia/web/app.py",
+      "hermeneia/workspace/export.py",
+      "hermeneia/workspace/restore.py"
+    ],
+    "workspace_identity": [
+      "hermeneia/storage/sqlite.py",
+      "hermeneia/workspace/identity.py"
+    ]
+  },
+  "method": "Static audit measurements. Reads source text only; emits JSON to stdout.\n\nNo product imports, databases, network calls, or workspace initialization.\nImport cycles include lazy/type-only imports and are NOT runtime-cycle proofs.\nSQL counts are AST execute-family callsites; table mentions are literal SQL\ntokens, not a complete dataflow analysis (dynamic SQL is deliberately omitted).\n",
+  "python_modules": 207,
+  "route_decorators": {
+    "hermeneia/web/app.py": 108,
+    "hermeneia/web/authoring_api.py": 12,
+    "hermeneia/web/supervisor.py": 3
+  },
+  "source_set_sha256": "b305daba4e1eba96a9af6a6fc98440c13cbfca61d875b45c1a4b7223d1e58a65",
+  "sql_callsite_modules": {
+    "hermeneia/authoring/preparation_job.py": {
+      "execute": 1
+    },
+    "hermeneia/authoring/service.py": {
+      "execute": 12
+    },
+    "hermeneia/authoring/store.py": {
+      "execute": 6,
+      "executescript": 1
+    },
+    "hermeneia/cli/architect_cmd.py": {
+      "execute": 7,
+      "executemany": 1
+    },
+    "hermeneia/cli/blueprinter.py": {
+      "execute": 11,
+      "executemany": 2
+    },
+    "hermeneia/cli/bootstrap_cmd.py": {
+      "execute": 9
+    },
+    "hermeneia/cli/comparer.py": {
+      "execute": 4
+    },
+    "hermeneia/cli/critic_cmd.py": {
+      "execute": 3
+    },
+    "hermeneia/cli/explorer_cmd.py": {
+      "execute": 5
+    },
+    "hermeneia/cli/extract_cmd.py": {
+      "execute": 3
+    },
+    "hermeneia/cli/health.py": {
+      "execute": 14
+    },
+    "hermeneia/cli/inspector.py": {
+      "execute": 21
+    },
+    "hermeneia/cli/interpreter.py": {
+      "execute": 9
+    },
+    "hermeneia/cli/profile_cmd.py": {
+      "execute": 2
+    },
+    "hermeneia/cli/theme_cmd.py": {
+      "execute": 2
+    },
+    "hermeneia/compiler/architect.py": {
+      "execute": 2
+    },
+    "hermeneia/compiler/critic/narrative_fidelity.py": {
+      "execute": 8
+    },
+    "hermeneia/compiler/evaluation_functions/accessibility.py": {
+      "execute": 1
+    },
+    "hermeneia/compiler/evaluation_functions/constitutional.py": {
+      "execute": 1
+    },
+    "hermeneia/compiler/evaluation_functions/observation_coverage.py": {
+      "execute": 3
+    },
+    "hermeneia/compiler/evaluation_functions/provenance.py": {
+      "execute": 4
+    },
+    "hermeneia/compiler/evaluation_functions/semantic.py": {
+      "execute": 5
+    },
+    "hermeneia/compiler/evaluation_functions/structural.py": {
+      "execute": 2
+    },
+    "hermeneia/compiler/projections/audit_dashboard.py": {
+      "execute": 2
+    },
+    "hermeneia/compiler/projections/critic_queue.py": {
+      "execute": 8
+    },
+    "hermeneia/compiler/projections/institutional_memory.py": {
+      "execute": 1
+    },
+    "hermeneia/compiler/projections/interpretive_divergence.py": {
+      "execute": 2
+    },
+    "hermeneia/compiler/projections/ratification_certificate.py": {
+      "execute": 2
+    },
+    "hermeneia/compiler/projections/review_queue.py": {
+      "execute": 2
+    },
+    "hermeneia/compiler/projections/semantic_inspector.py": {
+      "execute": 5
+    },
+    "hermeneia/compiler/projections/steward_ledger.py": {
+      "execute": 2
+    },
+    "hermeneia/compiler/projections/trust_card.py": {
+      "execute": 2
+    },
+    "hermeneia/compiler/projections/understanding_ledger.py": {
+      "execute": 2
+    },
+    "hermeneia/compiler/projections/witness_summary.py": {
+      "execute": 2
+    },
+    "hermeneia/compiler/ratification/record.py": {
+      "execute": 7
+    },
+    "hermeneia/compiler/staging/interpretation.py": {
+      "execute": 1
+    },
+    "hermeneia/compiler/stewardship/decision.py": {
+      "execute": 2
+    },
+    "hermeneia/compiler/witness/session.py": {
+      "execute": 2
+    },
+    "hermeneia/narrative/artist_providers.py": {
+      "execute": 2
+    },
+    "hermeneia/narrative/artist_service.py": {
+      "execute": 15
+    },
+    "hermeneia/narrative/profiles.py": {
+      "execute": 3
+    },
+    "hermeneia/scope_resolution.py": {
+      "execute": 5
+    },
+    "hermeneia/storage/sqlite.py": {
+      "execute": 161,
+      "executemany": 11,
+      "executescript": 11
+    },
+    "hermeneia/study_lineage.py": {
+      "execute": 2
+    },
+    "hermeneia/web/app.py": {
+      "execute": 220
+    },
+    "hermeneia/workspace/export.py": {
+      "execute": 4
+    },
+    "hermeneia/workspace/identity.py": {
+      "execute": 4
+    },
+    "hermeneia/workspace/lifecycle.py": {
+      "execute": 2
+    },
+    "hermeneia/workspace/restore.py": {
+      "execute": 11
+    }
+  },
+  "tests": {
+    "files_defining_js_extractor": 29,
+    "files_mentioning_index_html": 51,
+    "files_with_node_and_subprocess_run": 27,
+    "root_test_files": 135
+  }
+}
