@@ -228,6 +228,11 @@ Research artifacts are evidence from an active program of inquiry. They do not p
 
 ---
 
+## Future Performance Manuscript relationship
+
+A deferred integration hypothesis around **write / read / listen**, continuous audiobook production, and living audio/podcast projections is recorded in [docs/integrations/performance-manuscript-future-convergence.md](docs/integrations/performance-manuscript-future-convergence.md). The projects remain intentionally independent until each works as intended on its own terms.
+
+
 ## Current phase
 
 **Validation Phase — active development.**
