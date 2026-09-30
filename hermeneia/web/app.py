@@ -95,6 +95,7 @@ from ..perspective_runs import (
     build_perspective_prompt,
     build_perspective_receipt,
     build_perspective_room_receipt,
+    perspective_definition,
     perspective_definitions_payload,
     resolve_perspective_request,
     resolve_room_participants,
@@ -109,6 +110,12 @@ from ..perspective_identity import (
     normalize_revision_reason,
     resolution_from_frame_v2_row,
     utc_now_iso,
+)
+from ..perspective_execution_receipts import (
+    capture_execution_run,
+    load_retained_execution,
+    store_retained_execution,
+    validate_execution_references,
 )
 from ..workspace import (
     DEFAULT_LEGACY_DB,
@@ -212,6 +219,10 @@ def create_app(
     runtime_provider_keys: dict[str, str] = {}
     runtime_credential_sources: dict[str, str] = {}
     runtime_provider_keys_lock = threading.RLock()
+    # Successful single-Perspective results remain transient until an explicit
+    # steward decision names this server-owned run. Never accept reposted output.
+    perspective_execution_candidates: dict[str, dict] = {}
+    perspective_execution_candidates_lock = threading.RLock()
     _connections_settings_lock = threading.RLock()
     _connections_settings_load_error: str | None = None
     try:
@@ -4616,6 +4627,7 @@ def create_app(
         model = str(context["model_id"])
         host = str(context["runtime_host"])
 
+        created_at = utc_now_iso()
         try:
             adapter = active_provider_registry.create(
                 provider_id,
@@ -4642,6 +4654,9 @@ def create_app(
         return {
             "response": response_text,
             "execution": execution,
+            "prompt": prompt,
+            "created_at": created_at,
+            "completed_at": utc_now_iso(),
         }, None
 
     @app.route("/api/perspective/run", methods=["POST"])
@@ -4695,7 +4710,127 @@ def create_app(
             response=result["response"],
             perspective_metadata=perspective.receipt_metadata,
         )
+        metadata = perspective.receipt_metadata or {}
+        origin = metadata.get("origin", "built_in")
+        retainable = (
+            origin == "built_in" and perspective_definition(perspective.definition.id) is not None
+        ) or (
+            origin == "canonical_saved" and metadata.get("identity_scheme") == FRAME_V2_SCHEME
+        )
+        receipt["retention"] = {
+            "supported": retainable,
+            "state": "transient",
+            "reason": (
+                "Keep explicitly to retain this exact execution in the study."
+                if retainable else "Custom-draft executions remain transient in this receipt profile."
+            ),
+        }
+        if retainable:
+            try:
+                run = capture_execution_run(
+                    perspective.definition,
+                    question=question,
+                    scope_receipt=scope_receipt,
+                    execution=result["execution"],
+                    response=result["response"],
+                    prompt=result["prompt"],
+                    perspective_metadata=perspective.receipt_metadata,
+                    created_at=result["created_at"],
+                    completed_at=result["completed_at"],
+                )
+            except ValueError as exc:
+                return jsonify({"error": str(exc), "canonical_status": "not_persisted"}), 409
+            with perspective_execution_candidates_lock:
+                # Disposable server state has no history authority. Older tokens
+                # expire rather than growing into an implicit activity store.
+                while len(perspective_execution_candidates) >= 100:
+                    del perspective_execution_candidates[next(iter(perspective_execution_candidates))]
+                perspective_execution_candidates[run["run_id"]] = {"run": run, "receipt": None}
+            receipt["run_id"] = run["run_id"]
         return jsonify(receipt), 201
+
+    def _perspective_retention_decision(expected: str):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or set(payload) != {"decision"} or payload["decision"] != expected:
+            return jsonify({"error": f"exact decision '{expected}' is required; execution content is server-owned"}), 400
+        return None
+
+    def _require_projected_perspective_execution(conn, receipt_id: str):
+        from ..study_lineage import project_study_lineage
+        items = project_study_lineage(conn)["items"]
+        if not any(item.get("record", {}).get("table") == "perspective_execution_receipts"
+                   and item["record"]["key"].get("id") == receipt_id for item in items):
+            raise ValueError("retained execution is not eligible under the study's source/reference exclusions")
+
+    @app.route("/api/perspective/executions/<path:run_id>/retain", methods=["POST"])
+    def api_perspective_execution_retain(run_id: str):
+        error = _perspective_retention_decision("retain")
+        if error is not None:
+            return error
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        with perspective_execution_candidates_lock:
+            candidate = perspective_execution_candidates.get(run_id)
+            if candidate is None:
+                return jsonify({"error": "unknown or discarded transient run; rerun before retaining"}), 404
+            conn = _conn_rw()
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                validate_execution_references(conn, candidate["run"], require_eligible=True)
+                retained = candidate["receipt"]
+                if retained is None:
+                    retained = store_retained_execution(conn, candidate["run"])
+                    status = 201
+                else:
+                    retained = load_retained_execution(conn, retained["id"])
+                    if retained is None:
+                        raise ValueError("retained execution is missing")
+                    validate_execution_references(conn, retained["run"], require_eligible=True)
+                    status = 200
+                _require_projected_perspective_execution(conn, retained["id"])
+                conn.commit()
+                candidate["receipt"] = retained
+            except (ValueError, sqlite3.DatabaseError) as exc:
+                conn.rollback()
+                return jsonify({"error": str(exc), "canonical_status": "not_retained"}), 409
+            finally:
+                conn.close()
+        return jsonify(retained), status
+
+    @app.route("/api/perspective/executions/<path:run_id>/discard", methods=["POST"])
+    def api_perspective_execution_discard(run_id: str):
+        error = _perspective_retention_decision("discard")
+        if error is not None:
+            return error
+        with perspective_execution_candidates_lock:
+            candidate = perspective_execution_candidates.get(run_id)
+            if candidate is None:
+                return jsonify({"error": "unknown or already discarded transient run"}), 404
+            if candidate["receipt"] is not None:
+                return jsonify({"error": "retained execution cannot be discarded as a transient run"}), 409
+            del perspective_execution_candidates[run_id]
+        return jsonify({"run_id": run_id, "state": "discarded", "canonical_status": "not_persisted"})
+
+    @app.route("/api/perspective/executions/<path:receipt_id>", methods=["GET"])
+    def api_perspective_execution_get(receipt_id: str):
+        if not db_path.exists():
+            return jsonify({"error": "database not found"}), 404
+        conn = _conn()
+        try:
+            conn.execute("PRAGMA query_only=ON")
+            conn.execute("BEGIN")
+            retained = load_retained_execution(conn, receipt_id)
+            if retained is None:
+                return jsonify({"error": "unknown retained execution"}), 404
+            validate_execution_references(conn, retained["run"], require_eligible=True)
+            _require_projected_perspective_execution(conn, retained["id"])
+            response = jsonify(retained)
+            response.headers["Cache-Control"] = "no-store"
+            return response
+        except (ValueError, sqlite3.DatabaseError) as exc:
+            return jsonify({"error": str(exc)}), 409
+        finally:
+            conn.close()
 
     @app.route("/api/perspective/room", methods=["POST"])
     def api_perspective_room():
@@ -8655,6 +8790,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
         from ..workspace import build_workspace_zip, ensure_workspace_identity
+        from ..workspace.export import PerspectiveExecutionExportError, PublicationExportError
 
         # The bundle carries the workspace's durable identity (issue #83), not a
         # corpus fingerprint. Ensure one exists before exporting.
@@ -8665,10 +8801,13 @@ Return ONLY valid JSON, no markdown, no explanation:
             rw.close()
 
         generated_at = datetime.now(timezone.utc).isoformat()
-        data = build_workspace_zip(
-            db_path, generated_at=generated_at,
-            workspace_id=identity["workspace_id"],
-        )
+        try:
+            data = build_workspace_zip(
+                db_path, generated_at=generated_at,
+                workspace_id=identity["workspace_id"],
+            )
+        except (PerspectiveExecutionExportError, PublicationExportError) as exc:
+            return jsonify({"error": str(exc), "export_status": "refused"}), 409
         stamp = generated_at[:10]
         response = make_response(data)
         response.headers["Content-Type"] = "application/zip"

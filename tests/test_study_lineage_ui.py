@@ -271,6 +271,8 @@ def test_lineage_has_no_write_or_provider_routes_and_is_board_subview() -> None:
     source = _index()
     section = source[source.index('// Study Lineage is a read-only view'):source.index('async function _crOpenDoc(')]
     assert not re.search(r'\b(post|put|del|fetch|runtimeApiFetch)\s*\(', section)
-    assert '/api/perspective' not in section
+    assert '/api/perspective/run' not in section
+    assert '/api/perspective/room' not in section
+    assert "get(`/api/perspective/" in section  # Exact retained-execution contexts are read-only.
     assert 'id="evidence-board-view-lineage"' in source
     assert "_evidenceBoardSetView('lineage')" in source

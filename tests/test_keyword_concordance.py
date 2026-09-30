@@ -704,7 +704,7 @@ def test_gatsby_green_light_matches_mechanical_searchable_representation_oracle(
 
     body = _search(db_path, "green light", limit=3)
 
-    assert schema_version == SCHEMA_VERSION == 17
+    assert schema_version == SCHEMA_VERSION == 18
     assert body["occurrence_count"] == len(oracle_occurrences)
     assert body["passage_count"] == len(oracle_passages)
     assert body["count"] == body["passage_count"]

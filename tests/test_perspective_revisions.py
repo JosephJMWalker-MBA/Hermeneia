@@ -200,7 +200,7 @@ def test_v16_to_v17_migration_preserves_legacy_perspective_and_fk(tmp_path):
     }
     assert row["identity_scheme"] == "perspective-label-v1"
     assert interp["perspective_id"] == "legacy-id"
-    assert version == 17
+    assert version == 18
     assert violations == []
     assert "definition_fingerprint" in columns
 

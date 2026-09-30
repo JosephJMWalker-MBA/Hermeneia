@@ -10442,6 +10442,10 @@ function _crPopulateSavedPerspectiveSelect() {
 
 function _crResetPerspectiveRoomStateForWorkspaceChange() {
   _crPerspectiveWorkspaceEpoch += 1;
+  if (_crPerspectiveLastReceipt?.run_id) {
+    const output = document.getElementById('cr-perspective-output');
+    if (output) output.innerHTML = '';
+  }
   _crPerspectiveScope = null;
   _crPerspectiveLastReceipt = null;
   _crPerspectiveRoomRoster = [];
@@ -10453,6 +10457,10 @@ function _crResetPerspectiveRoomStateForWorkspaceChange() {
 
 function _crResetPerspectiveScopeForReaderContextChange() {
   _crPerspectiveWorkspaceEpoch += 1;
+  if (_crPerspectiveLastReceipt?.run_id) {
+    const output = document.getElementById('cr-perspective-output');
+    if (output) output.innerHTML = '';
+  }
   _crPerspectiveScope = null;
   _crPerspectiveLastReceipt = null;
   _crPerspectiveRenderScope();
@@ -11199,6 +11207,68 @@ function _crRenderPerspectiveRoom(receipt, model) {
     </div>`;
 }
 
+function _crRenderPerspectiveRetentionControls(receipt, epoch) {
+  if (!receipt?.run_id || receipt.retention?.supported !== true) return '';
+  const runId = x(JSON.stringify(receipt.run_id));
+  const disabled = receipt.retention?.pending ? ' disabled' : '';
+  return `<div class="e10-meta">Transient result · not retained in study</div>
+    <div class="cr-fln-hint">Keep records this exact execution and output. It does not mean agreement or acceptance as an Interpretation.</div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="cr-bottom-workstation-tab" type="button" onclick="_crDecidePerspectiveExecution(${runId}, ${Number(epoch)}, 'retain')"${disabled}>Keep in study</button>
+      <button class="cr-bottom-workstation-tab" type="button" onclick="_crDecidePerspectiveExecution(${runId}, ${Number(epoch)}, 'discard')"${disabled}>Discard</button>
+    </div>`;
+}
+
+function _crRenderRetainedPerspectiveExecution(receipt) {
+  const run = receipt?.run || {};
+  const frame = run.perspective || {};
+  const execution = run.execution || {};
+  const retention = receipt?.retention || {};
+  return `<div class="e10-card">
+    <div class="e10-meta">Retained Perspective execution · ${x(frame.definition?.label || frame.id || '')}</div>
+    <div class="e10-text" style="white-space:pre-wrap">${x(run.response || '')}</div>
+    <div class="cr-fln-hint">Model-generated output · explicitly human-retained. Retention does not mean agreement or acceptance as an Interpretation.</div>
+    <div class="e10-meta">Question: ${x(run.question || '')}</div>
+    <div class="e10-meta">Perspective: ${x(frame.id || '')}${frame.version ? ` · version ${x(frame.version)}` : ''}</div>
+    <div class="e10-meta">Via ${x(execution.provider_id || execution.provider || 'unknown')} / ${x(execution.model_id || 'unknown')}</div>
+    <div class="e10-meta">Executed ${x(run.created_at || '')} · completed ${x(run.completed_at || '')}<br>Retained ${x(retention.retained_at || '')} by local steward · individual identity unknown</div>
+    ${_crRenderPerspectiveScopeReceipt(run.scope_receipt)}
+    <details><summary>Exact execution provenance</summary><pre>${x(JSON.stringify({receipt_id: receipt?.id, run_id: run.run_id, perspective: frame, execution, prompt_version: run.prompt_version, prompt_sha256: run.prompt_sha256, question_sha256: run.question_sha256, scope_sha256: run.scope_sha256, response_sha256: run.response_sha256, retention}, null, 2))}</pre></details>
+  </div>`;
+}
+
+async function _crDecidePerspectiveExecution(runId, epoch, decision) {
+  const current = () => epoch === _crPerspectiveWorkspaceEpoch && _crPerspectiveLastReceipt?.run_id === runId;
+  if (!current() || !['retain', 'discard'].includes(decision)) return;
+  const original = _crPerspectiveLastReceipt;
+  if (original.retention?.state !== 'transient' || original.retention?.pending) return;
+  original.retention.pending = true;
+  const controls = document.getElementById('cr-perspective-retention');
+  if (controls) controls.innerHTML = '<div class="e10-meta">Recording the explicit decision…</div>';
+  try {
+    const result = await post(`/api/perspective/executions/${encodeURIComponent(runId)}/${decision}`, {decision});
+    if (!current()) return;
+    const output = document.getElementById('cr-perspective-output');
+    const status = document.getElementById('cr-perspective-status');
+    if (decision === 'retain') {
+      original.canonical_status = 'retained';
+      original.retention = {supported: true, state: 'retained', receipt_id: result.id};
+      if (output) output.innerHTML = _crRenderRetainedPerspectiveExecution(result);
+      if (status) status.textContent = 'Kept in study · retention is not agreement';
+      if (typeof _cmpRenderOnboarding === 'function') _cmpRenderOnboarding();
+    } else {
+      _crPerspectiveLastReceipt = null;
+      if (output) output.innerHTML = '<div class="e10-empty">Transient output discarded. No study execution receipt was created.</div>';
+      if (status) status.textContent = 'Discarded · no retained execution';
+    }
+  } catch (e) {
+    if (!current()) return;
+    original.retention.pending = false;
+    if (controls) controls.innerHTML = `<div class="e10-meta" style="color:var(--red)">${x(e.message)}</div>${_crRenderPerspectiveRetentionControls(original, epoch)}`;
+    showAppError(e.message);
+  }
+}
+
 async function _crRunPerspective() {
   const operationEpoch = _crPerspectiveWorkspaceEpoch;
   const btn = document.getElementById('cr-perspective-run-btn');
@@ -11243,6 +11313,7 @@ async function _crRunPerspective() {
     return;
   }
   if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+  _crPerspectiveLastReceipt = null;
   if (status) status.textContent = _crPerspectiveMode === 'room' ? 'Asking the local Room' : 'Running local Perspective';
   if (out) out.innerHTML = '<div class="e10-empty">Asking the selected local model…</div>';
   try {
@@ -11296,6 +11367,8 @@ async function _crRunPerspective() {
           Runtime host: ${x(ex.runtime_host || '')}<br>
           This is a proposed reading. Nothing has entered the canonical interpretation record.
         </div>
+        ${receipt.run_id ? `<div id="cr-perspective-retention" aria-live="polite" style="margin-top:10px">${_crRenderPerspectiveRetentionControls(receipt, operationEpoch)}</div>` : ''}
+        ${receipt.retention?.supported === false ? `<div class="cr-fln-hint">${x(receipt.retention.reason)}</div>` : ''}
       </div>`;
     if (status) status.textContent = 'Proposed reading';
   } catch (e) {
@@ -11311,6 +11384,7 @@ async function _crRunPerspective() {
 window._crPerspectiveFromSelection = _crPerspectiveFromSelection;
 window._crLoadPerspectiveRun = _crLoadPerspectiveRun;
 window._crRunPerspective = _crRunPerspective;
+window._crDecidePerspectiveExecution = _crDecidePerspectiveExecution;
 window._evidenceBoardLoad = _evidenceBoardLoad;
 window._evidenceBoardRender = _evidenceBoardRender;
 window._evidenceBoardToggleHighlight = _evidenceBoardToggleHighlight;
@@ -13594,7 +13668,7 @@ function _studyLineageItemHTML(item, tied) {
     : item.event === 'decision' ? 'Recorded decision' : 'Recorded item';
   const time = timestamp.value === null || timestamp.value === undefined || timestamp.value === ''
     ? 'Time unknown' : `${timestamp.field || 'Recorded time'}: ${timestamp.value}`;
-  const contexts = (item.contexts || []).filter(context => ['reader', 'lineage'].includes(context.kind));
+  const contexts = (item.contexts || []).filter(context => ['reader', 'lineage', 'perspective_execution'].includes(context.kind));
   const preview = String(item.content ?? '');
   return `<details class="evidence-board-row study-lineage-record" data-study-lineage-key="${x(key)}">
     <summary>
@@ -13606,7 +13680,7 @@ function _studyLineageItemHTML(item, tied) {
     <div class="evidence-board-row-text">${x(item.content ?? '')}</div>
     <div class="evidence-board-meta"><strong>Durable identity</strong> ${x(item.record?.table)} · ${x(JSON.stringify(item.record?.key || {}))}</div>
     <div class="evidence-board-meta">Authorship is shown only as supported by the stored provenance. A current snapshot does not establish when its present text was written.</div>
-    <div class="study-lineage-controls">${contexts.map(context => `<button class="cr-bottom-workstation-tab" type="button" onclick="_studyLineageOpenContext(${x(JSON.stringify(key))}, ${x(JSON.stringify(_studyLineageContextKey(context)))})"${context.kind === 'reader' ? ' title="Open the recorded source page; Reader navigation updates reading position"' : ''}>${context.kind === 'reader' ? 'Open source page in Reader' : 'Open object lineage'}</button>`).join('') || '<span class="evidence-board-meta">No stable context link recorded.</span>'}</div>
+    <div class="study-lineage-controls">${contexts.map(context => `<button class="cr-bottom-workstation-tab" type="button" onclick="_studyLineageOpenContext(${x(JSON.stringify(key))}, ${x(JSON.stringify(_studyLineageContextKey(context)))})"${context.kind === 'reader' ? ' title="Open the recorded source page; Reader navigation updates reading position"' : ''}>${({reader: 'Open source page in Reader', lineage: 'Open object lineage', perspective_execution: 'Open retained execution'})[context.kind]}</button>`).join('') || '<span class="evidence-board-meta">No stable context link recorded.</span>'}</div>
     <details><summary>Recorded provenance</summary><pre>${x(JSON.stringify(item.provenance || {}, null, 2))}</pre></details>
     <details><summary>Original stored record</summary><pre>${x(JSON.stringify(item.record_data || {}, null, 2))}</pre></details>
   </details>`;
@@ -13659,6 +13733,24 @@ async function _studyLineageOpenContext(itemKey, contextKey) {
   if (!context) return;
   if (context.kind === 'reader' && typeof context.document_id === 'string' && Number.isInteger(context.page) && context.page > 0) {
     return _attnOpen(context.document_id, context.page);
+  }
+  if (context.kind === 'perspective_execution') {
+    const id = context.receipt_id;
+    if (typeof id !== 'string' || !id) return;
+    const epoch = _evidenceBoardEpoch;
+    const seq = ++_studyLineageContextSeq;
+    const panel = document.getElementById('study-lineage-context');
+    if (!panel) return;
+    panel.innerHTML = '<div class="attn-hint">Loading exact retained context…</div>';
+    try {
+      const record = await get(`/api/perspective/executions/${encodeURIComponent(id)}`);
+      if (epoch !== _evidenceBoardEpoch || seq !== _studyLineageContextSeq || _evidenceBoardView !== 'lineage') return;
+      panel.innerHTML = _crRenderRetainedPerspectiveExecution(record);
+    } catch (e) {
+      if (epoch !== _evidenceBoardEpoch || seq !== _studyLineageContextSeq || _evidenceBoardView !== 'lineage') return;
+      panel.innerHTML = `<div class="attn-hint" style="color:var(--red)">${x(e.message)}</div>`;
+    }
+    return;
   }
   if (context.kind !== 'lineage' || typeof context.epistemic_class !== 'string' || typeof context.object_id !== 'string') return;
   const epoch = _evidenceBoardEpoch;

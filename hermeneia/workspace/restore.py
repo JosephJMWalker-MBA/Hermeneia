@@ -41,14 +41,19 @@ _TABLE_FILES: list[tuple[str, str]] = [
 ]
 
 _PERSPECTIVE_SUPERSESSION_FILE = "study/perspective_supersessions.json"
+_PERSPECTIVE_EXECUTION_FILE = "study/perspective_executions.json"
+_PERSPECTIVE_EXECUTION_CAPABILITY = "perspective-retained-execution-v1"
+_PERSPECTIVE_EXECUTION_TABLE = "perspective_execution_receipts"
 
 # Required capabilities this restorer can reconstruct (see export.py).
 _PUBLICATION_CAPABILITY = "publication-authoring-v0"
 _PUBLICATION_PREFIX = "publication/"
-SUPPORTED_CAPABILITIES = frozenset({_PUBLICATION_CAPABILITY})
+SUPPORTED_CAPABILITIES = frozenset({_PUBLICATION_CAPABILITY, _PERSPECTIVE_EXECUTION_CAPABILITY})
 
 # Tables whose presence means the workspace is not empty.
-_OCCUPANCY_TABLES = [table for table, _ in _TABLE_FILES] + ["workspace_investigation", "publication_works"]
+_OCCUPANCY_TABLES = [table for table, _ in _TABLE_FILES] + [
+    "workspace_investigation", "publication_works", _PERSPECTIVE_EXECUTION_TABLE,
+]
 
 
 class RestoreError(RuntimeError):
@@ -111,6 +116,7 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
         )
     tables = {table: (_load(rel) or []) for table, rel in _TABLE_FILES}
     perspective_supersessions = _load(_PERSPECTIVE_SUPERSESSION_FILE) or []
+    perspective_executions, receipt_coverage = _read_perspective_executions(root, manifest)
     publication = _read_publication_component(root, manifest)
     investigation = _load("investigation.json")
     uploads_dir = root / "corpus" / "uploads"
@@ -123,10 +129,68 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
         "manifest": manifest,
         "tables": tables,
         "perspective_supersessions": perspective_supersessions,
+        "perspective_executions": perspective_executions,
+        "coverage": {_PERSPECTIVE_EXECUTION_TABLE: receipt_coverage},
         "investigation": investigation,
         "uploads": uploads,
         "publication": publication,
     }
+
+
+def _read_perspective_executions(root: Path, manifest: dict) -> tuple[list[dict], dict]:
+    """Verify the narrow retained-execution component before any restore write.
+
+    Unsupported older coverage is reported explicitly, never interpreted as
+    evidence that no historical Perspective activity occurred.
+    """
+    declared = _PERSPECTIVE_EXECUTION_CAPABILITY in (manifest.get("required_capabilities") or [])
+    listed = [entry for entry in manifest.get("files") or []
+              if entry.get("path") == _PERSPECTIVE_EXECUTION_FILE]
+    path = root / _PERSPECTIVE_EXECUTION_FILE
+    if not declared and not listed and not path.exists():
+        return [], {"status": "unsupported", "reason": "Bundle does not cover retained Perspective executions; historical activity is unknown."}
+    if not declared:
+        raise RestoreError("Perspective execution component lacks its required capability declaration")
+    if len(listed) != 1 or listed[0].get("role") != "canonical" or not path.is_file():
+        raise RestoreError("Perspective execution component must have one complete canonical manifest entry")
+    if root.resolve() not in path.resolve().parents:
+        raise RestoreError("Perspective execution component escapes the bundle root")
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != listed[0].get("sha256"):
+        raise RestoreError("Perspective execution component failed its hash check")
+    from ..perspective_execution_receipts import receipt_from_row
+
+    try:
+        def unique_keys(pairs):
+            value = {}
+            for key, item in pairs:
+                if key in value:
+                    raise ValueError("duplicate key in Perspective execution component")
+                value[key] = item
+            return value
+
+        rows = json.loads(data, object_pairs_hook=unique_keys)
+        if not isinstance(rows, list):
+            raise ValueError("Perspective execution component must contain a row list")
+        ids, run_ids = set(), set()
+        for row in rows:
+            if not isinstance(row, dict) or set(row) != {"id", "run_id", "receipt_json"}:
+                raise ValueError("malformed Perspective execution row")
+            receipt_from_row(row)
+            if row["id"] in ids or row["run_id"] in run_ids:
+                raise ValueError("duplicate Perspective execution identity")
+            ids.add(row["id"])
+            run_ids.add(row["run_id"])
+        counts = manifest.get("counts")
+        if not isinstance(counts, dict):
+            raise ValueError("Perspective execution component requires explicit record counts")
+        count = counts.get(_PERSPECTIVE_EXECUTION_TABLE)
+        if type(count) is not int or count != len(rows):
+            raise ValueError("Perspective execution count disagrees with component")
+    except (ValueError, TypeError, KeyError) as exc:
+        raise RestoreError(str(exc)) from exc
+    return rows, {"status": "covered", "extant_records": len(rows),
+                  "reason": "Extant retained-receipt category covered; no complete historical activity claim."}
 
 
 def _read_publication_component(root: Path, manifest: dict) -> dict[str, Any] | None:
@@ -259,6 +323,8 @@ def preview_restore(db_path: str | Path, bundle_dir: str | Path) -> dict[str, An
             conn.close()
     counts = {table: len(rows) for table, rows in bundle["tables"].items()}
     counts["perspective_supersessions"] = len(bundle["perspective_supersessions"])
+    if bundle["coverage"][_PERSPECTIVE_EXECUTION_TABLE]["status"] == "covered":
+        counts[_PERSPECTIVE_EXECUTION_TABLE] = len(bundle["perspective_executions"])
     counts["uploads"] = len(bundle["uploads"])
     if bundle["publication"] is not None:
         for table, rows in bundle["publication"]["tables"].items():
@@ -270,6 +336,7 @@ def preview_restore(db_path: str | Path, bundle_dir: str | Path) -> dict[str, An
         "target_empty": target_empty,
         "would_create": counts,
         "has_investigation": bundle["investigation"] is not None,
+        "coverage": bundle["coverage"],
     }
 
 
@@ -327,6 +394,20 @@ def restore_workspace(
             )
             _validate_restored_perspective_graph(conn)
 
+            receipt_rows = bundle["perspective_executions"]
+            if bundle["coverage"][_PERSPECTIVE_EXECUTION_TABLE]["status"] == "covered":
+                from ..perspective_execution_receipts import receipt_from_row, validate_execution_references
+
+                for receipt_row in receipt_rows:
+                    try:
+                        validate_execution_references(conn, receipt_from_row(receipt_row))
+                    except (ValueError, KeyError, TypeError) as exc:
+                        raise RestoreError(f"invalid Perspective execution references: {exc}") from exc
+                restored[_PERSPECTIVE_EXECUTION_TABLE] = _insert_rows(
+                    conn, _PERSPECTIVE_EXECUTION_TABLE, receipt_rows,
+                    _table_columns(conn, _PERSPECTIVE_EXECUTION_TABLE),
+                )
+
             investigation = bundle["investigation"]
             if investigation is not None:
                 _restore_investigation(conn, investigation)
@@ -365,7 +446,8 @@ def restore_workspace(
         shutil.rmtree(staging, ignore_errors=True)
     _restore_uploads(db_path, bundle["uploads"])
     publication_files = len(bundle["publication"]["files"]) if bundle["publication"] is not None else 0
-    return {"restored": restored, "uploads": len(bundle["uploads"]), "publication_files": publication_files}
+    return {"restored": restored, "uploads": len(bundle["uploads"]),
+            "publication_files": publication_files, "coverage": bundle["coverage"]}
 
 
 def _copy_publication_file(src: Path, dest: Path) -> None:

@@ -10,6 +10,11 @@ import json
 import sqlite3
 from typing import Any
 
+from hermeneia.perspective_execution_receipts import (
+    TABLE as EXECUTION_TABLE, execution_references, receipt_from_row,
+    validate_execution_references,
+)
+
 SCHEMA = "hermeneia.study-lineage/v1"
 
 # table: (record type, title, historical time field, content field)
@@ -23,6 +28,7 @@ _SPECS = {
     "workspace_investigation": ("workspace_investigation", "Governing question — current snapshot", "updated_at", "thesis"),
     "investigation_log": ("field_note", "Corpus Field Note", "created_at", "understanding"),
     "perspectives": ("perspective", "Saved Perspective", "created_at", "name"),
+    EXECUTION_TABLE: ("retained_perspective_execution", "Retained Perspective execution", "retained_at", None),
     "proposed_interpretations": ("proposed_interpretation", "Model interpretation proposal", "created_at", "text"),
     "interpretations": ("interpretation", "Canonical Interpretation", "created_at", "text"),
     "narrative_blueprints": ("blueprint", "Saved Blueprint", "created_at", "thesis"),
@@ -176,6 +182,10 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
         documented.update(_RELATED_KEYS.get(table, ()))
         if table == "architect_plan_paragraphs":
             documented.update(("required_observations", "required_interpretations"))
+        if table == EXECUTION_TABLE:
+            # Times/content belong to the strict captured payload, not invented
+            # database columns. Malformed rows are omitted below.
+            required = documented = {"id", "run_id", "receipt_json"}
         absent = sorted(documented - set(columns))
         if absent:
             missing_columns[table] = absent
@@ -188,6 +198,7 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
     workspace = {"id": workspace_id, "name": identity.get("workspace_name")}
     allowed: dict[tuple[str, str], bool] = {}
     checking: set[tuple[str, str]] = set()
+    execution_receipts: dict[str, dict] = {}
 
     def parent(table: str, identifier: Any) -> dict | None:
         if not isinstance(identifier, str) or not identifier:
@@ -310,11 +321,24 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
         elif table == "authoring_outcomes" and ok:
             request = parent("authoring_requests", row.get("request_id"))
             ok = request.get("work_id") == row.get("work_id")
+        elif table == EXECUTION_TABLE:
+            try:
+                receipt = receipt_from_row(row)
+                validate_execution_references(conn, receipt)
+                ok = all(parent(ref["table"], ref["key"]["id"]) is not None
+                         and eligible(ref["table"], parent(ref["table"], ref["key"]["id"]))
+                         for ref in execution_references(receipt))
+                if ok:
+                    execution_receipts[row["id"]] = receipt
+            except (ValueError, TypeError, KeyError, sqlite3.Error):
+                ok = False
         checking.remove(token)
         allowed[token] = bool(ok)
         return bool(ok)
 
     def authorship(table: str, row: dict) -> tuple[str, str]:
+        if table == EXECUTION_TABLE:
+            return "model", "Machine-generated execution explicitly retained by a local steward; retention is not agreement or Interpretation acceptance."
         source = row.get("source")
         ai = linked_ai(table, row) if table in ("proposed_interpretations", "interpretations") else None
         if table == "proposed_interpretations" and ai and str(ai.get("generating_model") or "").strip():
@@ -347,6 +371,13 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
         return "unknown", "Authorship is not established by the stored record."
 
     def context(table: str, row: dict) -> list[dict]:
+        if table == EXECUTION_TABLE:
+            receipt = execution_receipts[row["id"]]
+            primary = receipt["run"]["scope_receipt"]["primary"]
+            result = [{"kind": "perspective_execution", "receipt_id": receipt["id"]}]
+            if isinstance(primary.get("page"), int) and primary["page"] > 0:
+                result.append({"kind": "reader", "document_id": primary["source_document_id"], "page": primary["page"]})
+            return result
         if table in _CANONICAL_CLASSES:
             return [{"kind": "lineage", "epistemic_class": _CANONICAL_CLASSES[table], "object_id": row["id"]}]
         doc_id, page = row.get("source_document_id"), row.get("page")
@@ -362,6 +393,15 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
         return []
 
     def provenance(table: str, row: dict, basis: str) -> dict:
+        if table == EXECUTION_TABLE:
+            receipt = execution_receipts[row["id"]]
+            run = receipt["run"]
+            return {"basis": basis, "references": execution_references(receipt), "records": [],
+                    "perspective": run["perspective"], "execution": run["execution"],
+                    "execution_created_at": run["created_at"], "execution_completed_at": run["completed_at"],
+                    "retention": receipt["retention"], "receipt_schema": receipt["schema"],
+                    "prompt_sha256": run["prompt_sha256"], "scope_sha256": run["scope_sha256"],
+                    "question_sha256": run["question_sha256"], "response_sha256": run["response_sha256"]}
         refs = [{"table": target, "key": {"id": row[field]}}
                 for field, target, _ in _PARENTS.get(table, ()) if row.get(field)]
         records = []
@@ -409,6 +449,10 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
                 "authorship": author, "provenance": provenance(table, row, basis),
                 "record_data": row, "contexts": context(table, row),
             }
+            if table == EXECUTION_TABLE:
+                receipt = execution_receipts[row["id"]]
+                item["content"] = receipt["run"]["response"][:1000]
+                item["timestamp"] = _timestamp("retention.retained_at", receipt["retention"]["retained_at"])
             items.append(item)
             if (table == "proposed_interpretations" and row.get("status") in ("accepted", "rejected")
                     and row.get("decided_at") and row.get("steward_id")):
@@ -424,7 +468,7 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
         "coverage": {
             "missing_tables": sorted(missing_tables), "missing_columns": missing_columns,
             "omitted": omitted, "unsupported_categories": [
-                "Transient Perspective and Room runs", "Overwritten annotation and governing-question revisions",
+                "Unretained/transient Perspective and Room runs", "Overwritten annotation and governing-question revisions",
                 "Deleted inquiry questions", "Unrecorded workspace exports and CLI publication events",
                 "Reading sessions and page traversal history", "Bucket and motif creation or revision history",
             ],
@@ -434,6 +478,7 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
                 "Unknown, naive and malformed timestamps are not chronologically ordered; equal times use identity order only.",
                 "Excluded evidence, unavailable or ambiguous parents, non-corpus notes and unbound publication works are omitted.",
                 "Unknown authorship remains unknown. Artifact references are recorded metadata, not a fresh integrity verification.",
+                "Retained Perspective receipts prove exact execution and explicit retention only; empty coverage cannot prove no past Perspective activity.",
             ],
         },
     }

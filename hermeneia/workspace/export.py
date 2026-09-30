@@ -37,9 +37,12 @@ WBS_VERSION = "1.1"
 # A workspace with an attached Publication Compositor work (issue #205, S1)
 # exports as 1.2 and declares a required capability, so a restorer that cannot
 # reconstruct the integrated authoring history refuses instead of dropping it.
-# Workspaces without an attached work still export as byte-identical 1.1.
+# Other additive components use required capabilities independently; stores
+# without those components retain the existing 1.1 representation.
 WBS_AUTHORING_VERSION = "1.2"
 PUBLICATION_CAPABILITY = "publication-authoring-v0"
+PERSPECTIVE_EXECUTION_CAPABILITY = "perspective-retained-execution-v1"
+PERSPECTIVE_EXECUTION_FILE = "study/perspective_executions.json"
 
 # Role of each file on restore (see spec §3).
 CANONICAL = "canonical"
@@ -78,6 +81,30 @@ def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
         ).fetchone()
         is not None
     )
+
+
+class PerspectiveExecutionExportError(RuntimeError):
+    """Retained execution history cannot be exported with intact provenance."""
+
+
+def _perspective_executions(conn: sqlite3.Connection) -> list[dict] | None:
+    """Capture complete extant receipt rows; older stores have no coverage.
+
+    An empty supported category covers zero extant retained records. It never
+    proves that no historical Perspective activity occurred.
+    """
+    if not _table_exists(conn, "perspective_execution_receipts"):
+        return None
+    from ..perspective_execution_receipts import receipt_from_row, validate_execution_references
+
+    try:
+        rows = _rows(conn, "SELECT * FROM perspective_execution_receipts ORDER BY id")
+        for row in rows:
+            receipt = receipt_from_row(row)
+            validate_execution_references(conn, receipt)
+    except (ValueError, TypeError, KeyError, sqlite3.Error) as exc:
+        raise PerspectiveExecutionExportError(f"invalid retained Perspective execution: {exc}") from exc
+    return rows
 
 
 def _investigation(conn: sqlite3.Connection) -> dict | None:
@@ -191,6 +218,34 @@ def build_bundle_files(
     app_version: str = "",
     publication: dict[str, Any] | None = None,
 ) -> dict[str, bytes]:
+    """Build the bundle from one caller-preserving SQLite read snapshot.
+
+    Receipts must close over the exact reference rows serialized with them.
+    Concurrent retention cannot add a receipt after its dependency files have
+    already been captured. Existing caller transactions remain caller-owned.
+    """
+    owns_snapshot = not conn.in_transaction
+    if owns_snapshot:
+        conn.execute("BEGIN")
+    try:
+        return _build_bundle_files_snapshot(
+            conn, generated_at=generated_at, workspace_id=workspace_id,
+            upload_files=upload_files, app_version=app_version, publication=publication,
+        )
+    finally:
+        if owns_snapshot:
+            conn.rollback()
+
+
+def _build_bundle_files_snapshot(
+    conn: sqlite3.Connection,
+    *,
+    generated_at: str,
+    workspace_id: str,
+    upload_files: list[tuple[str, bytes]] | None = None,
+    app_version: str = "",
+    publication: dict[str, Any] | None = None,
+) -> dict[str, bytes]:
     """Build every bundle file (including manifest) as path → bytes.
 
     Pure and deterministic: identical inputs (DB state, generated_at,
@@ -237,6 +292,7 @@ def build_bundle_files(
         "ORDER BY il.created_at, il.id",
     )
     investigation = _investigation(conn)
+    perspective_executions = _perspective_executions(conn)
     projections = _study_projections(highlights, field_notes)
     derived = _derived(
         conn,
@@ -264,6 +320,8 @@ def build_bundle_files(
         "lineage/lineage.json": (DERIVED, _dumps(derived["lineage"])),
         "evaluation/report.json": (DERIVED, _dumps(derived["evaluation"])),
     }
+    if perspective_executions is not None:
+        content[PERSPECTIVE_EXECUTION_FILE] = (CANONICAL, _dumps(perspective_executions))
 
     # Uploads: content-hash-named canonical files (the exact source, §5.1).
     for filename, data in sorted(upload_files or []):
@@ -307,6 +365,10 @@ def build_bundle_files(
         manifest["counts"]["authoring_accepted_versions"] = sum(
             1 for row in publication["tables"].get("authoring_outcomes", []) if row.get("status") == "accepted"
         )
+    if perspective_executions is not None:
+        manifest.setdefault("required_capabilities", []).append(PERSPECTIVE_EXECUTION_CAPABILITY)
+        manifest["required_capabilities"].sort()
+        manifest["counts"]["perspective_execution_receipts"] = len(perspective_executions)
 
     out: dict[str, bytes] = {path: data for path, (_role, data) in content.items()}
     out["manifest.json"] = _dumps(manifest)

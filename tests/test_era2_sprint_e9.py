@@ -87,8 +87,8 @@ def store_with_proposal(tmp_path):
 
 # ── Schema version ────────────────────────────────────────────────────────────
 
-def test_schema_version_is_17():
-    assert SCHEMA_VERSION == 17
+def test_schema_version_is_18():
+    assert SCHEMA_VERSION == 18
 
 
 def test_critic_reports_table_exists(store):

@@ -19,12 +19,12 @@ from hermeneia.study_lineage import SCHEMA as LINEAGE_SCHEMA
 
 REGISTRY_SCHEMA = "hermeneia.capability-registry/v1"
 RESULT_SCHEMA = "hermeneia.capability-evaluation/v1"
-EVALUATOR_VERSION = "1.0.0"
+EVALUATOR_VERSION = "1.1.0"
 STATUSES = frozenset({"available", "not_yet_available",
     "already_exercised_under_supported_evidence", "unsupported_due_to_missing_history"})
 _FACTS = frozenset({"reader_material", "evidence", "observation", "inquiry_context",
     "perspective_frame", "interpretation", "blueprint", "lineage",
-    "preserved_question", "attributed_interpretation"})
+    "preserved_question", "attributed_interpretation", "retained_perspective_execution"})
 _REASONS = frozenset({"READY", "MISSING_SOURCE", "INSUFFICIENT_EVIDENCE",
     "MISSING_INQUIRY_CONTEXT", "MISSING_PERSPECTIVE", "NO_INTERPRETATION",
     "NO_BLUEPRINT", "NO_LINEAGE", "HISTORY_UNSUPPORTED", "COVERAGE_UNSUPPORTED",
@@ -99,7 +99,11 @@ def _validate_registry(value: Any) -> dict:
         require(isinstance(unknown, dict) and set(unknown) == {"reason_code", "reason"}, "Explicit historical unknown condition required")
         require(unknown["reason_code"] == "HISTORY_UNSUPPORTED" and _text(unknown["reason"]), "Invalid historical unknown condition")
         # Readiness facts can never be promoted into historical exercise by data.
-        require(all(p["fact"] in {"preserved_question", "attributed_interpretation"} for p in definition["positive_evidence"]), "Readiness is not historical exercise")
+        historical_facts = {"preserved_question", "attributed_interpretation"}
+        if (identifier == "explore_perspective" and definition["definition_version"] == "1.1.0"
+                and tuple(map(int, value["registry_version"].split("."))) >= (1, 1, 0)):
+            historical_facts.add("retained_perspective_execution")
+        require(all(p["fact"] in historical_facts for p in definition["positive_evidence"]), "Readiness or unversioned receipt evidence is not historical exercise")
     for definition in definitions:
         require(all(target in ids for target in definition["related_or_next_capabilities"]), "Unknown related capability")
     normalized = deepcopy(value)
@@ -117,7 +121,7 @@ def load_capability_registry(path: Path | str | None = None) -> dict:
 
     No caching or caller mutation can change later default evaluations.
     """
-    resource = files("hermeneia").joinpath("data/capability-registry-v1.json") if path is None else Path(path)
+    resource = files("hermeneia").joinpath("data/capability-registry-v1.1.json") if path is None else Path(path)
     try:
         value = json.loads(resource.read_bytes(), object_pairs_hook=_object,
             parse_constant=lambda token: (_ for _ in ()).throw(CapabilityRegistryError(f"Nonfinite value: {token}")))
@@ -180,7 +184,12 @@ def _fact_inputs(lineage: dict, current_state: dict) -> dict[str, _Fact]:
             lambda i: i["event"] == "recorded" and nonblank(i, "question_text")),
         "attributed_interpretation": record_fact(("interpretations",),
             lambda i: i["event"] == "recorded" and i["authorship"] in ("human", "accepted_model") and nonblank(i, "text")),
+        "retained_perspective_execution": record_fact(("perspective_execution_receipts",),
+            lambda i: i["event"] == "recorded" and i["authorship"] == "model"
+            and i.get("record_type") == "retained_perspective_execution"),
     }
+    facts["retained_perspective_execution"].unknown.append(
+        "Only explicitly retained executions are covered; absent receipts do not establish no past Perspective activity.")
     for item in items:
         if (item["record"]["table"] == "interpretations" and item["authorship"] == "unknown"):
             facts["attributed_interpretation"].unknown.append("Canonical interpretation authorship is unknown; formation cannot be attributed.")

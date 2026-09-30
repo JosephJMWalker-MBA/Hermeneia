@@ -312,7 +312,8 @@ def test_registry_prerequisites_and_prose_remain_authoritative():
     lineage = project_study_lineage(conn)
     registry = load_capability_registry()
     definition = next(row for row in registry["capabilities"] if row["capability_id"] == "organize_evidence")
-    definition["definition_version"] = registry["registry_version"] = "1.0.1"
+    definition["definition_version"] = "1.0.1"
+    registry["registry_version"] = "1.1.1"
     definition["prerequisites"][0]["minimum"] = 999
     definition["purpose"] = "Definition-owned explanation."
     direct = {row["capability_id"]: row for row in evaluate_capabilities(lineage, registry)["capabilities"]}

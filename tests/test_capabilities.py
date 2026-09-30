@@ -1,6 +1,7 @@
 """Strict static definitions and conservative, deterministic capability rules."""
 from copy import deepcopy
 import json
+from pathlib import Path
 
 import pytest
 
@@ -51,11 +52,16 @@ def test_packaged_registry_is_explicit_complete_and_version_frozen():
     definitions = first["capabilities"]
     assert len(definitions) == len(IDS)
     assert {row["capability_id"] for row in definitions} == IDS
-    assert first["registry_version"] == EVALUATOR_VERSION == "1.0.0"
-    assert {row["definition_version"] for row in definitions} == {"1.0.0"}
-    result = evaluate_capabilities(_projection(), first)
+    assert first["registry_version"] == EVALUATOR_VERSION == "1.1.0"
+    assert {row["definition_version"] for row in definitions} == {"1.0.0", "1.1.0"}
+    assert next(row for row in definitions if row["capability_id"] == "explore_perspective")["definition_version"] == "1.1.0"
+    old = load_capability_registry(Path(__file__).parents[1] / "hermeneia/data/capability-registry-v1.json")
+    assert old["registry_version"] == "1.0.0"
+    assert {row["definition_version"] for row in old["capabilities"]} == {"1.0.0"}
+    result = evaluate_capabilities(_projection(), old)
     # Changing released definitions requires an explicit version/fixture review.
     assert result["registry_sha256"] == "7ec255a892ed48a6ce42b597cad2e247b6f99d59cb7e6edd41bca15d14074622"
+    assert evaluate_capabilities(_projection(), first)["registry_sha256"] == "eafda6b4081c50bdece9540a45c54c0404d0f7c0e05fcff750cf6f19626c9f75"
     assert STATUSES == {"available", "not_yet_available", EXERCISED, UNSUPPORTED}
 
 
