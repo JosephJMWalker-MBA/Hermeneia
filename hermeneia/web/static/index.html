@@ -2108,9 +2108,11 @@ body.has-workflow-rail { padding-bottom: 40px; }
   display: flex; align-items: center; justify-content: center;
   font-size: 9px; line-height: 1; margin-top: 1px;
 }
-.cmp-step.done .cmp-step-mark {
-  border-color: #2d6a4f; color: #b7e4c7; background: #16321f;
-}
+.cmp-step-select { width: 100%; background: none; border-right: none; border-bottom: none; border-left: none; text-align: left; font: inherit; cursor: pointer; }
+.cmp-step-select .cmp-step-why { display: block; }
+.cmp-cycle-detail { margin: 10px 0; }
+.cmp-cycle-basis { margin-top: 8px; font-size: 11px; color: var(--dim2); }
+.cmp-cycle-basis pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; }
 .cmp-step.current .cmp-step-mark {
   border-color: var(--accent); color: var(--accent); background: var(--accent2);
 }
@@ -2122,7 +2124,6 @@ body.has-workflow-rail { padding-bottom: 40px; }
   color: var(--fg2); cursor: pointer; font: inherit; font-size: 11px;
 }
 .cmp-step-action:hover { border-color: var(--accent); color: var(--accent); }
-.cmp-step.done .cmp-step-action { display: none; }
 .cmp-guide-paused {
   margin-bottom: 10px; padding: 9px 10px; border: 1px solid var(--border);
   border-radius: var(--r); background: var(--bg); font-size: 11px;
@@ -3280,15 +3281,15 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
           <div id="cr-perspective-select-wrap">
             <label class="cr-form-label" for="cr-perspective-select">Perspective</label>
             <div style="display:flex;gap:6px;align-items:center;margin-bottom:7px;flex-wrap:wrap">
-              <button class="cr-bottom-workstation-tab active" id="cr-perspective-kind-built-in" type="button" onclick="_crSetPerspectiveKind('built-in')">Built-in</button>
-              <button class="cr-bottom-workstation-tab" id="cr-perspective-kind-saved" type="button" onclick="_crSetPerspectiveKind('saved')">Saved</button>
-              <button class="cr-bottom-workstation-tab" id="cr-perspective-kind-custom" type="button" onclick="_crSetPerspectiveKind('custom')">Custom</button>
+              <button class="cr-bottom-workstation-tab active" id="cr-perspective-kind-built-in" type="button" onclick="_crSetPerspectiveKind('built-in');_cmpFrameSelectionChanged()">Built-in</button>
+              <button class="cr-bottom-workstation-tab" id="cr-perspective-kind-saved" type="button" onclick="_crSetPerspectiveKind('saved');_cmpFrameSelectionChanged()">Saved</button>
+              <button class="cr-bottom-workstation-tab" id="cr-perspective-kind-custom" type="button" onclick="_crSetPerspectiveKind('custom');_cmpFrameSelectionChanged()">Custom</button>
             </div>
             <div id="cr-perspective-built-in-panel">
-              <select class="ob-extract-provider" id="cr-perspective-select" style="width:100%"></select>
+              <select class="ob-extract-provider" id="cr-perspective-select" onchange="_cmpFrameSelectionChanged()" style="width:100%"></select>
             </div>
             <div id="cr-perspective-saved-panel" hidden style="font-size:12px;color:var(--dim2);line-height:1.5">
-              <select class="ob-extract-provider" id="cr-perspective-saved-select" onchange="_crRenderSavedPerspectiveDetail()" style="width:100%"></select>
+              <select class="ob-extract-provider" id="cr-perspective-saved-select" onchange="_crRenderSavedPerspectiveDetail();_cmpFrameSelectionChanged()" style="width:100%"></select>
               <div id="cr-perspective-saved-detail" style="margin-top:7px"></div>
             </div>
             <div id="cr-perspective-custom-panel" hidden style="font-size:12px;color:var(--dim2);line-height:1.5">
@@ -4728,6 +4729,7 @@ function _wsApplyCurrentWorkspace(workspace) {
   if (workspaceChanged) _crReaderLoadSeq += 1;
   _runtimeApplyWorkspaceDraftScope(workspace);
   _wsCurrentWorkspace = workspace;
+  if (workspaceChanged && typeof _cmpResetStudyCycle === 'function') _cmpResetStudyCycle();
   if (workspaceChanged && typeof _crResetPerspectiveRoomStateForWorkspaceChange === 'function') {
     _crResetPerspectiveRoomStateForWorkspaceChange();
   }
@@ -5506,6 +5508,7 @@ async function e10LoadFirstRun() {
       <div id="cmp-onboarding-host-firstrun">${_cmpOnboardingHtml()}</div>
     </aside>
     </div>`;
+  _cmpRenderOnboarding();
 }
 
 async function _frInit(btn) {
@@ -9260,285 +9263,266 @@ const _CMP_CONTEXT_LABELS = [
 ];
 
 const _CMP_ONBOARDING_KEY = 'hermeneia_companion_onboarding_v1';
-const _CMP_METHOD_STEPS = ['Thesis', 'Read', 'Observe', 'Search', 'Interpret', 'Blueprint', 'Critic', 'Meta-synthesis'];
-const _CMP_ONBOARDING_STEPS = [
-  {
-    id: 'welcome',
-    label: 'Welcome',
-    why: 'Hermeneia is a reading workbench. The Companion starts here as a guide to the method, not as a separate tour.',
-    action: 'Begin walkthrough',
-  },
-  {
-    id: 'reader',
-    label: 'Reader',
-    why: 'The Reader is the main canvas. Search, Timeline, field notes, and the later workflow all serve the reading.',
-    action: 'Center the Reader',
-  },
-  {
-    id: 'thesis',
-    label: 'Thesis',
-    why: 'Set a governing question so every observation, search, and interpretation has a human purpose.',
-    action: 'Set governing question',
-  },
-  {
-    id: 'read',
-    label: 'Read',
-    why: 'Read a small amount before asking the system to explain. The source text remains the first authority.',
-    action: 'I have read a little',
-  },
-  {
-    id: 'observe',
-    label: 'Observe',
-    why: 'Make or review one highlight, question, or observation candidate. Human attention starts the record.',
-    action: 'Open inspector',
-  },
-  {
-    id: 'search',
-    label: 'Search',
-    why: 'Ask: where else does this idea appear? Corpus Search checks the rest of the evidence without leaving the book.',
-    action: 'Open Corpus Search',
-  },
-  {
-    id: 'timeline',
-    label: 'Timeline',
-    why: 'Ask: what have you discovered so far? Timeline shows the trail of highlights, questions, notes, and field notes.',
-    action: 'Open Timeline',
-  },
-  {
-    id: 'later',
-    label: 'Interpret / Blueprint / Critic / Meta-synthesis',
-    why: 'Interpretation, Blueprint, Critic, and Meta-synthesis come later. First, build a traceable reading trail.',
-    action: 'Acknowledge later layers',
-  },
-  {
-    id: 'coach',
-    label: 'Persistent coach',
-    why: 'After onboarding, keep the Companion available as a checklist and coach while the Reader remains central.',
-    action: 'Keep Companion available',
-  },
-];
+const _CMP_STUDY_CYCLE_SCHEMA = 'hermeneia.guided-study-cycle/v1';
+let _cmpStudyCycle = null;
+let _cmpStudyCycleLoading = false;
+let _cmpStudyCycleError = '';
+let _cmpStudyCycleSeq = 0;
+let _cmpStudyNavigationSeq = 0;
+let _cmpSelectedCycleStep = '';
+let _cmpStudyWorkspaceEpoch = 0;
+let _cmpFrameSelectionEpoch = -1;
 
+// This key holds presentation preferences only. Legacy completion/finished
+// flags cannot establish study state, historical exercise, or recommendation.
 function _cmpDefaultOnboardingState() {
-  return { completed: {}, paused: false, finished: false, updated_at: '' };
+  return { paused: false, dismissed: false };
 }
-
 function _cmpLoadOnboardingState() {
   try {
     const saved = JSON.parse(localStorage.getItem(_CMP_ONBOARDING_KEY) || 'null');
-    return {
-      ..._cmpDefaultOnboardingState(),
-      ...(saved && typeof saved === 'object' ? saved : {}),
-      completed: (saved && typeof saved.completed === 'object' && saved.completed) ? saved.completed : {},
-    };
-  } catch {
-    return _cmpDefaultOnboardingState();
-  }
+    return { paused: saved?.paused === true, dismissed: saved?.dismissed === true };
+  } catch { return _cmpDefaultOnboardingState(); }
 }
-
 function _cmpSaveOnboardingState(state) {
-  const next = {
-    ..._cmpDefaultOnboardingState(),
-    ...(state || {}),
-    completed: state?.completed || {},
-    updated_at: new Date().toISOString(),
-  };
+  const next = { paused: state?.paused === true, dismissed: state?.dismissed === true };
   try { localStorage.setItem(_CMP_ONBOARDING_KEY, JSON.stringify(next)); } catch {}
   return next;
 }
-
-function _cmpStepComplete(stepId, state) {
-  if (state?.completed?.[stepId]) return true;
-  if (stepId === 'reader') return !!_crDocId;
-  if (stepId === 'thesis') return !!(invLoad()?.thesis || '').trim();
-  if (stepId === 'observe') return Array.isArray(_crHighlights) && _crHighlights.some(h => h && h.status !== 'dismissed');
-  return false;
+function _cmpResetStudyCycle() {
+  _cmpStudyCycleSeq += 1;
+  _cmpStudyNavigationSeq += 1;
+  _cmpStudyWorkspaceEpoch += 1;
+  _cmpFrameSelectionEpoch = -1;
+  _cmpStudyCycle = null;
+  _cmpStudyCycleLoading = false;
+  _cmpStudyCycleError = '';
+  _cmpSelectedCycleStep = '';
+  _cmpRenderOnboarding(false);
 }
-
-function _cmpStepsWithStatus(state) {
-  let currentFound = false;
-  return _CMP_ONBOARDING_STEPS.map(step => {
-    const done = _cmpStepComplete(step.id, state);
-    const current = !done && !currentFound;
-    if (current) currentFound = true;
-    return { ...step, done, current };
-  });
+function _cmpValidateStudyCycle(data) {
+  const statuses = ['ready', 'not_ready', 'currently_supported', 'historically_exercised', 'unknown'];
+  const surfaces = ['question', 'reader', 'capture', 'observations', 'inquiry', 'evidence',
+    'perspective', 'interpretation', 'search', 'blueprint', 'lineage'];
+  if (data?.schema !== _CMP_STUDY_CYCLE_SCHEMA || !Array.isArray(data.steps) || data.steps.length !== 11) {
+    throw new Error('Unsupported Study Cycle projection.');
+  }
+  const ids = new Set();
+  for (const [index, step] of data.steps.entries()) {
+    if (!step || typeof step.step_id !== 'string' || !step.step_id ||
+        step.step_id !== step.capability_id || ids.has(step.step_id) || step.ordinal !== index + 1 ||
+        !statuses.includes(step.status) || !surfaces.includes(step.target_surface) ||
+        !['supported', 'unsupported'].includes(step.history_support?.status) ||
+        typeof step.history_support?.reason !== 'string' ||
+        !['available', 'not_yet_available', 'unsupported_due_to_missing_history'].includes(step.availability) ||
+        !['available', 'not_yet_available', 'already_exercised_under_supported_evidence', 'unsupported_due_to_missing_history'].includes(step.capability_status) ||
+        !Array.isArray(step.evidence_or_state_basis) ||
+        ['title', 'why_it_matters', 'status_reason', 'recommended_action'].some(key => typeof step[key] !== 'string')) {
+      throw new Error('Unsupported Study Cycle step.');
+    }
+    ids.add(step.step_id);
+  }
+  if (!ids.has(data.recommended_step_id) || typeof data.recommendation_reason !== 'string') {
+    throw new Error('Unsupported Study Cycle recommendation.');
+  }
+  return data;
 }
-
-function _cmpCurrentStep(state) {
-  return _cmpStepsWithStatus(state).find(s => s.current) || null;
+function _cmpFrameSelectionChanged(epoch = _cmpStudyWorkspaceEpoch) {
+  if (epoch !== _cmpStudyWorkspaceEpoch) return;
+  _cmpFrameSelectionEpoch = epoch;
+  void _cmpLoadStudyCycle();
 }
-
-function _cmpOnboardingComplete(state) {
-  return _cmpStepsWithStatus(state).every(s => s.done);
+function _cmpStudyCycleURL() {
+  // Exact selected named frame is a current readiness input. The backend
+  // validates its declaration; room/custom drafts supply no fabricated frame.
+  if (_cmpFrameSelectionEpoch !== _cmpStudyWorkspaceEpoch) return '/api/guided-study-cycle';
+  const mode = typeof _crPerspectiveMode === 'undefined' ? '' : _crPerspectiveMode;
+  const kind = typeof _crPerspectiveKind === 'undefined' ? '' : _crPerspectiveKind;
+  if (mode === 'room' || !['built-in', 'saved'].includes(kind)) return '/api/guided-study-cycle';
+  const id = document.getElementById(kind === 'saved' ? 'cr-perspective-saved-select' : 'cr-perspective-select')?.value;
+  if (typeof id !== 'string' || !id) return '/api/guided-study-cycle';
+  return `/api/guided-study-cycle?perspective_kind=${kind === 'saved' ? 'saved' : 'builtin'}&perspective_id=${encodeURIComponent(id)}`;
 }
-
-function _cmpRenderMethodStrip(currentStep) {
-  const active = currentStep?.id || '';
-  const activeMethod = active === 'thesis' ? 'Thesis'
-    : active === 'read' || active === 'reader' || active === 'welcome' ? 'Read'
-    : active === 'observe' || active === 'timeline' ? 'Observe'
-    : active === 'search' ? 'Search'
-    : active === 'later' ? 'Interpret'
-    : active === 'coach' ? 'Meta-synthesis' : '';
-  return `<div class="cmp-method-strip" aria-label="Hermeneia study method">
-    ${_CMP_METHOD_STEPS.map(label => `<span class="cmp-method-step ${label === activeMethod ? 'active' : ''}">${x(label)}</span>`).join('')}
-  </div>`;
+async function _cmpLoadStudyCycle() {
+  const seq = ++_cmpStudyCycleSeq;
+  _cmpStudyCycleLoading = true;
+  _cmpStudyCycleError = '';
+  _cmpRenderOnboarding(false);
+  try {
+    const data = _cmpValidateStudyCycle(await get(_cmpStudyCycleURL()));
+    if (seq !== _cmpStudyCycleSeq) return;
+    _cmpStudyCycle = data;
+    if (!data.steps.some(step => step.step_id === _cmpSelectedCycleStep)) _cmpSelectedCycleStep = '';
+  } catch (error) {
+    if (seq !== _cmpStudyCycleSeq) return;
+    _cmpStudyCycle = null;
+    _cmpStudyCycleError = error.message || 'Could not load the current study state.';
+  } finally {
+    if (seq === _cmpStudyCycleSeq) {
+      _cmpStudyCycleLoading = false;
+      _cmpRenderOnboarding(false);
+    }
+  }
 }
-
+function _cmpCycleStepLabel(status) {
+  return ({ ready: 'Ready to use', not_ready: 'Prerequisite needed',
+    currently_supported: 'Current material present', historically_exercised: 'Supported retained result',
+    unknown: 'Current readiness unknown' })[status] || 'Unknown';
+}
+function _cmpCycleAvailabilityLabel(availability) {
+  return ({ available: 'Available now', not_yet_available: 'Prerequisite needed',
+    unsupported_due_to_missing_history: 'Current readiness unknown' })[availability] || 'Current readiness unknown';
+}
 function _cmpOnboardingHtml() {
   const state = _cmpLoadOnboardingState();
-  const steps = _cmpStepsWithStatus(state);
-  const current = steps.find(s => s.current);
-  const complete = _cmpOnboardingComplete(state);
-  const priority = current ? `<strong style="color:var(--fg)">Current:</strong> ${x(current.label)} — ${x(current.why)}` : 'Walkthrough complete.';
-
-  if (state.paused || state.finished || complete) {
-    const label = complete || state.finished ? 'Walkthrough complete' : 'Walkthrough paused';
+  const data = _cmpStudyCycle;
+  if (state.paused || state.dismissed) {
     return `<div class="cmp-guide-paused" id="cmp-onboarding">
-      <div><strong style="color:var(--fg)">${label}.</strong> ${priority}</div>
-      <div style="margin-top:4px">Progress is stored in this browser. No configured model is required for this guide; deterministic stub guidance still works before AI setup.</div>
+      <strong>${state.dismissed ? 'Study guide hidden' : 'Study guide paused'}.</strong> Use the workbench freely.
+      <div>These browser preferences do not record study completion or historical exercise.</div>
       <div class="cmp-guide-paused-actions">
         <button type="button" class="fs-pill" onclick="cmpOpenOnboarding()">Open guide</button>
-        <button type="button" class="fs-pill" onclick="cmpRestartOnboarding()">Restart walkthrough</button>
+        <button type="button" class="fs-pill" onclick="cmpRestartOnboarding()">Restart study guide</button>
       </div>
     </div>`;
   }
-
+  const steps = data?.steps || [];
+  const selected = steps.find(step => step.step_id === _cmpSelectedCycleStep)
+    || steps.find(step => step.step_id === data?.recommended_step_id);
+  const detail = selected ? `<div class="cmp-cycle-detail" aria-live="polite">
+      <div class="cmp-guide-kicker">Step ${selected.ordinal} of ${steps.length} · ${x(selected.title)}</div>
+      <div class="cmp-step-why"><strong>Why this matters</strong><br>${x(selected.why_it_matters)}</div>
+      <div class="cmp-step-why"><strong>Current state</strong><br>${x(_cmpCycleStepLabel(selected.status))}: ${x(selected.status_reason)}</div>
+      <div class="cmp-step-why"><strong>Readiness</strong><br>${x(_cmpCycleAvailabilityLabel(selected.availability))}${selected.availability_reason ? `: ${x(selected.availability_reason)}` : ''}</div>
+      <div class="cmp-step-why"><strong>History</strong><br>${selected.history_support.status === 'supported' ? 'A narrow retained result is supported.' : 'Historical exercise is unsupported; this is not a failure.'} ${x(selected.history_support.reason || '')}</div>
+      <div class="cmp-step-why"><strong>Recommended action</strong><br>${x(selected.recommended_action)}</div>
+      <button type="button" class="cmp-step-action" onclick="cmpOnboardingAction(${x(JSON.stringify(selected.step_id))})">${x(selected.recommended_action)}</button>
+      <details class="cmp-cycle-basis"><summary>Evidence / current-state basis</summary><pre>${x(JSON.stringify(selected.evidence_or_state_basis, null, 2))}</pre></details>
+    </div>` : `<div class="cmp-step-why" aria-live="polite">${_cmpStudyCycleError ? x(_cmpStudyCycleError) : 'Loading current study state…'}</div>`;
   return `<div class="cmp-guide" id="cmp-onboarding">
     <div class="cmp-guide-head">
-      <div>
-        <div class="cmp-guide-kicker">First Companion workflow</div>
-        <div class="cmp-guide-title">Companion-led onboarding</div>
-        <div class="cmp-guide-note">The Companion teaches the reading method while the Reader stays central. Progress is local to this browser.</div>
-      </div>
+      <div><div class="cmp-guide-kicker">Companion-led guide</div><div class="cmp-guide-title">Study Cycle</div>
+        <div class="cmp-guide-note">A guided method, not a historical accomplishment. No configured model is required for this guide.</div></div>
       <div class="cmp-guide-actions">
         <button type="button" class="fs-pill" onclick="cmpContinueOnboardingLater()">Continue later</button>
+        <button type="button" class="fs-pill" onclick="cmpHideOnboarding()">Hide guide</button>
         <button type="button" class="fs-pill" onclick="cmpRestartOnboarding()">Restart</button>
       </div>
     </div>
     <div class="cmp-guide-body">
-      ${_cmpRenderMethodStrip(current)}
-      ${steps.map(step => `
-        <div class="cmp-step ${step.done ? 'done' : step.current ? 'current' : ''}" data-step="${x(step.id)}">
-          <div class="cmp-step-mark">${step.done ? '✓' : step.current ? '→' : '○'}</div>
-          <div>
-            <div class="cmp-step-label">${x(step.label)}</div>
-            <div class="cmp-step-why">${x(step.why)}</div>
-            ${step.current ? `<button type="button" class="cmp-step-action" onclick="cmpOnboardingAction('${x(step.id)}')">${x(step.action)}</button>` : ''}
-          </div>
-        </div>`).join('')}
+      ${data ? `<div class="cmp-guide-note">${x(data.recommendation_reason)}</div>` : ''}
+      ${_cmpStudyCycleLoading && data ? '<div class="cmp-guide-note">Refreshing current study state…</div>' : ''}
+      ${detail}
+      <div class="cmp-cycle-checklist" aria-label="Study Cycle steps">${steps.map(step => `<button type="button" class="cmp-step cmp-step-select ${step.step_id === selected?.step_id ? 'current' : ''}" data-step="${x(step.step_id)}" aria-pressed="${step.step_id === selected?.step_id}" onclick="cmpSelectStudyStep(${x(JSON.stringify(step.step_id))})">
+        <span class="cmp-step-mark">${step.ordinal}</span><span><span class="cmp-step-label">${x(step.title)}</span><span class="cmp-step-why">${x(_cmpCycleStepLabel(step.status))} · ${step.history_support.status === 'supported' ? 'Retained result supported' : 'History unsupported'}</span></span>
+      </button>`).join('')}</div>
+      <div class="cmp-guide-note">You can revisit any step. Current material is not proof of a prior study cycle; unknown history does not mean the work failed.</div>
+      <button type="button" class="cmp-step-action" onclick="_cmpLoadStudyCycle()">Refresh current state</button>
+      <button type="button" class="cmp-step-action" onclick="cmpUseWorkbenchFreely()">Use workbench freely</button>
     </div>
   </div>`;
 }
-
-function _cmpRenderOnboarding() {
+function _cmpRenderOnboarding(refresh = true) {
   const host = document.getElementById('cmp-onboarding-host');
-  if (host) host.innerHTML = _cmpOnboardingHtml();
   const firstRunHost = document.getElementById('cmp-onboarding-host-firstrun');
+  if (host) host.innerHTML = _cmpOnboardingHtml();
   if (firstRunHost) firstRunHost.innerHTML = _cmpOnboardingHtml();
+  if (refresh && (host || firstRunHost) && !_cmpStudyCycleLoading) void _cmpLoadStudyCycle();
 }
-
+// Existing Reader hooks ask only for a fresh projection. Their labels are not
+// evidence and are never persisted as completed steps.
 function cmpMarkOnboardingStep(stepId, opts = {}) {
-  if (!_CMP_ONBOARDING_STEPS.some(s => s.id === stepId)) return;
-  const state = _cmpLoadOnboardingState();
-  state.completed[stepId] = true;
-  if (!opts.keepPaused) state.paused = false;
-  if (_cmpOnboardingComplete(state)) state.finished = true;
-  _cmpSaveOnboardingState(state);
   _cmpRenderOnboarding();
 }
-
+function cmpSelectStudyStep(stepId) {
+  if (!_cmpStudyCycle?.steps.some(step => step.step_id === stepId)) return;
+  _cmpSelectedCycleStep = stepId;
+  _cmpRenderOnboarding(false);
+}
 function cmpOpenOnboarding() {
-  const state = _cmpLoadOnboardingState();
-  state.paused = false;
-  state.finished = false;
-  _cmpSaveOnboardingState(state);
+  _cmpSaveOnboardingState(_cmpDefaultOnboardingState());
   _dockOpenPanel('guide');
   _cmpRenderOnboarding();
   document.getElementById('cmp-onboarding')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
-
 function cmpContinueOnboardingLater() {
-  const state = _cmpLoadOnboardingState();
-  state.paused = true;
-  _cmpSaveOnboardingState(state);
-  _cmpRenderOnboarding();
+  _cmpSaveOnboardingState({ paused: true, dismissed: false });
+  _cmpRenderOnboarding(false);
 }
-
+function cmpHideOnboarding() {
+  _cmpSaveOnboardingState({ paused: false, dismissed: true });
+  _cmpRenderOnboarding(false);
+}
+function cmpUseWorkbenchFreely() {
+  cmpHideOnboarding();
+  _dockClosePanel();
+}
 function cmpRestartOnboarding() {
   _cmpSaveOnboardingState(_cmpDefaultOnboardingState());
+  _cmpSelectedCycleStep = '';
+  _dockOpenPanel('guide');
   _cmpRenderOnboarding();
 }
-
-function _cmpSearchSeed() {
-  const selected = (_crSelText || (window.getSelection ? String(window.getSelection()).trim() : '')).trim();
-  if (selected && selected.length <= 80) return selected;
-  const thesis = (invLoad()?.thesis || '').trim();
-  const words = thesis.split(/\s+/).map(w => w.replace(/[^\w-]/g, '')).filter(w => w.length > 3);
-  return words[0] || '';
-}
-
-function _cmpFocusReader() {
-  e10Go('reader');
-  setTimeout(() => {
-    const view = document.getElementById('cr-page-view');
-    if (view) view.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 80);
-}
-
-function cmpOnboardingAction(stepId) {
-  if (stepId === 'welcome') {
-    cmpMarkOnboardingStep('welcome');
-    document.getElementById('cr-companion-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    return;
-  }
-  if (stepId === 'reader') {
-    cmpMarkOnboardingStep('reader');
-    _cmpFocusReader();
-    return;
-  }
-  if (stepId === 'thesis') {
-    if ((invLoad()?.thesis || '').trim()) {
-      cmpMarkOnboardingStep('thesis');
-      return;
+function _cmpStudyObservationContext(step) {
+  const ids = new Set();
+  for (const ref of step.evidence_or_state_basis) {
+    const contexts = [ref.record, ...(ref.provenance?.references || [])];
+    for (const record of contexts) {
+      if (record?.table === 'observations' && typeof record.key?.id === 'string' && record.key.id) ids.add(record.key.id);
     }
+  }
+  // Several source contexts require the existing chooser, never an arbitrary
+  // inferred association. Duplicate references to one typed ID are harmless.
+  return ids.size === 1 ? [...ids][0] : '';
+}
+async function cmpOnboardingAction(stepId) {
+  const step = _cmpStudyCycle?.steps.find(row => row.step_id === stepId);
+  if (!step) return;
+  const seq = ++_cmpStudyNavigationSeq;
+  const target = step.target_surface;
+  _dockClosePanel();
+  if (target === 'inquiry' || target === 'interpretation') {
+    // Select an existing typed Observation context; navigation is not a new
+    // eligibility rule and cannot turn this record into exercise history.
+    const observationId = _cmpStudyObservationContext(step);
+    if (observationId) {
+      await e10SelectObservation(observationId);
+      if (seq !== _cmpStudyNavigationSeq) return;
+      if (target === 'inquiry') document.getElementById('obs-inquiry-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      e10Go('corpus');
+    }
+    return;
+  }
+  if (_currentStageId !== 'reader') await e10Go('reader');
+  if (seq !== _cmpStudyNavigationSeq) return;
+  if (target === 'question' && (_currentStageId !== 'reader' || !document.getElementById('cr-question-panel'))) {
+    e10Go('setup');  // Existing question form remains usable before a readable source.
+    return;
+  }
+  if (_currentStageId !== 'reader') return;
+  if (target === 'question') {
     _crRenderQuestionCard(true);
     _crRailGo('question');
-    setTimeout(() => document.getElementById('cr-question-input')?.focus(), 120);
-    return;
-  }
-  if (stepId === 'read') {
-    cmpMarkOnboardingStep('read');
-    _cmpFocusReader();
-    return;
-  }
-  if (stepId === 'observe') {
-    if (_cmpStepComplete('observe', _cmpLoadOnboardingState())) cmpMarkOnboardingStep('observe');
-    _crRailGo('capture');
-    return;
-  }
-  if (stepId === 'search') {
-    cmpMarkOnboardingStep('search');
-    openCorpusSearch(_cmpSearchSeed());
-    return;
-  }
-  if (stepId === 'timeline') {
-    cmpMarkOnboardingStep('timeline');
-    openTimeline();
-    return;
-  }
-  if (stepId === 'later') {
-    cmpMarkOnboardingStep('later');
-    document.getElementById('workflow-rail')?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    return;
-  }
-  if (stepId === 'coach') {
-    cmpMarkOnboardingStep('coach');
-    const state = _cmpLoadOnboardingState();
-    state.paused = true;
-    state.finished = true;
-    _cmpSaveOnboardingState(state);
-    _cmpRenderOnboarding();
+    document.getElementById('cr-question-input')?.focus();
+  } else if (target === 'reader') {
+    _crCloseBottomWorkstation();
+    document.getElementById('cr-page-view')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (target === 'capture' || target === 'observations') {
+    const candidateContext = target === 'observations' &&
+      !step.evidence_or_state_basis.some(ref => ref.record?.table === 'observations') &&
+      step.evidence_or_state_basis.some(ref => ref.record?.table === 'reader_highlights');
+    _crRailGo(candidateContext ? 'capture' : target);
+  } else if (target === 'search') {
+    // Counterevidence belongs beside the source. Publication fidelity audit
+    // is a separate existing Critic workflow, never proof of this method act.
+    await _crOpenBottomWorkstation('search');
+  } else if (target === 'lineage') {
+    await _evidenceBoardSetView('lineage');
+    if (seq !== _cmpStudyNavigationSeq) return;
+    await _crOpenBottomWorkstation('evidence');
+  } else {
+    await _crOpenBottomWorkstation(target);
   }
 }
 
@@ -10759,6 +10743,7 @@ function _crSetPerspectiveKind(kind) {
       ? 'Scope + Custom Draft Perspective + Question + Model'
       : (_crPerspectiveKind === 'saved' ? 'Scope + Saved Perspective + Question + Model' : 'Scope + Perspective + Question + Model');
   }
+  if (typeof _cmpLoadStudyCycle === 'function') void _cmpLoadStudyCycle();
 }
 
 function _crPerspectiveCurrentPageScope() {
@@ -10937,6 +10922,7 @@ function _crSetPerspectiveMode(mode) {
 }
 
 async function _crLoadPerspectiveRun() {
+  const guideWorkspaceEpoch = typeof _cmpStudyWorkspaceEpoch === 'undefined' ? null : _cmpStudyWorkspaceEpoch;
   const status = document.getElementById('cr-perspective-status');
   const pSel = document.getElementById('cr-perspective-select');
   const mSel = document.getElementById('cr-perspective-model');
@@ -10989,6 +10975,7 @@ async function _crLoadPerspectiveRun() {
   }
   _crSetPerspectiveKind(_crPerspectiveKind);
   _crSetPerspectiveMode(_crPerspectiveMode);
+  if (typeof _cmpFrameSelectionChanged === 'function' && guideWorkspaceEpoch !== null) _cmpFrameSelectionChanged(guideWorkspaceEpoch);
 }
 
 async function _crPerspectiveRefreshScope() {

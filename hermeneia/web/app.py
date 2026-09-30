@@ -9389,6 +9389,53 @@ Return ONLY valid JSON, no markdown, no explanation:
             "empty": len(active_hl) == 0 and total_pages_read == 0,
         })
 
+    @app.route("/api/guided-study-cycle")
+    def api_guided_study_cycle():
+        """Provider-free guide over one read-only snapshot, never saved progress."""
+        from ..guided_study_cycle import project_guided_study_cycle
+        from ..study_lineage import project_study_lineage, serialize_projection
+        from ..perspective_runs import perspective_definition
+
+        if set(request.args) - {"perspective_kind", "perspective_id"}:
+            return jsonify({"error": "Only an explicit current named frame selection is supported"}), 400
+
+        # An absent store needs no initialization. The empty in-memory query
+        # has exactly Lineage's missing-storage coverage and creates no files.
+        conn = _conn() if db_path.exists() else sqlite3.connect(":memory:")
+        try:
+            conn.execute("PRAGMA query_only=ON")
+            conn.execute("BEGIN")
+            lineage = project_study_lineage(conn)
+            current = {}
+            selection = None
+            if request.args:
+                kind, identifier = request.args.get("perspective_kind"), request.args.get("perspective_id")
+                if (not identifier or kind not in ("builtin", "saved")
+                        or any(len(request.args.getlist(key)) != 1 for key in request.args)):
+                    return jsonify({"error": "A single supported current frame kind and ID are required"}), 400
+                if kind == "builtin":
+                    valid = perspective_definition(identifier) is not None
+                else:
+                    valid = any(item["record"] == {"table": "perspectives", "key": {"id": identifier}}
+                                and item["record_data"].get("identity_scheme") == FRAME_V2_SCHEME
+                                and isinstance(item["record_data"].get("name"), str)
+                                and item["record_data"]["name"].strip() for item in lineage["items"])
+                if not valid:
+                    return jsonify({"error": "Current selected frame is unavailable; no readiness was inferred"}), 400
+                current["perspective_available"] = True
+                selection = {"kind": kind, "id": identifier, "basis": "current_ui_selection"}
+            result = project_guided_study_cycle(lineage, current_state=current)
+            result["current_frame_selection"] = selection
+            payload = serialize_projection(result)
+        except (sqlite3.Error, ValueError):
+            return jsonify({"error": "Study guide could not evaluate this workspace; no progress was inferred"}), 409
+        finally:
+            conn.close()
+        response = make_response(payload)
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
     @app.route("/api/study-lineage")
     @app.route("/api/study-lineage/export")
     def api_study_lineage():
