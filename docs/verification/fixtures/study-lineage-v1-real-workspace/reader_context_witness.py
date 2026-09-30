@@ -1,8 +1,10 @@
-"""Frozen negative witness from real-workspace Lineage validation.
+"""Promoted regression from the frozen real-workspace Lineage witness.
 
 No study is created or modified. The real IDs/page metadata are sanitized;
 source text is unnecessary. Actual production navigation functions run against
 the minimum DOM/HTTP scheduling needed to reproduce the observed failure.
+Commit 5e14463 preserves the negative version; M0 reproduced it before repair
+and demonstrated a strict unexpected pass before removing the expected failure.
 """
 import json
 from pathlib import Path
@@ -22,8 +24,6 @@ class KnownReaderContextFailure(AssertionError):
     """Only the exact observed navigation failure is expected here."""
 
 
-@pytest.mark.xfail(strict=True, raises=KnownReaderContextFailure,
-                   reason="Observed Lineage source link races Reader rebuild; repair requires a separate packet")
 def test_recorded_reader_context_reaches_its_recorded_page():
     node = shutil.which("node")
     if not node:
@@ -41,6 +41,7 @@ def test_recorded_reader_context_reaches_its_recorded_page():
 const context = evidence.context;
 const item = {record:evidence.record, event:'current_snapshot', contexts:[context]};
 let _studyLineageData = {items:[item]}, _expert = false;
+let _crReaderLoadSeq = 0;
 let _crDocId = context.document_id, _crPage = evidence.saved_last_page;
 let _crDocs = [{id:_crDocId, source_role:'primary', last_page:_crPage}];
 let _crPages = [{page:1,extractions:[]},{page:62,extractions:[]}], _crTotalPages = 85;
@@ -85,7 +86,7 @@ const get = async url => url === '/api/reader/documents' ? documentsPending :
 """
     completed = subprocess.run([node, "-e", script], check=True, capture_output=True, text=True)
     observed = json.loads(completed.stdout)
-    # The current code instead throws TypeError and restores saved page 62.
+    # Retain the exact original failure classification as a regression diagnostic.
     if (observed["error"] == {"name": "TypeError", "message": "Cannot set properties of null (setting 'innerHTML')"}
             and observed["page"] == evidence["saved_last_page"]):
         raise KnownReaderContextFailure({"error": observed["error"], "settled_page": observed["page"],

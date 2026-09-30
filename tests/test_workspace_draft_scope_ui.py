@@ -326,6 +326,7 @@ def test_workspace_open_flushes_old_drafts_and_hydrates_target_drafts() -> None:
     result = _run_node(
         r"""
 let get;
+let _crReaderLoadSeq=0;
 elements['workspace-catalog']=makeInput('');
 elements['workspace-catalog-status']=makeInput('');
 elements['runtime-workspace-chip']=makeInput('');

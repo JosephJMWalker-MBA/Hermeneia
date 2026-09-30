@@ -4725,6 +4725,7 @@ function _wsApplyRuntimePayload(data) {
 function _wsApplyCurrentWorkspace(workspace) {
   if (!workspace) return;
   const workspaceChanged = !!_wsCurrentWorkspace && !_wsWorkspaceMatches(_wsCurrentWorkspace, workspace);
+  if (workspaceChanged) _crReaderLoadSeq += 1;
   _runtimeApplyWorkspaceDraftScope(workspace);
   _wsCurrentWorkspace = workspace;
   if (workspaceChanged && typeof _crResetPerspectiveRoomStateForWorkspaceChange === 'function') {
@@ -8161,7 +8162,8 @@ function _e10RenderMissingWorkspaceRecovery(id, scrollTarget) {
   e10LoadFirstRun();
 }
 
-function e10Go(id, scrollTarget) {
+function e10Go(id, scrollTarget, readerTarget = null) {
+  const readerLoadSeq = ++_crReaderLoadSeq;
   _expert = false;
   document.body.classList.remove('x');
   if (_e10ShouldRecoverMissingWorkspace(id)) {
@@ -8179,7 +8181,7 @@ function e10Go(id, scrollTarget) {
   if (id === 'critic')    e10LoadCriticExplorer();
   if (id === 'review')    e10LoadReview();
   if (id === 'reports')   e10LoadReader();
-  if (id === 'reader')    e10LoadCloseReader();
+  if (id === 'reader')    return e10LoadCloseReader(readerTarget, readerLoadSeq);
   if (id === 'guide')          e10LoadGuide();
   if (id === 'constitution')   e10LoadConstitution();
 }
@@ -8982,6 +8984,8 @@ async function e10OpenReaderLineage(narrativeId) {
 // ── Close Reading Workspace ───────────────────────────────────────────────────
 
 let _crDocId = null;
+// Only the latest Reader navigation may install loaded document/page state.
+let _crReaderLoadSeq = 0;
 let _crPage  = 1;
 let _crTotalPages = 1;
 let _crDocs  = [];
@@ -9017,26 +9021,33 @@ function _crClearPending() {
   _crSelRange = null;
 }
 
-async function e10LoadCloseReader() {
+async function e10LoadCloseReader(target = null, loadSeq = ++_crReaderLoadSeq) {
   const ws = document.getElementById('reader-workspace');
+  const isCurrent = () => loadSeq === _crReaderLoadSeq && ws === document.getElementById('reader-workspace');
+  if (!ws || !isCurrent()) return false;
   ws.innerHTML = '<div class="e10-empty">Loading corpus…</div>';
   try {
     const data = await get('/api/reader/documents');
+    if (!isCurrent()) return false;
     _crDocs = data.documents || [];
+    const requested = target && _crDocs.find(d => d.id === target.document_id);
+    if (target && !requested) throw new Error('The requested source document is not available in this workspace.');
     if (_crDocs.length === 0) {
       ws.innerHTML = '<div class="e10-empty">No source documents found. Upload a corpus first.</div>';
-      return;
+      return false;
     }
-    // Default to first primary doc
-    const primary = _crDocs.find(d => d.source_role === 'primary') || _crDocs[0];
+    // Explicit context selects its exact document; ordinary opening uses primary.
+    const selected = requested || _crDocs.find(d => d.source_role === 'primary') || _crDocs[0];
     _crRenderDocPicker(ws);
     _crMaybeShowReaderBanner(ws);
     _crRenderQuestionCard();
     _flnRender();
     _cmpRender();
-    await _crOpenDoc(primary.id);
+    return await _crOpenDoc(selected.id, target ? target.page : null, loadSeq);
   } catch(e) {
+    if (!isCurrent()) return false;
     ws.innerHTML = `<div class="e10-empty" style="color:var(--red)">Error loading corpus: ${x(e.message)}</div>`;
+    return false;
   }
 }
 
@@ -13167,9 +13178,7 @@ function _attnWhen(iso) {
   } catch { return ''; }
 }
 function _attnOpen(docId, page) {
-  e10Go('reader');
-  if (docId === _crDocId) { _crGoToPage(page); }
-  else { _crOpenDoc(docId).then(() => _crGoToPage(page)).catch(() => {}); }
+  return e10Go('reader', null, { document_id: docId, page });
 }
 
 // ── Evidence Board (provider-free study inventory) ───────────────────────
@@ -13662,8 +13671,7 @@ async function _studyLineageOpenContext(itemKey, contextKey) {
   const context = item?.contexts?.find(row => _studyLineageContextKey(row) === contextKey);
   if (!context) return;
   if (context.kind === 'reader' && typeof context.document_id === 'string' && Number.isInteger(context.page) && context.page > 0) {
-    _attnOpen(context.document_id, context.page);
-    return;
+    return _attnOpen(context.document_id, context.page);
   }
   if (context.kind !== 'lineage' || typeof context.epistemic_class !== 'string' || typeof context.object_id !== 'string') return;
   const epoch = _evidenceBoardEpoch;
@@ -13681,7 +13689,14 @@ async function _studyLineageOpenContext(itemKey, contextKey) {
   }
 }
 
-async function _crOpenDoc(docId) {
+async function _crOpenDoc(docId, targetPage = null, loadSeq = null) {
+  const view = document.getElementById('cr-page-view');
+  // A caller cannot start a document load while Reader DOM is being rebuilt.
+  // Leave the active Reader load in charge until that container exists.
+  if (!view) return false;
+  if (loadSeq === null) loadSeq = ++_crReaderLoadSeq;
+  const isCurrent = () => loadSeq === _crReaderLoadSeq && view === document.getElementById('cr-page-view');
+  if (!isCurrent()) return false;
   _crDocId = docId;
   _crPage  = 1;
   _crCurrentExtractions = [];
@@ -13702,24 +13717,35 @@ async function _crOpenDoc(docId) {
     warn.innerHTML = '';
   }
 
-  const view = document.getElementById('cr-page-view');
   view.innerHTML = '<div class="e10-empty">Loading pages…</div>';
 
   try {
     const data = await get(`/api/reader/documents/${encodeURIComponent(docId)}/pages`);
+    if (!isCurrent()) return false;
     _crPages = data.pages || [];
     _crTotalPages = data.total_pages || _crPages.length || 1;
 
-    // Restore last page
-    const docMeta = _crDocs.find(d => d.id === docId);
-    if (docMeta?.last_page) _crPage = docMeta.last_page;
-
+    // Preserve ordinary restoration timing, including paging while highlights load.
+    if (targetPage === null) {
+      const docMeta = _crDocs.find(d => d.id === docId);
+      if (docMeta?.last_page) _crPage = docMeta.last_page;
+    }
     await _crLoadHighlightList();
-    _crRenderPage();
+    if (!isCurrent()) return false;
+    // Apply an explicit target only after the document and its DOM are ready.
+    // Do not render or record the saved page before the requested page.
+    if (targetPage !== null) {
+      _crGoToPage(targetPage);
+    } else {
+      _crRenderPage();
+    }
     _crRefreshTrail();
     _cmpRenderOnboarding();
+    return true;
   } catch(e) {
+    if (!isCurrent()) return false;
     view.innerHTML = `<div class="e10-empty" style="color:var(--red)">Error: ${x(e.message)}</div>`;
+    return false;
   }
 }
 
@@ -14510,11 +14536,15 @@ function _crBriefCompanion(obsId) {
 
 async function _crLoadHighlightList() {
   if (!_crDocId) return;
+  const docId = _crDocId;
+  const loadSeq = _crReaderLoadSeq;
   const list = document.getElementById('cr-highlight-list');
   const count = document.getElementById('cr-hl-count');
+  const isCurrent = () => loadSeq === _crReaderLoadSeq && docId === _crDocId && list === document.getElementById('cr-highlight-list');
   if (!list) return;
   try {
-    const data = await get(`/api/reader/documents/${encodeURIComponent(_crDocId)}/highlights`);
+    const data = await get(`/api/reader/documents/${encodeURIComponent(docId)}/highlights`);
+    if (!isCurrent()) return;
     _crHighlights = data.highlights || [];
     if (count) count.textContent = _crHighlights.length ? `(${_crHighlights.length})` : '';
     if (_crHighlights.length === 0) {
@@ -14545,6 +14575,7 @@ async function _crLoadHighlightList() {
       </div>`;
     }).join('');
   } catch(e) {
+    if (!isCurrent()) return;
     list.innerHTML = `<div style="font-size:12px;color:var(--red)">${x(e.message)}</div>`;
   }
 }

@@ -95,6 +95,7 @@ function refreshNavCycleStatuses(){calls.push(['refresh']); return Promise.resol
 function _updateStageNavBar(id){calls.push(['stage', id]);}
 let calls=[];
 let _expert = false;
+let _crReaderLoadSeq = 0;
 let _obCanUploadDocuments = true;
 """
         + _extract_workspace_state_block(html)

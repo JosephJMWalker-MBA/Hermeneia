@@ -93,7 +93,7 @@ def test_guide_navigation_contract_matches_current_surfaces() -> None:
     router = _extract_function(index, "function e10Go(")
 
     assert "if (id === 'setup')      e10LoadSetup();" in router
-    assert "if (id === 'reader')    e10LoadCloseReader();" in router
+    assert "if (id === 'reader')    return e10LoadCloseReader(readerTarget, readerLoadSeq);" in router
     assert "if (id === 'lab')" in router
     assert "if (id === 'review')    e10LoadReview();" in router
     assert "if (id === 'architect') e10LoadArchitect();" in router

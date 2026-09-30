@@ -743,7 +743,7 @@ def test_edited_working_blueprint_clears_dirty_state_on_confirmed_workspace_chan
     html = _index()
     script = (
         _dom_prefix(_candidate_js())
-        + "let _wsCurrentWorkspace = null;"
+        + "let _wsCurrentWorkspace = null; let _crReaderLoadSeq = 0;"
         + "Object.assign(elements,{'runtime-workspace-chip':{hidden:true,dataset:{},title:''},'runtime-workspace-name':{textContent:''}});"
         + "function _runtimeApplyWorkspaceDraftScope(){} function _wsRenderWorkspaceCatalog(){} function _crResetPerspectiveRoomStateForWorkspaceChange(){}"
         + _extract_fn(html, "_wsWorkspaceSelector")

@@ -1,0 +1,380 @@
+{
+  "capture": {
+    "api_statuses": [
+      200,
+      200,
+      200
+    ],
+    "export_sha256": "2fdf336b84b52b6c729e986b1afb8da2f42143f47e363fa8e1742e34a66497bc",
+    "projected_counts": {
+      "observations": 2369,
+      "reader_highlights": 395,
+      "source_documents": 1,
+      "source_extractions": 1738
+    },
+    "snapshot_unchanged": true,
+    "source_integrity_checks": {
+      "database_bytes_equal": true,
+      "logical_records_equal": true,
+      "shm_presence_and_bytes_equal": true,
+      "wal_presence_and_bytes_equal": true
+    },
+    "source_unchanged": true,
+    "status": "completed_bounded_checks",
+    "stored_counts": {
+      "ai_provenance": 0,
+      "architect_plan_paragraphs": 0,
+      "architect_plans": 0,
+      "blueprint_interpretation_links": 0,
+      "blueprint_observation_links": 0,
+      "critic_reports": 0,
+      "expression_profiles": 9,
+      "findings": 0,
+      "inquiry_notes": 0,
+      "interpretations": 0,
+      "investigation_log": 0,
+      "narrative_blueprints": 0,
+      "observation_derived": 2369,
+      "observation_reviews": 0,
+      "observation_terms": 15847,
+      "observations": 2369,
+      "perspectives": 0,
+      "proposed_interpretations": 0,
+      "provenance": 2369,
+      "ratification_records": 0,
+      "reader_highlights": 395,
+      "reading_progress": 1,
+      "rendered_narratives": 0,
+      "schema_version": 1,
+      "source_documents": 1,
+      "source_extractions": 1738,
+      "steward_decisions": 0,
+      "supersession_relations": 0,
+      "terms": 3320,
+      "validation_reports": 0,
+      "witness_sessions": 0,
+      "workspace_identity": 1,
+      "workspace_investigation": 0
+    }
+  },
+  "final_browser_guard": {
+    "files_after": {
+      "-shm": {
+        "exists": true,
+        "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+        "size": 32768
+      },
+      "-wal": {
+        "exists": true,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "database": {
+        "exists": true,
+        "sha256": "562a1991a4c0f19e078f46d5234a1fd17bad71a027cc56f405acd7f33e46bee5",
+        "size": 13115392
+      }
+    },
+    "files_before": {
+      "-shm": {
+        "exists": true,
+        "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+        "size": 32768
+      },
+      "-wal": {
+        "exists": true,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "database": {
+        "exists": true,
+        "sha256": "562a1991a4c0f19e078f46d5234a1fd17bad71a027cc56f405acd7f33e46bee5",
+        "size": 13115392
+      }
+    },
+    "guard": "private snapshot; allowlisted GETs; mode=ro and query_only",
+    "logical_sha256_after": "f95c9193e675f99a2a4a032e795ef151748b71b5380b4475a8668f7393e4197d",
+    "logical_sha256_before": "f95c9193e675f99a2a4a032e795ef151748b71b5380b4475a8668f7393e4197d",
+    "requests": [
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/"
+      },
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/api/health"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/e10/observations"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/e10/findings"
+      },
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/api/project/summary"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/investigation"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/edition/cycles"
+      },
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/api/reader/documents"
+      },
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/api/project/summary"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/runtime/workspace"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/workspaces"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/favicon.ico"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/investigation-log"
+      },
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/api/project/summary"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/e10/providers"
+      },
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/pages"
+      },
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/highlights"
+      },
+      {
+        "allowed": false,
+        "method": "POST",
+        "path": "/api/reader/progress"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/related-observations"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/summary"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/summary"
+      },
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/api/evidence-board"
+      },
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/api/study-lineage"
+      },
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/api/project/summary"
+      },
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/api/reader/documents"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/investigation-log"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/e10/providers"
+      },
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/pages"
+      },
+      {
+        "allowed": true,
+        "method": "GET",
+        "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/highlights"
+      },
+      {
+        "allowed": false,
+        "method": "POST",
+        "path": "/api/reader/progress"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/related-observations"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/summary"
+      },
+      {
+        "allowed": false,
+        "method": "GET",
+        "path": "/api/reader/documents/311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44/summary"
+      }
+    ],
+    "unchanged": true
+  },
+  "limitations": [
+    "Only a private copy was served; progress POSTs and providers were blocked.",
+    "Real browser navigation proves displayed page and nonmutation, not successful progress persistence.",
+    "Deterministic tests exercise overlapping document/highlight loads and progress request bodies.",
+    "The earlier interrupted browser process did not emit its final guard report; this complete repeat supplied the committed browser integrity evidence. Live source inventories span both runs.",
+    "No private database, PDF, source text, full projection export, or private-content screenshot is included."
+  ],
+  "packet": "Hermeneia #215 M0",
+  "production_file": "hermeneia/web/static/index.html",
+  "production_sha256": "67f7fca117057a7e4ad8cd215a1b9512e28f9e0317776fa19e5fcec32b45736f",
+  "recorded_at_utc": "2026-09-30T09:39:48.145893+00:00",
+  "source_integrity": {
+    "all_files_after": {
+      "benchmark02-attribution-packet__2o12fqh.herm/context.json": {
+        "sha256": "9c095d338518fe4b976fc9bfc36ad7aa0b42fcd622fdcff25b594915f90ae740",
+        "size": 372
+      },
+      "benchmark02-attribution-packet__2o12fqh.herm/hermeneia.db": {
+        "sha256": "5f682cfe6390deb58ee704d0dc53405fcbf25d1762907db287dcfe878d5e5c63",
+        "size": 12816384
+      },
+      "calibration.json": {
+        "sha256": "7922e0701ece110e7b8c22a3367c1ef1567b9bf4dded9db6746bc57d7ce05a02",
+        "size": 51
+      },
+      "hermeneia.db": {
+        "sha256": "d2139970ed4ee29ea413f1301fd4f035bea9037590e8d8a02e7bd385846d7c81",
+        "size": 13115392
+      },
+      "hermeneia.db-shm": {
+        "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+        "size": 32768
+      },
+      "hermeneia.db-wal": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "uploads/benchmark02-attribution-packet.pdf": {
+        "sha256": "311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44",
+        "size": 225118
+      }
+    },
+    "all_files_before": {
+      "benchmark02-attribution-packet__2o12fqh.herm/context.json": {
+        "sha256": "9c095d338518fe4b976fc9bfc36ad7aa0b42fcd622fdcff25b594915f90ae740",
+        "size": 372
+      },
+      "benchmark02-attribution-packet__2o12fqh.herm/hermeneia.db": {
+        "sha256": "5f682cfe6390deb58ee704d0dc53405fcbf25d1762907db287dcfe878d5e5c63",
+        "size": 12816384
+      },
+      "calibration.json": {
+        "sha256": "7922e0701ece110e7b8c22a3367c1ef1567b9bf4dded9db6746bc57d7ce05a02",
+        "size": 51
+      },
+      "hermeneia.db": {
+        "sha256": "d2139970ed4ee29ea413f1301fd4f035bea9037590e8d8a02e7bd385846d7c81",
+        "size": 13115392
+      },
+      "hermeneia.db-shm": {
+        "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+        "size": 32768
+      },
+      "hermeneia.db-wal": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size": 0
+      },
+      "uploads/benchmark02-attribution-packet.pdf": {
+        "sha256": "311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44",
+        "size": 225118
+      }
+    },
+    "all_files_equal": true,
+    "logical_rows_equal": true,
+    "logical_sha256_after_final_read": "f95c9193e675f99a2a4a032e795ef151748b71b5380b4475a8668f7393e4197d",
+    "logical_sha256_before": "f95c9193e675f99a2a4a032e795ef151748b71b5380b4475a8668f7393e4197d"
+  },
+  "starting_commit": "886f788b6b7644c6126e409b58fcfda29c3b43f9",
+  "verified_date": "2026-09-30",
+  "witness": {
+    "baseline_error": {
+      "message": "Cannot set properties of null (setting 'innerHTML')",
+      "name": "TypeError"
+    },
+    "baseline_settled_page": 62,
+    "browser_method": "actual UI: Evidence / Lineage / reader highlight / unknown / exact durable ID / Open source page in Reader",
+    "document_id": "311e01f51d3493badb5cebd780b849e87c6f55d0b8c2e4a32dce2cf798b9cc44",
+    "final_browser_console_errors": [
+      {
+        "operation": "e10LoadObservations",
+        "reason": "Blocked by evidence-only read-only browser harness",
+        "type": "RuntimeHttpError"
+      },
+      {
+        "operation": "e10LoadFindings",
+        "reason": "Blocked by evidence-only read-only browser harness",
+        "type": "RuntimeHttpError"
+      }
+    ],
+    "final_browser_console_typeerror_count": 0,
+    "final_browser_document_button_class": "cr-doc-btn active",
+    "final_browser_observation_window_utc": [
+      "2026-09-30T09:35:34Z",
+      "2026-09-30T09:36:30Z"
+    ],
+    "final_browser_page_label": "PAGE 1 OF 85",
+    "record_id": "6932bf50-8517-4440-ac87-b128d033b81f",
+    "record_table": "reader_highlights",
+    "recorded_page": 1,
+    "saved_page_before": 62,
+    "total_pages": 85,
+    "workspace_id": "50a8d313f4394b4b9f39714201ae5e7d"
+  }
+}

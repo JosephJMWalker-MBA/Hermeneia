@@ -9,7 +9,7 @@ from test_evidence_board_ui import _base_script, _extract_function, _index, _run
 
 def _script(extra: str) -> str:
     source = _index()
-    section = source[source.index('// Study Lineage is a read-only view'):source.index('async function _crOpenDoc(docId)')]
+    section = source[source.index('// Study Lineage is a read-only view'):source.index('async function _crOpenDoc(')]
     signatures = re.findall(r'(?:async )?function [A-Za-z_]+\(', section)
     functions = '\n'.join(_extract_function(source, signature) for signature in signatures if '_studyLineageReset(' not in signature)
     return _base_script('''
@@ -269,7 +269,7 @@ def test_unsupported_projection_version_refuses_to_render_and_clears_old_data() 
 
 def test_lineage_has_no_write_or_provider_routes_and_is_board_subview() -> None:
     source = _index()
-    section = source[source.index('// Study Lineage is a read-only view'):source.index('async function _crOpenDoc(docId)')]
+    section = source[source.index('// Study Lineage is a read-only view'):source.index('async function _crOpenDoc(')]
     assert not re.search(r'\b(post|put|del|fetch|runtimeApiFetch)\s*\(', section)
     assert '/api/perspective' not in section
     assert 'id="evidence-board-view-lineage"' in source

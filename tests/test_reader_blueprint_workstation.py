@@ -361,7 +361,7 @@ def test_blueprint_working_candidate_clears_only_on_confirmed_workspace_change()
     script = (
         "let _crBlueprintCandidate = {title:'Reviewed A',thesis:'Thesis A.',sections:[{claim:'Claim A.',supporting_observations:[],supporting_interpretations:[]}]};"
         "let _crBlueprintCandidateDirty = false; let _crBlueprintOperation = 'idle'; let _crBlueprintWorkspaceEpoch = 0; let _crBlueprintRevision = null; let _crBlueprintRevisionRequestSeq = 0;"
-        "let _wsCurrentWorkspace = null; let resetCount = 0;"
+        "let _wsCurrentWorkspace = null; let resetCount = 0; let _crReaderLoadSeq = 0;"
         "function x(v){return String(v == null ? '' : v).replace(/[&<>\"']/g, c => c);}"
         "const elements={"
         "'runtime-workspace-chip':{hidden:true,dataset:{},title:''},"

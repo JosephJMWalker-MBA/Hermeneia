@@ -150,6 +150,7 @@ def _node_base() -> str:
       try {{ return fn(localStorage); }} catch {{ return fallback; }}
     }}
     let _wsCurrentWorkspace = null;
+    let _crReaderLoadSeq = 0;
     let _wsCatalog = [];
     let _wsCatalogLoading = false;
     let _wsCreateInFlight = false;

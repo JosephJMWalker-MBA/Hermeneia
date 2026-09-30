@@ -98,6 +98,7 @@ def _node_base() -> str:
     function _crPerspectiveRenderScope() {{}}
     function showAppError(message) {{ globalThis.lastAppError = message; }}
     let _wsCurrentWorkspace = null;
+    let _crReaderLoadSeq = 0;
     let _crPerspectiveDefinitions = [];
     let _crPerspectiveRoomDefinitions = [];
     let _crPerspectiveRoomRoster = [];

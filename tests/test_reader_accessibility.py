@@ -346,7 +346,7 @@ def test_reader_page_context_reset_invalidates_cached_reading_tools_passage():
 def test_reader_context_reset_before_document_load_failure_invalidates_old_passage():
     html = INDEX.read_text()
 
-    open_start = html.index("async function _crOpenDoc(docId)")
+    open_start = html.index("async function _crOpenDoc(")
     reset_at = html.index("_crResetReaderTransientSelectionForContext();", open_start)
     loading_at = html.index("view.innerHTML = '<div class=\"e10-empty\">Loading pages", open_start)
     fetch_at = html.index("await get(`/api/reader/documents/", open_start)
@@ -890,7 +890,7 @@ def test_read_page_navigation_uses_invocation_time_page_snapshot():
 def test_reader_context_reset_clears_stale_page_speech_source():
     html = INDEX.read_text()
 
-    open_start = html.index("async function _crOpenDoc(docId)")
+    open_start = html.index("async function _crOpenDoc(")
     page_clear_at = html.index("_crCurrentExtractions = [];", open_start)
     reset_at = html.index("_crResetReaderTransientSelectionForContext();", open_start)
     loading_at = html.index("view.innerHTML = '<div class=\"e10-empty\">Loading pages", open_start)

@@ -1,0 +1,52 @@
+{
+  "final_focused": {
+    "result_lines": [
+      "143 passed, 5 warnings in 11.16s"
+    ],
+    "sha256": "d7cdc9c87dca9ab708bb16769fbf705f2a24838dbef86c7b361ce08e32e9fabc"
+  },
+  "final_full": {
+    "result_lines": [
+      "FAILED tests/test_reader_accessibility.py::test_read_page_button_is_rendered_in_page_header_with_accessible_label",
+      "FAILED tests/test_reader_accessibility.py::test_failed_or_missing_page_cannot_speak_prior_page_source",
+      "FAILED tests/test_reader_blueprint_workstation.py::test_blueprint_is_a_workstation_mode_not_a_separate_drawer",
+      "FAILED tests/test_reader_record_view.py::test_record_tab_and_panel_present - ...",
+      "FAILED tests/test_reader_record_view.py::test_record_is_a_workstation_mode_not_a_separate_drawer",
+      "FAILED tests/test_reader_voice_profile.py::test_voice_is_a_workstation_mode_not_a_separate_drawer",
+      "6 failed, 1983 passed, 21 skipped, 5 warnings in 100.17s (0:01:40)"
+    ],
+    "sha256": "353749248a0204e1478f640ed76fbc25358f0299eb0dc16a0a3b8ddd212e7b72"
+  },
+  "ordinary_progress_regression_red": {
+    "result_lines": [
+      "FAILED tests/test_reader_context_navigation.py::test_ordinary_next_during_highlight_load_keeps_user_page_over_saved_restore",
+      "1 failed in 0.07s"
+    ],
+    "sha256": "835d6ccd02ecc7af0b260215d59de3b87e78ce8aea72d9cba211b4d7510e77fa"
+  },
+  "starting_full": {
+    "result_lines": [
+      "FAILED tests/test_reader_accessibility.py::test_read_page_button_is_rendered_in_page_header_with_accessible_label",
+      "FAILED tests/test_reader_accessibility.py::test_failed_or_missing_page_cannot_speak_prior_page_source",
+      "FAILED tests/test_reader_blueprint_workstation.py::test_blueprint_is_a_workstation_mode_not_a_separate_drawer",
+      "FAILED tests/test_reader_record_view.py::test_record_tab_and_panel_present - ...",
+      "FAILED tests/test_reader_record_view.py::test_record_is_a_workstation_mode_not_a_separate_drawer",
+      "FAILED tests/test_reader_voice_profile.py::test_voice_is_a_workstation_mode_not_a_separate_drawer",
+      "6 failed, 1966 passed, 21 skipped, 5 warnings in 97.70s (0:01:37)"
+    ],
+    "sha256": "29aa7b86453abf4305cf6206bd7c7345e4e68dbba19b96cd5dcf36da44f9652c"
+  },
+  "starting_witness_runxfail": {
+    "result_lines": [
+      "FAILED docs/verification/fixtures/study-lineage-v1-real-workspace/reader_context_witness.py::test_recorded_reader_context_reaches_its_recorded_page",
+      "1 failed in 0.05s"
+    ],
+    "sha256": "baa63b4ad2fbc76436b62686d3b398c0384a37c9c1d0e7161e7be9d90baedb25"
+  },
+  "starting_witness_xfail": {
+    "result_lines": [
+      "1 xfailed in 0.06s"
+    ],
+    "sha256": "36be4f5b69c5570b0ea8333085347c2dfee1188f7609a0dc9e52f8a62802a6ee"
+  }
+}
