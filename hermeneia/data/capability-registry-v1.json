@@ -1,0 +1,319 @@
+{
+  "schema": "hermeneia.capability-registry/v1",
+  "registry_version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "governing_question",
+      "definition_version": "1.0.0",
+      "title": "Set a governing question",
+      "purpose": "Give inquiry an explicit human purpose.",
+      "prerequisites": [],
+      "positive_evidence": [],
+      "refusal_or_unknown_conditions": {
+        "reason_code": "HISTORY_UNSUPPORTED",
+        "reason": "Current governing questions are mutable snapshots; their formulation and revisions are not recorded as a complete historical act."
+      },
+      "expected_outputs": [
+        "Current governing question"
+      ],
+      "related_or_next_capabilities": [
+        "read_source"
+      ],
+      "user_facing_explanation": "Set a question as a compass; it does not predetermine the conclusion."
+    },
+    {
+      "capability_id": "read_source",
+      "definition_version": "1.0.0",
+      "title": "Read source material",
+      "purpose": "Encounter the source before interpretation.",
+      "prerequisites": [
+        {
+          "fact": "reader_material",
+          "minimum": 1,
+          "reason_code": "MISSING_SOURCE",
+          "reason": "An eligible source extraction with readable text is required."
+        }
+      ],
+      "positive_evidence": [],
+      "refusal_or_unknown_conditions": {
+        "reason_code": "HISTORY_UNSUPPORTED",
+        "reason": "Registration, extraction and aggregate progress do not prove a reading session or comprehension."
+      },
+      "expected_outputs": [
+        "Human encounter with source material; not durably measured in v1"
+      ],
+      "related_or_next_capabilities": [
+        "mark_evidence"
+      ],
+      "user_facing_explanation": "Read the source directly before asking for an explanation."
+    },
+    {
+      "capability_id": "mark_evidence",
+      "definition_version": "1.0.0",
+      "title": "Mark anchored evidence",
+      "purpose": "Preserve attention to an exact source passage.",
+      "prerequisites": [
+        {
+          "fact": "reader_material",
+          "minimum": 1,
+          "reason_code": "MISSING_SOURCE",
+          "reason": "An eligible source extraction with readable text is required."
+        }
+      ],
+      "positive_evidence": [],
+      "refusal_or_unknown_conditions": {
+        "reason_code": "HISTORY_UNSUPPORTED",
+        "reason": "Reader marks are current mutable snapshots with unknown authorship; they do not prove complete historical marking behavior."
+      },
+      "expected_outputs": [
+        "Anchored Reader mark"
+      ],
+      "related_or_next_capabilities": [
+        "record_observation",
+        "preserve_question"
+      ],
+      "user_facing_explanation": "Save the exact passage that caught your attention and retain its source anchor."
+    },
+    {
+      "capability_id": "record_observation",
+      "definition_version": "1.0.0",
+      "title": "Record or inspect an observation",
+      "purpose": "Keep source-derived units and human observation candidates distinct.",
+      "prerequisites": [
+        {
+          "fact": "evidence",
+          "minimum": 1,
+          "reason_code": "INSUFFICIENT_EVIDENCE",
+          "reason": "Retain eligible evidence with a stable source anchor first."
+        }
+      ],
+      "positive_evidence": [],
+      "refusal_or_unknown_conditions": {
+        "reason_code": "HISTORY_UNSUPPORTED",
+        "reason": "Compiled Observations do not prove human observation; promoting a Reader mark changes a candidate status rather than creating a canonical Observation."
+      },
+      "expected_outputs": [
+        "Inspectable canonical Observation or anchored Reader observation candidate"
+      ],
+      "related_or_next_capabilities": [
+        "preserve_question",
+        "form_interpretation"
+      ],
+      "user_facing_explanation": "Inspect the preserved source unit or designate an anchored mark as a candidate without rewriting the evidence."
+    },
+    {
+      "capability_id": "preserve_question",
+      "definition_version": "1.0.0",
+      "title": "Preserve an inquiry question",
+      "purpose": "Retain a separately identified question without forcing a conclusion.",
+      "prerequisites": [
+        {
+          "fact": "evidence",
+          "minimum": 1,
+          "reason_code": "INSUFFICIENT_EVIDENCE",
+          "reason": "Retain eligible evidence with a stable source anchor first."
+        }
+      ],
+      "positive_evidence": [
+        {
+          "fact": "preserved_question",
+          "minimum": 1
+        }
+      ],
+      "refusal_or_unknown_conditions": {
+        "reason_code": "HISTORY_UNSUPPORTED",
+        "reason": "Without an extant supported inquiry note, historical question preservation is unknown; mutable highlight question fields are not separate question identities."
+      },
+      "expected_outputs": [
+        "Individually identified inquiry note; authorship may remain unknown"
+      ],
+      "related_or_next_capabilities": [
+        "explore_perspective"
+      ],
+      "user_facing_explanation": "Keep a question attached to its evidence. A saved note proves retention, not resolution or authorship."
+    },
+    {
+      "capability_id": "organize_evidence",
+      "definition_version": "1.0.0",
+      "title": "Organize evidence",
+      "purpose": "Compare multiple distinct evidence anchors before synthesis.",
+      "prerequisites": [
+        {
+          "fact": "evidence",
+          "minimum": 2,
+          "reason_code": "INSUFFICIENT_EVIDENCE",
+          "reason": "At least two distinct eligible evidence identities are required."
+        }
+      ],
+      "positive_evidence": [],
+      "refusal_or_unknown_conditions": {
+        "reason_code": "HISTORY_UNSUPPORTED",
+        "reason": "Bucket labels and rankings are mutable state; Board and Scope selections do not establish durable organization history."
+      },
+      "expected_outputs": [
+        "Current evidence organization; no durable bucket identity introduced"
+      ],
+      "related_or_next_capabilities": [
+        "explore_perspective",
+        "form_interpretation"
+      ],
+      "user_facing_explanation": "Bring distinct evidence together and decide what belongs; grouping does not admit material into Scope."
+    },
+    {
+      "capability_id": "explore_perspective",
+      "definition_version": "1.0.0",
+      "title": "Explore a Perspective",
+      "purpose": "Examine supported inquiry from an explicit interpretive frame.",
+      "prerequisites": [
+        {
+          "fact": "inquiry_context",
+          "minimum": 1,
+          "reason_code": "MISSING_INQUIRY_CONTEXT",
+          "reason": "Supply a current governing question or a supported preserved inquiry question."
+        },
+        {
+          "fact": "evidence",
+          "minimum": 1,
+          "reason_code": "INSUFFICIENT_EVIDENCE",
+          "reason": "Retain eligible evidence with a stable source anchor first."
+        }
+      ],
+      "positive_evidence": [],
+      "refusal_or_unknown_conditions": {
+        "reason_code": "HISTORY_UNSUPPORTED",
+        "reason": "Saved Perspective definitions and proposal generation provenance do not prove a retained Perspective or Room execution."
+      },
+      "expected_outputs": [
+        "A framed examination; execution receipt remains transient under the current contract"
+      ],
+      "related_or_next_capabilities": [
+        "form_interpretation"
+      ],
+      "user_facing_explanation": "Choose a frame and explicitly admit the material to Scope. Current readiness is not provider authorization."
+    },
+    {
+      "capability_id": "form_interpretation",
+      "definition_version": "1.0.0",
+      "title": "Form a supported interpretation",
+      "purpose": "Develop an attributable interpretation anchored in canonical evidence.",
+      "prerequisites": [
+        {
+          "fact": "observation",
+          "minimum": 1,
+          "reason_code": "INSUFFICIENT_EVIDENCE",
+          "reason": "An eligible canonical Observation is required."
+        },
+        {
+          "fact": "perspective_frame",
+          "minimum": 1,
+          "reason_code": "MISSING_PERSPECTIVE",
+          "reason": "A named saved or explicitly supplied current Perspective frame is required."
+        }
+      ],
+      "positive_evidence": [
+        {
+          "fact": "attributed_interpretation",
+          "minimum": 1
+        }
+      ],
+      "refusal_or_unknown_conditions": {
+        "reason_code": "HISTORY_UNSUPPORTED",
+        "reason": "A proposal is not a canonical Interpretation; unknown origin cannot establish attributable formation. Extant records are not complete formation history."
+      },
+      "expected_outputs": [
+        "Canonical Interpretation with recorded human or accepted-model origin"
+      ],
+      "related_or_next_capabilities": [
+        "challenge_interpretation",
+        "review_blueprint"
+      ],
+      "user_facing_explanation": "Separate what the evidence says from your interpretation; retain acceptance and model origin where recorded."
+    },
+    {
+      "capability_id": "challenge_interpretation",
+      "definition_version": "1.0.0",
+      "title": "Challenge an interpretation",
+      "purpose": "Check a proposal or interpretation against its supporting evidence and alternatives.",
+      "prerequisites": [
+        {
+          "fact": "interpretation",
+          "minimum": 1,
+          "reason_code": "NO_INTERPRETATION",
+          "reason": "An eligible canonical Interpretation or staged interpretation proposal is required."
+        },
+        {
+          "fact": "observation",
+          "minimum": 1,
+          "reason_code": "INSUFFICIENT_EVIDENCE",
+          "reason": "An eligible canonical Observation is required."
+        }
+      ],
+      "positive_evidence": [],
+      "refusal_or_unknown_conditions": {
+        "reason_code": "HISTORY_UNSUPPORTED",
+        "reason": "A proposal-scoped Critic report proves evaluation output, not human review or deliberate contradiction-seeking; rejection alone is not a challenge event."
+      },
+      "expected_outputs": [
+        "Bounded Critic evaluation or human examination; no review event invented"
+      ],
+      "related_or_next_capabilities": [
+        "form_interpretation",
+        "review_blueprint"
+      ],
+      "user_facing_explanation": "Test the claim against its evidence and alternatives. Critic findings remain separate from Steward judgment."
+    },
+    {
+      "capability_id": "review_blueprint",
+      "definition_version": "1.0.0",
+      "title": "Review the Blueprint",
+      "purpose": "Examine how a retained Blueprint organizes claims and evidence.",
+      "prerequisites": [
+        {
+          "fact": "blueprint",
+          "minimum": 1,
+          "reason_code": "NO_BLUEPRINT",
+          "reason": "An eligible saved Blueprint is required."
+        }
+      ],
+      "positive_evidence": [],
+      "refusal_or_unknown_conditions": {
+        "reason_code": "HISTORY_UNSUPPORTED",
+        "reason": "Blueprint creation and supersession do not prove that a user reviewed a Blueprint or that evidence caused a revision."
+      },
+      "expected_outputs": [
+        "Human review; any revision still follows the existing exact approval contract"
+      ],
+      "related_or_next_capabilities": [
+        "review_lineage"
+      ],
+      "user_facing_explanation": "Check the retained Blueprint against its evidence; a recommendation cannot ratify or revise it."
+    },
+    {
+      "capability_id": "review_lineage",
+      "definition_version": "1.0.0",
+      "title": "Review study lineage",
+      "purpose": "Inspect the retained identity and provenance of the study.",
+      "prerequisites": [
+        {
+          "fact": "lineage",
+          "minimum": 1,
+          "reason_code": "NO_LINEAGE",
+          "reason": "At least one eligible Lineage item is required."
+        }
+      ],
+      "positive_evidence": [],
+      "refusal_or_unknown_conditions": {
+        "reason_code": "HISTORY_UNSUPPORTED",
+        "reason": "Lineage opening, filtering, context inspection and export have no durable review event."
+      },
+      "expected_outputs": [
+        "Read-only inspection of extant study records"
+      ],
+      "related_or_next_capabilities": [
+        "governing_question",
+        "read_source"
+      ],
+      "user_facing_explanation": "Trace what is actually retained and notice the stated gaps without inventing missing history."
+    }
+  ]
+}
