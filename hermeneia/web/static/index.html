@@ -3568,6 +3568,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
           <button type="button" onclick="_dockClosePanel();openTimeline()">Open Timeline</button>
         </div>
         <div id="cmp-onboarding-host"></div>
+        <div id="cmp-accomplishments-host"></div>
         <div class="dock-subhead">Workflow navigation</div>
         <div class="dock-workflow-grid">
           <button type="button" onclick="_dockClosePanel();_wfGo('reader')">Read</button>
@@ -9290,6 +9291,7 @@ function _cmpSaveOnboardingState(state) {
   return next;
 }
 function _cmpResetStudyCycle() {
+  if (typeof _cmpAccomplishmentsReset === 'function') _cmpAccomplishmentsReset();
   _cmpStudyCycleSeq += 1;
   _cmpStudyNavigationSeq += 1;
   _cmpStudyWorkspaceEpoch += 1;
@@ -9427,6 +9429,7 @@ function _cmpRenderOnboarding(refresh = true) {
   const firstRunHost = document.getElementById('cmp-onboarding-host-firstrun');
   if (host) host.innerHTML = _cmpOnboardingHtml();
   if (firstRunHost) firstRunHost.innerHTML = _cmpOnboardingHtml();
+  if (typeof _cmpRenderAccomplishments === 'function') _cmpRenderAccomplishments();
   if (refresh && (host || firstRunHost) && !_cmpStudyCycleLoading) void _cmpLoadStudyCycle();
 }
 // Existing Reader hooks ask only for a fresh projection. Their labels are not
@@ -9531,6 +9534,284 @@ function cmpToggleFlag(key) {
   try { localStorage.setItem('hermeneia_companion_context', JSON.stringify(_cmpFlags)); } catch {}
   _cmpRenderContextRows();
 }
+
+// Perspective accomplishments are explicit
+// Presentation only: the server owns eligibility, exact digests, issuance and
+// verification. Session state is disposable and never an award/history store.
+const _CMP_ACCOMPLISHMENT_LABELS = {
+  perspective_explorer: 'Perspective Explorer', second_opinion: 'Second Opinion',
+};
+const _CMP_ACCOMPLISHMENTS_API = '/api/achievements/perspective';
+let _cmpAccomplishments = {open:false, assessments:{}, history:null, loading:false,
+  error:'', notice:'', review:null, inspection:null, pending:false, reconcile:false, stale:''};
+let _cmpAccomplishmentsEpoch = 0, _cmpAccomplishmentsSeq = 0, _cmpAccomplishmentsInspectSeq = 0;
+let _cmpAccomplishmentsFocus = '';
+
+function _cmpAccomplishmentsReset() {
+  _cmpAccomplishmentsEpoch += 1;
+  _cmpAccomplishmentsSeq += 1;
+  _cmpAccomplishmentsInspectSeq += 1;
+  _cmpAccomplishmentsFocus = '';
+  _cmpAccomplishments = {open:false, assessments:{}, history:null, loading:false,
+    error:'', notice:'', review:null, inspection:null, pending:false, reconcile:false, stale:''};
+  _cmpRenderAccomplishments();
+}
+function _cmpAccomplishmentsSwitching() {
+  return typeof _wsOpenInFlight !== 'undefined' && _wsOpenInFlight;
+}
+function _cmpAccomplishmentsAssessment(data, id) {
+  const statuses = ['earned', 'not_earned', 'unsupported_due_to_missing_coverage', 'invalid_evidence'];
+  if (data?.achievement_id !== id || !statuses.includes(data.status) ||
+      typeof data.rule_id !== 'string' || typeof data.rule_version !== 'string' ||
+      (data.status === 'earned' && (typeof data.assessment_package_sha256 !== 'string' ||
+                                  !data.assessment_package_sha256))) throw new Error('Unsupported response');
+  // Never retain or render the private package, definitions or execution metadata.
+  return {achievement_id:id, status:data.status, rule_id:data.rule_id, rule_version:data.rule_version,
+    digest:data.status === 'earned' ? data.assessment_package_sha256 : null,
+    evidence_count:Array.isArray(data.qualifying_receipt_ids) ? data.qualifying_receipt_ids.length : null,
+    coverage:typeof data.coverage?.status === 'string' ? data.coverage.status : 'unknown'};
+}
+function _cmpAccomplishmentsSummary(data) {
+  if (!data || ['award_id','achievement_id','rule_id','rule_version','earned_at','awarded_at']
+      .some(key => typeof data[key] !== 'string') || data.evaluation_status !== 'earned') throw new Error('Unsupported response');
+  return Object.fromEntries(['award_id','achievement_id','rule_id','rule_version','earned_at','awarded_at','issuer']
+    .map(key => [key, data[key]]));
+}
+function _cmpAccomplishmentsHistory(data) {
+  if (data?.receipt_representation !== 'safe_summary' || !Array.isArray(data.awards)) throw new Error('Unsupported response');
+  const rows = data.awards.map(_cmpAccomplishmentsSummary);
+  if (new Set(rows.map(row => row.award_id)).size !== rows.length) throw new Error('Ambiguous response');
+  return rows.filter(row => Object.hasOwn(_CMP_ACCOMPLISHMENT_LABELS, row.achievement_id));
+}
+async function _cmpAccomplishmentsOpen() {
+  _cmpAccomplishments.open = true;
+  _cmpRenderAccomplishments();
+  await _cmpAccomplishmentsRefresh();
+}
+async function _cmpAccomplishmentsRefresh() {
+  if (_cmpAccomplishments.pending || _cmpAccomplishmentsSwitching()) return false;
+  const epoch = _cmpAccomplishmentsEpoch, seq = ++_cmpAccomplishmentsSeq;
+  _cmpAccomplishments.open = true;
+  _cmpAccomplishments.loading = true;
+  _cmpAccomplishments.error = '';
+  // A refresh never carries a previous approval into the newly read assessment.
+  _cmpAccomplishments.review = null;
+  _cmpAccomplishments.stale = '';
+  _cmpRenderAccomplishments();
+  const ids = Object.keys(_CMP_ACCOMPLISHMENT_LABELS);
+  const results = await Promise.allSettled([
+    ...ids.map(id => get(`${_CMP_ACCOMPLISHMENTS_API}/${id}/assessment`, {reportErrors:false})),
+    get(`${_CMP_ACCOMPLISHMENTS_API}/awards`, {reportErrors:false}),
+  ]);
+  if (epoch !== _cmpAccomplishmentsEpoch || seq !== _cmpAccomplishmentsSeq) return false;
+  if (_cmpAccomplishmentsSwitching()) {
+    // A failed switch may leave this workspace active without a reset. Release
+    // only this read's loading state; never accept its possibly mixed results.
+    _cmpAccomplishments.loading = false;
+    _cmpAccomplishments.assessments = {};
+    _cmpAccomplishments.error = 'Workspace switching interrupted this check. Check accomplishments again after switching finishes.';
+    _cmpRenderAccomplishments();
+    return false;
+  }
+  for (const [index,id] of ids.entries()) {
+    try {
+      if (results[index].status !== 'fulfilled') throw new Error('Unavailable');
+      _cmpAccomplishments.assessments[id] = _cmpAccomplishmentsAssessment(results[index].value,id);
+    } catch { delete _cmpAccomplishments.assessments[id]; _cmpAccomplishments.error = 'Some current assessments could not be read. Check again when the local server is available.'; }
+  }
+  try {
+    if (results[2].status !== 'fulfilled') throw new Error('Unavailable');
+    _cmpAccomplishments.history = _cmpAccomplishmentsHistory(results[2].value);
+    _cmpAccomplishments.reconcile = false;
+  } catch { _cmpAccomplishments.error = 'Recorded history could not be refreshed. Its existence is unknown from this request; try checking again.'; }
+  _cmpAccomplishments.loading = false;
+  _cmpRenderAccomplishments();
+  return seq;
+}
+async function _cmpAccomplishmentsHistoryRefresh() {
+  // A history-only read must not invalidate the owner of a full loading state.
+  if (_cmpAccomplishments.loading || _cmpAccomplishmentsSwitching()) return false;
+  const epoch = _cmpAccomplishmentsEpoch, seq = ++_cmpAccomplishmentsSeq;
+  try {
+    const rows = _cmpAccomplishmentsHistory(await get(`${_CMP_ACCOMPLISHMENTS_API}/awards`, {reportErrors:false}));
+    if (epoch !== _cmpAccomplishmentsEpoch || seq !== _cmpAccomplishmentsSeq || _cmpAccomplishmentsSwitching()) return false;
+    _cmpAccomplishments.history = rows;
+    _cmpAccomplishments.reconcile = false;
+    _cmpAccomplishments.error = '';
+    return true;
+  } catch {
+    if (epoch !== _cmpAccomplishmentsEpoch || seq !== _cmpAccomplishmentsSeq) return false;
+    _cmpAccomplishments.reconcile = true;
+    _cmpAccomplishments.error = 'Recorded history could not be checked. Refresh history before reviewing another recording attempt.';
+    return false;
+  } finally { if (epoch === _cmpAccomplishmentsEpoch && seq === _cmpAccomplishmentsSeq) _cmpRenderAccomplishments(); }
+}
+function _cmpAccomplishmentsReview(id, invoker) {
+  const data = _cmpAccomplishments.assessments[id];
+  if (!data || data.status !== 'earned' || _cmpAccomplishments.pending || _cmpAccomplishments.reconcile ||
+      _cmpAccomplishments.loading || _cmpAccomplishmentsSwitching()) return;
+  _cmpAccomplishmentsInspectSeq += 1;
+  _cmpAccomplishments.inspection = null;
+  _cmpAccomplishmentsFocus = invoker?.id || `cmp-accomplishments-review-${id}`;
+  _cmpAccomplishments.review = {...data, epoch:_cmpAccomplishmentsEpoch};
+  _cmpAccomplishments.stale = '';
+  _cmpRenderAccomplishments();
+  document.getElementById('cmp-accomplishments-detail-title')?.focus();
+}
+function _cmpAccomplishmentsClose() {
+  _cmpAccomplishmentsInspectSeq += 1;
+  _cmpAccomplishments.review = null;
+  _cmpAccomplishments.inspection = null;
+  _cmpRenderAccomplishments();
+  _cmpAccomplishmentsRestoreFocus(_cmpAccomplishmentsFocus);
+}
+function _cmpAccomplishmentsEscape(event) {
+  if (event.key !== 'Escape') return;
+  event.preventDefault(); event.stopPropagation(); _cmpAccomplishmentsClose();
+}
+async function _cmpAccomplishmentsReviewUpdated(id) {
+  const epoch = _cmpAccomplishmentsEpoch, inspectSeq = _cmpAccomplishmentsInspectSeq;
+  const acceptedSeq = await _cmpAccomplishmentsRefresh();
+  if (!acceptedSeq || epoch !== _cmpAccomplishmentsEpoch || acceptedSeq !== _cmpAccomplishmentsSeq ||
+      inspectSeq !== _cmpAccomplishmentsInspectSeq) return;
+  _cmpAccomplishmentsReview(id, document.getElementById(`cmp-accomplishments-review-${id}`));
+}
+async function _cmpAccomplishmentsRecord() {
+  const review = _cmpAccomplishments.review, epoch = _cmpAccomplishmentsEpoch;
+  if (!review || review.epoch !== epoch || _cmpAccomplishments.pending || _cmpAccomplishments.reconcile ||
+      _cmpAccomplishments.loading || _cmpAccomplishmentsSwitching()) return;
+  _cmpAccomplishments.pending = true;
+  _cmpAccomplishments.error = '';
+  _cmpRenderAccomplishments();
+  try {
+    const outcome = await post(`${_CMP_ACCOMPLISHMENTS_API}/${review.achievement_id}/award`, {
+      rule_id:review.rule_id, rule_version:review.rule_version, assessment_package_sha256:review.digest,
+    }, {reportErrors:false});
+    if (epoch !== _cmpAccomplishmentsEpoch) return;
+    if (!['recorded','already_recorded'].includes(outcome?.status) || outcome.receipt_representation !== 'safe_summary') throw new Error('Unknown outcome');
+    _cmpAccomplishmentsSummary(outcome.receipt_projection);
+    _cmpAccomplishments.review = null;
+    _cmpAccomplishments.notice = outcome.status === 'already_recorded'
+      ? 'This achievement is already recorded. Its original recorded time is preserved.'
+      : 'Achievement recorded. Its historical record is preserved under the reviewed rule.';
+    _cmpAccomplishments.reconcile = true;
+    await _cmpAccomplishmentsHistoryRefresh();
+  } catch (error) {
+    if (epoch !== _cmpAccomplishmentsEpoch) return;
+    _cmpAccomplishments.review = null;
+    if (error?.status === 409 && error?.data?.reason_code === 'STALE_ASSESSMENT') {
+      delete _cmpAccomplishments.assessments[review.achievement_id];
+      _cmpAccomplishments.stale = review.achievement_id;
+      _cmpAccomplishments.error = 'The study changed since you reviewed this achievement. Review the updated evidence before recording it.';
+    } else if ([400,404,409].includes(error?.status)) {
+      delete _cmpAccomplishments.assessments[review.achievement_id];
+      _cmpAccomplishments.error = 'The recording request was refused. Check the current assessment and recorded history before trying again.';
+    } else {
+      _cmpAccomplishments.reconcile = true;
+      _cmpAccomplishments.error = 'The recording outcome could not be confirmed. An award may already exist. Refresh recorded history before trying again.';
+    }
+  } finally {
+    if (epoch === _cmpAccomplishmentsEpoch) {
+      _cmpAccomplishments.pending = false;
+      _cmpRenderAccomplishments();
+      if (!_cmpAccomplishments.review) document.getElementById('cmp-accomplishments-status')?.focus();
+    }
+  }
+}
+async function _cmpAccomplishmentsInspect(id, invoker) {
+  const existing = _cmpAccomplishments.history?.find(row => row.award_id === id);
+  if (!existing || _cmpAccomplishmentsSwitching()) return;
+  const epoch = _cmpAccomplishmentsEpoch, seq = ++_cmpAccomplishmentsInspectSeq;
+  _cmpAccomplishmentsFocus = invoker?.id || `cmp-accomplishments-inspect-${id}`;
+  _cmpAccomplishments.review = null;
+  _cmpAccomplishments.inspection = {summary:existing, verification:null, loading:true, error:''};
+  _cmpRenderAccomplishments();
+  document.getElementById('cmp-accomplishments-detail-title')?.focus();
+  const results = await Promise.allSettled([
+    get(`${_CMP_ACCOMPLISHMENTS_API}/awards/${encodeURIComponent(id)}`, {reportErrors:false}),
+    get(`${_CMP_ACCOMPLISHMENTS_API}/awards/${encodeURIComponent(id)}/verification`, {reportErrors:false}),
+  ]);
+  if (epoch !== _cmpAccomplishmentsEpoch || seq !== _cmpAccomplishmentsInspectSeq || _cmpAccomplishmentsSwitching()) return;
+  const item = _cmpAccomplishments.inspection;
+  try {
+    if (results[0].status !== 'fulfilled' || results[0].value.receipt_representation !== 'safe_summary') throw new Error('Unavailable');
+    const summary = _cmpAccomplishmentsSummary(results[0].value.receipt_projection);
+    if (summary.award_id !== id) throw new Error('Detached response');
+    item.summary = summary;
+  } catch { item.error = 'Award detail could not be read. The listed historical record has not been removed.'; }
+  if (results[1].status === 'fulfilled' && results[1].value?.award_id === id) {
+    const data = results[1].value;
+    item.verification = Object.fromEntries(['receipt_integrity','evidence_verification','historical_snapshot_replay'].map(key => [key,data[key]]));
+  } else { item.error = 'Verification could not be read. This request does not determine whether the historical award is valid.'; }
+  item.loading = false;
+  _cmpRenderAccomplishments();
+}
+function _cmpAccomplishmentsVerificationLabel(dimension, status) {
+  if (dimension === 'historical_snapshot_replay' && status === 'verified') return 'Original historical assessment replayed under its recorded profile.';
+  if (status === 'verified') return 'Verified from the currently available canonical evidence.';
+  if (dimension === 'receipt_integrity') return ({valid:'Valid receipt integrity.', invalid:'Receipt integrity failed validation.', unsupported:'Receipt integrity profile is unsupported.'})[status] || 'Receipt integrity unavailable.';
+  if (dimension === 'historical_snapshot_replay') return ({unsupported:'Historical replay is not available from the evidence currently present.', invalid:'Historical replay failed validation.'})[status] || 'Historical replay unavailable.';
+  return ({unverifiable_missing_evidence:'Some historical evidence required for verification is unavailable.',
+    unverifiable_missing_coverage:'This workspace does not contain enough historical coverage to verify the award.',
+    unverifiable_unsupported_rule:'This Hermeneia version cannot replay the historical rule.',
+    invalid_evidence:'Referenced historical evidence failed validation.'})[status] || 'Evidence verification unavailable.';
+}
+function _cmpAccomplishmentsDetailHtml() {
+  const review = _cmpAccomplishments.review, item = _cmpAccomplishments.inspection;
+  if (!review && !item) return '';
+  const summary = review || item.summary;
+  const title = _CMP_ACCOMPLISHMENT_LABELS[summary.achievement_id];
+  const body = review ? `<p>The server determined this assessment is earned under the recorded rule.</p>
+    <p>Evidence: ${review.evidence_count === null ? 'Count unavailable' : x(review.evidence_count)} qualifying retained Perspective execution(s). Coverage: ${x(review.coverage)}.</p>
+    ${summary.achievement_id === 'second_opinion' ? '<p>The server finding records the same question and Scope/frame, with distinct validated Perspective methodologies.</p>' : ''}
+    <p>Recording creates an append-only historical award. It does not establish agreement or mastery. Future rule versions may evaluate differently.</p>
+    <button id="cmp-accomplishments-record" class="cmp-step-action" type="button" onclick="_cmpAccomplishmentsRecord()"${_cmpAccomplishments.pending ? ' disabled' : ''}>${_cmpAccomplishments.pending ? 'Recording…' : 'Record achievement'}</button>`
+    : `<dl><dt>Earned at</dt><dd>${x(summary.earned_at)}</dd><dt>Recorded at</dt><dd>${x(summary.awarded_at)}</dd><dt>Issuer</dt><dd>${x(summary.issuer?.kind || 'unknown')} · ${x(summary.issuer?.authorship || 'unknown')}</dd></dl>
+      ${item.loading ? '<p role="status">Loading award detail and verification…</p>' : ''}
+      ${item.verification ? ['receipt_integrity','evidence_verification','historical_snapshot_replay'].map((key,index) => `<div class="cmp-step-why"><strong>${['Receipt integrity','Evidence verification','Historical replay'][index]}</strong><br>${x(_cmpAccomplishmentsVerificationLabel(key,item.verification[key]))}<br><small>${x(item.verification[key] || 'unavailable')}</small></div>`).join('') : ''}
+      ${item.error ? `<p role="status">${x(item.error)}</p>` : ''}`;
+  return `<section id="cmp-accomplishments-detail" class="cmp-cycle-detail" role="region" aria-labelledby="cmp-accomplishments-detail-title" onkeydown="_cmpAccomplishmentsEscape(event)">
+    <h4 id="cmp-accomplishments-detail-title" tabindex="-1">${review ? 'Review' : 'Inspect'} ${x(title)}</h4>
+    <p>Rule: ${x(summary.rule_id)} · version ${x(summary.rule_version)}</p>${body}
+    <button id="cmp-accomplishments-close" type="button" class="cmp-step-action" onclick="_cmpAccomplishmentsClose()">${review ? 'Cancel review' : 'Close inspection'}</button>
+  </section>`;
+}
+function _cmpAccomplishmentsRestoreFocus(id) {
+  const target = document.getElementById(id);
+  if (target && !target.disabled) target.focus();
+  else document.getElementById('cmp-accomplishments-status')?.focus();
+}
+function _cmpRenderAccomplishments() {
+  const host = document.getElementById('cmp-accomplishments-host');
+  if (!host) return;
+  // Companion refreshes and async inspection replace this projection's nodes.
+  // Preserve keyboard position when the active control still exists.
+  const focusId = host.contains(document.activeElement) ? document.activeElement?.id : '';
+  const state = _cmpAccomplishments;
+  const labels = {earned:'Ready to record', not_earned:'No qualifying retained evidence currently supports this accomplishment.',
+    unsupported_due_to_missing_coverage:'History unavailable: this workspace does not contain enough coverage to determine whether this was earned.',
+    invalid_evidence:'Unable to verify: required historical evidence did not pass validation. No achievement will be recorded from this assessment.'};
+  host.innerHTML = `<section class="cmp-guide" aria-label="Study accomplishments">
+    <div class="cmp-guide-head"><div><div class="cmp-guide-title">Study accomplishments</div><div class="cmp-guide-note">Evidence-backed method, with explicit recording. No model is required.</div></div>
+      <button id="cmp-accomplishments-open" type="button" class="fs-pill" aria-expanded="${state.open}" aria-controls="cmp-accomplishments-body" onclick="_cmpAccomplishmentsOpen()">Check accomplishments</button></div>
+    <div id="cmp-accomplishments-body" class="cmp-guide-body"${state.open ? '' : ' hidden'}>
+      <div id="cmp-accomplishments-status" tabindex="-1" role="status" aria-live="polite">${x(state.loading ? 'Checking current assessments and recorded history…' : state.pending ? 'Recording the explicitly approved assessment…' : state.error || state.notice)}</div>
+      ${state.stale ? `<button id="cmp-accomplishments-updated" type="button" class="cmp-step-action" onclick="_cmpAccomplishmentsReviewUpdated('${state.stale}')">Review updated assessment</button>` : ''}
+      ${state.reconcile ? `<button id="cmp-accomplishments-history-refresh" type="button" class="cmp-step-action" onclick="_cmpAccomplishmentsHistoryRefresh()"${state.loading || state.pending ? ' disabled' : ''}>Refresh recorded history</button>` : ''}
+      <h4>Current assessment</h4>
+      ${Object.entries(_CMP_ACCOMPLISHMENT_LABELS).map(([id,title]) => {
+        const data = state.assessments[id];
+        return `<div class="cmp-step-why"><strong>${x(title)}</strong><p>${x(data ? labels[data.status] : 'Current assessment unavailable. Check accomplishments to read it.')}</p>
+          ${data ? `<div>Rule version ${x(data.rule_version)}</div>` : ''}
+          ${data?.status === 'earned' ? `<button id="cmp-accomplishments-review-${id}" type="button" class="cmp-step-action" onclick="_cmpAccomplishmentsReview('${id}',this)"${state.pending || state.reconcile || state.loading ? ' disabled' : ''}>Review and record ${x(title)}</button>` : ''}</div>`;
+      }).join('')}
+      ${_cmpAccomplishmentsDetailHtml()}
+      <h4>Historical awards</h4><div class="cmp-guide-note">Recorded under the original rule; current assessment and current verification are separate.</div>
+      ${state.history === null ? '<p>Recorded history has not been read.</p>' : state.history.length ? state.history.map(row => `<div class="cmp-step-why"><strong>${x(_CMP_ACCOMPLISHMENT_LABELS[row.achievement_id])}</strong><div>Recorded <time datetime="${x(row.awarded_at)}">${x(row.awarded_at)}</time><br>Earned under rule v${x(row.rule_version)}</div><button id="cmp-accomplishments-inspect-${x(row.award_id)}" type="button" class="cmp-step-action" onclick="_cmpAccomplishmentsInspect(${x(JSON.stringify(row.award_id))},this)">Inspect ${x(_CMP_ACCOMPLISHMENT_LABELS[row.achievement_id])}</button></div>`).join('') : '<p>No historical awards are recorded for these two accomplishments.</p>'}
+    </div></section>`;
+  if (focusId) _cmpAccomplishmentsRestoreFocus(focusId);
+}
+// End Perspective accomplishments
 
 function _cmpRenderContextRows() {
   const host = document.getElementById('cmp-context');
@@ -16469,11 +16750,12 @@ function e10LineageNodeHtml(node) {
 }
 
 // ── Utilities ──────────────────────────────────────────
-function get(url) {
-  return requestJSON(url);
+function get(url, options = {}) {
+  return requestJSON(url, options);
 }
-function post(url, body) {
+function post(url, body, options = {}) {
   return requestJSON(url, {
+    ...options,
     method: 'POST',
     body,
   });
@@ -16485,7 +16767,9 @@ function del(url, body) {
   return requestJSON(url, body === undefined ? { method: 'DELETE' } : { method: 'DELETE', body });
 }
 async function requestJSON(url, options = {}) {
-  const requestOptions = { ...options };
+  // A bounded surface can own its error copy without disclosing response text
+  // through the global banner. This presentation option never reaches fetch.
+  const { reportErrors = true, ...requestOptions } = options;
   if (requestOptions.body !== undefined) {
     requestOptions.headers = { 'Content-Type': 'application/json', ...(requestOptions.headers || {}) };
     requestOptions.body = JSON.stringify(requestOptions.body || {});
@@ -16497,7 +16781,7 @@ async function requestJSON(url, options = {}) {
     clearAppError();
     return data;
   } catch (error) {
-    showAppError(_runtimeIsEndpointError(error) ? _runtimeEndpointLostMessage() : error.message);
+    if (reportErrors) showAppError(_runtimeIsEndpointError(error) ? _runtimeEndpointLostMessage() : error.message);
     throw error;
   }
 }
