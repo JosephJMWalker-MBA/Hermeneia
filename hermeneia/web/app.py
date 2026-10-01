@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sqlite3
 import tempfile
 import threading
@@ -9574,6 +9575,186 @@ Return ONLY valid JSON, no markdown, no explanation:
         response.headers["Content-Type"] = "application/json; charset=utf-8"
         response.headers["Cache-Control"] = "no-store"
         return response
+
+    def _award_json(payload, status=200):
+        response = jsonify(payload)
+        response.headers["Cache-Control"] = "no-store"
+        return response, status
+
+    def _award_error(code, message, status, **state):
+        return _award_json({"error": message, "reason_code": code, **state}, status)
+
+    def _award_summary(receipt):
+        # Same safe record_data whitelist as Study Lineage, without evaluating
+        # current evidence merely to inspect an immutable historical record.
+        package = receipt["evidence_package"]
+        coverage = package["assessment"]["coverage"]
+        summary = {field: receipt[field] for field in (
+            "award_id", "achievement_id", "rule_id", "rule_version", "evaluation_status",
+            "earned_at", "awarded_at", "issuer",
+        )}
+        summary.update(
+            profile=package["profile"],
+            evidence_refs=[ref["record"] for ref in package["assessment"]["finding"]["evidence_refs"]],
+            coverage={field: coverage[field] for field in (
+                "source", "status", "capability", "receipt_schema", "historical_completeness",
+                "extant_records", "eligible_records",
+            ) if field in coverage},
+            verification={"receipt_integrity": "valid", "evidence_verification": "not_performed",
+                          "historical_snapshot_replay": "unsupported", "reason_code": "LINEAGE_SUMMARY_ONLY"},
+        )
+        return summary
+
+    def _award_read(read):
+        """Bounded award reads share one read-only snapshot, without startup DDL."""
+        from .. import achievement_awards as domain
+
+        if not db_path.exists():
+            return _award_error("WORKSPACE_NOT_FOUND", "Database not found", 404)
+        conn = None
+        try:
+            conn = _conn()
+            conn.execute("PRAGMA query_only=ON")
+            conn.execute("BEGIN")
+            payload, status = read(conn)
+            return _award_json(payload, status)
+        except domain.UnsupportedAward:
+            return _award_error("AWARD_COVERAGE_UNSUPPORTED", "Award record or profile is unsupported", 409,
+                                receipt_integrity="unsupported")
+        except domain.InvalidAward:
+            return _award_error("AWARD_INTEGRITY_INVALID", "Award record fails integrity validation", 409,
+                                receipt_integrity="invalid")
+        except sqlite3.Error:
+            return _award_error("AWARD_COVERAGE_UNSUPPORTED", "Award evidence could not be read", 409)
+        except Exception:
+            return _award_error("AWARD_REQUEST_FAILED", "Perspective achievement request failed", 500)
+        finally:
+            if conn is not None:
+                conn.close()
+
+    @app.route("/api/achievements/perspective/<achievement_id>/assessment", methods=["GET"])
+    def api_perspective_achievement_assessment(achievement_id):
+        from .. import achievement_awards as domain
+        from ..perspective_achievement_evidence import read_perspective_achievement_evidence
+        from ..perspective_achievements import evaluate_perspective_achievements
+
+        if achievement_id not in {rule["achievement_id"] for rule in domain.perspective_achievement_rules()}:
+            return _award_error("UNKNOWN_ACHIEVEMENT", "Unknown Perspective achievement", 404)
+
+        def read(conn):
+            try:
+                package = domain.prepare_perspective_achievement_award(conn, achievement_id)
+                assessment = package["assessment"]
+            except domain.StaleAssessment:
+                # The preparation seam only returns earned packages. Preserve
+                # the pure evaluator's other states from the same SQL snapshot.
+                result = evaluate_perspective_achievements(read_perspective_achievement_evidence(conn))
+                assessment = {**result, "finding": next(
+                    item for item in result["achievements"] if item["achievement_id"] == achievement_id)}
+                package = None
+            return {**assessment["finding"], "evaluator_version": assessment["evaluator_version"],
+                    "limitations": assessment["limitations"], "assessment_package": package,
+                    "assessment_package_sha256": domain.evidence_package_digest(package) if package is not None else None}, 200
+
+        return _award_read(read)
+
+    @app.route("/api/achievements/perspective/<achievement_id>/award", methods=["POST"])
+    def api_perspective_achievement_award(achievement_id):
+        from .. import achievement_awards as domain
+
+        def unique_fields(pairs):
+            value = {}
+            for key, item in pairs:
+                if key in value:
+                    raise ValueError("Ambiguous approval field")
+                value[key] = item
+            return value
+
+        try:
+            # Flask's default decoder silently keeps the last duplicate key.
+            # Contradictory approval fields must never become implicit intent.
+            payload = json.loads(request.get_data(), object_pairs_hook=unique_fields) if request.is_json else None
+        except (ValueError, UnicodeError):
+            payload = None
+        fields = {"rule_id", "rule_version", "assessment_package_sha256"}
+        if (not isinstance(payload, dict) or set(payload) != fields
+                or any(not isinstance(payload[field], str) or not payload[field].strip() for field in fields)
+                or re.fullmatch(r"sha256:[0-9a-f]{64}", payload["assessment_package_sha256"]) is None):
+            return _award_error("MALFORMED_AWARD_REQUEST", "Exact rule, version and SHA-256 approval are required", 400)
+        if achievement_id not in {rule["achievement_id"] for rule in domain.perspective_achievement_rules()}:
+            return _award_error("UNKNOWN_ACHIEVEMENT", "Unknown Perspective achievement", 404)
+        if not db_path.exists():
+            return _award_error("WORKSPACE_NOT_FOUND", "Database not found", 404)
+        conn = None
+        try:
+            conn = _conn_rw()
+            # The domain owns BEGIN IMMEDIATE, committed re-evaluation, exact
+            # intent comparison, insertion verification and rollback/commit.
+            outcome = domain.materialize_perspective_achievement_award(
+                conn, achievement_id, payload["rule_id"], payload["rule_version"],
+                payload["assessment_package_sha256"])
+            receipt = outcome["receipt"]
+            return _award_json({"status": outcome["status"], "award_id": receipt["award_id"],
+                                "receipt_representation": "safe_summary", "receipt_projection": _award_summary(receipt)},
+                               201 if outcome["status"] == "recorded" else 200)
+        except domain.StaleAssessment:
+            return _award_error("STALE_ASSESSMENT", "Approved assessment is stale or no longer earned", 409,
+                                canonical_status="not_recorded")
+        except domain.UnsupportedAward:
+            return _award_error("UNSUPPORTED_AWARD_RULE", "Requested award rule or evidence coverage is unsupported", 409,
+                                canonical_status="not_recorded")
+        except domain.InvalidAward:
+            return _award_error("AWARD_INTEGRITY_INVALID", "Canonical award evidence fails integrity validation", 409,
+                                canonical_status="not_recorded")
+        except sqlite3.Error:
+            return _award_error("AWARD_STORAGE_UNAVAILABLE", "Award could not be recorded in this workspace", 409,
+                                canonical_status="not_recorded")
+        except Exception:
+            return _award_error("AWARD_REQUEST_FAILED", "Perspective achievement request failed", 500)
+        finally:
+            if conn is not None:
+                conn.close()
+
+    @app.route("/api/achievements/perspective/awards", methods=["GET"])
+    def api_perspective_achievement_awards():
+        from .. import achievement_awards as domain
+
+        def read(conn):
+            cursor = conn.execute(f"SELECT * FROM {domain.TABLE}")
+            names = [column[0] for column in cursor.description]
+            # Validate the entire list before emitting anything. Do not treat
+            # absent coverage or a malformed historical row as empty history.
+            receipts = [domain.award_from_row(dict(zip(names, row))) for row in cursor]
+            receipts.sort(key=lambda receipt: (receipt["awarded_at"], receipt["award_id"]))
+            return {"awards": [_award_summary(receipt) for receipt in receipts],
+                    "receipt_representation": "safe_summary"}, 200
+
+        return _award_read(read)
+
+    @app.route("/api/achievements/perspective/awards/<path:award_id>", methods=["GET"])
+    def api_perspective_achievement_award_get(award_id):
+        from .. import achievement_awards as domain
+
+        def read(conn):
+            if conn.execute(f"SELECT 1 FROM {domain.TABLE} WHERE id=?", (award_id,)).fetchone() is None:
+                return {"error": "Unknown award", "reason_code": "UNKNOWN_AWARD"}, 404
+            receipt = domain.load_achievement_award(conn, award_id)
+            return {"award_id": receipt["award_id"], "receipt_representation": "safe_summary",
+                    "receipt_projection": _award_summary(receipt)}, 200
+
+        return _award_read(read)
+
+    @app.route("/api/achievements/perspective/awards/<path:award_id>/verification", methods=["GET"])
+    def api_perspective_achievement_award_verify(award_id):
+        from .. import achievement_awards as domain
+        from ..achievement_award_verification import verify_achievement_award
+
+        def read(conn):
+            if conn.execute(f"SELECT 1 FROM {domain.TABLE} WHERE id=?", (award_id,)).fetchone() is None:
+                return {"error": "Unknown award", "reason_code": "UNKNOWN_AWARD"}, 404
+            return verify_achievement_award(conn, award_id), 200
+
+        return _award_read(read)
 
     @app.route("/api/study-lineage")
     @app.route("/api/study-lineage/export")
