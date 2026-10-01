@@ -43,6 +43,12 @@ WBS_AUTHORING_VERSION = "1.2"
 PUBLICATION_CAPABILITY = "publication-authoring-v0"
 PERSPECTIVE_EXECUTION_CAPABILITY = "perspective-retained-execution-v1"
 PERSPECTIVE_EXECUTION_FILE = "study/perspective_executions.json"
+ACHIEVEMENT_AWARD_CAPABILITY = "perspective-achievement-awards-v1"
+ACHIEVEMENT_AWARD_FILE = "study/achievement_awards.json"
+_ACHIEVEMENT_AWARD_TABLE = "achievement_awards"
+_ACHIEVEMENT_AWARD_COLUMNS = frozenset({
+    "id", "achievement_id", "rule_id", "rule_version", "receipt_json",
+})
 
 # Role of each file on restore (see spec §3).
 CANONICAL = "canonical"
@@ -104,6 +110,42 @@ def _perspective_executions(conn: sqlite3.Connection) -> list[dict] | None:
             validate_execution_references(conn, receipt)
     except (ValueError, TypeError, KeyError, sqlite3.Error) as exc:
         raise PerspectiveExecutionExportError(f"invalid retained Perspective execution: {exc}") from exc
+    return rows
+
+
+class AchievementAwardExportError(RuntimeError):
+    """Award history cannot be exported with its required archival closure."""
+
+
+def _achievement_awards(conn: sqlite3.Connection) -> list[dict] | None:
+    """Export exact extant rows, without re-evaluating historical eligibility.
+
+    Missing legacy schema is unsupported history coverage, rather than an empty
+    award ledger. Complete supported rows must retain their immutable parents;
+    exclusion and mutable historical snapshot drift do not replace old bytes.
+    """
+    if not _table_exists(conn, _ACHIEVEMENT_AWARD_TABLE):
+        return None
+    columns = {row[1] for row in conn.execute(f"PRAGMA table_info({_ACHIEVEMENT_AWARD_TABLE})")}
+    if not _ACHIEVEMENT_AWARD_COLUMNS <= columns:
+        return None
+    from ..achievement_awards import award_from_row, validate_award_references
+
+    try:
+        rows = _rows(conn, f"SELECT * FROM {_ACHIEVEMENT_AWARD_TABLE} ORDER BY id")
+        ids, slots = set(), set()
+        for row in rows:
+            if set(row) != _ACHIEVEMENT_AWARD_COLUMNS:
+                raise ValueError("malformed achievement award row")
+            receipt = award_from_row(row)
+            slot = (row["achievement_id"], row["rule_id"], row["rule_version"])
+            if row["id"] in ids or slot in slots:
+                raise ValueError("duplicate achievement award identity or slot")
+            ids.add(row["id"])
+            slots.add(slot)
+            validate_award_references(conn, receipt)
+    except (ValueError, TypeError, KeyError, sqlite3.Error) as exc:
+        raise AchievementAwardExportError(f"invalid achievement award: {exc}") from exc
     return rows
 
 
@@ -293,6 +335,7 @@ def _build_bundle_files_snapshot(
     )
     investigation = _investigation(conn)
     perspective_executions = _perspective_executions(conn)
+    achievement_awards = _achievement_awards(conn)
     projections = _study_projections(highlights, field_notes)
     derived = _derived(
         conn,
@@ -322,6 +365,8 @@ def _build_bundle_files_snapshot(
     }
     if perspective_executions is not None:
         content[PERSPECTIVE_EXECUTION_FILE] = (CANONICAL, _dumps(perspective_executions))
+    if achievement_awards is not None:
+        content[ACHIEVEMENT_AWARD_FILE] = (CANONICAL, _dumps(achievement_awards))
 
     # Uploads: content-hash-named canonical files (the exact source, §5.1).
     for filename, data in sorted(upload_files or []):
@@ -369,6 +414,10 @@ def _build_bundle_files_snapshot(
         manifest.setdefault("required_capabilities", []).append(PERSPECTIVE_EXECUTION_CAPABILITY)
         manifest["required_capabilities"].sort()
         manifest["counts"]["perspective_execution_receipts"] = len(perspective_executions)
+    if achievement_awards is not None:
+        manifest.setdefault("required_capabilities", []).append(ACHIEVEMENT_AWARD_CAPABILITY)
+        manifest["required_capabilities"].sort()
+        manifest["counts"][_ACHIEVEMENT_AWARD_TABLE] = len(achievement_awards)
 
     out: dict[str, bytes] = {path: data for path, (_role, data) in content.items()}
     out["manifest.json"] = _dumps(manifest)

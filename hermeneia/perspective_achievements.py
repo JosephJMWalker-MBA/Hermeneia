@@ -112,6 +112,43 @@ def _negative(source_state: str, diagnostics: list[dict], family_states: set[str
             "No qualifying retained evidence exists in this supported extant eligible snapshot under this rule version.")
 
 
+def _candidates(evidence: PerspectiveAchievementEvidence) -> list:
+    if not isinstance(evidence, PerspectiveAchievementEvidence):
+        raise TypeError("Canonical PerspectiveAchievementEvidence adapter snapshot required")
+    if evidence.source_state not in {"supported", "unsupported", "invalid"}:
+        raise ValueError("Invalid evidence source state")
+    candidates = sorted(((execution, _receipt(execution)) for execution in evidence.executions),
+                        key=lambda item: _order(item[1]))
+    if len({receipt["id"] for _, receipt in candidates}) != len(candidates):
+        raise ValueError("Duplicate canonical receipt in evidence snapshot")
+    if len({receipt["run"]["run_id"] for _, receipt in candidates}) != len(candidates):
+        raise ValueError("Duplicate canonical execution in evidence snapshot")
+    return candidates
+
+
+def _evidence_basis(evidence, candidates) -> dict:
+    return {
+        "source_state": evidence.source_state,
+        "coverage": json.loads(evidence.coverage_json),
+        "diagnostics": json.loads(evidence.diagnostics_json),
+        "executions": [{
+            "receipt_sha256": _digest(execution.receipt_json.encode("utf-8")),
+            "lineage_ref": json.loads(execution.lineage_ref_json),
+            "family_key": list(execution.family_key) if execution.family_key is not None else None,
+            "family_state": execution.family_state,
+            "family_evidence": json.loads(execution.family_evidence_json),
+            "family_reason_code": execution.family_reason_code,
+            "dependency_evidence": json.loads(execution.dependency_evidence_json),
+            "eligibility_observations": json.loads(execution.eligibility_json),
+        } for execution, _ in candidates],
+    }
+
+
+def achievement_evidence_basis(evidence: PerspectiveAchievementEvidence) -> dict:
+    """The exact unchanged category basis hashed by the evaluator and awards."""
+    return _evidence_basis(evidence, _candidates(evidence))
+
+
 def evaluate_perspective_achievements(evidence: PerspectiveAchievementEvidence) -> dict:
     """Evaluate the frozen rules purely over a canonical adapter snapshot.
 
@@ -120,18 +157,9 @@ def evaluate_perspective_achievements(evidence: PerspectiveAchievementEvidence) 
     survives unrelated local diagnostics; without a witness invalidity precedes
     unsupported coverage, then the bounded extant-snapshot negative result.
     """
-    if not isinstance(evidence, PerspectiveAchievementEvidence):
-        raise TypeError("Canonical PerspectiveAchievementEvidence adapter snapshot required")
-    if evidence.source_state not in {"supported", "unsupported", "invalid"}:
-        raise ValueError("Invalid evidence source state")
+    candidates = _candidates(evidence)
     coverage = json.loads(evidence.coverage_json)
     diagnostics = json.loads(evidence.diagnostics_json)
-    candidates = sorted(((execution, _receipt(execution)) for execution in evidence.executions),
-                        key=lambda item: _order(item[1]))
-    if len({receipt["id"] for _, receipt in candidates}) != len(candidates):
-        raise ValueError("Duplicate canonical receipt in evidence snapshot")
-    if len({receipt["run"]["run_id"] for _, receipt in candidates}) != len(candidates):
-        raise ValueError("Duplicate canonical execution in evidence snapshot")
 
     pair = None
     unresolved_family_states = set()
@@ -150,20 +178,7 @@ def evaluate_perspective_achievements(evidence: PerspectiveAchievementEvidence) 
 
     # Definition and input digests identify this assessment without minting an
     # award/evaluation object identity or copying canonical model output to it.
-    basis = {
-        "source_state": evidence.source_state, "coverage": coverage,
-        "diagnostics": diagnostics,
-        "executions": [{
-            "receipt_sha256": _digest(execution.receipt_json.encode("utf-8")),
-            "lineage_ref": json.loads(execution.lineage_ref_json),
-            "family_key": list(execution.family_key) if execution.family_key is not None else None,
-            "family_state": execution.family_state,
-            "family_evidence": json.loads(execution.family_evidence_json),
-            "family_reason_code": execution.family_reason_code,
-            "dependency_evidence": json.loads(execution.dependency_evidence_json),
-            "eligibility_observations": json.loads(execution.eligibility_json),
-        } for execution, _ in candidates],
-    }
+    basis = _evidence_basis(evidence, candidates)
     rules = perspective_achievement_rules()
     results = []
     for index, definition in enumerate(rules):

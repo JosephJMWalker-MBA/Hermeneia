@@ -16,6 +16,7 @@ from hermeneia.perspective_execution_receipts import (
 )
 
 SCHEMA = "hermeneia.study-lineage/v1"
+_AWARD_TABLE = "achievement_awards"
 
 # table: (record type, title, historical time field, content field)
 _SPECS = {
@@ -29,6 +30,7 @@ _SPECS = {
     "investigation_log": ("field_note", "Corpus Field Note", "created_at", "understanding"),
     "perspectives": ("perspective", "Saved Perspective", "created_at", "name"),
     EXECUTION_TABLE: ("retained_perspective_execution", "Retained Perspective execution", "retained_at", None),
+    _AWARD_TABLE: ("perspective_achievement_award", "Perspective achievement award", "awarded_at", None),
     "proposed_interpretations": ("proposed_interpretation", "Model interpretation proposal", "created_at", "text"),
     "interpretations": ("interpretation", "Canonical Interpretation", "created_at", "text"),
     "narrative_blueprints": ("blueprint", "Saved Blueprint", "created_at", "thesis"),
@@ -186,6 +188,8 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
             # Times/content belong to the strict captured payload, not invented
             # database columns. Malformed rows are omitted below.
             required = documented = {"id", "run_id", "receipt_json"}
+        if table == _AWARD_TABLE:
+            required = documented = {"id", "achievement_id", "rule_id", "rule_version", "receipt_json"}
         absent = sorted(documented - set(columns))
         if absent:
             missing_columns[table] = absent
@@ -199,6 +203,8 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
     allowed: dict[tuple[str, str], bool] = {}
     checking: set[tuple[str, str]] = set()
     execution_receipts: dict[str, dict] = {}
+    award_receipts: dict[str, dict] = {}
+    diagnostics: list[dict] = []
 
     def parent(table: str, identifier: Any) -> dict | None:
         if not isinstance(identifier, str) or not identifier:
@@ -250,6 +256,9 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
         if table != "supersession_relations":
             identifier = row.get("sha256" if table == "publication_artifacts" else "id")
             if not isinstance(identifier, str) or not identifier:
+                if table == _AWARD_TABLE:
+                    diagnostics.append({"record": None, "table": table, "state": "invalid",
+                                        "reason_code": "AWARD_RECEIPT_IDENTITY_INVALID"})
                 return False
         token = (table, _encoded(_key(table, row)))
         if token in allowed:
@@ -332,11 +341,34 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
                     execution_receipts[row["id"]] = receipt
             except (ValueError, TypeError, KeyError, sqlite3.Error):
                 ok = False
+        elif table == _AWARD_TABLE:
+            # The award domain imports the adapter, which itself projects
+            # Lineage. Import only when needed and never invoke its verifier:
+            # checking the envelope does not prove its historical evidence.
+            from hermeneia.achievement_awards import UnsupportedAward, award_from_row
+            try:
+                receipt = award_from_row(row)
+                slot = (receipt["achievement_id"], receipt["rule_id"], receipt["rule_version"])
+                ok = (sum(candidate.get("id") == row["id"] for candidate in data[table]) == 1
+                      and sum(tuple(candidate.get(field) for field in
+                                    ("achievement_id", "rule_id", "rule_version")) == slot
+                              for candidate in data[table]) == 1)
+                if not ok:
+                    raise ValueError("Ambiguous award identity or slot")
+                award_receipts[row["id"]] = receipt
+            except (ValueError, TypeError, KeyError, sqlite3.Error, UnicodeError, OverflowError) as exc:
+                ok = False
+                diagnostics.append({"record": {"table": table, "key": {"id": row["id"]}},
+                                    "state": "unsupported" if isinstance(exc, UnsupportedAward) else "invalid",
+                                    "reason_code": "AWARD_RECEIPT_UNSUPPORTED" if isinstance(exc, UnsupportedAward)
+                                                   else "AWARD_RECEIPT_INVALID"})
         checking.remove(token)
         allowed[token] = bool(ok)
         return bool(ok)
 
     def authorship(table: str, row: dict) -> tuple[str, str]:
+        if table == _AWARD_TABLE:
+            return "derived", "Recorded deterministic system assessment; no agreement, mastery, human authorship or current evidence verification is established."
         if table == EXECUTION_TABLE:
             return "model", "Machine-generated execution explicitly retained by a local steward; retention is not agreement or Interpretation acceptance."
         source = row.get("source")
@@ -371,6 +403,24 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
         return "unknown", "Authorship is not established by the stored record."
 
     def context(table: str, row: dict) -> list[dict]:
+        if table == _AWARD_TABLE:
+            from hermeneia.perspective_achievement_evidence import _EvidenceProblem, _check_frame_and_prompt
+            import hashlib
+            result = []
+            for binding in award_receipts[row["id"]]["evidence_package"]["witness_bindings"]:
+                candidate = parent(EXECUTION_TABLE, binding["receipt_id"])
+                if candidate is None or not eligible(EXECUTION_TABLE, candidate):
+                    continue
+                receipt = execution_receipts[binding["receipt_id"]]
+                try:
+                    _check_frame_and_prompt(receipt)
+                    raw = candidate["receipt_json"].encode("utf-8")
+                    if (binding["run_id"] == receipt["run"]["run_id"]
+                            and binding["receipt_sha256"] == "sha256:" + hashlib.sha256(raw).hexdigest()):
+                        result.append({"kind": "perspective_execution", "receipt_id": binding["receipt_id"]})
+                except (_EvidenceProblem, ValueError, KeyError, TypeError, UnicodeError):
+                    continue
+            return result
         if table == EXECUTION_TABLE:
             receipt = execution_receipts[row["id"]]
             primary = receipt["run"]["scope_receipt"]["primary"]
@@ -393,6 +443,9 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
         return []
 
     def provenance(table: str, row: dict, basis: str) -> dict:
+        if table == _AWARD_TABLE:
+            finding = award_receipts[row["id"]]["evidence_package"]["assessment"]["finding"]
+            return {"basis": basis, "references": [ref["record"] for ref in finding["evidence_refs"]], "records": []}
         if table == EXECUTION_TABLE:
             receipt = execution_receipts[row["id"]]
             run = receipt["run"]
@@ -453,6 +506,28 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
                 receipt = execution_receipts[row["id"]]
                 item["content"] = receipt["run"]["response"][:1000]
                 item["timestamp"] = _timestamp("retention.retained_at", receipt["retention"]["retained_at"])
+            elif table == _AWARD_TABLE:
+                receipt = award_receipts[row["id"]]
+                package = receipt["evidence_package"]
+                # This whitelist applies even with eligible ancestors. Private
+                # definitions/execution metadata never enter generic previews.
+                coverage = package["assessment"]["coverage"]
+                safe = {field: receipt[field] for field in (
+                    "award_id", "achievement_id", "rule_id", "rule_version", "evaluation_status",
+                    "earned_at", "awarded_at", "issuer",
+                )}
+                safe.update(profile=package["profile"],
+                            evidence_refs=[ref["record"] for ref in package["assessment"]["finding"]["evidence_refs"]],
+                            coverage={field: coverage[field] for field in (
+                                "source", "status", "capability", "receipt_schema", "historical_completeness",
+                                "extant_records", "eligible_records",
+                            ) if field in coverage},
+                            verification={"receipt_integrity": "valid", "evidence_verification": "not_performed",
+                                          "historical_snapshot_replay": "unsupported",
+                                          "reason_code": "LINEAGE_SUMMARY_ONLY"})
+                item["record_data"] = safe
+                item["content"] = "Recorded earned system assessment; agreement, mastery and current eligibility are not established."
+                item["timestamp"] = _timestamp("awarded_at", receipt["awarded_at"])
             items.append(item)
             if (table == "proposed_interpretations" and row.get("status") in ("accepted", "rejected")
                     and row.get("decided_at") and row.get("steward_id")):
@@ -467,6 +542,7 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
         "schema": SCHEMA, "workspace": workspace, "items": items,
         "coverage": {
             "missing_tables": sorted(missing_tables), "missing_columns": missing_columns,
+            "diagnostics": sorted(diagnostics, key=_encoded),
             "omitted": omitted, "unsupported_categories": [
                 "Unretained/transient Perspective and Room runs", "Overwritten annotation and governing-question revisions",
                 "Deleted inquiry questions", "Unrecorded workspace exports and CLI publication events",
@@ -479,6 +555,7 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
                 "Excluded evidence, unavailable or ambiguous parents, non-corpus notes and unbound publication works are omitted.",
                 "Unknown authorship remains unknown. Artifact references are recorded metadata, not a fresh integrity verification.",
                 "Retained Perspective receipts prove exact execution and explicit retention only; empty coverage cannot prove no past Perspective activity.",
+                "Award summaries validate receipt integrity only; evidence verification and historical snapshot replay are not performed by Lineage.",
             ],
         },
     }

@@ -193,4 +193,6 @@ def test_guided_cycle_consumes_supported_receipt_without_award_or_write(tmp_path
     assert step["history_support"]["status"] == "supported"
     assert guide["registry_version"] == "1.1.0"
     assert tuple(conn.iterdump()) == before
-    assert "award" not in json.dumps(guide).lower()
+    assert conn.execute("SELECT count(*) FROM achievement_awards").fetchone()[0] == 0
+    assert all(ref.get("record", {}).get("table") != "achievement_awards"
+               for row in guide["steps"] for ref in row["evidence_or_state_basis"])

@@ -350,7 +350,7 @@ def test_schema_addition_preserves_old_workspace_rows(receipt_conn):
     path = conn.execute("PRAGMA database_list").fetchone()[2]
     SQLiteStore(path).close()
     assert [tuple(row) for row in conn.execute("SELECT * FROM source_documents")] == rows
-    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == 18
+    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == 19
     assert conn.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0] == 0
 
 

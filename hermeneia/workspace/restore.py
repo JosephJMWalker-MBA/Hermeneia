@@ -44,20 +44,38 @@ _PERSPECTIVE_SUPERSESSION_FILE = "study/perspective_supersessions.json"
 _PERSPECTIVE_EXECUTION_FILE = "study/perspective_executions.json"
 _PERSPECTIVE_EXECUTION_CAPABILITY = "perspective-retained-execution-v1"
 _PERSPECTIVE_EXECUTION_TABLE = "perspective_execution_receipts"
+_ACHIEVEMENT_AWARD_FILE = "study/achievement_awards.json"
+_ACHIEVEMENT_AWARD_CAPABILITY = "perspective-achievement-awards-v1"
+_ACHIEVEMENT_AWARD_TABLE = "achievement_awards"
+_ACHIEVEMENT_AWARD_COLUMNS = frozenset({
+    "id", "achievement_id", "rule_id", "rule_version", "receipt_json",
+})
 
 # Required capabilities this restorer can reconstruct (see export.py).
 _PUBLICATION_CAPABILITY = "publication-authoring-v0"
 _PUBLICATION_PREFIX = "publication/"
-SUPPORTED_CAPABILITIES = frozenset({_PUBLICATION_CAPABILITY, _PERSPECTIVE_EXECUTION_CAPABILITY})
+SUPPORTED_CAPABILITIES = frozenset({
+    _PUBLICATION_CAPABILITY, _PERSPECTIVE_EXECUTION_CAPABILITY, _ACHIEVEMENT_AWARD_CAPABILITY,
+})
 
 # Tables whose presence means the workspace is not empty.
 _OCCUPANCY_TABLES = [table for table, _ in _TABLE_FILES] + [
     "workspace_investigation", "publication_works", _PERSPECTIVE_EXECUTION_TABLE,
+    _ACHIEVEMENT_AWARD_TABLE,
 ]
 
 
 class RestoreError(RuntimeError):
     """Raised when a bundle cannot be safely restored."""
+
+
+def _unique_json_keys(pairs):
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON key: {key}")
+        value[key] = item
+    return value
 
 
 def find_bundle_root(extracted: str | Path) -> Path:
@@ -103,7 +121,10 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
     manifest_path = root / "manifest.json"
     if not manifest_path.is_file():
         raise RestoreError(f"no manifest.json in {root}")
-    manifest = json.loads(manifest_path.read_text())
+    try:
+        manifest = json.loads(manifest_path.read_bytes(), object_pairs_hook=_unique_json_keys)
+    except (ValueError, UnicodeError) as exc:
+        raise RestoreError(f"invalid bundle manifest: {exc}") from exc
 
     def _load(rel: str) -> Any:
         path = root / rel
@@ -117,6 +138,7 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
     tables = {table: (_load(rel) or []) for table, rel in _TABLE_FILES}
     perspective_supersessions = _load(_PERSPECTIVE_SUPERSESSION_FILE) or []
     perspective_executions, receipt_coverage = _read_perspective_executions(root, manifest)
+    achievement_awards, award_coverage = _read_achievement_awards(root, manifest)
     publication = _read_publication_component(root, manifest)
     investigation = _load("investigation.json")
     uploads_dir = root / "corpus" / "uploads"
@@ -130,7 +152,9 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
         "tables": tables,
         "perspective_supersessions": perspective_supersessions,
         "perspective_executions": perspective_executions,
-        "coverage": {_PERSPECTIVE_EXECUTION_TABLE: receipt_coverage},
+        "achievement_awards": achievement_awards,
+        "coverage": {_PERSPECTIVE_EXECUTION_TABLE: receipt_coverage,
+                     _ACHIEVEMENT_AWARD_TABLE: award_coverage},
         "investigation": investigation,
         "uploads": uploads,
         "publication": publication,
@@ -191,6 +215,54 @@ def _read_perspective_executions(root: Path, manifest: dict) -> tuple[list[dict]
         raise RestoreError(str(exc)) from exc
     return rows, {"status": "covered", "extant_records": len(rows),
                   "reason": "Extant retained-receipt category covered; no complete historical activity claim."}
+
+
+def _read_achievement_awards(root: Path, manifest: dict) -> tuple[list[dict], dict]:
+    """Validate the award wire component without accepting or issuing history."""
+    declared = _ACHIEVEMENT_AWARD_CAPABILITY in (manifest.get("required_capabilities") or [])
+    listed = [entry for entry in manifest.get("files") or []
+              if entry.get("path") == _ACHIEVEMENT_AWARD_FILE]
+    path = root / _ACHIEVEMENT_AWARD_FILE
+    if not declared and not listed and not path.exists():
+        return [], {"status": "unsupported",
+                    "reason": "Bundle does not cover achievement award history; historical awards are unknown."}
+    if not declared:
+        raise RestoreError("Achievement award component lacks its required capability declaration")
+    if len(listed) != 1 or listed[0].get("role") != "canonical" or not path.is_file():
+        raise RestoreError("Achievement award component must have one complete canonical manifest entry")
+    if root.resolve() not in path.resolve().parents:
+        raise RestoreError("Achievement award component escapes the bundle root")
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != listed[0].get("sha256"):
+        raise RestoreError("Achievement award component failed its hash check")
+    from ..achievement_awards import award_from_row
+
+    try:
+        rows = json.loads(data, object_pairs_hook=_unique_json_keys)
+        if not isinstance(rows, list):
+            raise ValueError("Achievement award component must contain a row list")
+        ids, slots = set(), set()
+        for row in rows:
+            if not isinstance(row, dict) or set(row) != _ACHIEVEMENT_AWARD_COLUMNS:
+                raise ValueError("malformed achievement award row")
+            award_from_row(row)
+            slot = (row["achievement_id"], row["rule_id"], row["rule_version"])
+            if row["id"] in ids or slot in slots:
+                raise ValueError("duplicate achievement award identity or slot")
+            ids.add(row["id"])
+            slots.add(slot)
+        if [row["id"] for row in rows] != sorted(ids):
+            raise ValueError("Achievement award component must use ASCII identity order")
+        counts = manifest.get("counts")
+        if not isinstance(counts, dict):
+            raise ValueError("Achievement award component requires explicit record counts")
+        count = counts.get(_ACHIEVEMENT_AWARD_TABLE)
+        if type(count) is not int or count != len(rows):
+            raise ValueError("Achievement award count disagrees with component")
+    except (ValueError, TypeError, KeyError, UnicodeError) as exc:
+        raise RestoreError(str(exc)) from exc
+    return rows, {"status": "covered", "extant_records": len(rows),
+                  "reason": "Extant award category covered; no complete historical award claim."}
 
 
 def _read_publication_component(root: Path, manifest: dict) -> dict[str, Any] | None:
@@ -310,6 +382,20 @@ def _workspace_is_empty(conn: sqlite3.Connection) -> bool:
     return True
 
 
+def _refuse_occupied_target(conn: sqlite3.Connection, *, award_coverage: bool, overwrite: bool) -> None:
+    award_table_exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (_ACHIEVEMENT_AWARD_TABLE,),
+    ).fetchone() is not None
+    award_target_occupied = award_table_exists and conn.execute(
+        f"SELECT 1 FROM {_ACHIEVEMENT_AWARD_TABLE} LIMIT 1"
+    ).fetchone() is not None
+    if not _workspace_is_empty(conn) and (not overwrite or award_coverage or award_target_occupied):
+        raise RestoreError(
+            "target workspace is not empty; refusing to restore (WBS v1 has "
+            "no award-history merge or overwrite). Restore into a fresh database."
+        )
+
+
 def preview_restore(db_path: str | Path, bundle_dir: str | Path) -> dict[str, Any]:
     """Report what a restore would create, without writing anything."""
     bundle = read_bundle(bundle_dir)
@@ -325,6 +411,8 @@ def preview_restore(db_path: str | Path, bundle_dir: str | Path) -> dict[str, An
     counts["perspective_supersessions"] = len(bundle["perspective_supersessions"])
     if bundle["coverage"][_PERSPECTIVE_EXECUTION_TABLE]["status"] == "covered":
         counts[_PERSPECTIVE_EXECUTION_TABLE] = len(bundle["perspective_executions"])
+    if bundle["coverage"][_ACHIEVEMENT_AWARD_TABLE]["status"] == "covered":
+        counts[_ACHIEVEMENT_AWARD_TABLE] = len(bundle["achievement_awards"])
     counts["uploads"] = len(bundle["uploads"])
     if bundle["publication"] is not None:
         for table, rows in bundle["publication"]["tables"].items():
@@ -348,11 +436,22 @@ def restore_workspace(
 ) -> dict[str, Any]:
     """Restore a bundle into a fresh workspace database.
 
-    Refuses a non-empty target unless ``overwrite=True`` (which the caller must
-    set deliberately — v1 has no merge). Returns per-table restored counts.
+    Award history requires a fresh/empty target even with ``overwrite=True``;
+    that legacy option cannot merge, replace or ignore an immutable award slot.
+    Returns per-table restored counts.
     """
     db_path = Path(db_path)
     bundle = read_bundle(bundle_dir)
+    award_coverage = bundle["coverage"][_ACHIEVEMENT_AWARD_TABLE]["status"] == "covered"
+
+    # A refused immutable-history merge must leave even startup/migration DDL
+    # outside the occupied target. Recheck after startup for a concurrent writer.
+    if db_path.exists():
+        existing = sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True)
+        try:
+            _refuse_occupied_target(existing, award_coverage=award_coverage, overwrite=overwrite)
+        finally:
+            existing.close()
 
     # Ensure schema exists (creates the DB and all tables if absent).
     SQLiteStore(db_path).close()
@@ -362,11 +461,7 @@ def restore_workspace(
     staging: Path | None = None
     installed: list[Path] = []
     try:
-        if not overwrite and not _workspace_is_empty(conn):
-            raise RestoreError(
-                "target workspace is not empty; refusing to restore (WBS v1 has "
-                "no merge). Pass overwrite=True to restore into a fresh database."
-            )
+        _refuse_occupied_target(conn, award_coverage=award_coverage, overwrite=overwrite)
 
         # Publication artifacts are staged and hash-verified before any row is
         # inserted, installed before the commit, and discarded on any failure,
@@ -378,8 +473,11 @@ def restore_workspace(
         # Insert in FK order; disable FK enforcement during the bulk load so a
         # partially-covered bundle cannot half-fail mid-restore.
         conn.execute("PRAGMA foreign_keys=OFF")
-        conn.execute("BEGIN")
+        conn.execute("BEGIN IMMEDIATE")
         try:
+            # Hold the write reservation during the final fresh-target check;
+            # a concurrent insert must not turn restore into an implicit merge.
+            _refuse_occupied_target(conn, award_coverage=award_coverage, overwrite=overwrite)
             for table, _rel in _TABLE_FILES:
                 columns = _table_columns(conn, table)
                 rows = bundle["tables"][table]
@@ -406,6 +504,23 @@ def restore_workspace(
                 restored[_PERSPECTIVE_EXECUTION_TABLE] = _insert_rows(
                     conn, _PERSPECTIVE_EXECUTION_TABLE, receipt_rows,
                     _table_columns(conn, _PERSPECTIVE_EXECUTION_TABLE),
+                )
+
+            if award_coverage:
+                from ..achievement_awards import award_from_row, validate_award_references
+
+                award_rows = bundle["achievement_awards"]
+                for award_row in award_rows:
+                    try:
+                        validate_award_references(conn, award_from_row(award_row))
+                    except (ValueError, KeyError, TypeError, sqlite3.Error) as exc:
+                        raise RestoreError(f"invalid achievement award references: {exc}") from exc
+                # Exact component shape was checked above. No generic column
+                # filtering may silently discard an unknown award field.
+                if not _ACHIEVEMENT_AWARD_COLUMNS <= _table_columns(conn, _ACHIEVEMENT_AWARD_TABLE):
+                    raise RestoreError("target cannot store the complete achievement award row")
+                restored[_ACHIEVEMENT_AWARD_TABLE] = _insert_rows(
+                    conn, _ACHIEVEMENT_AWARD_TABLE, award_rows, set(_ACHIEVEMENT_AWARD_COLUMNS),
                 )
 
             investigation = bundle["investigation"]

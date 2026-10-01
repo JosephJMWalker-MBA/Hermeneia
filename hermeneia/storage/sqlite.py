@@ -13,7 +13,7 @@ from ..perspective_identity import (
 )
 from .hashing import make_semantic_hash
 
-SCHEMA_VERSION = 18  # explicit retained Perspective execution receipts
+SCHEMA_VERSION = 19  # explicit append-only Perspective achievement awards
 
 # Supersession triggers must be dropped and recreated whenever the canonical object
 # list grows. SQLite has no ALTER TRIGGER.
@@ -1198,6 +1198,8 @@ CREATE TABLE IF NOT EXISTS workspace_identity (
     # migration path. Read-only projections never initialize these tables.
     from ..perspective_execution_receipts import ensure_perspective_execution_tables
     ensure_perspective_execution_tables(conn)
+    from ..achievement_awards import ensure_achievement_award_tables
+    ensure_achievement_award_tables(conn)
     conn.commit()
 
 
