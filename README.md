@@ -228,9 +228,13 @@ Research artifacts are evidence from an active program of inquiry. They do not p
 
 ---
 
-## Future Performance Manuscript relationship
+## Performance Manuscript relationship
 
-A deferred integration hypothesis around **write / read / listen**, continuous audiobook production, and living audio/podcast projections is recorded in [docs/integrations/performance-manuscript-future-convergence.md](docs/integrations/performance-manuscript-future-convergence.md). The projects remain intentionally independent until each works as intended on its own terms.
+A bounded integration seam is now active: **Performance Manuscript produces exhaustive machine observations; Hermeneia captures explicit human attention while reading and listening.** The projects remain separate systems and exchange governed sidecars rather than sharing canonical state.
+
+The active design is [docs/integrations/performance-manuscript-human-attention-bridge.md](docs/integrations/performance-manuscript-human-attention-bridge.md). The broader **write / read / listen**, continuous-audiobook, and living-audio/podcast hypothesis remains recorded in [docs/integrations/performance-manuscript-future-convergence.md](docs/integrations/performance-manuscript-future-convergence.md).
+
+The interaction target is Reader-first and tablet-friendly: highlight a passage, annotate identity/Perspective/performance, optionally speak a short note, confirm the structured result, and preserve the event without letting machine transcription or passive reading become authority.
 
 
 ## Current phase
