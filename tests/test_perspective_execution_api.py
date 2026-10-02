@@ -110,6 +110,43 @@ def test_adapter_stub_provenance_is_preserved_without_fabricating_a_model_versio
     assert "model_version" not in execution and "temperature" not in execution
 
 
+def test_ollama_chat_provenance_and_exact_prompt_survive_retention(tmp_path, monkeypatch):
+    from hermeneia.narrative.artist_providers import DEFAULT_PROVIDER_REGISTRY
+    from test_e10_vertical_slice_api import _FakeOllamaClient
+
+    _install_fake_ollama(monkeypatch, ["qwen2.5:0.5b"])
+    requests = []
+
+    def chat(self, **kwargs):
+        requests.append(kwargs)
+        return {"message": {"role": "assistant", "content": OUTPUT}}
+
+    monkeypatch.setattr(_FakeOllamaClient, "chat", chat, raising=False)
+    db = tmp_path / "study.db"
+    _seed_perspective_scope_source(db)
+    client = create_app(db_path=db, provider_registry=DEFAULT_PROVIDER_REGISTRY).test_client()
+    _rollback_journal(db)
+    before = _snapshot(db.parent)
+
+    transient = _run(client)
+
+    assert _count(db) == 0
+    assert _snapshot(db.parent) == before
+    assert transient["execution"]["request_api"] == "chat"
+    assert transient["execution"]["request_schema_version"] == "1"
+    assert transient["execution"]["provider_id"] == "ollama-local"
+    assert transient["execution"]["provider"] == "ollama"
+    assert transient["execution"]["model_id"] == "qwen2.5:0.5b"
+    receipt = _retain(client, transient).get_json()
+    assert receipt["run"]["execution"] == transient["execution"]
+    assert receipt["run"]["response"] == OUTPUT
+    assert requests == [{
+        "model": "qwen2.5:0.5b",
+        "messages": [{"role": "user", "content": receipt["run"]["prompt"]}],
+        "stream": False,
+    }]
+
+
 def test_explicit_discard_creates_no_durable_positive_or_negative_history(study):
     db, client = study
     run = _run(client)
