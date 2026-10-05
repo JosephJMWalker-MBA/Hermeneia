@@ -315,9 +315,18 @@ def _build_bundle_files_snapshot(
     highlights = _rows(
         conn, "SELECT * FROM reader_highlights ORDER BY page, created_at, id"
     )
+    # An older workspace keeps the pre-ADR-0045 perspectives shape until a write
+    # path migrates it. Export stays read-only and emits those rows verbatim;
+    # every such row is perspective-label-v1, so the row order is unchanged.
+    perspective_columns = {row[1] for row in conn.execute("PRAGMA table_info(perspectives)")}
+    perspective_order = (
+        "identity_scheme, name, created_at, id"
+        if "identity_scheme" in perspective_columns
+        else "name, created_at, id"
+    )
     perspectives = _rows(
         conn,
-        "SELECT * FROM perspectives ORDER BY identity_scheme, name, created_at, id",
+        f"SELECT * FROM perspectives ORDER BY {perspective_order}",
     )
     perspective_ids = {row["id"] for row in perspectives}
     perspective_supersessions = [
