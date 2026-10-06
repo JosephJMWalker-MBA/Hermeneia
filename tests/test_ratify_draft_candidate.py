@@ -147,3 +147,39 @@ def test_reader_confirms_verbatim_recording_of_saved_text(seeded):
     first = _ratify(client, ids, {"provider": "ratify-test"}, text="Draft A the steward first approved.")
     shown = _render_ratify_result(first.status_code, first.get_json(), "Draft A the steward first approved.")
     assert "recorded verbatim" in shown, shown
+
+
+# ── #235 direct-API boundary ─────────────────────────────────────────────────
+# 06_Ontology.md: a RenderedNarrative is expression produced by an ArtistProvider
+# from ArchitectPlan, ExpressionProfile and ArtistProvider invocation metadata,
+# and preserves that execution context. The server can only record an
+# invocation it observed, so text without a server-held preview is not ratified.
+
+@pytest.mark.xfail(strict=True, raises=RatificationRecordFailure,
+                   reason="#235: ratify-draft without a server-held candidate persists a narrative with no invocation record")
+def test_ratification_without_a_server_held_candidate_persists_nothing(seeded):
+    db, ids, client = seeded
+    before = _narrative_texts(db)
+    response = client.post("/api/pipeline/ratify-draft", json={
+        "plan_id": ids["plan_id"], "provider": "ollama-local", "profile_slug": PROFILE,
+        "text": "Text whose generation the server never observed."})
+    if response.status_code < 400 or _narrative_texts(db) != before:
+        raise RatificationRecordFailure(f"{response.status_code} {response.get_json()}")
+
+
+@pytest.mark.xfail(strict=True, raises=RatificationRecordFailure,
+                   reason="#235: ratify_draft persists without the observed invocation record")
+def test_ratify_draft_service_requires_the_observed_invocation_record(seeded):
+    db, ids, _client = seeded
+    before = _narrative_texts(db)
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    try:
+        artist_service.ratify_draft(ids["plan_id"], conn, provider="ollama-local", profile_slug=PROFILE,
+                                    text="Text whose generation the server never observed.")
+    except artist_service.ArtistRenderError:
+        pass
+    finally:
+        conn.close()
+    if _narrative_texts(db) != before:
+        raise RatificationRecordFailure("ratify_draft persisted a narrative without an execution record")
