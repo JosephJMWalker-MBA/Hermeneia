@@ -1,9 +1,11 @@
-"""Frozen witness for #225: the herm CLI must open exactly the target it is given.
+"""Promoted regression for #225: the herm CLI must open exactly the target it is given.
 
 Run from inside another workspace (so ./build/hermeneia.db exists), every CLI
 database resolver must resolve an explicit target exactly (a SQLite file of
 any name, or the hermeneia.db inside a .herm bundle or workspace directory)
 or fail loudly. None may substitute ./build/hermeneia.db.
+Commit 04a574d preserves the negative version; the repair demonstrated strict
+unexpected passes for every resolver before the expected failures were removed.
 Synthetic databases only.
 """
 from __future__ import annotations
@@ -68,8 +70,6 @@ def _documents(path: Path) -> list[str]:
     return [r[0] for r in sqlite3.connect(path).execute("SELECT original_filename FROM source_documents")]
 
 
-@pytest.mark.xfail(strict=True, raises=WrongWorkspaceTarget,
-                   reason="#225: CLI resolvers substitute ./build/hermeneia.db; repair requires its own packet")
 @pytest.mark.parametrize("module", RESOLVER_MODULES + ["extract_cmd"])
 def test_explicit_targets_resolve_exactly(layout, module):
     for label in ("portable", "copy"):
@@ -81,8 +81,6 @@ def test_explicit_targets_resolve_exactly(layout, module):
             raise WrongWorkspaceTarget(f"{module} resolved {label} to {resolved} ({_documents(resolved)})")
 
 
-@pytest.mark.xfail(strict=True, raises=WrongWorkspaceTarget,
-                   reason="#225: unresolvable explicit targets fall back silently; repair requires its own packet")
 @pytest.mark.parametrize("module", RESOLVER_MODULES + ["extract_cmd"])
 def test_unresolvable_explicit_targets_fail_loudly(layout, module):
     for label in ("missing", "empty_dir"):
@@ -93,8 +91,6 @@ def test_unresolvable_explicit_targets_fail_loudly(layout, module):
         raise WrongWorkspaceTarget(f"{module} resolved unresolvable {label} target to {resolved}")
 
 
-@pytest.mark.xfail(strict=True, raises=WrongWorkspaceTarget,
-                   reason="#225: herm stats reports another workspace; repair requires its own packet")
 def test_herm_stats_on_portable_bundle_reports_that_bundle(layout):
     env = dict(os.environ, PYTHONPATH=str(ROOT), PYTHONDONTWRITEBYTECODE="1")
     result = subprocess.run([sys.executable, "-B", "-m", "hermeneia.cli.main", "stats", str(layout["portable"])],

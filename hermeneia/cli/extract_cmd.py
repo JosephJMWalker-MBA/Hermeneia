@@ -30,6 +30,7 @@ from rich.table import Table
 from rich import box
 
 from ..storage.hashing import make_blueprint_id
+from .target import resolve_db_target
 from ..compiler.blueprint_extractor import extract_blueprint_from_text, BlueprintExtractionError
 from ..compiler.architect import compile_architect_plan
 
@@ -37,12 +38,7 @@ console = Console()
 
 
 def _open_db(bundle_or_db: str | None) -> tuple[Path, sqlite3.Connection]:
-    default = "build/hermeneia.db"
-    if bundle_or_db is None:
-        db_path = Path(default)
-    else:
-        p = Path(bundle_or_db)
-        db_path = p if (p.suffix == ".db" or "hermeneia.db" in p.name) else Path(default)
+    db_path = resolve_db_target(bundle_or_db)
 
     if not db_path.exists():
         console.print(f"[red]Database not found:[/] {db_path}")

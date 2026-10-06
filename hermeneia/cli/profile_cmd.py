@@ -13,6 +13,8 @@ same semantic commitments as literary-en.
 """
 from __future__ import annotations
 
+from .target import resolve_db_target
+
 import sqlite3
 import sys
 from datetime import datetime, timezone
@@ -36,10 +38,7 @@ def _open_db(db_path: Path) -> sqlite3.Connection:
 
 
 def _resolve_db(bundle_or_db: str | None, default: str = "build/hermeneia.db") -> Path:
-    if bundle_or_db is None:
-        return Path(default)
-    p = Path(bundle_or_db)
-    return p if (p.suffix == ".db" or p.name.endswith(".db")) else Path(default)
+    return resolve_db_target(bundle_or_db, default)
 
 
 def cmd_profile_list(bundle_or_db: str | None = None) -> None:
