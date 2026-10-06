@@ -1,10 +1,12 @@
-"""Frozen witnesses for #228 and #227: malformed request inputs get structured answers.
+"""Promoted regressions for #228 and #227: malformed request inputs get structured answers.
 
 A write request whose JSON body is not an object is refused with a
 structured 4xx, as the routes that validate their payload type already do
 (P3 retention, award issuance); and a malformed `limit` query parameter falls
 back to the default, as `/api/investigation-log` does. Neither ever becomes
-an HTML 500. Synthetic empty workspace; no provider calls.
+an HTML 500. Commit 02f4013 preserves the negative versions; the repair
+demonstrated strict unexpected passes before the expected failures were removed.
+Synthetic empty workspace; no provider calls.
 """
 from __future__ import annotations
 
@@ -51,8 +53,6 @@ def client(tmp_path_factory):
     return app.test_client()
 
 
-@pytest.mark.xfail(strict=True, raises=UnstructuredServerError,
-                   reason="#228: write routes call .get on a non-object JSON body; repair requires its own packet")
 @pytest.mark.parametrize("body", ["[1]", '"x"'])
 @pytest.mark.parametrize("method,url", NON_OBJECT_BODY_ROUTES)
 def test_non_object_json_body_is_a_structured_4xx(client, method, url, body):
@@ -61,8 +61,6 @@ def test_non_object_json_body_is_a_structured_4xx(client, method, url, body):
         raise UnstructuredServerError(f"{method} {url} {body}: {response.status_code} {response.mimetype}")
 
 
-@pytest.mark.xfail(strict=True, raises=UnstructuredServerError,
-                   reason="#227: limit is parsed with a bare int(); repair requires its own packet")
 @pytest.mark.parametrize("url", MALFORMED_LIMIT_URLS)
 def test_malformed_limit_falls_back_to_the_default(client, url):
     response = client.get(url)

@@ -626,6 +626,27 @@ def create_app(
                 pass  # already closed by the route
             conn.close()
 
+    class _JSONBodyError(Exception):
+        """A JSON request body that is not an object."""
+
+    @app.errorhandler(_JSONBodyError)
+    def _json_body_error(_exc):
+        return jsonify({"error": "request body must be a JSON object"}), 400
+
+    def _json_body(*, force: bool = False) -> dict:
+        """The request's JSON object body; {} when absent; a 400 when it is another JSON value."""
+        payload = request.get_json(force=True) if force else request.get_json(silent=True)
+        if payload and not isinstance(payload, dict):
+            raise _JSONBodyError()
+        return payload or {}
+
+    def _int_arg(name: str, default: int) -> int:
+        """An integer query parameter; a malformed value falls back to the default."""
+        try:
+            return int(request.args.get(name, default))
+        except (TypeError, ValueError):
+            return default
+
     def _store() -> SQLiteStore:
         return SQLiteStore(db_path)
 
@@ -3332,7 +3353,7 @@ def create_app(
     @app.route("/api/workspaces", methods=["GET", "POST"])
     def api_workspaces():
         if request.method == "POST":
-            body = request.get_json(silent=True) or {}
+            body = _json_body()
             raw_name = body.get("name") if isinstance(body, dict) else None
             name = str(raw_name or "").strip()
             try:
@@ -3395,7 +3416,7 @@ def create_app(
     @app.route("/api/search")
     def api_search():
         q = request.args.get("q", "").strip()
-        limit = min(int(request.args.get("limit", 15)), 50)
+        limit = min(_int_arg("limit", 15), 50)
 
         if not q or not db_path.exists():
             return jsonify({**_empty_literal_concordance_response(q), "results": []})
@@ -3876,7 +3897,7 @@ def create_app(
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         status    = str(payload.get("status", "")).strip()
         rationale = str(payload.get("rationale", "")).strip()
 
@@ -3930,7 +3951,7 @@ def create_app(
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         name = str(payload.get("name") or "").strip()
         artist_prompt = str(payload.get("artist_prompt") or "").strip()
         if not name:
@@ -4379,7 +4400,7 @@ def create_app(
 
         q = request.args.get("q", "").strip()
         filter_name = request.args.get("filter", "all").strip().lower()
-        limit = min(max(int(request.args.get("limit", 40)), 1), 100)
+        limit = min(max(_int_arg("limit", 40), 1), 100)
 
         conn = _conn()
         rows = conn.execute(
@@ -4555,7 +4576,7 @@ def create_app(
 
     @app.route("/api/perspective/saved", methods=["POST"])
     def api_perspective_saved_create():
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         draft = payload.get("perspective_draft")
         try:
             declared_by = normalize_declared_by(payload.get("declared_by"))
@@ -4578,7 +4599,7 @@ def create_app(
 
     @app.route("/api/perspective/saved/<path:perspective_id>/revisions", methods=["POST"])
     def api_perspective_saved_revision(perspective_id: str):
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         draft = payload.get("perspective_draft")
         try:
             declared_by = normalize_declared_by(payload.get("declared_by"))
@@ -4718,7 +4739,7 @@ def create_app(
 
     @app.route("/api/perspective/run", methods=["POST"])
     def api_perspective_run():
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         question = str(payload.get("question") or "").strip()
         raw_model = str(payload.get("model") or "").strip()
         try:
@@ -4891,7 +4912,7 @@ def create_app(
 
     @app.route("/api/perspective/room", methods=["POST"])
     def api_perspective_room():
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         question = str(payload.get("question") or "").strip()
         raw_model = str(payload.get("model") or "").strip()
         if not question:
@@ -5057,7 +5078,7 @@ def create_app(
                 "error": f"{label} has no registered provider adapter"
             }), 409
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         provider_meta = active_provider_registry.definition(provider_id).metadata()
         source_state = _credential_source_for_provider(provider_meta)
 
@@ -5215,7 +5236,7 @@ def create_app(
                 "error": f"{label} has no registered provider adapter"
             }), 409
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         model = str(payload.get("model") or "").strip()
         if not model:
             return jsonify({"error": "model is required"}), 400
@@ -5277,7 +5298,7 @@ def create_app(
 
     @app.route("/api/e10/ollama/host", methods=["PUT"])
     def api_e10_ollama_host():
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         host = str(payload.get("host") or "").strip()
         if not host:
             return jsonify({"error": "host is required"}), 400
@@ -5307,7 +5328,7 @@ def create_app(
 
     @app.route("/api/e10/ollama/install", methods=["POST"])
     def api_e10_ollama_install_model():
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         participant = str(payload.get("participant") or "local").strip()
         participant_info = _e10_participant(participant)
         if participant_info is None:
@@ -5624,7 +5645,7 @@ def create_app(
         if role not in _CALIBRATION_ROLES:
             return jsonify({"error": f"unknown role: {role}"}), 400
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         status = payload.get("status", "").strip().lower()
         note = str(payload.get("note", "")).strip() or None
         valid_statuses = {"approved", "rejected", "untested", "caution"}
@@ -5768,7 +5789,7 @@ def create_app(
             return jsonify({"error": "database not found"}), 404
 
         from ..explorer.interpreter import VALID_RESPONSE_MODES
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         observation_id = str(payload.get("observation_id", "")).strip()
         raw_participants = payload.get("participants") or []
         response_mode = str(payload.get("response_mode") or "interpretive").strip()
@@ -5932,7 +5953,7 @@ def create_app(
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         raw_obs_ids = payload.get("observation_ids") or []
         raw_participants = payload.get("participants") or []
 
@@ -6082,7 +6103,7 @@ def create_app(
 
     @app.route("/api/e10/proposals/<proposal_id>/accept", methods=["POST"])
     def api_e10_accept_proposal(proposal_id: str):
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         steward_id = str(payload.get("steward_id") or "web-steward").strip()
         rationale = str(payload.get("comment") or payload.get("rationale") or "").strip()
         if not rationale:
@@ -6112,7 +6133,7 @@ def create_app(
 
     @app.route("/api/e10/proposals/<proposal_id>/reject", methods=["POST"])
     def api_e10_reject_proposal(proposal_id: str):
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         steward_id = str(payload.get("steward_id") or "web-steward").strip()
         rationale = str(payload.get("comment") or payload.get("rationale") or "").strip()
         if not rationale:
@@ -6137,7 +6158,7 @@ def create_app(
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         proposal_id = str(payload.get("proposal_id", "")).strip()
         policies = payload.get("policies") or ["conservative"]
         if not proposal_id:
@@ -6550,7 +6571,7 @@ def create_app(
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         directive = str(payload.get("directive", "")).strip()
         provider  = str(payload.get("provider", "")).strip()
         if not directive:
@@ -6816,7 +6837,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         title   = str(payload.get("title", "")).strip()
         thesis  = str(payload.get("thesis", "")).strip()
         raw_sections = payload.get("sections", [])
@@ -6934,7 +6955,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         store = _store()
         try:
             excluded = payload["excluded"] if "excluded" in payload else None
@@ -7006,7 +7027,7 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_obs_review_post(observation_id: str):
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         status = payload.get("review_status", "")
         if status not in _VALID_REVIEW_STATUSES:
             return jsonify({"error": f"review_status must be one of {sorted(_VALID_REVIEW_STATUSES)}"}), 400
@@ -7069,7 +7090,7 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_obs_inquiry_post(observation_id: str):
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         question_text = (payload.get("question_text") or "").strip()
         if not question_text:
             return jsonify({"error": "question_text is required"}), 400
@@ -7370,7 +7391,7 @@ Return ONLY valid JSON, no markdown, no explanation:
           or if save=true:
           { "blueprint_id": "...", "plan_id": "...", "proposed_blueprint": {...} }
         """
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         text     = str(payload.get("text", "")).strip()
         provider = str(payload.get("provider", "null")).strip()
         save     = bool(payload.get("save", False))
@@ -7431,7 +7452,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         proposed = payload.get("proposed_blueprint", payload.get("candidate"))
         candidate, error = _normalize_blueprint_candidate(proposed)
         if error:
@@ -7463,7 +7484,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         predecessor_id = str(payload.get("predecessor_id", "")).strip()
         reason = str(payload.get("reason", "")).strip()
         proposed = payload.get("proposed_blueprint", payload.get("candidate"))
@@ -7502,7 +7523,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         plan_id  = str(payload.get("plan_id", "")).strip()
         obs_ref  = str(payload.get("obs_ref", "")).strip()
         provider = str(payload.get("provider", "openai")).strip()
@@ -7568,7 +7589,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         plan_id = str(payload.get("plan_id", "")).strip()
         provider = str(payload.get("provider", "null")).strip() or "null"
         profile = str(payload.get("profile", "")).strip() or None
@@ -7638,7 +7659,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         plan_id = str(payload.get("plan_id", "")).strip()
         provider = str(payload.get("provider", "")).strip() or "null"
         profile_slug = str(payload.get("profile_slug", "")).strip() or None
@@ -7703,7 +7724,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         text = str(payload.get("text", "")).strip()
         profile_slug = str(payload.get("profile_slug", "")).strip()
         if not text:
@@ -7734,7 +7755,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         plan_id  = str(payload.get("plan_id", "")).strip()
         provider = str(payload.get("provider", "openai")).strip()
 
@@ -7793,7 +7814,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         narrative_id = str(payload.get("narrative_id", "")).strip() or None
         obs_ref = str(payload.get("obs_ref", "")).strip() or None
 
@@ -8184,7 +8205,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """Save a human highlight from the Close Reading workspace."""
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(force=True) or {}
+        payload = _json_body(force=True)
         doc_id = str(payload.get("source_document_id") or "").strip()
         selected_text = str(payload.get("selected_text") or "").strip()
         if not doc_id or not selected_text:
@@ -8251,7 +8272,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """Update note, question, relevance, status, or tags on a highlight."""
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(force=True) or {}
+        payload = _json_body(force=True)
         conn = _request_write_conn()
         row = conn.execute(
             "SELECT id, source_document_id FROM reader_highlights WHERE id = ?",
@@ -8526,7 +8547,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """Upsert reading progress for a document."""
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(force=True) or {}
+        payload = _json_body(force=True)
         doc_id = str(payload.get("document_id") or "").strip()
         page = int(payload.get("page") or 1)
         if not doc_id:
@@ -8625,7 +8646,7 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_companion_ask():
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         message = str(payload.get("message") or "").strip()
         if not message:
             return jsonify({"error": "message is required"}), 400
@@ -8786,7 +8807,7 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_investigation_log_create():
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         lane = str(payload.get("lane") or "corpus").strip().lower()
         if lane not in ("corpus", "instrument"):
             return jsonify({"error": "lane must be 'corpus' or 'instrument'"}), 400
@@ -8852,7 +8873,7 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_investigation_put():
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         thesis = str(payload.get("thesis") or "").strip()
         if not thesis:
             return jsonify({"error": "thesis is required"}), 400
@@ -8948,7 +8969,7 @@ Return ONLY valid JSON, no markdown, no explanation:
             return jsonify({"error": "database not found"}), 404
         from ..workspace import set_workspace_name
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         rw = _conn_rw()
         try:
             identity = set_workspace_name(rw, payload.get("workspace_name"))

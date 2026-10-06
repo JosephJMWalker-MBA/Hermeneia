@@ -21,8 +21,15 @@ def register_authoring_routes(app: Flask, db_path: Path) -> None:
     def _error(exc: AuthoringError):
         return jsonify(exc.payload()), exc.status
 
+    @app.errorhandler(AuthoringError)
+    def _uncaught_authoring_error(exc: AuthoringError):
+        return _error(exc)
+
     def _body() -> dict:
-        return request.get_json(silent=True) or {}
+        body = request.get_json(silent=True)
+        if body and not isinstance(body, dict):
+            raise AuthoringError("MALFORMED_REQUEST", "Request body must be a JSON object.", 400)
+        return body or {}
 
     def _actor(body: dict) -> str:
         return str(body.get("actor") or "author").strip() or "author"
