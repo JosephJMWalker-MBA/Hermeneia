@@ -7648,14 +7648,15 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_pipeline_ratify_draft():
         """Ratify & save the EXACT previewed Artist draft as a RenderedNarrative.
 
-        Body: { plan_id, provider, profile_slug?, text, candidate_id? }
+        Body: { plan_id, provider, profile_slug?, text, candidate_id }
 
         Persists the bytes the steward saw and judged — verbatim, no re-render,
         no provider call. Deterministic id means a second ratify is idempotent;
         the record is immutable (no post-save mutation). Explicit action only.
-        With candidate_id, the submission must be the server-held preview and
-        the record keeps that invocation's execution config (CI-011).
-        ``matches_submitted`` reports whether the record holds the submitted text.
+        Only a server-held preview can be ratified: the submission must be that
+        candidate, and the record keeps its observed invocation (CI-011;
+        06_Ontology.md RenderedNarrative). ``matches_submitted`` reports whether
+        the record holds the submitted text.
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
@@ -7669,18 +7670,19 @@ Return ONLY valid JSON, no markdown, no explanation:
         if not isinstance(text, str) or not text.strip():
             return jsonify({"error": "text is required"}), 400
         candidate_id = str(payload.get("candidate_id") or "").strip()
-        execution_config = None
-        if candidate_id:
-            with artist_preview_candidates_lock:
-                candidate = artist_preview_candidates.get(candidate_id)
-            if candidate is None:
-                return jsonify({"error": "unknown or expired preview; preview the draft again before ratifying",
-                                "canonical_status": "not_persisted"}), 404
-            submitted = {"plan_id": plan_id, "provider": provider, "profile_slug": profile_slug, "text": text}
-            if any(candidate[key] != value for key, value in submitted.items()):
-                return jsonify({"error": "the submitted draft is not the previewed draft; nothing was ratified",
-                                "canonical_status": "not_persisted"}), 409
-            execution_config = candidate["execution_config"]
+        if not candidate_id:
+            return jsonify({"error": "candidate_id is required: only a server-held Artist preview can be ratified",
+                            "canonical_status": "not_persisted"}), 400
+        with artist_preview_candidates_lock:
+            candidate = artist_preview_candidates.get(candidate_id)
+        if candidate is None:
+            return jsonify({"error": "unknown or expired preview; preview the draft again before ratifying",
+                            "canonical_status": "not_persisted"}), 404
+        submitted = {"plan_id": plan_id, "provider": provider, "profile_slug": profile_slug, "text": text}
+        if any(candidate[key] != value for key, value in submitted.items()):
+            return jsonify({"error": "the submitted draft is not the previewed draft; nothing was ratified",
+                            "canonical_status": "not_persisted"}), 409
+        execution_config = candidate["execution_config"]
 
         from ..narrative.artist_service import ArtistRenderError, ratify_draft
 

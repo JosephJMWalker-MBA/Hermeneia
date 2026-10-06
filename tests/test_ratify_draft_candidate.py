@@ -5,10 +5,11 @@ invocation, so its record keeps that invocation's provider, model,
 configuration and timestamp (CI-011), and the bytes saved are the bytes the
 server previewed. When the record does not hold the submitted bytes, the API
 says so and the Reader does not claim verbatim recording (`ratify_draft`:
-"It must save the artifact the steward actually saw and judged").
-Commit 4738bbf preserves the negative versions; the repair demonstrated
-strict unexpected passes before the expected failures were removed.
-Fake in-process Artist; the real `_crRatifyDraft` runs under Node.
+"It must save the artifact the steward actually saw and judged"). Only a
+server-held preview can be ratified (06_Ontology.md RenderedNarrative).
+Commits 4738bbf and 4eb0970 preserve the negative versions; the repairs
+demonstrated strict unexpected passes before the expected failures were removed.
+Fake in-process Artists; the real `_crRatifyDraft` runs under Node.
 """
 from __future__ import annotations
 
@@ -45,6 +46,42 @@ class FakeLocalArtist:
 
     def execution_config(self) -> dict:
         return dict(CONFIG)
+
+
+class ScriptedArtist:
+    """In-process Artist that renders the given texts in order under one provider name."""
+
+    def __init__(self, provider_name: str, texts: list[str]):
+        self.provider_name = provider_name
+        self._texts = texts
+
+    def render(self, prompt: str) -> str:
+        return self._texts.pop(0)
+
+    def execution_config(self) -> dict:
+        return {"provider": self.provider_name, "model_id": "scripted-artist", "max_tokens": 1024}
+
+
+def preview_candidates(client, monkeypatch, plan_id: str, texts: list[str], *,
+                       provider: str = "ratify-test", profile: str | None = PROFILE) -> list[dict]:
+    """Preview each text through the real preview route; each result names its server-held candidate."""
+    artist = ScriptedArtist(provider, list(texts))
+    monkeypatch.setattr(artist_service, "get_provider", lambda *_a, **_k: artist)
+    previews = []
+    for _ in texts:
+        response = client.post("/api/pipeline/preview-artist", json={
+            "plan_id": plan_id, "provider": provider, **({"profile": profile} if profile else {})})
+        assert response.status_code == 200, response.get_data(as_text=True)
+        previews.append(response.get_json())
+    return previews
+
+
+def ratify_candidate(client, preview: dict):
+    """Ratify exactly what the Reader sends for a previewed draft."""
+    return client.post("/api/pipeline/ratify-draft", json={
+        "plan_id": preview["plan_id"], "provider": preview["provider"], "text": preview["text"],
+        "candidate_id": preview["candidate_id"],
+        **({"profile_slug": preview["profile_slug"]} if preview["profile_slug"] else {})})
 
 
 @pytest.fixture
@@ -121,30 +158,33 @@ def test_candidate_ratification_refuses_text_the_preview_did_not_produce(seeded)
         raise RatificationRecordFailure(f"{response.status_code} {response.get_json()}")
 
 
-def test_already_ratified_response_says_whether_the_record_holds_the_submitted_text(seeded):
+def test_already_ratified_response_says_whether_the_record_holds_the_submitted_text(seeded, monkeypatch):
     _db, ids, client = seeded
-    preview = {"provider": "ratify-test"}
-    first = _ratify(client, ids, preview, text="Draft A the steward first approved.")
-    second = _ratify(client, ids, preview, text="Draft B, a different text.")
+    draft_a, draft_b = preview_candidates(client, monkeypatch, ids["plan_id"],
+                                          ["Draft A the steward first approved.", "Draft B, a different text."])
+    first = ratify_candidate(client, draft_a)
+    second = ratify_candidate(client, draft_b)
     assert (first.status_code, second.status_code) == (201, 200)
     assert second.get_json()["status"] == "already_ratified"
     if first.get_json().get("matches_submitted") is not True or second.get_json().get("matches_submitted") is not False:
         raise RatificationRecordFailure(f"first={first.get_json()} second={second.get_json()}")
 
 
-def test_reader_does_not_claim_verbatim_recording_of_unsaved_text(seeded):
+def test_reader_does_not_claim_verbatim_recording_of_unsaved_text(seeded, monkeypatch):
     _db, ids, client = seeded
-    preview = {"provider": "ratify-test"}
-    _ratify(client, ids, preview, text="Draft A the steward first approved.")
-    second = _ratify(client, ids, preview, text="Draft B, a different text.")
+    draft_a, draft_b = preview_candidates(client, monkeypatch, ids["plan_id"],
+                                          ["Draft A the steward first approved.", "Draft B, a different text."])
+    assert ratify_candidate(client, draft_a).status_code == 201
+    second = ratify_candidate(client, draft_b)
     shown = _render_ratify_result(second.status_code, second.get_json(), "Draft B, a different text.")
     if "recorded verbatim" in shown or "not saved" not in shown:
         raise RatificationRecordFailure(shown)
 
 
-def test_reader_confirms_verbatim_recording_of_saved_text(seeded):
+def test_reader_confirms_verbatim_recording_of_saved_text(seeded, monkeypatch):
     _db, ids, client = seeded
-    first = _ratify(client, ids, {"provider": "ratify-test"}, text="Draft A the steward first approved.")
+    [draft_a] = preview_candidates(client, monkeypatch, ids["plan_id"], ["Draft A the steward first approved."])
+    first = ratify_candidate(client, draft_a)
     shown = _render_ratify_result(first.status_code, first.get_json(), "Draft A the steward first approved.")
     assert "recorded verbatim" in shown, shown
 
@@ -155,8 +195,6 @@ def test_reader_confirms_verbatim_recording_of_saved_text(seeded):
 # and preserves that execution context. The server can only record an
 # invocation it observed, so text without a server-held preview is not ratified.
 
-@pytest.mark.xfail(strict=True, raises=RatificationRecordFailure,
-                   reason="#235: ratify-draft without a server-held candidate persists a narrative with no invocation record")
 def test_ratification_without_a_server_held_candidate_persists_nothing(seeded):
     db, ids, client = seeded
     before = _narrative_texts(db)
@@ -167,8 +205,6 @@ def test_ratification_without_a_server_held_candidate_persists_nothing(seeded):
         raise RatificationRecordFailure(f"{response.status_code} {response.get_json()}")
 
 
-@pytest.mark.xfail(strict=True, raises=RatificationRecordFailure,
-                   reason="#235: ratify_draft persists without the observed invocation record")
 def test_ratify_draft_service_requires_the_observed_invocation_record(seeded):
     db, ids, _client = seeded
     before = _narrative_texts(db)

@@ -120,10 +120,14 @@ def test_artist_refuses_plan_whose_evidence_was_excluded_after_commit(study):
     db, client, muted, primary_obs, muted_obs = study
     plan = client.post("/api/pipeline/ratify-blueprint",
                        json={"candidate": _candidate(primary_obs, muted_obs)}).get_json()["plan_id"]
+    held = client.post("/api/pipeline/preview-artist", json={"plan_id": plan, "provider": "null"}).get_json()
     _exclude(client, muted)
     run = client.post("/api/pipeline/run-artist", json={"plan_id": plan, "provider": "null"})
     preview = client.post("/api/pipeline/preview-artist", json={"plan_id": plan, "provider": "null"})
-    ratify = client.post("/api/pipeline/ratify-draft", json={"plan_id": plan, "provider": "steward", "text": "Draft."})
+    # A preview held from before the exclusion is refused for its evidence, not for a missing candidate.
+    ratify = client.post("/api/pipeline/ratify-draft", json={
+        "plan_id": plan, "provider": held["provider"], "text": held["text"], "candidate_id": held["candidate_id"]})
+    assert ratify.get_json().get("error_type") == "ExcludedEvidenceError", ratify.get_json()
     statuses = [run.status_code, preview.status_code, ratify.status_code]
     if any(status < 400 for status in statuses) or _prompts_with_muted_text(db):
         raise ExcludedEvidenceCrossed(f"statuses={statuses} prompts_with_muted_text={_prompts_with_muted_text(db)}")

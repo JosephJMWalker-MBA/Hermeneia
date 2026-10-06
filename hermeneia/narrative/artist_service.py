@@ -404,7 +404,9 @@ def ratify_draft(
     verbatim; ``prompt_used`` is reconstructed deterministically (no LLM) for
     provenance. The narrative id is deterministic on (plan, provider, profile),
     so a second ratify is idempotent and the immutable table is never rewritten.
-    ``execution_config`` is the previewed invocation's CI-011 record, kept as is.
+    ``execution_config`` is the previewed invocation's CI-011 record, kept as
+    is; without it nothing is persisted, because a RenderedNarrative carries
+    the ArtistProvider invocation that produced it (06_Ontology.md).
 
     Returns {"row": <dict>, "created": bool}.
     """
@@ -429,6 +431,11 @@ def ratify_draft(
         # immutable, so return it unchanged rather than overwriting.
         return {"row": dict(existing), "created": False}
 
+    if not execution_config:
+        raise ArtistRenderError(
+            "Ratification requires the observed Artist invocation record (CI-011); preview the draft first."
+        )
+
     paragraphs = [
         dict(row)
         for row in conn.execute(
@@ -446,8 +453,7 @@ def ratify_draft(
         "expression_profile_id": expression_profile_id,
         "text": text,
         "prompt_used": prompt,
-        "execution_config": json.dumps({**(execution_config or {"provider": provider}),
-                                        "source": "ratified_preview"}),
+        "execution_config": json.dumps({**execution_config, "source": "ratified_preview"}),
         "created_at": now,
     }
     conn.execute(
