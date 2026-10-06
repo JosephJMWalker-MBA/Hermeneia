@@ -259,6 +259,7 @@ def build_bundle_files(
     upload_files: list[tuple[str, bytes]] | None = None,
     app_version: str = "",
     publication: dict[str, Any] | None = None,
+    uploads_dir: Path | None = None,
 ) -> dict[str, bytes]:
     """Build the bundle from one caller-preserving SQLite read snapshot.
 
@@ -273,6 +274,7 @@ def build_bundle_files(
         return _build_bundle_files_snapshot(
             conn, generated_at=generated_at, workspace_id=workspace_id,
             upload_files=upload_files, app_version=app_version, publication=publication,
+            uploads_dir=uploads_dir,
         )
     finally:
         if owns_snapshot:
@@ -287,6 +289,7 @@ def _build_bundle_files_snapshot(
     upload_files: list[tuple[str, bytes]] | None = None,
     app_version: str = "",
     publication: dict[str, Any] | None = None,
+    uploads_dir: Path | None = None,
 ) -> dict[str, bytes]:
     """Build every bundle file (including manifest) as path → bytes.
 
@@ -377,10 +380,10 @@ def _build_bundle_files_snapshot(
     if achievement_awards is not None:
         content[ACHIEVEMENT_AWARD_FILE] = (CANONICAL, _dumps(achievement_awards))
 
-    # Uploads: content-hash-named canonical files (the exact source, §5.1).
-    for filename, data in sorted(upload_files or []):
-        digest = hashlib.sha256(data).hexdigest()
-        suffix = Path(filename).suffix
+    # Uploads: the exact source bytes of the documents in this snapshot,
+    # content-hash named (§4, §5.1). Other files are not canonical evidence.
+    source_uploads, missing_sources = _source_uploads(documents, uploads_dir, upload_files)
+    for digest, suffix, data in source_uploads:
         content[f"corpus/uploads/{digest}{suffix}"] = (CANONICAL, data)
 
     # Integrated authoring history (issue #205): authored decision rows plus the
@@ -412,6 +415,9 @@ def _build_bundle_files_snapshot(
             "perspective_supersessions": len(perspective_supersessions),
             "field_notes": len(field_notes),
         },
+        # Source-byte coverage: exported documents whose bytes are absent are
+        # named explicitly instead of silently omitted.
+        "source_bytes": {"documents": len(documents), "missing": missing_sources},
     }
     if publication:
         manifest["required_capabilities"] = [PUBLICATION_CAPABILITY]
@@ -461,14 +467,44 @@ def _publication_component(conn: sqlite3.Connection, db_path: Path) -> dict[str,
     return {"tables": tables, "files": files}
 
 
-def _read_upload_files(db_path: Path) -> list[tuple[str, bytes]]:
-    uploads_dir = Path(db_path).parent / "uploads"
-    files: list[tuple[str, bytes]] = []
-    if uploads_dir.is_dir():
-        for f in sorted(uploads_dir.iterdir()):
-            if f.is_file():
-                files.append((f.name, f.read_bytes()))
-    return files
+def _source_uploads(
+    documents: list[dict],
+    uploads_dir: Path | None,
+    upload_files: list[tuple[str, bytes]] | None,
+) -> tuple[list[tuple[str, str, bytes]], list[str]]:
+    """Select each document's source bytes by content hash.
+
+    Content-addressed names (``<sha256><suffix>``) are tried first; older
+    workspaces keep sources under other names, so remaining files are hashed.
+    Returns ``(digest, suffix, bytes)`` per found document and the sorted IDs
+    of documents whose bytes are absent.
+    """
+    if uploads_dir is not None and Path(uploads_dir).is_dir():
+        pending = [(p.name, p.read_bytes) for p in sorted(Path(uploads_dir).iterdir()) if p.is_file()]
+    else:
+        pending = [(name, (lambda data=data: data)) for name, data in sorted(upload_files or [])]
+    by_digest: dict[str, tuple[str, bytes]] = {}
+
+    def hash_next(index: int) -> None:
+        name, read = pending.pop(index)
+        data = read()
+        by_digest.setdefault(hashlib.sha256(data).hexdigest(), (name, data))
+
+    found: list[tuple[str, str, bytes]] = []
+    missing: list[str] = []
+    for document in documents:
+        expected = str(document.get("file_hash") or document.get("id"))
+        named = next((i for i, (name, _read) in enumerate(pending) if Path(name).stem == expected), None)
+        if expected not in by_digest and named is not None:
+            hash_next(named)
+        while expected not in by_digest and pending:
+            hash_next(0)
+        if expected in by_digest:
+            name, data = by_digest[expected]
+            found.append((expected, Path(name).suffix, data))
+        else:
+            missing.append(str(document.get("id")))
+    return found, sorted(missing)
 
 
 def build_workspace_zip(
@@ -493,7 +529,7 @@ def build_workspace_zip(
             conn,
             generated_at=generated_at,
             workspace_id=workspace_id,
-            upload_files=_read_upload_files(db_path),
+            uploads_dir=db_path.parent / "uploads",
             app_version=app_version,
             publication=_publication_component(conn, db_path),
         )
@@ -553,20 +589,13 @@ def export_workspace_bundle(
     if workspace_id is None:
         workspace_id = _default_workspace_id(db_path)
 
-    uploads_dir = db_path.parent / "uploads"
-    upload_files: list[tuple[str, bytes]] = []
-    if uploads_dir.is_dir():
-        for f in sorted(uploads_dir.iterdir()):
-            if f.is_file():
-                upload_files.append((f.name, f.read_bytes()))
-
     conn = _connect_ro(db_path)
     try:
         files = build_bundle_files(
             conn,
             generated_at=generated_at,
             workspace_id=workspace_id,
-            upload_files=upload_files,
+            uploads_dir=db_path.parent / "uploads",
             app_version=app_version,
             publication=_publication_component(conn, db_path),
         )

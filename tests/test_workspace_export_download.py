@@ -7,6 +7,8 @@ button wiring.
 """
 from __future__ import annotations
 
+import hashlib
+
 import io
 import sqlite3
 import zipfile
@@ -25,7 +27,9 @@ def _now() -> str:
 def _seed(tmp_path: Path) -> Path:
     db_path = tmp_path / "workspace.db"
     SQLiteStore(db_path).close()
-    doc_id = "a" * 64
+    # The seeded SourceDocument is the uploaded source: its identity is the
+    # SHA-256 of those bytes (WBS §4; docs/15_Storage.md).
+    doc_id = hashlib.sha256(b'%PDF-1.7 fake').hexdigest()
     conn = sqlite3.connect(db_path)
     conn.execute(
         """INSERT INTO source_documents

@@ -1,10 +1,12 @@
-"""Frozen witnesses for #229 and #238: export canonical uploads from SourceDocuments.
+"""Promoted regressions for #229 and #238: export canonical uploads from SourceDocuments.
 
 Bundle uploads are the source bytes of the exported SourceDocuments, named by
 the content hash that is their identity (WBS §4). Files that are not the
 source of any exported document are not canonical evidence, a document is
 never exported without its bytes because of a concurrent upload, and a
 document whose bytes are absent is classified explicitly rather than silently.
+Commit 39fcb0b preserves the negative versions; the repair demonstrated strict
+unexpected passes before the expected failures were removed.
 Synthetic workspaces only.
 """
 from __future__ import annotations
@@ -76,8 +78,6 @@ def _concurrent_upload(app):
     t.join(60)
 
 
-@pytest.mark.xfail(strict=True, raises=SourceBytesExportFailure,
-                   reason="#229: every file in uploads/ is exported as canonical; repair requires its own packet")
 def test_only_source_bytes_of_exported_documents_are_canonical_uploads(workspace):
     _tmp, ws, db, _app = workspace
     (ws / "uploads" / ".DS_Store").write_bytes(b"\x00\x00\x00\x01Bud1")
@@ -90,8 +90,6 @@ def test_only_source_bytes_of_exported_documents_are_canonical_uploads(workspace
         raise SourceBytesExportFailure(f"unreferenced canonical uploads: {sorted(uploads - documents)}")
 
 
-@pytest.mark.xfail(strict=True, raises=SourceBytesExportFailure,
-                   reason="#238: library export reads uploads outside its snapshot; repair requires its own packet")
 def test_library_export_never_exports_a_document_without_its_bytes(workspace, monkeypatch):
     _tmp, ws, db, app = workspace
     real_connect = export_module._connect_ro
@@ -110,8 +108,6 @@ def test_library_export_never_exports_a_document_without_its_bytes(workspace, mo
         raise SourceBytesExportFailure(f"documents exported without source bytes: {sorted(missing)}")
 
 
-@pytest.mark.xfail(strict=True, raises=SourceBytesExportFailure,
-                   reason="#238: zip export reads uploads outside its snapshot; repair requires its own packet")
 def test_zip_export_never_exports_a_document_without_its_bytes(workspace, monkeypatch):
     _tmp, _ws, db, app = workspace
     real_publication = export_module._publication_component
@@ -130,8 +126,6 @@ def test_zip_export_never_exports_a_document_without_its_bytes(workspace, monkey
         raise SourceBytesExportFailure(f"documents exported without source bytes: {sorted(missing)}")
 
 
-@pytest.mark.xfail(strict=True, raises=SourceBytesExportFailure,
-                   reason="#229/#238: absent source bytes are not classified; repair requires its own packet")
 def test_document_with_absent_source_bytes_is_classified_in_the_manifest(workspace):
     _tmp, ws, db, app = workspace
     lost = upload(app, _pdf("A document whose bytes were lost."), "lost.pdf")["document_id"]
