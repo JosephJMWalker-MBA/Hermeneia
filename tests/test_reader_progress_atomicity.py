@@ -1,8 +1,10 @@
-"""Frozen witnesses for #236 and #226: reading progress must be an atomic upsert.
+"""Promoted regressions for #236 and #226: reading progress must be an atomic upsert.
 
 Two progress posts for one document may overlap. Each accepted page must be
 stored, concurrent first posts must not fail, and the post whose page set
-reaches 100% must record completion. Synthetic workspace only.
+reaches 100% must record completion. Commit d814812 preserves the negative
+versions; the repair demonstrated strict unexpected passes before the expected
+failures were removed. Synthetic workspace only.
 """
 from __future__ import annotations
 
@@ -78,8 +80,6 @@ def _concurrent_posts(monkeypatch, app, doc_id, pages):
     return statuses
 
 
-@pytest.mark.xfail(strict=True, raises=LostProgress,
-                   reason="#236: concurrent first posts race on INSERT; repair requires its own packet")
 def test_concurrent_first_posts_both_succeed_and_keep_both_pages(workspace, monkeypatch):
     db, app = workspace
     doc_id = _document(app.test_client(), 5)
@@ -89,8 +89,6 @@ def test_concurrent_first_posts_both_succeed_and_keep_both_pages(workspace, monk
         raise LostProgress(f"statuses={statuses} pages={pages}")
 
 
-@pytest.mark.xfail(strict=True, raises=LostProgress,
-                   reason="#236: progress update is read-modify-write; repair requires its own packet")
 def test_concurrent_update_posts_keep_both_pages(workspace, monkeypatch):
     db, app = workspace
     client = app.test_client()
@@ -102,8 +100,6 @@ def test_concurrent_update_posts_keep_both_pages(workspace, monkeypatch):
         raise LostProgress(f"statuses={statuses} pages={pages}")
 
 
-@pytest.mark.xfail(strict=True, raises=LostProgress,
-                   reason="#226: the first progress row never records completion; repair requires its own packet")
 def test_first_post_reaching_completion_sets_completed_at(workspace):
     db, app = workspace
     client = app.test_client()

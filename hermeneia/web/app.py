@@ -8458,6 +8458,9 @@ Return ONLY valid JSON, no markdown, no explanation:
         total_pages = max(int(doc["total_pages"] or 1), 1)
         import uuid as _uuid
 
+        # Hold the write lock from read to write: concurrent posts for one
+        # document serialize instead of overwriting each other's page set.
+        conn.execute("BEGIN IMMEDIATE")
         existing = conn.execute(
             "SELECT id, pages_read FROM reading_progress WHERE document_id = ?", (doc_id,)
         ).fetchone()
@@ -8479,11 +8482,14 @@ Return ONLY valid JSON, no markdown, no explanation:
         else:
             pages_read = [page]
             percent = round(1 / total_pages * 100, 1)
+            completed_at = now if percent >= 100 else None
             conn.execute(
                 """INSERT INTO reading_progress
-                   (id, document_id, pages_read, last_page, total_pages, percent_read, updated_at)
-                   VALUES (?,?,?,?,?,?,?)""",
-                (_uuid.uuid4().hex, doc_id, json.dumps(pages_read), page, total_pages, percent, now)
+                   (id, document_id, pages_read, last_page, total_pages, percent_read,
+                    completed_at, updated_at)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                (_uuid.uuid4().hex, doc_id, json.dumps(pages_read), page, total_pages, percent,
+                 completed_at, now)
             )
 
         conn.commit()
