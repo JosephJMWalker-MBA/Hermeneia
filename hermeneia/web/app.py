@@ -842,6 +842,11 @@ def create_app(
             missing = [iid for iid in interp_ids if iid not in found_interps]
             if missing:
                 return "unknown supporting_interpretations: " + ", ".join(missing)
+        # Excluded evidence is a scope refusal (403), not a malformed candidate.
+        from ..narrative.artist_service import excluded_evidence_ids
+        excluded = excluded_evidence_ids(conn, obs_ids, interp_ids)
+        if excluded:
+            raise _ScopeAccessError("supporting evidence is excluded_from_analysis: " + ", ".join(excluded))
         return None
 
     def _persist_exact_blueprint_and_compile(
@@ -6870,6 +6875,9 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "section_count": len(sections_data),
             }), 201
 
+        except _ScopeAccessError as exc:
+            conn.rollback()
+            return _scope_error_response(exc)
         except ValueError as exc:
             conn.rollback()
             return jsonify({"error": str(exc)}), 400
@@ -7402,6 +7410,9 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "blueprint_id": result["blueprint_id"],
                 "plan_id": result["plan_id"],
             }), 201
+        except _ScopeAccessError as exc:
+            conn.rollback()
+            return _scope_error_response(exc)
         except ValueError as exc:
             conn.rollback()
             return jsonify({"error": str(exc)}), 400
@@ -7430,6 +7441,9 @@ Return ONLY valid JSON, no markdown, no explanation:
             result = _persist_exact_blueprint_and_compile(conn, candidate, source="extracted")
             conn.commit()
             return jsonify(result), 201
+        except _ScopeAccessError as exc:
+            conn.rollback()
+            return _scope_error_response(exc)
         except ValueError as exc:
             conn.rollback()
             return jsonify({"error": str(exc)}), 400
@@ -7467,6 +7481,8 @@ Return ONLY valid JSON, no markdown, no explanation:
                 reason=reason,
             )
             return jsonify(result), 201
+        except _ScopeAccessError as exc:
+            return _scope_error_response(exc)
         except KeyError as exc:
             return jsonify({"error": str(exc).strip("'")}), 404
         except ValueError as exc:

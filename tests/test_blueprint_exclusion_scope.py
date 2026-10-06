@@ -1,10 +1,12 @@
-"""Frozen witnesses for #232: excluded evidence cannot enter a Blueprint or an Artist prompt.
+"""Promoted regressions for #232: excluded evidence cannot enter a Blueprint or an Artist prompt.
 
 Committing a Blueprint (ratify or revise) refuses supporting Observations, and
 supporting Interpretations whose evidence touches Observations, from documents
 excluded from analysis (403 `excluded_from_analysis`, as the other
 evidence-consuming routes do). As defense in depth, a plan committed before
 its evidence was excluded is refused before any Artist prompt is constructed.
+Commit 4d520a9 preserves the negative versions; the repair demonstrated
+strict unexpected passes before the expected failures were removed.
 Synthetic PDFs; offline `null` Artist provider.
 """
 from __future__ import annotations
@@ -78,8 +80,6 @@ def _refused(response) -> bool:
     return response.status_code == 403 and body.get("scope") == "excluded_from_analysis"
 
 
-@pytest.mark.xfail(strict=True, raises=ExcludedEvidenceCrossed,
-                   reason="#232: ratify-blueprint accepts excluded Observations; repair requires its own packet")
 def test_ratify_refuses_observations_from_excluded_documents(study):
     db, client, muted, primary_obs, muted_obs = study
     _exclude(client, muted)
@@ -88,8 +88,6 @@ def test_ratify_refuses_observations_from_excluded_documents(study):
         raise ExcludedEvidenceCrossed(f"{response.status_code} {response.get_json()}")
 
 
-@pytest.mark.xfail(strict=True, raises=ExcludedEvidenceCrossed,
-                   reason="#232: revise-blueprint accepts excluded Observations; repair requires its own packet")
 def test_revise_refuses_observations_from_excluded_documents(study):
     db, client, muted, primary_obs, muted_obs = study
     predecessor = client.post("/api/pipeline/ratify-blueprint", json={"candidate": _candidate(primary_obs)}).get_json()
@@ -101,8 +99,6 @@ def test_revise_refuses_observations_from_excluded_documents(study):
         raise ExcludedEvidenceCrossed(f"{response.status_code} {response.get_json()}")
 
 
-@pytest.mark.xfail(strict=True, raises=ExcludedEvidenceCrossed,
-                   reason="#232: Blueprint validation ignores Interpretations resting on excluded evidence")
 def test_ratify_refuses_interpretations_resting_on_excluded_evidence(study):
     db, client, muted, primary_obs, muted_obs = study
     conn = sqlite3.connect(db)
@@ -120,8 +116,6 @@ def test_ratify_refuses_interpretations_resting_on_excluded_evidence(study):
         raise ExcludedEvidenceCrossed(f"{response.status_code} {response.get_json()}")
 
 
-@pytest.mark.xfail(strict=True, raises=ExcludedEvidenceCrossed,
-                   reason="#232: the Artist builds prompts from plans whose evidence was excluded")
 def test_artist_refuses_plan_whose_evidence_was_excluded_after_commit(study):
     db, client, muted, primary_obs, muted_obs = study
     plan = client.post("/api/pipeline/ratify-blueprint",
