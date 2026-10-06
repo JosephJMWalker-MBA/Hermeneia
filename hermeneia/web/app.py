@@ -640,6 +640,11 @@ def create_app(
             raise _JSONBodyError()
         return payload or {}
 
+    def _optional_text(payload: dict, key: str) -> str | None:
+        """An optional JSON text field: absent, null and blank all mean not given."""
+        value = payload.get(key)
+        return (str(value).strip() or None) if value is not None else None
+
     def _int_arg(name: str, default: int) -> int:
         """An integer query parameter; a malformed value falls back to the default."""
         try:
@@ -7590,9 +7595,9 @@ Return ONLY valid JSON, no markdown, no explanation:
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
         payload = _json_body()
-        plan_id = str(payload.get("plan_id", "")).strip()
-        provider = str(payload.get("provider", "null")).strip() or "null"
-        profile = str(payload.get("profile", "")).strip() or None
+        plan_id = _optional_text(payload, "plan_id") or ""
+        provider = _optional_text(payload, "provider") or "null"
+        profile = _optional_text(payload, "profile")
         if not plan_id:
             return jsonify({"error": "plan_id is required"}), 400
 
@@ -7661,9 +7666,9 @@ Return ONLY valid JSON, no markdown, no explanation:
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
         payload = _json_body()
-        plan_id = str(payload.get("plan_id", "")).strip()
-        provider = str(payload.get("provider", "")).strip() or "null"
-        profile_slug = str(payload.get("profile_slug", "")).strip() or None
+        plan_id = _optional_text(payload, "plan_id") or ""
+        provider = _optional_text(payload, "provider") or "null"
+        profile_slug = _optional_text(payload, "profile_slug")
         text = payload.get("text")
         if not plan_id:
             return jsonify({"error": "plan_id is required"}), 400
