@@ -1,10 +1,12 @@
-"""Frozen witness for #221: a failed compile leaves no partial evidence chain.
+"""Promoted regression for #221: a failed compile leaves no partial evidence chain.
 
 If compilation fails at any persistence stage, no SourceDocument,
 SourceExtraction, Observation, provenance, derived or term row from that
 compile may remain (CI lineage invariant: creation fails when a required
 provenance relation is absent), and the upload's source bytes are not
-discarded. Synthetic PDFs; failures injected at real persistence seams.
+discarded. Commit 6e45298 preserves the negative versions; the repair
+demonstrated strict unexpected passes before the expected failures were removed.
+Synthetic PDFs; failures injected at real persistence seams.
 """
 from __future__ import annotations
 
@@ -52,8 +54,6 @@ FAULTS = {
 }
 
 
-@pytest.mark.xfail(strict=True, raises=PartialEvidenceChain,
-                   reason="#221: compile commits each stage separately; repair requires its own packet")
 @pytest.mark.parametrize("fault", sorted(FAULTS))
 def test_failed_upload_compile_leaves_no_rows_and_keeps_source_bytes(tmp_path, monkeypatch, fault):
     ws = tmp_path / "ws"
@@ -73,8 +73,6 @@ def test_failed_upload_compile_leaves_no_rows_and_keeps_source_bytes(tmp_path, m
         raise PartialEvidenceChain(f"{fault}: counts={counts} source_bytes_kept={kept}")
 
 
-@pytest.mark.xfail(strict=True, raises=PartialEvidenceChain,
-                   reason="#221: compile commits each stage separately; repair requires its own packet")
 def test_failed_cli_compile_leaves_no_rows(tmp_path, monkeypatch):
     pdf = tmp_path / "study.pdf"
     pdf.write_bytes(_pdf("A document compiled from the command line."))

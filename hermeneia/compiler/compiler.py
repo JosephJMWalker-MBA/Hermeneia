@@ -41,7 +41,7 @@ class Compiler:
         compilation_run_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
 
-        # --- Step 1: Register source document ---
+        # --- Step 1: Identify the source document ---
         doc_hash = sha256_file(pdf_path)
         total_pages = page_count(pdf_path)
 
@@ -53,7 +53,6 @@ class Compiler:
             "registered_at": now.isoformat(),
             "compiler_version": COMPILER_VERSION,
         }
-        self.repo.register_source_document(source_doc)
 
         # --- Step 2: Exact parser output → immutable SourceExtraction ---
         raw_blocks: list[RawBlock] = list(parse_pdf(pdf_path))
@@ -67,7 +66,6 @@ class Compiler:
             parser_version=p_version,
             now=now,
         )
-        self.repo.persist_source_extractions([r.row for r in source_extractions])
 
         # --- Step 3: SourceExtraction-derived paragraphs ---
         paragraphs = list(
@@ -88,13 +86,17 @@ class Compiler:
             now=now,
         )
 
-        # --- Step 5: Persist (append-only) ---
-        self.repo.persist_observations([r.obs for r in records])
-        self.repo.persist_provenance([r.prov for r in records])
-        self.repo.persist_observation_derived([r.derived for r in records])
-
-        # --- Step 5b: Build Field v0.1 term index ---
-        n_terms, n_pairs = build_term_index(self.repo.store)
+        # --- Step 5: Persist the whole evidence chain in one transaction ---
+        # Parsing and derivation above run without the write lock; a failure
+        # at any persistence step leaves none of this compile's rows behind.
+        with self.repo.transaction():
+            self.repo.register_source_document(source_doc)
+            self.repo.persist_source_extractions([r.row for r in source_extractions])
+            self.repo.persist_observations([r.obs for r in records])
+            self.repo.persist_provenance([r.prov for r in records])
+            self.repo.persist_observation_derived([r.derived for r in records])
+            # --- Step 5b: Build Field v0.1 term index ---
+            n_terms, n_pairs = build_term_index(self.repo.store)
         print(f"  Field v0.1: {n_terms:,} terms, {n_pairs:,} observation-term pairs")
 
         # --- Step 6: Write .herm bundle ---

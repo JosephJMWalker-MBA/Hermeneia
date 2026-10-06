@@ -5,6 +5,7 @@ Derived tables are disposable/regenerable.
 """
 import json
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 from ..perspective_identity import (
@@ -1252,7 +1253,34 @@ class SQLiteStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self._atomic = False
         self._apply_schema()
+
+    @contextmanager
+    def atomic(self):
+        """Run several store writes as one transaction (all or nothing).
+
+        Batch writers called inside defer their commit to the end of the block,
+        and any exception rolls the whole block back.
+        """
+        if self._atomic:
+            yield self
+            return
+        self._conn.commit()
+        self._conn.execute("BEGIN IMMEDIATE")
+        self._atomic = True
+        try:
+            yield self
+        except BaseException:
+            self._atomic = False
+            self._conn.rollback()
+            raise
+        self._atomic = False
+        self._conn.commit()
+
+    def _commit(self) -> None:
+        if not self._atomic:
+            self._conn.commit()
 
     def _apply_schema(self) -> None:
         self._conn.executescript(DDL)
@@ -1500,7 +1528,7 @@ class SQLiteStore:
             """,
             doc,
         )
-        self._conn.commit()
+        self._commit()
 
     # --- source_extractions (append-only evidence) ---
 
@@ -1518,7 +1546,7 @@ class SQLiteStore:
             """,
             rows,
         )
-        self._conn.commit()
+        self._commit()
 
     def source_document_exists(self, doc_id: str) -> bool:
         cur = self._conn.execute(
@@ -1550,7 +1578,7 @@ class SQLiteStore:
             """,
             prepared,
         )
-        self._conn.commit()
+        self._commit()
 
     def insert_observation_derived_batch(self, rows: list[dict]) -> None:
         self._conn.executemany(
@@ -1564,7 +1592,7 @@ class SQLiteStore:
             """,
             rows,
         )
-        self._conn.commit()
+        self._commit()
 
     # --- provenance (append-only) ---
 
@@ -1588,7 +1616,7 @@ class SQLiteStore:
             """,
             rows,
         )
-        self._conn.commit()
+        self._commit()
 
     # --- Field v0.1: term index (append-only) ---
 
@@ -1598,7 +1626,7 @@ class SQLiteStore:
             "INSERT OR IGNORE INTO terms (id, term) VALUES (:id, :term)",
             term_rows,
         )
-        self._conn.commit()
+        self._commit()
 
     def insert_observation_terms_batch(self, rows: list[dict]) -> None:
         """rows: list of {observation_id, term_id}"""
@@ -1606,7 +1634,7 @@ class SQLiteStore:
             "INSERT OR IGNORE INTO observation_terms (observation_id, term_id) VALUES (:observation_id, :term_id)",
             rows,
         )
-        self._conn.commit()
+        self._commit()
 
     def observations_for_term(self, term: str) -> list[dict]:
         """Return all observations that contain the given term (exact token match)."""
