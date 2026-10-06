@@ -1857,6 +1857,32 @@ def create_app(
             kwargs["model"] = selected_model
         return kwargs
 
+    def _e10_participant_adapters(participants: list[tuple[str, str, str]]) -> tuple[dict, list[dict]]:
+        """Construct every requested participant's adapter before anything is attributed to it (#234)."""
+        adapters: dict[str, object] = {}
+        unavailable: list[dict] = []
+        for key, label, _model in participants:
+            provider_id = _E10_PARTICIPANTS[key][1]
+            try:
+                adapters[key] = active_provider_registry.create(provider_id, **_provider_kwargs(provider_id))
+            except Exception as exc:
+                unavailable.append({"participant": key, "label": label, "provider_id": provider_id,
+                                    "error": str(exc)})
+        return adapters, unavailable
+
+    def _e10_unavailable_response(unavailable: list[dict]):
+        labels = ", ".join(item["label"] for item in unavailable)
+        return jsonify({
+            "error": f"Selected participants could not run: {labels}. No proposals were created.",
+            "unavailable_participants": unavailable,
+            "created_count": 0,
+        }), 409
+
+    def _e10_executed_model(adapter: object, fallback: str | None) -> str | None:
+        execution_config = getattr(adapter, "execution_config", None)
+        config = execution_config() if callable(execution_config) else {}
+        return config.get("model_id") or fallback
+
     def _provider_connection_kwargs(provider_id: str, *, api_key: str | None = None) -> dict:
         kwargs: dict[str, object] = {}
         if provider_id.startswith("ollama-"):
@@ -5770,6 +5796,9 @@ def create_app(
             "observation_source": obs_doc_row["original_filename"] if obs_doc_row else None,
             "observation_role": (obs_doc_row["source_role"] or "primary") if obs_doc_row else "primary",
         }
+        adapters, unavailable = _e10_participant_adapters(participants)
+        if unavailable:
+            return _e10_unavailable_response(unavailable)
 
         store = _store()
         try:
@@ -5781,13 +5810,7 @@ def create_app(
             for key, label, model in participants:
                 _provider_id = _E10_PARTICIPANTS[key][1]
                 selected_model, _ = _selected_model_for_provider(_provider_id, model)
-                try:
-                    _adapter = active_provider_registry.create(
-                        _provider_id,
-                        **_provider_kwargs(_provider_id),
-                    )
-                except Exception:
-                    _adapter = active_provider_registry.create("null")
+                _adapter = adapters[key]
                 import time as _time
                 _gen_start = _time.monotonic()
                 _gen_error = None
@@ -5831,7 +5854,7 @@ def create_app(
                     perspective=label,
                     text=interp_text,
                     evidential_status="speculative",
-                    generating_model=selected_model or model,
+                    generating_model=_e10_executed_model(_adapter, selected_model or model),
                     prompt_reference=prompt_used,
                     prompt_reference_type="full_text",
                     conn=store,
@@ -5942,17 +5965,13 @@ def create_app(
             "observation_role": (obs_doc_row["source_role"] or "primary") if obs_doc_row else "primary",
         }
 
+        adapters, unavailable = _e10_participant_adapters(participants)
+        if unavailable:
+            return _e10_unavailable_response(unavailable)
+
         # Bucketing pass — ephemeral, never stored
-        bucket_provider_id = _E10_PARTICIPANTS[participants[0][0]][1]
         try:
-            _bucketing_provider = active_provider_registry.create(
-                bucket_provider_id,
-                **_provider_kwargs(bucket_provider_id),
-            )
-        except Exception:
-            _bucketing_provider = active_provider_registry.create("null")
-        try:
-            buckets = generate_candidate_buckets(obs_rows, _bucketing_provider)
+            buckets = generate_candidate_buckets(obs_rows, adapters[participants[0][0]])
         except BucketingError as exc:
             return jsonify({"error": f"Bucketing failed: {exc}"}), 400
 
@@ -5994,13 +6013,7 @@ def create_app(
 
                     _provider_id = _E10_PARTICIPANTS[key][1]
                     selected_model, _ = _selected_model_for_provider(_provider_id, model)
-                    try:
-                        _adapter = active_provider_registry.create(
-                            _provider_id,
-                            **_provider_kwargs(_provider_id),
-                        )
-                    except Exception:
-                        _adapter = active_provider_registry.create("null")
+                    _adapter = adapters[key]
 
                     try:
                         interp_text, prompt_used = generate_interpretation_from_bucket(
@@ -6017,7 +6030,7 @@ def create_app(
                         perspective=label,
                         text=interp_text,
                         evidential_status="speculative",
-                        generating_model=selected_model or model,
+                        generating_model=_e10_executed_model(_adapter, selected_model or model),
                         prompt_reference=prompt_used,
                         prompt_reference_type="full_text",
                         conn=store,

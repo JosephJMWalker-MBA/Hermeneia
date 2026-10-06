@@ -1,17 +1,17 @@
-"""Frozen witnesses for #234: E10 proposals record the execution that actually ran.
+"""Promoted regressions for #234: E10 proposals record the execution that actually ran.
 
 A participant whose provider cannot be constructed must not yield a proposal
 attributed to that participant's model, and a proposal's generating model is
 the model the executing adapter reports (CI-011 Nondeterministic Audit
-Record). No network: unconnected participants use the hermetic default
-registry; connected ones use an in-process fake.
+Record). Commit b9d615e preserves the negative versions; the repair
+demonstrated strict unexpected passes before the expected failures were removed.
+No network: unconnected participants use the hermetic default registry;
+connected ones use an in-process fake.
 """
 from __future__ import annotations
 
 import sqlite3
 from types import SimpleNamespace
-
-import pytest
 
 from hermeneia.narrative.artist_providers import NullArtistProvider
 from hermeneia.narrative.provider_registry import ProviderDefinition, ProviderRegistration, ProviderRegistry
@@ -57,8 +57,6 @@ def _attributions(db) -> list[tuple[str, str]]:
         "JOIN ai_provenance a ON a.id = p.ai_provenance_id ORDER BY p.perspective"))
 
 
-@pytest.mark.xfail(strict=True, raises=MisattributedExecution,
-                   reason="#234: generate substitutes the null provider for unconnected participants; repair requires its own packet")
 def test_generate_with_unconnected_participants_creates_no_attributed_proposals(tmp_path):
     db, ids = _seed_discover_db(tmp_path)
     response = create_app(db_path=db).test_client().post(
@@ -67,8 +65,6 @@ def test_generate_with_unconnected_participants_creates_no_attributed_proposals(
         raise MisattributedExecution(f"{response.status_code} {_attributions(db)}")
 
 
-@pytest.mark.xfail(strict=True, raises=MisattributedExecution,
-                   reason="#234: discover substitutes the null provider for unconnected participants; repair requires its own packet")
 def test_discover_with_unconnected_participant_creates_no_attributed_proposals(tmp_path):
     db, ids = _seed_discover_db(tmp_path)
     response = create_app(db_path=db).test_client().post(
@@ -78,8 +74,6 @@ def test_discover_with_unconnected_participant_creates_no_attributed_proposals(t
         raise MisattributedExecution(f"{response.status_code} {_attributions(db)}")
 
 
-@pytest.mark.xfail(strict=True, raises=MisattributedExecution,
-                   reason="#234: generating model is taken from configuration, not the executing adapter; repair requires its own packet")
 def test_generating_model_is_the_executing_adapters_model(tmp_path):
     db, ids = _seed_discover_db(tmp_path)
     response = create_app(db_path=db, provider_registry=_registry()).test_client().post(

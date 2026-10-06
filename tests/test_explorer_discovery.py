@@ -26,6 +26,7 @@ from hermeneia.explorer.interpreter import (
     generate_candidate_interpretation,
     generate_interpretation_from_bucket,
 )
+from hermeneia.narrative.provider_registry import ProviderDefinition, ProviderRegistration, ProviderRegistry
 from hermeneia.storage.hashing import make_semantic_hash, make_source_locator
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.web.app import create_app
@@ -72,6 +73,33 @@ class _InterpProvider:
         self._text = text
         self._model = "test"
         self._client = _FakeAnthropicClient(text)
+
+
+class _ParticipantMessages:
+    def create(self, *, messages, **_):
+        if "Return the bucket JSON now." in messages[-1]["content"]:
+            text = json.dumps({"buckets": [{"indices": [1, 2]}]})
+        else:
+            text = "These observations share a site of meaning for the investigator to evaluate."
+        return type("R", (), {"content": [type("C", (), {"text": text})()]})()
+
+
+class _ConnectedParticipant:
+    """Anthropic-shaped adapter for a connected E10 participant; no network."""
+    def __init__(self, model: str | None = None, **_):
+        self._model = model or "claude-sonnet-4-6"
+        self._client = type("Client", (), {"messages": _ParticipantMessages()})()
+
+    def execution_config(self) -> dict:
+        return {"provider": "anthropic", "model_id": self._model}
+
+
+def _connected_app(db_path: Path):
+    definition = ProviderDefinition(id="anthropic", display_name="Anthropic", provider_type="artist", enabled=True,
+                                    capabilities=("text",), local_or_remote="remote",
+                                    default_model="claude-sonnet-4-6")
+    registry = ProviderRegistry((ProviderRegistration(definition, _ConnectedParticipant),))
+    return create_app(db_path=db_path, provider_registry=registry)
 
 
 # ── Bucketer tests ────────────────────────────────────────────────────────────
@@ -220,7 +248,7 @@ def _seed_discover_db(tmp_path: Path) -> tuple[Path, dict]:
 def test_discover_endpoint_returns_proposals(tmp_path):
     """Proof 1: multiple observations produce speculative interpretations."""
     db_path, ids = _seed_discover_db(tmp_path)
-    client = create_app(db_path=db_path).test_client()
+    client = _connected_app(db_path).test_client()
 
     resp = client.post("/api/e10/interpretations/discover", json={
         "observation_ids": [ids["obs_id"], ids["obs2_id"]],
@@ -235,12 +263,13 @@ def test_discover_endpoint_returns_proposals(tmp_path):
 def test_discover_endpoint_no_bucket_table(tmp_path):
     """Proof 2: bucket objects are not persisted — no 'buckets' table exists."""
     db_path, ids = _seed_discover_db(tmp_path)
-    client = create_app(db_path=db_path).test_client()
+    client = _connected_app(db_path).test_client()
 
-    client.post("/api/e10/interpretations/discover", json={
+    resp = client.post("/api/e10/interpretations/discover", json={
         "observation_ids": [ids["obs_id"], ids["obs2_id"]],
         "participants": ["claude"],
     })
+    assert resp.status_code == 201
 
     conn = sqlite3.connect(str(db_path))
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -253,7 +282,7 @@ def test_discover_endpoint_no_bucket_table(tmp_path):
 def test_discover_endpoint_evidence_ids_stored(tmp_path):
     """Proof 3: evidence_observation_ids contains all supporting observations."""
     db_path, ids = _seed_discover_db(tmp_path)
-    client = create_app(db_path=db_path).test_client()
+    client = _connected_app(db_path).test_client()
 
     resp = client.post("/api/e10/interpretations/discover", json={
         "observation_ids": [ids["obs_id"], ids["obs2_id"]],
@@ -281,7 +310,7 @@ def test_discover_endpoint_evidence_ids_stored(tmp_path):
 def test_discover_endpoint_idempotency(tmp_path):
     """Proof 4: same bucket called twice → second call skipped."""
     db_path, ids = _seed_discover_db(tmp_path)
-    client = create_app(db_path=db_path).test_client()
+    client = _connected_app(db_path).test_client()
 
     payload = {
         "observation_ids": [ids["obs_id"], ids["obs2_id"]],

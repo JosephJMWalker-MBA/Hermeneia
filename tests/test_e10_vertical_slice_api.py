@@ -422,12 +422,16 @@ def test_e10_observation_reads_are_side_effect_free(tmp_path):
     assert _table_counts(db_path) == before
 
 
-def test_e10_generate_review_promote_and_critic_flow(tmp_path):
+def test_e10_generate_review_promote_and_critic_flow(tmp_path, monkeypatch):
     db_path = tmp_path / "e10.db"
     store = SQLiteStore(db_path)
     ids = _seed_full_chain(store)
     store.close()
-    client = create_app(db_path=db_path).test_client()
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(tmp_path / "user-config" / "connections.json"))
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-openai-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "environment-anthropic-key")
+    _reset_catalog_provider()
+    client = create_app(db_path=db_path, provider_registry=_cloud_catalog_registry()).test_client()
 
     generated = client.post(
         "/api/e10/interpretations/generate",
