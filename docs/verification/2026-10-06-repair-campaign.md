@@ -1,0 +1,193 @@
+# Frozen-witness repair campaign — 2026-10-06
+
+**Result:** The campaign repaired all 21 defects it was authorized to repair:
+#216, the 20 open bugs #220–#238 from the `bdf280a` investigation, and #239,
+which was found during the campaign. Each repair followed a committed strict
+expected-failure witness. After each fix, the witness showed strict unexpected
+passes and was promoted to a regression test. A second new defect, #240, was
+filed and classified but not repaired.
+
+Final verification gave these results:
+
+- all 121 campaign regression tests pass;
+- every filed reproduction now shows the repaired behavior;
+- the full suite fails only the six static Reader baselines that also fail at
+  `bdf280a`;
+- the protected-copy real-study round trip remains exactly equivalent.
+
+- **Frozen baseline:** `bdf280a`, preserved unchanged with the filed issues as
+  historical witnesses.
+- **Branch:** `repair-campaign` at `242a826`. Local only; not pushed or merged.
+- **Inventory:** the repair map from the `bdf280a` investigation, with seven
+  clusters: source-artifact binding, schema readiness, route hygiene,
+  governed-candidate binding, execution identity, Scope enforcement and CLI
+  resolution.
+- **Safe study alias:** `study-d88c4a642956`
+
+## Method
+
+Every packet followed the same steps:
+
+1. reproduce the filed witness;
+2. commit the smallest deterministic strict-xfail witness (a `test:` commit);
+3. confirm the governing authority;
+4. make the smallest correction (a `fix:` commit);
+5. show `XPASS(strict)`, then remove the markers and record the witness commit
+   in the test docstring;
+6. run focused and neighboring tests;
+7. rerun the issue's reproduction;
+8. comment on the issue with the evidence.
+
+No contract or existing assertion was weakened to make a test pass. Race
+witnesses use barriers or injected faults at real seams, not timing luck.
+Providers were fakes or the offline `null` adapter, and no external call was
+made.
+
+## Bug → frozen witness → repair → regression test → final result
+
+| Bug | Frozen witness | Repair | Regression test | Final result |
+| --- | --- | --- | --- | --- |
+| #216 hybrid `perspectives` schema crashes WBS export | `c4d4f27` | `5171faf` | `test_workspace_export_hybrid_schema.py` | **Fixed.** Reproduction exports. Real-study round trip is exactly equivalent. |
+| #237 write routes leak open transactions | `683ae5d` | `1acb5ba` | `test_route_write_transaction_lifecycle.py` (10 routes) | **Fixed.** Teardown rolls back and closes. |
+| #236 reading-progress race loses pages / first-visit 500 | `d814812` | `90aae9f` | `test_reader_progress_atomicity.py` | **Fixed.** `BEGIN IMMEDIATE` upsert. |
+| #226 first 100% post never sets `completed_at` | `d814812` | `90aae9f` | `test_reader_progress_atomicity.py` | **Fixed.** Reproduction records `completed_at`. |
+| #225 CLI silently uses `./build/hermeneia.db` | `04a574d` | `7a4bcff` | `test_cli_target_resolution.py` | **Fixed.** A missing target exits 1 with "Database not found", and `--db` reads exactly the named file. |
+| #222 same-filename upload discards source bytes | `3b1caca` | `180adab` | `test_upload_source_binding.py` | **Fixed.** Both documents keep their bytes. |
+| #223 `original_filename` records a temporary name | `3b1caca` | `180adab` | `test_upload_source_binding.py` | **Fixed.** Records `My Study.pdf`; bytes are stored under their SHA-256. |
+| #224 re-upload applies role to a different document | `3b1caca` | `180adab` | `test_upload_source_binding.py` | **Fixed.** The role lands on the uploaded document. |
+| #239 client filename becomes a storage path *(found in 4a)* | `3b1caca` | `180adab` | `test_upload_source_binding.py` | **Fixed.** Nothing is written outside `uploads/`. |
+| #229 export packages any file in `uploads/` as canonical | `39fcb0b` | `3c35441` | `test_export_source_bytes.py` | **Fixed.** Only SourceDocument bytes are canonical. |
+| #238 export reads uploads outside its snapshot | `39fcb0b` | `3c35441` | `test_export_source_bytes.py` | **Fixed.** Uploads are read inside the snapshot, and missing bytes are classified in the manifest. |
+| #221 failed compile leaves partial evidence chain | `6e45298` | `ca1aaa4` | `test_compile_atomicity.py` | **Fixed.** Returns 500, writes 0 rows and keeps the source bytes. |
+| #234 E10 attributes template text to unconnected models | `b9d615e` | `ee231a1` | `test_e10_execution_identity.py` | **Fixed.** Returns 409 with no proposals; `generating_model` comes from the executing adapter. |
+| #231 UI claims verbatim recording of unsaved text | `4738bbf` | `f98e1d0` | `test_ratify_draft_candidate.py` | **Fixed.** The response reports `matches_submitted`, and the Reader shows "Draft not saved". The immutability rule is unchanged. |
+| #235 ratified drafts lose the CI-011 record | `4738bbf` | `f98e1d0` | `test_ratify_draft_candidate.py` | **Fixed for the Reader path,** through the server-held candidate. A known limitation remains for text-only API calls (below). |
+| #232 Blueprint accepts excluded evidence | `4d520a9` | `cfa9423` | `test_blueprint_exclusion_scope.py` | **Fixed.** Returns 403 `excluded_from_analysis`, with 0 Blueprints and 0 prompts containing muted text. The Artist refuses plans whose evidence was excluded later. |
+| #230 transient EF failure leaves a report with no Findings | `9e71daa` | `f21c593` | `test_critic_ledger_atomicity.py` | **Fixed.** A faulted run returns 500 and records nothing. The retry returns 201 with 18/18 Findings, and legacy empty ledgers are completed. |
+| #220 proof PDF returns HTML 500 without authoring tables | `90c1acb` | `0ea9873` | `test_read_paths_without_ddl.py` | **Fixed.** Returns 404 `NO_PROOF_PDF`. |
+| #233 `herm trace` / `herm profile` create schema, fail read-only | `90c1acb` | `0ea9873` | `test_read_paths_without_ddl.py` | **Fixed.** Both exit 0 on a mode-0444 workspace and create nothing on older ones. |
+| #228 non-object JSON body returns 500 on 20 routes | `02f4013` | `242a826` | `test_malformed_request_inputs.py` (40 cases) | **Fixed.** Structured 400. |
+| #227 non-integer `limit` returns 500 | `02f4013` | `242a826` | `test_malformed_request_inputs.py` | **Fixed.** Falls back to the default. |
+| #240 JSON `null` profile becomes slug `"None"` *(found in 5b)* | — | — | — | **Filed, not repaired.** Classified BUG and outside the authorized packet order. The reproduction still returns 400. |
+
+## Bug fixed, known limitation, architectural improvement
+
+**Bugs fixed (21):** #216, #220–#239.
+
+**Known limitations, kept and disclosed:**
+
+- **#235, text-only API path.** `ratify-draft` without `candidate_id` still
+  records only `{provider, source}`. The server holds no execution for
+  arbitrary submitted text. The issue's original snippet uses this path and
+  so still shows the reduced record. The Reader always sends the candidate.
+- **Preview candidates are in memory.** Server-held Artist preview candidates
+  are bounded at 100, like Perspective execution candidates. After a restart
+  or eviction, ratify returns 404 and the steward previews again.
+- **#231, immutability unchanged.** A different second draft for the same
+  (plan, provider, profile) is still not saved. It is now reported rather
+  than silently confirmed.
+- **#232, status codes.** The commit-time refusal is 403. The Artist-side
+  defense-in-depth refusal surfaces as 400 (`ExcludedEvidenceError`, an
+  `ArtistRenderError`).
+- **#230, behavior change.** A Critic run whose Evaluation Function fails
+  persistently now fails visibly instead of storing a partial ledger
+  (ADR-0042 completeness).
+- **#217–#219.** Closed earlier as KNOWN: already disclosed in the frozen #213
+  audit.
+- **Round-trip count differences.** Derived tables, `workspace_identity`,
+  `reading_progress` and absent authoring tables differ in counts. This is
+  unchanged from the packet 0 rerun and is existing bundle scope, not a
+  campaign effect.
+
+**Architectural improvements introduced by repairs.** These are the
+mechanisms that made the repairs possible, not features:
+
+- request-scoped write connections with teardown rollback;
+- content-addressed upload storage, with the client filename kept only as
+  metadata;
+- SourceDocument-driven source-bytes export with manifest classification;
+- `SQLiteStore.atomic()` / `Repository.transaction()`, reused by the Critic
+  ledger;
+- one CLI database-target resolver;
+- up-front participant adapter construction with adapter-reported model
+  identity;
+- server-held Artist preview candidates;
+- one shared excluded-evidence rule (`excluded_evidence_ids`);
+- `_json_body` / `_int_arg` request helpers.
+
+No constitutional ontology or authority changed.
+
+## Final verification
+
+1. **Witnesses.**
+   - All 13 campaign regression files (121 tests) pass together, and no
+     xfail markers remain.
+   - The 17 filed Python reproductions were rerun at `242a826` with outbound
+     sockets blocked. Each showed the repaired behavior, except #240
+     (unrepaired) and the #235 text-only path (the known limitation).
+   - #232's snippet stops at its now-refused ratify (403).
+   - #225 and #233 were reproduced through `python -m hermeneia.cli.main`.
+   - #236, #237 and #238 have no standalone snippet; their deterministic
+     regression witnesses cover them.
+2. **Full suite.** 2802 passed, 21 skipped, 6 failed. The six failures are
+   static Reader UI checks:
+   - `test_reader_accessibility` (2);
+   - `test_reader_blueprint_workstation`;
+   - `test_reader_record_view` (2);
+   - `test_reader_voice_profile`.
+
+   They fail identically on the frozen `bdf280a` copy (6 failed, 58 passed in
+   those four files). The run included two unrelated uncommitted
+   working-tree edits by others (Reader corpus-search navigation in
+   `index.html` and its test). Those edits were not committed by this
+   campaign.
+3. **Real-study protected-copy round trip** (`242a826`). The seven original
+   files were copied with filesystem reads only. The copy was verified
+   byte-identical before any database access. All captures were read-only on
+   the copy, and outbound sockets were blocked. No award was issued.
+   - Copy and identity checks:
+     - the original was unchanged after the copy and at the end;
+     - receipt, run, package digest and alias all match the 2026-10-03 state;
+     - the copy's bytes, logical dump and counts were unchanged by export.
+   - Export: WBS 1.1, 1 receipt, 0 awards, `source_bytes` = 1 document,
+     0 missing, and exactly one upload in the bundle. Restore covered both
+     categories.
+   - Comparison: Explorer `earned` → `earned`, Second Opinion `not_earned` →
+     `not_earned`. Evidence, package digest, receipt bytes, Lineage item,
+     coverage and diagnostics are all equal, with no dependency drift.
+   - Decision: **`exact_equivalence`.** Every A/B field is identical to the
+     packet 0 rerun; only the new `source_bytes` fields were added.
+4. **Issue states.**
+   - #216 and #220–#239 are open, each with a campaign comment naming its
+     witness and repair commits. They stay open until the branch is merged.
+   - #240 is open and unrepaired.
+   - #217–#219 are closed as not planned (KNOWN).
+5. **Comparison against `bdf280a`.** At `242a826`, before this note: 41 files changed, +2286/−315.
+   - Production code:
+     - `web/app.py`, `web/authoring_api.py`, `web/static/index.html`
+       (`_crPreviewArtistDraft` / `_crRatifyDraft` only);
+     - `workspace/export.py`, `compiler/compiler.py`;
+     - `storage/sqlite.py`, `storage/repository.py`;
+     - `narrative/artist_service.py`, `authoring/service.py`;
+     - twelve CLI modules plus the new `cli/target.py`.
+   - Tests: 13 new test files.
+   - Five pre-existing tests were modified, none weakened:
+     - **Three export/restore fixtures.** The seeded SourceDocument id is now
+       the SHA-256 of the seeded bytes, matching the content-addressed
+       identity contract (WBS §4, `15_Storage.md`).
+     - **`test_explorer_discovery.py` and
+       `test_e10_vertical_slice_api.py`.** These relied on the #234 null
+       fallback to create proposals for unconnected participants. They now
+       use in-process fake connected providers, and their assertions are
+       unchanged.
+   - No constitution, invariant, ADR or specification changed. `bdf280a` and
+     its frozen copy are untouched.
+
+## Not done
+
+- P5–P10 feature work: stopped as instructed.
+- #240 repair.
+- Pushing, merging, or closing issues after merge.
+
+Raw source text, private paths and workspace identity remain outside this
+note.
