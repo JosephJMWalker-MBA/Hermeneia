@@ -22,7 +22,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, jsonify, make_response, request, send_from_directory
+from flask import Flask, g, jsonify, make_response, request, send_from_directory
 
 from ..concordance import (
     MATCHING_MODE,
@@ -600,6 +600,26 @@ def create_app(
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
         return conn
+
+    def _request_write_conn() -> sqlite3.Connection:
+        """Read-write connection whose lifetime ends with the request.
+
+        Teardown rolls back a transaction an exception left open and closes the
+        connection, so one failed write cannot keep the workspace locked.
+        """
+        conn = _conn_rw()
+        g.setdefault("hermeneia_write_conns", []).append(conn)
+        return conn
+
+    @app.teardown_request
+    def _release_request_write_conns(_exc):
+        for conn in g.pop("hermeneia_write_conns", []):
+            try:
+                if conn.in_transaction:
+                    conn.rollback()
+            except sqlite3.ProgrammingError:
+                pass  # already closed by the route
+            conn.close()
 
     def _store() -> SQLiteStore:
         return SQLiteStore(db_path)
@@ -6964,7 +6984,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         status = payload.get("review_status", "")
         if status not in _VALID_REVIEW_STATUSES:
             return jsonify({"error": f"review_status must be one of {sorted(_VALID_REVIEW_STATUSES)}"}), 400
-        conn = _conn_rw()
+        conn = _request_write_conn()
         try:
             require_active_observation(conn, observation_id)
         except _ScopeAccessError as exc:
@@ -7030,7 +7050,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         question_type = payload.get("question_type") or "unclassified"
         if question_type not in _VALID_QUESTION_TYPES:
             question_type = "unclassified"
-        conn = _conn_rw()
+        conn = _request_write_conn()
         try:
             require_active_observation(conn, observation_id)
         except _ScopeAccessError as exc:
@@ -7059,7 +7079,7 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_obs_inquiry_delete(observation_id: str, note_id: str):
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        conn = _conn_rw()
+        conn = _request_write_conn()
         try:
             require_active_observation(conn, observation_id)
         except _ScopeAccessError as exc:
@@ -8086,7 +8106,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         if not doc_id or not selected_text:
             return jsonify({"error": "source_document_id and selected_text required"}), 400
 
-        conn = _conn_rw()
+        conn = _request_write_conn()
         try:
             doc = require_active_document(conn, doc_id)
         except _ScopeAccessError as exc:
@@ -8148,7 +8168,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
         payload = request.get_json(force=True) or {}
-        conn = _conn_rw()
+        conn = _request_write_conn()
         row = conn.execute(
             "SELECT id, source_document_id FROM reader_highlights WHERE id = ?",
             (highlight_id,)
@@ -8201,7 +8221,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """Dismiss (soft-delete) a highlight."""
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        conn = _conn_rw()
+        conn = _request_write_conn()
         row = conn.execute(
             "SELECT id, source_document_id FROM reader_highlights WHERE id = ?",
             (highlight_id,),
@@ -8428,7 +8448,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         if not doc_id:
             return jsonify({"error": "document_id required"}), 400
 
-        conn = _conn_rw()
+        conn = _request_write_conn()
         try:
             doc = require_active_document(conn, doc_id)
         except _ScopeAccessError as exc:
@@ -8475,7 +8495,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """Promote a highlight to observation_candidate status (does not create an Observation)."""
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        conn = _conn_rw()
+        conn = _request_write_conn()
         row = conn.execute(
             "SELECT * FROM reader_highlights WHERE id = ?", (highlight_id,)
         ).fetchone()
@@ -8688,7 +8708,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         import uuid
         entry_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
-        conn = _conn_rw()
+        conn = _request_write_conn()
         doc_id = str(payload.get("source_document_id") or "").strip() or None
         if doc_id:
             row = conn.execute(
@@ -8751,7 +8771,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         lenses = payload.get("lenses")
         lenses_json = json.dumps(lenses if isinstance(lenses, list) else [])
         now = datetime.now(timezone.utc).isoformat()
-        conn = _conn_rw()
+        conn = _request_write_conn()
         # Preserve the original created_at across revisions.
         existing = conn.execute(
             "SELECT created_at FROM workspace_investigation WHERE id = 'current'"

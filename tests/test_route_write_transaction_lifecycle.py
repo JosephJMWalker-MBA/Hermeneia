@@ -1,9 +1,11 @@
-"""Frozen witness for #237: a failed write request must not keep the workspace locked.
+"""Promoted regression for #237: a failed write request must not keep the workspace locked.
 
 Each listed route opens a read-write connection, executes a write, and commits.
 If anything raises after the write (here: the commit itself fails once), the
 request's transaction must be rolled back and its connection released before
 the next request, so an independent writer can take the lock immediately.
+Commit 683ae5d preserves the negative version; the repair demonstrated a
+strict unexpected pass on all ten routes before the expected failure was removed.
 Synthetic workspace only.
 """
 from __future__ import annotations
@@ -92,8 +94,6 @@ def _fill(value, ids):
     return value
 
 
-@pytest.mark.xfail(strict=True, raises=WorkspaceLockHeld,
-                   reason="#237: write routes leak an open transaction on exceptions; repair requires its own packet")
 @pytest.mark.parametrize("route", sorted(ROUTES))
 def test_failed_write_request_releases_the_workspace_lock(workspace, route):
     db, client, ids = workspace
