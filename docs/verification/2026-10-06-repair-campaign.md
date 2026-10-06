@@ -5,7 +5,8 @@
 which was found during the campaign. Each repair followed a committed strict
 expected-failure witness. After each fix, the witness showed strict unexpected
 passes and was promoted to a regression test. A second new defect, #240, was
-filed and classified but not repaired.
+filed and classified but not repaired. *(Superseded: see the merge-readiness
+audit addendum below; #235 was completed and #240 repaired.)*
 
 Final verification gave these results:
 
@@ -61,14 +62,14 @@ made.
 | #221 failed compile leaves partial evidence chain | `6e45298` | `ca1aaa4` | `test_compile_atomicity.py` | **Fixed.** Returns 500, writes 0 rows and keeps the source bytes. |
 | #234 E10 attributes template text to unconnected models | `b9d615e` | `ee231a1` | `test_e10_execution_identity.py` | **Fixed.** Returns 409 with no proposals; `generating_model` comes from the executing adapter. |
 | #231 UI claims verbatim recording of unsaved text | `4738bbf` | `f98e1d0` | `test_ratify_draft_candidate.py` | **Fixed.** The response reports `matches_submitted`, and the Reader shows "Draft not saved". The immutability rule is unchanged. |
-| #235 ratified drafts lose the CI-011 record | `4738bbf` | `f98e1d0` | `test_ratify_draft_candidate.py` | **Fixed for the Reader path,** through the server-held candidate. A known limitation remains for text-only API calls (below). |
+| #235 ratified drafts lose the CI-011 record | `4738bbf` | `f98e1d0` | `test_ratify_draft_candidate.py` | **Fixed for the Reader path,** through the server-held candidate. *(Superseded: fully repaired by `f22fc2a`; see addendum.)* |
 | #232 Blueprint accepts excluded evidence | `4d520a9` | `cfa9423` | `test_blueprint_exclusion_scope.py` | **Fixed.** Returns 403 `excluded_from_analysis`, with 0 Blueprints and 0 prompts containing muted text. The Artist refuses plans whose evidence was excluded later. |
 | #230 transient EF failure leaves a report with no Findings | `9e71daa` | `f21c593` | `test_critic_ledger_atomicity.py` | **Fixed.** A faulted run returns 500 and records nothing. The retry returns 201 with 18/18 Findings, and legacy empty ledgers are completed. |
 | #220 proof PDF returns HTML 500 without authoring tables | `90c1acb` | `0ea9873` | `test_read_paths_without_ddl.py` | **Fixed.** Returns 404 `NO_PROOF_PDF`. |
 | #233 `herm trace` / `herm profile` create schema, fail read-only | `90c1acb` | `0ea9873` | `test_read_paths_without_ddl.py` | **Fixed.** Both exit 0 on a mode-0444 workspace and create nothing on older ones. |
 | #228 non-object JSON body returns 500 on 20 routes | `02f4013` | `242a826` | `test_malformed_request_inputs.py` (40 cases) | **Fixed.** Structured 400. |
 | #227 non-integer `limit` returns 500 | `02f4013` | `242a826` | `test_malformed_request_inputs.py` | **Fixed.** Falls back to the default. |
-| #240 JSON `null` profile becomes slug `"None"` *(found in 5b)* | — | — | — | **Filed, not repaired.** Classified BUG and outside the authorized packet order. The reproduction still returns 400. |
+| #240 JSON `null` profile becomes slug `"None"` *(found in 5b)* | — | — | — | **Filed, not repaired.** *(Superseded: repaired by `09b94b2`, witness `38beb7a`; see addendum.)* |
 
 ## Bug fixed, known limitation, architectural improvement
 
@@ -76,7 +77,7 @@ made.
 
 **Known limitations, kept and disclosed:**
 
-- **#235, text-only API path.** `ratify-draft` without `candidate_id` still
+- *(Withdrawn by the addendum: not a permitted limitation.)* **#235, text-only API path.** `ratify-draft` without `candidate_id` still
   records only `{provider, source}`. The server holds no execution for
   arbitrary submitted text. The issue's original snippet uses this path and
   so still shows the reduced record. The Reader always sends the candidate.
@@ -191,3 +192,45 @@ No constitutional ontology or authority changed.
 
 Raw source text, private paths and workspace identity remain outside this
 note.
+
+## Merge-readiness audit addendum — 2026-10-06
+
+**#235 contract check.** `docs/06_Ontology.md` § RenderedNarrative defines a
+RenderedNarrative as expression produced by an ArtistProvider from the
+ArchitectPlan, ExpressionProfile and ArtistProvider invocation metadata, and
+requires it to preserve that execution context. Constitution Art. II and
+CI-011 require the same record for nondeterministic objects and invocations.
+A direct API ratification without a server-held preview has no observed
+invocation, so the "known limitation" above is withdrawn. Witness `4eb0970`;
+repair `f22fc2a`: `ratify-draft` requires `candidate_id` (400, nothing
+persisted), and `ratify_draft` refuses to persist without the observed
+`execution_config`. No provenance is constructed. Tests that ratified
+arbitrary text now ratify real preview candidates; no assertion was removed.
+
+**#240.** Witness `38beb7a`; repair `09b94b2`: `_optional_text()` treats
+absent, null and blank Artist preview/ratify fields as "not given".
+
+**#241 (new).** `revise-blueprint` with `reason: null` records the rationale
+"None". Filed and classified BUG; not repaired. The same
+`str(payload.get(k, ""))` idiom elsewhere was not individually audited.
+
+**Audit results at `09b94b2`.**
+
+- Every production hunk since `bdf280a` maps to a campaign witness or its
+  supporting change.
+- No constitution, invariant, ADR or specification changed; only the two
+  verification notes were added under `docs/`.
+- Seven pre-existing tests were modified (setup only); no assertion line was
+  removed.
+- Campaign regressions: 125 passed (the original 121 plus 2 for #235 and 2
+  for #240), with no xfail markers left.
+- Full suite on a clean detached worktree of HEAD: 2805 passed, 21 skipped,
+  6 failed. On the working tree: 2806 passed, because of one unrelated
+  uncommitted test. The six failures are the static Reader baselines, which
+  fail identically at `bdf280a`.
+- Protected-copy real-study round trip at `09b94b2`: `exact_equivalence`,
+  with original guards intact. It is identical to the `242a826` run except
+  for the HEAD hash.
+- The unrelated Reader edits in `index.html` and
+  `tests/test_reader_context_navigation.py` remain uncommitted and are absent
+  from every campaign commit.
