@@ -1,11 +1,13 @@
-"""Frozen witnesses for #230: a Critic run records its complete Finding ledger or reports failure.
+"""Promoted regressions for #230: a Critic run records its complete Finding ledger or reports failure.
 
 ADR-0042 Completeness: every obligation in scope produces exactly one Finding,
 so the full ledger is computable for any narrative. A run-critic request
 whose Evaluation Functions fail must not report a created evaluation with an
 incomplete ledger, and a retry (including over a report left without its
 ledger) completes the missing Findings; Finding IDs are deterministic, so
-re-evaluation is idempotent (ADR-0041). Synthetic PDF; offline `null` Artist.
+re-evaluation is idempotent (ADR-0041). Commit 9e71daa preserves the
+negative versions; the repair demonstrated strict unexpected passes before the
+expected failures were removed. Synthetic PDF; offline `null` Artist.
 """
 from __future__ import annotations
 
@@ -57,8 +59,6 @@ def _critic(client, nid):
     return client.post("/api/pipeline/run-critic", json={"narrative_id": nid})
 
 
-@pytest.mark.xfail(strict=True, raises=IncompleteFindingLedger,
-                   reason="#230: a transient runner failure commits a report with no Findings; repair requires its own packet")
 def test_transient_runner_failure_is_reported_and_retry_completes_the_ledger(narrative, monkeypatch):
     db, client, nid, expected = narrative
     with monkeypatch.context() as patch:
@@ -72,8 +72,6 @@ def test_transient_runner_failure_is_reported_and_retry_completes_the_ledger(nar
             f"findings={len(_finding_ids(db, nid))}/{len(expected)}")
 
 
-@pytest.mark.xfail(strict=True, raises=IncompleteFindingLedger,
-                   reason="#230: one failing Evaluation Function yields a created report with a partial ledger")
 def test_failing_evaluation_function_is_reported_and_retry_completes_the_ledger(narrative, monkeypatch):
     db, client, nid, expected = narrative
     real_load = runner._load_efs
@@ -93,8 +91,6 @@ def test_failing_evaluation_function_is_reported_and_retry_completes_the_ledger(
             f"findings={len(_finding_ids(db, nid))}/{len(expected)}")
 
 
-@pytest.mark.xfail(strict=True, raises=IncompleteFindingLedger,
-                   reason="#230: already_exists returns before completing a report's missing ledger")
 def test_retry_completes_the_ledger_of_a_report_left_without_findings(narrative):
     db, client, nid, expected = narrative
     conn = sqlite3.connect(db)

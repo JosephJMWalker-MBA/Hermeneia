@@ -2430,7 +2430,7 @@ class SQLiteStore:
             """,
             rows,
         )
-        self._conn.commit()
+        self._commit()
 
     def findings_for_narrative(self, rendered_narrative_id: str, dimension: str | None = None) -> list[dict]:
         """Return all Findings for a given RenderedNarrative, optionally filtered by dimension."""

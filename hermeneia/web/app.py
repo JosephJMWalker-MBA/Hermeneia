@@ -7816,55 +7816,68 @@ Return ONLY valid JSON, no markdown, no explanation:
 
             report = run_critic(n, all_ids, conn, narrative_id=narrative_id)
 
-            existing = conn.execute(
-                "SELECT * FROM validation_reports WHERE id = ?", (report["id"],)
-            ).fetchone()
-            if existing:
-                return jsonify({"status": "already_exists", "report": dict(existing)}), 200
-
-            conn.execute(
-                """INSERT INTO validation_reports
-                   (id, rendered_narrative_id, architect_plan_id, expression_profile_id,
-                    semantic_fidelity, required_terms_present, required_terms_missing,
-                    unsupported_claims, omitted_observations, omitted_interpretations,
-                    semantic_drift, warnings, approved, profile_fidelity, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    report["id"], report["rendered_narrative_id"], report["architect_plan_id"],
-                    report.get("expression_profile_id"),
-                    report["semantic_fidelity"],
-                    report["required_terms_present"],
-                    report["required_terms_missing"],
-                    report.get("unsupported_claims", "[]"),
-                    report.get("omitted_observations", "[]"),
-                    report.get("omitted_interpretations", "[]"),
-                    report.get("semantic_drift", "[]"),
-                    report.get("warnings", "[]"),
-                    int(report.get("approved", False)),
-                    report.get("profile_fidelity"),
-                    report["created_at"],
-                ),
-            )
-            conn.commit()
-
-            # Run all Evaluation Functions and persist Findings
+            # ADR-0042 completeness: the report and its full Finding ledger are
+            # recorded together or not at all. Finding IDs are deterministic
+            # (ADR-0041), so a retry also completes a ledger left incomplete.
             ef_run_result = None
-            ef_errors: dict = {}
             try:
                 from ..compiler.evaluation_functions.runner import run_all_evaluation_functions
-                from ..storage.sqlite import SQLiteStore
                 ef_run_result = run_all_evaluation_functions(
                     report["rendered_narrative_id"],
                     report["architect_plan_id"],
                     conn,
                 )
-                if ef_run_result.all_findings:
-                    store = SQLiteStore(db_path)
-                    store.insert_findings_batch(ef_run_result.all_findings)
-                    store.close()
                 ef_errors = ef_run_result.errors
             except Exception as run_exc:
                 ef_errors = {"runner": str(run_exc)}
+            if ef_errors:
+                return jsonify({
+                    "status": "failed",
+                    "error": "Evaluation Functions failed; no Critic report or Findings were recorded by this run. Retry the Critic run.",
+                    "ef_errors": ef_errors,
+                }), 500
+
+            from ..storage.sqlite import SQLiteStore
+            store = SQLiteStore(db_path)
+            try:
+                with store.atomic():
+                    created = store._conn.execute(
+                        """INSERT OR IGNORE INTO validation_reports
+                           (id, rendered_narrative_id, architect_plan_id, expression_profile_id,
+                            semantic_fidelity, required_terms_present, required_terms_missing,
+                            unsupported_claims, omitted_observations, omitted_interpretations,
+                            semantic_drift, warnings, approved, profile_fidelity, created_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            report["id"], report["rendered_narrative_id"], report["architect_plan_id"],
+                            report.get("expression_profile_id"),
+                            report["semantic_fidelity"],
+                            report["required_terms_present"],
+                            report["required_terms_missing"],
+                            report.get("unsupported_claims", "[]"),
+                            report.get("omitted_observations", "[]"),
+                            report.get("omitted_interpretations", "[]"),
+                            report.get("semantic_drift", "[]"),
+                            report.get("warnings", "[]"),
+                            int(report.get("approved", False)),
+                            report.get("profile_fidelity"),
+                            report["created_at"],
+                        ),
+                    ).rowcount == 1
+                    before = store._conn.total_changes
+                    store.insert_findings_batch(ef_run_result.all_findings)
+                    findings_completed = store._conn.total_changes - before
+                existing = store._conn.execute(
+                    "SELECT * FROM validation_reports WHERE id = ?", (report["id"],)
+                ).fetchone()
+            finally:
+                store.close()
+            if not created:
+                return jsonify({
+                    "status": "already_exists",
+                    "report": dict(existing),
+                    "findings_completed": findings_completed,
+                }), 200
 
             pf = report.get("profile_fidelity")
             return jsonify({"status": "created", "report": {
@@ -7872,12 +7885,12 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "semantic_fidelity": report["semantic_fidelity"],
                 "approved": report.get("approved", False),
                 "profile_fidelity": json.loads(pf) if pf else None,
-                "total_findings": ef_run_result.total_findings if ef_run_result else 0,
+                "total_findings": ef_run_result.total_findings,
                 "findings_by_dimension": {
                     dim: len(findings)
-                    for dim, findings in (ef_run_result.findings_by_dimension if ef_run_result else {}).items()
+                    for dim, findings in ef_run_result.findings_by_dimension.items()
                 },
-                "ef_errors": ef_errors or None,
+                "ef_errors": None,
             }}), 201
 
         except Exception as exc:
