@@ -330,6 +330,7 @@ def ratify_draft(
     provider: str,
     profile_slug: str | None,
     text: str,
+    execution_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Persist the EXACT previewed draft bytes as a RenderedNarrative.
 
@@ -339,6 +340,7 @@ def ratify_draft(
     verbatim; ``prompt_used`` is reconstructed deterministically (no LLM) for
     provenance. The narrative id is deterministic on (plan, provider, profile),
     so a second ratify is idempotent and the immutable table is never rewritten.
+    ``execution_config`` is the previewed invocation's CI-011 record, kept as is.
 
     Returns {"row": <dict>, "created": bool}.
     """
@@ -379,7 +381,8 @@ def ratify_draft(
         "expression_profile_id": expression_profile_id,
         "text": text,
         "prompt_used": prompt,
-        "execution_config": json.dumps({"source": "ratified_preview", "provider": provider}),
+        "execution_config": json.dumps({**(execution_config or {"provider": provider}),
+                                        "source": "ratified_preview"}),
         "created_at": now,
     }
     conn.execute(

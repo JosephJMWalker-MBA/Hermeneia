@@ -12828,7 +12828,7 @@ async function _crPreviewArtistDraft() {
     // ratification saves — THIS text, never a re-render.
     _crLastArtistDraft = {
       text: d.text || '', profileSlug: d.profile_slug || '', profileName: d.profile_name || '',
-      planId: sk.planId || '', provider: d.provider || 'null', skeleton: sk,
+      planId: sk.planId || '', provider: d.provider || 'null', candidateId: d.candidate_id || '', skeleton: sk,
     };
     const canJudge = !!(d.profile_slug);
     out.innerHTML = `
@@ -12941,12 +12941,22 @@ async function _crRatifyDraft() {
   try {
     const resp = await fetch('/api/pipeline/ratify-draft', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      // The EXACT previewed bytes — never re-rendered.
-      body: JSON.stringify({ plan_id: d.planId, provider: d.provider, profile_slug: d.profileSlug || null, text: d.text }),
+      // The EXACT previewed bytes — never re-rendered — named by the server-held preview.
+      body: JSON.stringify({ plan_id: d.planId, provider: d.provider, profile_slug: d.profileSlug || null, text: d.text, candidate_id: d.candidateId || null }),
     });
     const r = await resp.json();
     if (!resp.ok) { result.innerHTML = `<div style="color:#f87171;font-size:13px;margin-top:8px">✗ ${x(r.error || 'ratify failed')}</div>`; return; }
     const already = r.status === 'already_ratified';
+    // Claim verbatim recording only when the server reports the record holds these bytes.
+    if (r.matches_submitted !== true) {
+      result.innerHTML = `
+      <div class="cr-draft-ratified">
+        <div class="cr-draft-preview-banner" style="color:#e0a800;border-color:color-mix(in srgb,#e0a800 45%,transparent);background:color-mix(in srgb,#e0a800 12%,transparent)">⚠ Draft not saved — the record holds different text</div>
+        <div class="cr-draft-meta">RenderedNarrative <b>${x((r.id || '').slice(0, 12))}…</b> · Voice: <b>${x(d.profileName || d.profileSlug || 'none')}</b> · Provider: <b>${x(r.provider)}</b> · Plan: <b>${x((r.plan_id || '').slice(0, 12))}…</b></div>
+        <div class="cr-voice-hint">A RenderedNarrative already exists for this plan, provider and voice, and its text differs from the draft above. RenderedNarratives are immutable, so your draft was not saved; the Record shows the text that was ratified.</div>
+      </div>`;
+      if (btn) { btn.textContent = 'Not saved'; return; }
+    }
     result.innerHTML = `
       <div class="cr-draft-ratified">
         <div class="cr-draft-preview-banner" style="color:var(--green);border-color:color-mix(in srgb,var(--green) 45%,transparent);background:color-mix(in srgb,var(--green) 12%,transparent)">✓ ${already ? 'Already ratified' : 'Ratified & saved to the record'}</div>

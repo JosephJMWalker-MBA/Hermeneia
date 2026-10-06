@@ -1,4 +1,4 @@
-"""Frozen witnesses for #231 and #235: ratification records what the steward judged.
+"""Promoted regressions for #231 and #235: ratification records what the steward judged.
 
 A ratified Artist draft is the persisted output of a nondeterministic
 invocation, so its record keeps that invocation's provider, model,
@@ -6,6 +6,8 @@ configuration and timestamp (CI-011), and the bytes saved are the bytes the
 server previewed. When the record does not hold the submitted bytes, the API
 says so and the Reader does not claim verbatim recording (`ratify_draft`:
 "It must save the artifact the steward actually saw and judged").
+Commit 4738bbf preserves the negative versions; the repair demonstrated
+strict unexpected passes before the expected failures were removed.
 Fake in-process Artist; the real `_crRatifyDraft` runs under Node.
 """
 from __future__ import annotations
@@ -102,8 +104,6 @@ _crRatifyDraft().then(() => console.log(
     return result.stdout.strip()
 
 
-@pytest.mark.xfail(strict=True, raises=RatificationRecordFailure,
-                   reason="#235: ratify-draft records only the client-sent provider; repair requires its own packet")
 def test_ratified_preview_keeps_the_invocations_execution_record(seeded):
     db, ids, client = seeded
     response = _ratify(client, ids, _preview(client, ids))
@@ -114,8 +114,6 @@ def test_ratified_preview_keeps_the_invocations_execution_record(seeded):
         raise RatificationRecordFailure(f"execution_config={config}")
 
 
-@pytest.mark.xfail(strict=True, raises=RatificationRecordFailure,
-                   reason="#235: ratify-draft accepts any text for a previewed candidate; repair requires its own packet")
 def test_candidate_ratification_refuses_text_the_preview_did_not_produce(seeded):
     db, ids, client = seeded
     response = _ratify(client, ids, _preview(client, ids), text="Text the provider never produced.")
@@ -123,8 +121,6 @@ def test_candidate_ratification_refuses_text_the_preview_did_not_produce(seeded)
         raise RatificationRecordFailure(f"{response.status_code} {response.get_json()}")
 
 
-@pytest.mark.xfail(strict=True, raises=RatificationRecordFailure,
-                   reason="#231: an already-ratified response does not say whether the record holds the submitted text")
 def test_already_ratified_response_says_whether_the_record_holds_the_submitted_text(seeded):
     _db, ids, client = seeded
     preview = {"provider": "ratify-test"}
@@ -136,8 +132,6 @@ def test_already_ratified_response_says_whether_the_record_holds_the_submitted_t
         raise RatificationRecordFailure(f"first={first.get_json()} second={second.get_json()}")
 
 
-@pytest.mark.xfail(strict=True, raises=RatificationRecordFailure,
-                   reason="#231: the Reader claims verbatim recording for text that was not recorded")
 def test_reader_does_not_claim_verbatim_recording_of_unsaved_text(seeded):
     _db, ids, client = seeded
     preview = {"provider": "ratify-test"}

@@ -224,6 +224,11 @@ def create_app(
     # steward decision names this server-owned run. Never accept reposted output.
     perspective_execution_candidates: dict[str, dict] = {}
     perspective_execution_candidates_lock = threading.RLock()
+    # Previewed Artist drafts are held the same way: ratification names the
+    # server-owned candidate, so its bytes and CI-011 execution record are the
+    # invocation's, not a client assertion.
+    artist_preview_candidates: dict[str, dict] = {}
+    artist_preview_candidates_lock = threading.RLock()
     _connections_settings_lock = threading.RLock()
     _connections_settings_load_error: str | None = None
     try:
@@ -7570,6 +7575,17 @@ Return ONLY valid JSON, no markdown, no explanation:
                 persist=False,
             )
             prof = result.profile
+            candidate_id = uuid.uuid4().hex
+            with artist_preview_candidates_lock:
+                while len(artist_preview_candidates) >= 100:
+                    del artist_preview_candidates[next(iter(artist_preview_candidates))]
+                artist_preview_candidates[candidate_id] = {
+                    "plan_id": plan_id,
+                    "provider": result.row["provider"],
+                    "profile_slug": profile,
+                    "text": result.row["text"],
+                    "execution_config": _json_loads(result.row["execution_config"], {}),
+                }
             return jsonify({
                 "preview": True,
                 "persisted": False,
@@ -7578,6 +7594,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "profile_slug": profile,
                 "profile_name": (prof["name"] if prof else None),
                 "text": result.row["text"],
+                "candidate_id": candidate_id,
             }), 200
         except ArtistRenderError as exc:
             return jsonify({"error": str(exc), "error_type": type(exc).__name__}), 400
@@ -7594,11 +7611,14 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_pipeline_ratify_draft():
         """Ratify & save the EXACT previewed Artist draft as a RenderedNarrative.
 
-        Body: { plan_id, provider, profile_slug?, text }
+        Body: { plan_id, provider, profile_slug?, text, candidate_id? }
 
         Persists the bytes the steward saw and judged — verbatim, no re-render,
         no provider call. Deterministic id means a second ratify is idempotent;
         the record is immutable (no post-save mutation). Explicit action only.
+        With candidate_id, the submission must be the server-held preview and
+        the record keeps that invocation's execution config (CI-011).
+        ``matches_submitted`` reports whether the record holds the submitted text.
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
@@ -7611,6 +7631,19 @@ Return ONLY valid JSON, no markdown, no explanation:
             return jsonify({"error": "plan_id is required"}), 400
         if not isinstance(text, str) or not text.strip():
             return jsonify({"error": "text is required"}), 400
+        candidate_id = str(payload.get("candidate_id") or "").strip()
+        execution_config = None
+        if candidate_id:
+            with artist_preview_candidates_lock:
+                candidate = artist_preview_candidates.get(candidate_id)
+            if candidate is None:
+                return jsonify({"error": "unknown or expired preview; preview the draft again before ratifying",
+                                "canonical_status": "not_persisted"}), 404
+            submitted = {"plan_id": plan_id, "provider": provider, "profile_slug": profile_slug, "text": text}
+            if any(candidate[key] != value for key, value in submitted.items()):
+                return jsonify({"error": "the submitted draft is not the previewed draft; nothing was ratified",
+                                "canonical_status": "not_persisted"}), 409
+            execution_config = candidate["execution_config"]
 
         from ..narrative.artist_service import ArtistRenderError, ratify_draft
 
@@ -7618,7 +7651,11 @@ Return ONLY valid JSON, no markdown, no explanation:
         try:
             result = ratify_draft(
                 plan_id, conn, provider=provider, profile_slug=profile_slug, text=text,
+                execution_config=execution_config,
             )
+            recorded_text = conn.execute(
+                "SELECT text FROM rendered_narratives WHERE id = ?", (result["row"]["id"],),
+            ).fetchone()[0]
         except ArtistRenderError as exc:
             return jsonify({"error": str(exc), "error_type": type(exc).__name__}), 400
         finally:
@@ -7633,6 +7670,8 @@ Return ONLY valid JSON, no markdown, no explanation:
             "profile_slug": profile_slug,
             "plan_id": plan_id,
             "blueprint_id": result.get("blueprint_id"),
+            "matches_submitted": recorded_text == text,
+            "recorded_text_sha256": hashlib.sha256(recorded_text.encode("utf-8")).hexdigest(),
         }), (201 if result["created"] else 200)
 
     @app.route("/api/critic/voice-preview", methods=["POST"])
