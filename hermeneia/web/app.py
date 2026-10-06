@@ -7136,6 +7136,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         Idempotent: recompiling the same PDF (same SHA-256) inserts nothing.
         """
         from ..compiler.compiler import Compiler
+        from ..storage.hashing import sha256_file
 
         if "file" not in request.files:
             return jsonify({"error": "No file field in request"}), 400
@@ -7153,27 +7154,36 @@ Return ONLY valid JSON, no markdown, no explanation:
         uploads_dir = build_dir / "uploads"
         uploads_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save to a named temp file so the compiler can hash it
-        suffix = Path(f.filename).suffix or ".pdf"
+        # The client filename is metadata only, never a storage path. Source
+        # bytes live under their content hash, which is also the SourceDocument
+        # identity, so distinct documents cannot collide or overwrite each other.
+        original_filename = Path(f.filename).name
+        suffix = Path(original_filename).suffix.lower() or ".pdf"
         with tempfile.NamedTemporaryFile(
-            dir=uploads_dir, suffix=suffix, delete=False,
-            prefix=Path(f.filename).stem + "_",
+            dir=uploads_dir, suffix=suffix, delete=False, prefix=".upload-",
         ) as tmp:
-            f.save(tmp.name)
-            saved_path = Path(tmp.name)
+            f.save(tmp)
+            spooled = Path(tmp.name)
+        doc_hash = sha256_file(spooled)
+        source_path = uploads_dir / f"{doc_hash}{suffix}"
+        os.replace(spooled, source_path)
 
         try:
             compiler = Compiler(db_path=db_path, build_dir=build_dir)
-            compiler.compile(saved_path)
-            compiler.close()
+            try:
+                compiler.compile(source_path, original_filename=original_filename)
+            finally:
+                compiler.close()
         except Exception as exc:
-            saved_path.unlink(missing_ok=True)
+            # Content-addressed bytes may belong to an existing or concurrently
+            # compiled document, so they are kept rather than deleted.
             return jsonify({"error": f"Compilation failed: {exc}"}), 500
 
-        # Read back counts from the freshly compiled document
+        # Read back counts for the document this request compiled
         conn = _conn()
         doc = conn.execute(
-            "SELECT id, original_filename, total_pages FROM source_documents ORDER BY registered_at DESC LIMIT 1"
+            "SELECT id, original_filename, total_pages FROM source_documents WHERE id = ?",
+            (doc_hash,),
         ).fetchone()
         obs_count = 0
         term_count = 0
@@ -7198,16 +7208,9 @@ Return ONLY valid JSON, no markdown, no explanation:
             ).fetchone()[0]
         conn.close()
 
-        # Rename temp file to the original filename for future reference
-        final_path = uploads_dir / f.filename
-        if not final_path.exists():
-            saved_path.rename(final_path)
-        else:
-            saved_path.unlink(missing_ok=True)
-
         return jsonify({
             "status": "compiled",
-            "filename": f.filename,
+            "filename": original_filename,
             "document_id": doc["id"] if doc else None,
             "total_pages": doc["total_pages"] if doc else None,
             "observation_count": obs_count,

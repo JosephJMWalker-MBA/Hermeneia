@@ -1,8 +1,10 @@
-"""Frozen witnesses for #222, #223, #224 and #239: upload source-artifact binding.
+"""Promoted regressions for #222, #223, #224 and #239: upload source-artifact binding.
 
 A compiled SourceDocument keeps its own source bytes in uploads/ under a name
 the server controls; it records the user's filename as metadata; and the
-upload route acts on the document it actually compiled. Synthetic PDFs only.
+upload route acts on the document it actually compiled. Commit 3b1caca preserves
+the negative versions; the repair demonstrated strict unexpected passes before
+the expected failures were removed. Synthetic PDFs only.
 """
 from __future__ import annotations
 
@@ -52,8 +54,6 @@ def _roles(db) -> dict[str, str]:
     return dict(sqlite3.connect(db).execute("SELECT id, source_role FROM source_documents"))
 
 
-@pytest.mark.xfail(strict=True, raises=SourceBindingFailure,
-                   reason="#222: a second PDF with an existing filename loses its bytes; repair requires its own packet")
 def test_same_filename_different_documents_both_keep_source_bytes(workspace):
     _tmp, ws, _db, app = workspace
     a, b = _pdf("First document text."), _pdf("A different second document.")
@@ -64,8 +64,6 @@ def test_same_filename_different_documents_both_keep_source_bytes(workspace):
         raise SourceBindingFailure(f"source bytes missing for {sorted(missing)}")
 
 
-@pytest.mark.xfail(strict=True, raises=SourceBindingFailure,
-                   reason="#222: concurrent same-name uploads overwrite each other; repair requires its own packet")
 def test_concurrent_same_filename_uploads_both_keep_source_bytes(workspace):
     _tmp, ws, _db, app = workspace
     a, b = _pdf("First concurrent document."), _pdf("Second concurrent document.")
@@ -86,8 +84,6 @@ def test_concurrent_same_filename_uploads_both_keep_source_bytes(workspace):
         raise SourceBindingFailure(f"statuses={statuses} missing={sorted(missing)}")
 
 
-@pytest.mark.xfail(strict=True, raises=SourceBindingFailure,
-                   reason="#223: original_filename records the temporary name; repair requires its own packet")
 def test_original_filename_records_the_uploaded_name(workspace):
     _tmp, _ws, db, app = workspace
     assert _upload(app, _pdf("The lamp burned all night."), "My Study.pdf").status_code == 200
@@ -96,8 +92,6 @@ def test_original_filename_records_the_uploaded_name(workspace):
         raise SourceBindingFailure(f"original_filename={names}")
 
 
-@pytest.mark.xfail(strict=True, raises=SourceBindingFailure,
-                   reason="#224: re-upload applies the role to another document; repair requires its own packet")
 def test_reupload_applies_role_to_the_uploaded_document(workspace):
     _tmp, _ws, db, app = workspace
     a, b = _pdf("Document A text."), _pdf("Document B text.")
@@ -110,8 +104,6 @@ def test_reupload_applies_role_to_the_uploaded_document(workspace):
         raise SourceBindingFailure(f"response={body['document_id'][:12]} roles={roles}")
 
 
-@pytest.mark.xfail(strict=True, raises=SourceBindingFailure,
-                   reason="#224: concurrent uploads misattribute the compiled document; repair requires its own packet")
 def test_concurrent_new_uploads_apply_role_to_their_own_documents(workspace, monkeypatch):
     _tmp, _ws, db, app = workspace
     a, b = _pdf("Document A, uploaded as reference."), _pdf("Document B, uploaded as primary.")
@@ -135,8 +127,6 @@ def test_concurrent_new_uploads_apply_role_to_their_own_documents(workspace, mon
         raise SourceBindingFailure(f"response={body['document_id'][:12]} roles={roles}")
 
 
-@pytest.mark.xfail(strict=True, raises=SourceBindingFailure,
-                   reason="#239: the raw client filename becomes a storage path; repair requires its own packet")
 def test_client_filename_never_becomes_a_storage_path(workspace):
     tmp, ws, db, app = workspace
     outside = tmp / "outside"

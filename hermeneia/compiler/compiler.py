@@ -29,11 +29,13 @@ class Compiler:
         self.build_dir = Path(build_dir)
         self.repo = Repository(self.db_path)
 
-    def compile(self, pdf_path: str | Path) -> Path:
+    def compile(self, pdf_path: str | Path, *, original_filename: str | None = None) -> Path:
         """Compile a PDF to a .herm bundle directory.
 
         Returns the path to the bundle directory.
         Idempotent: recompiling the same PDF inserts nothing (INSERT OR IGNORE).
+        ``original_filename`` records the user's name for the source when the
+        bytes are stored under a server-controlled name (e.g. web uploads).
         """
         pdf_path = Path(pdf_path)
         compilation_run_id = str(uuid.uuid4())
@@ -45,7 +47,7 @@ class Compiler:
 
         source_doc = {
             "id": doc_hash,
-            "original_filename": pdf_path.name,
+            "original_filename": original_filename or pdf_path.name,
             "file_hash": doc_hash,
             "total_pages": total_pages,
             "registered_at": now.isoformat(),
