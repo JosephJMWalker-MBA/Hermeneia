@@ -1,11 +1,13 @@
-"""Frozen witnesses for #220 and #233: read paths read historical and read-only states as they are.
+"""Promoted regressions for #220 and #233: read paths read historical and read-only states as they are.
 
 Read-only operations have zero side effects: a lineage inspection or other
 read shall not create or migrate schemas or seed profiles (Constitution
 Art. XII; CI-012; 15_Storage.md Read-Only Storage Rule). So the CLI pipeline
 trace and profile listing work on a read-only workspace and create nothing on
 an older one, and the proof-PDF reader answers its documented 404 on a
-workspace without authoring tables. Synthetic workspaces only.
+workspace without authoring tables. Commit 90c1acb preserves the negative
+versions; the repair demonstrated strict unexpected passes before the expected
+failures were removed. Synthetic workspaces only.
 """
 from __future__ import annotations
 
@@ -55,8 +57,6 @@ def _drop(db, tables) -> None:
     conn.close()
 
 
-@pytest.mark.xfail(strict=True, raises=ReadPathSideEffect,
-                   reason="#233: trace and profile list initialize schema before reading; repair requires its own packet")
 def test_trace_and_profile_list_work_on_a_read_only_workspace(workspace, capsys):
     os.chmod(workspace, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
     try:
@@ -70,8 +70,6 @@ def test_trace_and_profile_list_work_on_a_read_only_workspace(workspace, capsys)
     assert "Pipeline Trace: OBS-1" in out and "Expression Profiles" in out
 
 
-@pytest.mark.xfail(strict=True, raises=ReadPathSideEffect,
-                   reason="#233: trace and profile list create tables on an older workspace; repair requires its own packet")
 def test_trace_and_profile_list_create_no_schema_on_an_older_workspace(workspace, capsys):
     _drop(workspace, LATER_LAYER_TABLES)
     before = _schema(workspace)
@@ -83,8 +81,6 @@ def test_trace_and_profile_list_create_no_schema_on_an_older_workspace(workspace
     assert "Pipeline Trace: OBS-1" in capsys.readouterr().out
 
 
-@pytest.mark.xfail(strict=True, raises=ReadPathSideEffect,
-                   reason="#220: proof_pdf queries authoring_proofs without the authoring-table guard")
 def test_proof_pdf_is_a_structured_404_without_authoring_tables(workspace):
     _drop(workspace, AUTHORING_TABLES)
     client = create_app(db_path=workspace).test_client()
