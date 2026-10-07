@@ -1,9 +1,11 @@
-"""Frozen witness for #245: a null calibration note stays absent, never "None".
+"""Promoted regression for #245: a null calibration note stays absent, never "None".
 
 `PATCH /api/e10/providers/<participant>/roles/<role>` treats the steward note
 as optional: an absent or blank note is stored as null (`... .strip() or
 None`), which is also how never-calibrated roles appear in calibration.json.
 JSON null means the same thing; it never becomes the steward note "None".
+Commit 74883be preserves the negative version; the repair demonstrated a
+strict unexpected pass before the expected failure was removed.
 Synthetic workspace; no provider calls.
 """
 from __future__ import annotations
@@ -39,8 +41,6 @@ def _explorer_notes(ws) -> list:
             if "Explorer" in record.get("role_status", {})]
 
 
-@pytest.mark.xfail(strict=True, raises=FabricatedNote,
-                   reason="#245: a null note is stored as the steward note 'None'; repair requires its own packet")
 def test_null_note_is_stored_as_no_note(workspace):
     ws, client = workspace
     _calibrate(client, note=None)

@@ -5655,7 +5655,7 @@ def create_app(
 
         payload = _json_body()
         status = payload.get("status", "").strip().lower()
-        note = str(payload.get("note", "")).strip() or None
+        note = _optional_text(payload, "note")  # absent, null and blank: no note (#245)
         valid_statuses = {"approved", "rejected", "untested", "caution"}
         if status not in valid_statuses:
             return jsonify({
