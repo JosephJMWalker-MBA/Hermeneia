@@ -807,8 +807,9 @@ def create_app(
     def _normalize_blueprint_candidate(value: object) -> tuple[dict | None, str | None]:
         if not isinstance(value, dict):
             return None, "proposed_blueprint must be an object"
-        title = str(value.get("title", "")).strip()
-        thesis = str(value.get("thesis", "")).strip()
+        # null means "not given", so it meets the same refusal as an absent field (#243).
+        title = _optional_text(value, "title") or ""
+        thesis = _optional_text(value, "thesis") or ""
         raw_sections = value.get("sections")
         if not title:
             return None, "title is required"
@@ -821,7 +822,7 @@ def create_app(
         for index, raw_section in enumerate(raw_sections):
             if not isinstance(raw_section, dict):
                 return None, f"section {index + 1} must be an object"
-            claim = str(raw_section.get("claim", "")).strip()
+            claim = _optional_text(raw_section, "claim") or ""
             if not claim:
                 return None, f"section {index + 1} claim is required"
             supporting_observations = raw_section.get("supporting_observations", [])
@@ -6843,8 +6844,8 @@ Return ONLY valid JSON, no markdown, no explanation:
             return jsonify({"error": "database not found"}), 404
 
         payload = _json_body()
-        title   = str(payload.get("title", "")).strip()
-        thesis  = str(payload.get("thesis", "")).strip()
+        title   = _optional_text(payload, "title") or ""
+        thesis  = _optional_text(payload, "thesis") or ""
         raw_sections = payload.get("sections", [])
 
         if not title:
@@ -6863,7 +6864,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 
             sections_data = []
             for sec in raw_sections:
-                claim = str(sec.get("claim", "")).strip()
+                claim = _optional_text(sec, "claim") or ""
                 if not claim:
                     continue
                 obs_ids_sec = []

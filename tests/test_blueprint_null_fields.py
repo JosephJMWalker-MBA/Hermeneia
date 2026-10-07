@@ -1,4 +1,4 @@
-"""Frozen witnesses for #243: a null Blueprint title, thesis or claim never becomes "None".
+"""Promoted regressions for #243: a null Blueprint title, thesis or claim never becomes "None".
 
 Every Blueprint commit route requires a title, a thesis and section claims
 ("title is required", "thesis is required", "section N claim is required";
@@ -6,6 +6,8 @@ the extractor's "missing required keys" / "missing 'claim'"; architect/import
 skips a section without a claim). JSON null — from a client or a provider
 reply — means "not given", exactly as an absent key does; it never becomes
 the literal "None" in an immutable NarrativeBlueprint (Constitution Art. X).
+Commit b27b4e8 preserves the negative versions; the repair demonstrated
+strict unexpected passes before the expected failures were removed.
 Synthetic workspace; offline in-process extractor provider.
 """
 from __future__ import annotations
@@ -74,8 +76,6 @@ class _ExtractorReply:
         self._client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_k: SimpleNamespace(content=content)))
 
 
-@pytest.mark.xfail(strict=True, raises=NoneCommitted,
-                   reason="#243: ratify-blueprint commits a null field as 'None'; repair requires its own packet")
 @pytest.mark.parametrize("field", FIELDS)
 def test_ratify_refuses_a_null_required_field(workspace, field):
     db, client, obs = workspace
@@ -84,8 +84,6 @@ def test_ratify_refuses_a_null_required_field(workspace, field):
     _check(db, before, response)
 
 
-@pytest.mark.xfail(strict=True, raises=NoneCommitted,
-                   reason="#243: revise-blueprint commits a null field as 'None'; repair requires its own packet")
 @pytest.mark.parametrize("field", FIELDS)
 def test_revise_refuses_a_null_required_field(workspace, field):
     db, client, obs = workspace
@@ -98,8 +96,6 @@ def test_revise_refuses_a_null_required_field(workspace, field):
     _check(db, before, response)
 
 
-@pytest.mark.xfail(strict=True, raises=NoneCommitted,
-                   reason="#243: extract-and-save commits a provider's null field as 'None'; repair requires its own packet")
 @pytest.mark.parametrize("field", FIELDS)
 def test_extract_and_save_refuses_a_provider_null_required_field(workspace, field):
     db, client, _obs = workspace
@@ -110,8 +106,6 @@ def test_extract_and_save_refuses_a_provider_null_required_field(workspace, fiel
     _check(db, before, response, expected_status=422)
 
 
-@pytest.mark.xfail(strict=True, raises=NoneCommitted,
-                   reason="#243: architect/import commits a null title or thesis as 'None'; repair requires its own packet")
 @pytest.mark.parametrize("field", ("title", "thesis"))
 def test_import_refuses_a_null_title_or_thesis(workspace, field):
     db, client, _obs = workspace
@@ -121,8 +115,6 @@ def test_import_refuses_a_null_title_or_thesis(workspace, field):
     _check(db, before, response)
 
 
-@pytest.mark.xfail(strict=True, raises=NoneCommitted,
-                   reason="#243: architect/import commits a null claim as 'None'; repair requires its own packet")
 def test_import_skips_a_section_whose_claim_is_null_as_it_skips_a_blank_one(workspace):
     db, client, _obs = workspace
     response = client.post("/api/architect/import", json={"title": "T", "thesis": "Th", "sections": [

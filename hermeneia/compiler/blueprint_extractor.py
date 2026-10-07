@@ -177,7 +177,8 @@ def _parse_and_validate(raw: str) -> dict:
             f"LLM did not return valid JSON.\nRaw response:\n{raw[:500]}"
         ) from exc
 
-    missing = [k for k in ("title", "thesis", "sections") if k not in data]
+    # A null value is a missing value; it never becomes the text "None" (#243).
+    missing = [k for k in ("title", "thesis", "sections") if k not in data or data[k] is None]
     if missing:
         raise BlueprintExtractionError(
             f"Blueprint missing required keys: {missing}\nParsed: {data}"
@@ -189,7 +190,7 @@ def _parse_and_validate(raw: str) -> dict:
     # Normalize sections: ensure empty obs/interp lists
     normalized_sections = []
     for i, s in enumerate(data["sections"]):
-        if "claim" not in s or not str(s["claim"]).strip():
+        if "claim" not in s or s["claim"] is None or not str(s["claim"]).strip():
             raise BlueprintExtractionError(f"Section {i} missing 'claim' field.")
         normalized_sections.append({
             "claim": str(s["claim"]).strip(),
