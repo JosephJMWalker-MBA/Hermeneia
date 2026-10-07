@@ -234,3 +234,45 @@ absent, null and blank Artist preview/ratify fields as "not given".
 - The unrelated Reader edits in `index.html` and
   `tests/test_reader_context_navigation.py` remain uncommitted and are absent
   from every campaign commit.
+
+## Null-normalization audit and #241 — 2026-10-07
+
+The campaign as audited above was pushed at `abe253e` and opened for review as
+PR #242. Afterwards, #241 was repaired and one bounded audit was run, limited
+to request- or provider-JSON conversions of the form `str(x.get(k[, d]))`
+where JSON `null` becomes the string `"None"`.
+
+**#241 repaired.** Witness `7e645ff`, repair `b6c8fd4`. `revise-blueprint`
+now reads `reason` through `_optional_text()`, so a `null` reason gets the
+existing 400 "revision reason is required" and nothing is persisted. The
+witness's controls pin the absent and blank refusals and the verbatim
+recording of a stated reason. Blueprint and governance neighbors: 483
+passed.
+
+**Audit inventory.** There are 31 unguarded conversions in
+`hermeneia/web/app.py` and none in `authoring_api.py`. Helpers using
+`str(v or "")` are null-safe; Perspective revision reasons, for example,
+already were. Other unguarded conversions outside `app.py` read database
+rows, bundle manifests or internal runtime JSON, so they are outside this
+scope.
+
+| Class | Sites (field) | Disposition |
+| --- | --- | --- |
+| Harmless / caught | provider key `api_key` (fails the 8-character check); steward `status` (not in the allowed set); voice-preview `text` and `profile_slug` (read-only) | none |
+| Input-validation weakness | E10 `observation_id`; E10 critic `proposal_id`; revise `predecessor_id`; run-artist `plan_id`, `obs_ref`, `provider`, `profile`; run-artist-all-profiles `plan_id`, `provider`; run-critic `narrative_id`, `obs_ref`; architect/generate `directive`, `provider`; extract-blueprint `text`, `provider` | a misleading error or a bypassed "required" check, with no persisted `"None"`; not filed |
+| Canonical-data corruption | Blueprint candidate `title`, `thesis`, `claim` (ratify, revise, extract-save) and architect/import `title`, `thesis`, `claim` | **#243** filed, not repaired |
+| Canonical-data corruption (machine output) | architect/generate provider `title`, `thesis`, `claim` | **#244** filed, not repaired |
+| Provenance / identity | preview/ratify `provider` and `profile` | fixed earlier as #240; no other persisted identity found |
+| Governance state | revise `reason` | **#241 repaired** |
+| Governance state | provider role calibration `note` (API-only) | **#245** filed, not repaired |
+| Governance state | narrative steward `rationale` | cannot persist, because the route always fails; see #246 |
+
+**Incidental finding.** Filed as **#246**, not repaired. `PATCH
+/api/reader/narratives/<id>/steward` always returns 500 "RenderedNarrative
+immutable": it UPDATEs a table whose trigger forbids every update. This is a
+specification/implementation conflict that needs an authority decision.
+
+All four new issues were reproduced on `bdf280a` and at `b6c8fd4`, and each
+reproduction was verified as written. Campaign regressions at `b6c8fd4`: 130
+passed (the 125 above plus 5 for #241). #243–#246 are reported, not
+implemented, because the narrow #241 boundary does not resolve them.
