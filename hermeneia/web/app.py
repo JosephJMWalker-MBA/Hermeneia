@@ -40,6 +40,9 @@ from ..cli.health import (
     observation_count,
     perspective_count,
 )
+# Imported at load: a first import inside a request would bind artist_service's
+# provider lookup to whatever is installed at that moment.
+from ..narrative.artist_service import excluded_evidence_ids
 from ..narrative.provider_registry import (
     ModelCatalog,
     ModelCatalogEntry,
@@ -870,7 +873,6 @@ def create_app(
             if missing:
                 return "unknown supporting_interpretations: " + ", ".join(missing)
         # Excluded evidence is a scope refusal (403), not a malformed candidate.
-        from ..narrative.artist_service import excluded_evidence_ids
         excluded = excluded_evidence_ids(conn, obs_ids, interp_ids)
         if excluded:
             raise _ScopeAccessError("supporting evidence is excluded_from_analysis: " + ", ".join(excluded))
