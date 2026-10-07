@@ -1,0 +1,141 @@
+{
+  "schema": "hermeneia.synthetic-study-trajectory/v1",
+  "trajectory_id": "T4_model_perspective_reliance",
+  "planned_profile": "overuses model Perspectives with little user-authored analysis",
+  "fixture_class": "lawful",
+  "policy": {
+    "trajectory_policy_version": "p5-lab-1.0.0",
+    "registry_version": "1.1.0",
+    "evaluator_version": "1.1.0",
+    "guide_version": "1.0.0"
+  },
+  "documents": {
+    "A": [
+      "The lamp burned all night.",
+      "Nobody asked why it burned.",
+      "The keeper wrote nothing down.",
+      "By morning the harbor was empty.",
+      "A second lamp was lit at dusk.",
+      "The ledger records only the oil."
+    ]
+  },
+  "operations": [
+    {
+      "op": "upload",
+      "doc": "A"
+    },
+    {
+      "op": "set_governing_question",
+      "text": "What does the lamp signal to the harbor?"
+    },
+    {
+      "op": "retain_perspective_run",
+      "perspective": "close-reader",
+      "doc": "A",
+      "sentence": 1,
+      "question": "What remains uncertain about the lamp?"
+    },
+    {
+      "op": "retain_perspective_run",
+      "perspective": "skeptical-reader",
+      "doc": "A",
+      "sentence": 1,
+      "question": "What remains uncertain about the lamp?"
+    },
+    {
+      "op": "model_proposal",
+      "key": "M1",
+      "doc": "A",
+      "sentence": 2
+    }
+  ],
+  "current_state": {},
+  "declared_lineage": {
+    "observations|recorded|derived": 6,
+    "perspective_execution_receipts|recorded|model": 2,
+    "proposed_interpretations|recorded|model": 1,
+    "source_documents|recorded|unknown": 1,
+    "source_extractions|recorded|derived": 6,
+    "workspace_investigation|current_snapshot|unknown": 1
+  },
+  "coverage": {
+    "missing_tables": [],
+    "missing_columns": {},
+    "omitted_nonzero": {}
+  },
+  "edges": [
+    "Superficially similar evidence: an unaccepted model proposal is current material but is not attributable formation and must not trigger the counterevidence resumption anchor.",
+    "Retained runs of built-in frames establish narrow explore_perspective history but are not saved frame declarations, so form_interpretation stays not_ready."
+  ],
+  "expected": {
+    "capabilities": {
+      "governing_question": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "read_source": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "mark_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "record_observation": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "preserve_question": {
+        "availability": "available",
+        "status": "available",
+        "guide": "ready"
+      },
+      "organize_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "explore_perspective": {
+        "availability": "available",
+        "status": "already_exercised_under_supported_evidence",
+        "guide": "historically_exercised"
+      },
+      "form_interpretation": {
+        "availability": "not_yet_available",
+        "status": "not_yet_available",
+        "guide": "not_ready"
+      },
+      "challenge_interpretation": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "review_blueprint": {
+        "availability": "not_yet_available",
+        "status": "not_yet_available",
+        "guide": "not_ready"
+      },
+      "review_lineage": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      }
+    },
+    "preferred_next": "read_source",
+    "permitted_next": [
+      "read_source"
+    ],
+    "must_not_suggest": [
+      "explore_perspective",
+      "challenge_interpretation",
+      "form_interpretation",
+      "review_blueprint"
+    ],
+    "reason": "Model Perspective runs and a model proposal exist, but no saved Reader mark is retained; with no attributable Interpretation the guide walks from the start and the first unsupported step is reading the source.",
+    "derivation": "P2 ordinary rule (guided-study-cycle-v1.md): walk the ordered cycle and recommend the first step that is neither currently_supported nor historically_exercised; P1 owns readiness and history (capability-registry-v1.md)."
+  }
+}
