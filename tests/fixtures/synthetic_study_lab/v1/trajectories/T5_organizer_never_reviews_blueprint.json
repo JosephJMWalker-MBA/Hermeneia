@@ -1,0 +1,189 @@
+{
+  "schema": "hermeneia.synthetic-study-trajectory/v1",
+  "trajectory_id": "T5_organizer_never_reviews_blueprint",
+  "planned_profile": "organizes evidence but never reviews Blueprint",
+  "fixture_class": "lawful",
+  "policy": {
+    "trajectory_policy_version": "p5-lab-1.0.0",
+    "registry_version": "1.1.0",
+    "evaluator_version": "1.1.0",
+    "guide_version": "1.0.0"
+  },
+  "documents": {
+    "A": [
+      "The lamp burned all night.",
+      "Nobody asked why it burned.",
+      "The keeper wrote nothing down.",
+      "By morning the harbor was empty.",
+      "A second lamp was lit at dusk.",
+      "The ledger records only the oil."
+    ]
+  },
+  "operations": [
+    {
+      "op": "upload",
+      "doc": "A"
+    },
+    {
+      "op": "set_governing_question",
+      "text": "What does the lamp signal to the harbor?"
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 1,
+      "theme_bucket": "light"
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 5,
+      "theme_bucket": "light"
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 3,
+      "evidence_bucket": "silence"
+    },
+    {
+      "op": "inquiry",
+      "doc": "A",
+      "sentence": 2,
+      "question": "Who should have asked?"
+    },
+    {
+      "op": "save_perspective",
+      "key": "P1",
+      "label": "Light and vigilance",
+      "purpose": "Read light as watchfulness.",
+      "questions": [
+        "Who is the lamp for?"
+      ]
+    },
+    {
+      "op": "steward_interpretation",
+      "key": "I1",
+      "doc": "A",
+      "sentence": 1,
+      "perspective": "P1",
+      "text": "The burning lamp marks a vigil no one admits to keeping."
+    },
+    {
+      "op": "ratify_blueprint",
+      "title": "The unasked lamp",
+      "thesis": "The lamp records a vigil the town declines to name.",
+      "sections": [
+        {
+          "claim": "The lamp burns without explanation.",
+          "observations": [
+            {
+              "doc": "A",
+              "sentence": 1
+            },
+            {
+              "doc": "A",
+              "sentence": 2
+            }
+          ],
+          "interpretations": [
+            "I1"
+          ]
+        }
+      ]
+    }
+  ],
+  "current_state": {},
+  "declared_lineage": {
+    "architect_plans|recorded|derived": 1,
+    "inquiry_notes|recorded|unknown": 1,
+    "interpretations|recorded|human": 1,
+    "narrative_blueprints|recorded|derived": 1,
+    "observations|recorded|derived": 6,
+    "perspectives|recorded|unknown": 1,
+    "reader_highlights|current_snapshot|unknown": 3,
+    "source_documents|recorded|unknown": 1,
+    "source_extractions|recorded|derived": 6,
+    "workspace_investigation|current_snapshot|unknown": 1
+  },
+  "coverage": {
+    "missing_tables": [],
+    "missing_columns": {},
+    "omitted_nonzero": {}
+  },
+  "edges": [
+    "Blueprint review is not durably recorded: a saved Blueprint is current material, never evidence of review; the guide routes to Lineage inspection rather than claiming or demanding review."
+  ],
+  "expected": {
+    "capabilities": {
+      "governing_question": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "read_source": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "mark_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "record_observation": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "preserve_question": {
+        "availability": "available",
+        "status": "already_exercised_under_supported_evidence",
+        "guide": "historically_exercised"
+      },
+      "organize_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "explore_perspective": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "form_interpretation": {
+        "availability": "available",
+        "status": "already_exercised_under_supported_evidence",
+        "guide": "historically_exercised"
+      },
+      "challenge_interpretation": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "review_blueprint": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "review_lineage": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      }
+    },
+    "preferred_next": "review_lineage",
+    "permitted_next": [
+      "review_lineage"
+    ],
+    "must_not_suggest": [
+      "organize_evidence",
+      "mark_evidence",
+      "read_source",
+      "preserve_question",
+      "form_interpretation"
+    ],
+    "reason": "A governing question, an attributable canonical Interpretation and a saved Blueprint are retained, so the guide recommends inspecting their Lineage; Blueprint review itself cannot be evidenced.",
+    "derivation": "P2 retained-result resumption: governing question present + attributable canonical Interpretation + eligible Blueprint -> recommend Lineage inspection; no review or complete cycle is inferred (guided-study-cycle-v1.md)."
+  }
+}

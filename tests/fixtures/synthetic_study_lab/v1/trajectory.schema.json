@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermeneia.synthetic-study-trajectory/v1",
+  "title": "P5 Synthetic Study Laboratory trajectory (v1)",
+  "description": "A frozen evaluation fixture for #215 P5. 'documents', 'operations' and 'current_state' are the only inputs: operations are materialized through existing production write boundaries into a disposable workspace (a labeled legacy-shape operation is the only direct SQL), and the production Lineage projection, Capability Registry evaluator and Guided Study Cycle decide every result. 'expected' is never passed to production; it is compared afterwards. Synthetic text only; no provider or model call; no real workspace; not study history.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "trajectory_id", "planned_profile", "fixture_class", "policy", "documents",
+               "operations", "current_state", "declared_lineage", "coverage", "edges", "expected"],
+  "properties": {
+    "schema": {"const": "hermeneia.synthetic-study-trajectory/v1"},
+    "trajectory_id": {"type": "string", "pattern": "^T[1-7]_[a-z0-9_]+$"},
+    "planned_profile": {"type": "string", "description": "The #215 P5 trajectory description. Descriptive only; never an evaluator input."},
+    "fixture_class": {"enum": ["lawful", "lawful_then_legacy_shape"],
+                      "description": "lawful: every operation uses a production write boundary. lawful_then_legacy_shape: lawful operations followed by an explicitly labeled direct-SQL legacy shape (audit §12: legacy fixtures are not proof a user workflow can produce the state)."},
+    "policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["trajectory_policy_version", "registry_version", "evaluator_version", "guide_version"],
+      "properties": {
+        "trajectory_policy_version": {"const": "p5-lab-1.0.0"},
+        "registry_version": {"type": "string"},
+        "evaluator_version": {"type": "string"},
+        "guide_version": {"type": "string"}
+      },
+      "description": "The production rule versions the expectations were derived from. A mismatch refuses evaluation; fixtures are re-frozen deliberately, never silently."
+    },
+    "documents": {
+      "type": "object", "minProperties": 1,
+      "additionalProperties": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+      "description": "Synthetic documents: one sentence per line becomes one extraction block and one compiler Observation."
+    },
+    "operations": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["op"],
+        "properties": {
+          "op": {"enum": ["upload", "set_governing_question", "mark", "inquiry", "save_perspective",
+                          "retain_perspective_run", "steward_interpretation", "model_proposal",
+                          "accept_proposal", "ratify_blueprint", "exclude_document", "legacy_drop_table"]}
+        }
+      },
+      "description": "Applied in order. Boundaries: upload=POST /api/upload; set_governing_question=PUT /api/investigation; mark=POST /api/reader/highlights; inquiry=POST /api/observations/<id>/inquiry; save_perspective=POST /api/perspective/saved; retain_perspective_run=POST /api/perspective/run + /retain (in-process fake adapter); steward_interpretation=SQLiteStore.insert_interpretation (steward-authored); model_proposal=POST /api/e10/interpretations/generate (in-process fake adapter); accept_proposal=POST /api/e10/proposals/<id>/accept; ratify_blueprint=POST /api/pipeline/ratify-blueprint; exclude_document=PATCH /api/documents/<id>/scope; legacy_drop_table=labeled direct SQL."
+    },
+    "current_state": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "governing_question": {"type": ["string", "null"]},
+        "perspective_available": {"type": "boolean"}
+      },
+      "description": "The only explicit current-state inputs the production evaluator accepts (P1 contract)."
+    },
+    "declared_lineage": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 1},
+      "description": "Exact expected Study Lineage item counts keyed 'table|event|authorship'. Equality proves no history is manufactured or lost."
+    },
+    "coverage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["missing_tables", "missing_columns", "omitted_nonzero"],
+      "properties": {
+        "missing_tables": {"type": "array", "items": {"type": "string"}},
+        "missing_columns": {"type": "object"},
+        "omitted_nonzero": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}}
+      },
+      "description": "Explicit coverage limits; must equal the production Lineage coverage of the materialized workspace."
+    },
+    "edges": {"type": "array", "items": {"type": "string"},
+              "description": "Edge conditions this trajectory discriminates (partial history, unsupported coverage, superficially similar evidence)."},
+    "expected": {
+      "type": "object", "additionalProperties": false,
+      "required": ["capabilities", "preferred_next", "permitted_next", "must_not_suggest", "reason", "derivation"],
+      "properties": {
+        "capabilities": {
+          "type": "object",
+          "description": "All 11 capabilities. availability = production P1 current readiness (available | not_yet_available | unsupported_due_to_missing_history); status = production P1 historical status (adds already_exercised_under_supported_evidence); guide = production P2 step state (ready | currently_supported | historically_exercised | not_ready | unknown).",
+          "additionalProperties": {
+            "type": "object", "additionalProperties": false, "required": ["availability", "status", "guide"],
+            "properties": {
+              "availability": {"enum": ["available", "not_yet_available", "unsupported_due_to_missing_history"]},
+              "status": {"enum": ["available", "not_yet_available", "unsupported_due_to_missing_history", "already_exercised_under_supported_evidence"]},
+              "guide": {"enum": ["ready", "currently_supported", "historically_exercised", "not_ready", "unknown"]}
+            }
+          }
+        },
+        "preferred_next": {"type": "string"},
+        "permitted_next": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "must_not_suggest": {"type": "array", "items": {"type": "string"}},
+        "reason": {"type": "string", "description": "Deterministic reason, stated in terms of declared evidence and the governing rule."},
+        "derivation": {"type": "string", "description": "The authority rule the expected recommendation follows from."}
+      }
+    }
+  }
+}

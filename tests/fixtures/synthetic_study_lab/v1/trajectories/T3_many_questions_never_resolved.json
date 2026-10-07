@@ -1,0 +1,146 @@
+{
+  "schema": "hermeneia.synthetic-study-trajectory/v1",
+  "trajectory_id": "T3_many_questions_never_resolved",
+  "planned_profile": "asks many questions but never promotes/resolves",
+  "fixture_class": "lawful_then_legacy_shape",
+  "policy": {
+    "trajectory_policy_version": "p5-lab-1.0.0",
+    "registry_version": "1.1.0",
+    "evaluator_version": "1.1.0",
+    "guide_version": "1.0.0"
+  },
+  "documents": {
+    "A": [
+      "The lamp burned all night.",
+      "Nobody asked why it burned.",
+      "The keeper wrote nothing down.",
+      "By morning the harbor was empty.",
+      "A second lamp was lit at dusk.",
+      "The ledger records only the oil."
+    ]
+  },
+  "operations": [
+    {
+      "op": "upload",
+      "doc": "A"
+    },
+    {
+      "op": "inquiry",
+      "doc": "A",
+      "sentence": 1,
+      "question": "Why did the lamp burn all night?"
+    },
+    {
+      "op": "inquiry",
+      "doc": "A",
+      "sentence": 2,
+      "question": "Who should have asked?"
+    },
+    {
+      "op": "inquiry",
+      "doc": "A",
+      "sentence": 3,
+      "question": "What did the keeper fail to record?"
+    },
+    {
+      "op": "inquiry",
+      "doc": "A",
+      "sentence": 4,
+      "question": "Where did the ships go?"
+    },
+    {
+      "op": "legacy_drop_table",
+      "table": "perspectives",
+      "label": "Labeled legacy-shape fixture: the workspace predates saved Perspective declarations. Direct SQL; not proof a user workflow produces this state."
+    }
+  ],
+  "current_state": {},
+  "declared_lineage": {
+    "inquiry_notes|recorded|unknown": 4,
+    "observations|recorded|derived": 6,
+    "source_documents|recorded|unknown": 1,
+    "source_extractions|recorded|derived": 6
+  },
+  "coverage": {
+    "missing_tables": [
+      "perspectives"
+    ],
+    "missing_columns": {},
+    "omitted_nonzero": {}
+  },
+  "edges": [
+    "Superficially similar evidence: separately identified inquiry questions satisfy P1 inquiry context but must not be relabeled as the governing question.",
+    "Unsupported coverage: with no perspectives table, frame readiness is unknown (unsupported_due_to_missing_history), not a known absence (contrast T1's not_yet_available)."
+  ],
+  "expected": {
+    "capabilities": {
+      "governing_question": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "read_source": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "mark_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "record_observation": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "preserve_question": {
+        "availability": "available",
+        "status": "already_exercised_under_supported_evidence",
+        "guide": "historically_exercised"
+      },
+      "organize_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "explore_perspective": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "form_interpretation": {
+        "availability": "unsupported_due_to_missing_history",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "unknown"
+      },
+      "challenge_interpretation": {
+        "availability": "not_yet_available",
+        "status": "not_yet_available",
+        "guide": "not_ready"
+      },
+      "review_blueprint": {
+        "availability": "not_yet_available",
+        "status": "not_yet_available",
+        "guide": "not_ready"
+      },
+      "review_lineage": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      }
+    },
+    "preferred_next": "governing_question",
+    "permitted_next": [
+      "governing_question"
+    ],
+    "must_not_suggest": [
+      "preserve_question",
+      "form_interpretation",
+      "challenge_interpretation",
+      "review_blueprint"
+    ],
+    "reason": "Four inquiry questions are retained but no governing question is established; inquiry questions are not silently promoted to it, so establishing a governing question is first.",
+    "derivation": "P2 ordinary rule (guided-study-cycle-v1.md): walk the ordered cycle and recommend the first step that is neither currently_supported nor historically_exercised; P1 owns readiness and history (capability-registry-v1.md)."
+  }
+}

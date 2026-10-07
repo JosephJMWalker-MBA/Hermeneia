@@ -1,0 +1,137 @@
+{
+  "schema": "hermeneia.synthetic-study-trajectory/v1",
+  "trajectory_id": "T2_early_interpreter_no_contradiction",
+  "planned_profile": "forms interpretations too early, little contradiction testing",
+  "fixture_class": "lawful",
+  "policy": {
+    "trajectory_policy_version": "p5-lab-1.0.0",
+    "registry_version": "1.1.0",
+    "evaluator_version": "1.1.0",
+    "guide_version": "1.0.0"
+  },
+  "documents": {
+    "A": [
+      "The lamp burned all night.",
+      "Nobody asked why it burned.",
+      "The keeper wrote nothing down.",
+      "By morning the harbor was empty.",
+      "A second lamp was lit at dusk.",
+      "The ledger records only the oil."
+    ]
+  },
+  "operations": [
+    {
+      "op": "upload",
+      "doc": "A"
+    },
+    {
+      "op": "set_governing_question",
+      "text": "What does the lamp signal to the harbor?"
+    },
+    {
+      "op": "save_perspective",
+      "key": "P1",
+      "label": "Light and vigilance",
+      "purpose": "Read light as watchfulness.",
+      "questions": [
+        "Who is the lamp for?"
+      ]
+    },
+    {
+      "op": "steward_interpretation",
+      "key": "I1",
+      "doc": "A",
+      "sentence": 1,
+      "perspective": "P1",
+      "text": "The burning lamp marks a vigil no one admits to keeping."
+    }
+  ],
+  "current_state": {},
+  "declared_lineage": {
+    "interpretations|recorded|human": 1,
+    "observations|recorded|derived": 6,
+    "perspectives|recorded|unknown": 1,
+    "source_documents|recorded|unknown": 1,
+    "source_extractions|recorded|derived": 6,
+    "workspace_investigation|current_snapshot|unknown": 1
+  },
+  "coverage": {
+    "missing_tables": [],
+    "missing_columns": {},
+    "omitted_nonzero": {}
+  },
+  "edges": [
+    "Partial history: earlier method steps (reading, marking) remain unrecorded and are not reconstructed as completed; the guide resumes at counterevidence instead."
+  ],
+  "expected": {
+    "capabilities": {
+      "governing_question": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "read_source": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "mark_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "record_observation": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "preserve_question": {
+        "availability": "available",
+        "status": "available",
+        "guide": "ready"
+      },
+      "organize_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "explore_perspective": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "form_interpretation": {
+        "availability": "available",
+        "status": "already_exercised_under_supported_evidence",
+        "guide": "historically_exercised"
+      },
+      "challenge_interpretation": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "review_blueprint": {
+        "availability": "not_yet_available",
+        "status": "not_yet_available",
+        "guide": "not_ready"
+      },
+      "review_lineage": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      }
+    },
+    "preferred_next": "challenge_interpretation",
+    "permitted_next": [
+      "challenge_interpretation"
+    ],
+    "must_not_suggest": [
+      "form_interpretation",
+      "read_source",
+      "mark_evidence",
+      "review_blueprint"
+    ],
+    "reason": "A governing question and a steward-authored canonical Interpretation are retained and no Blueprint exists, so the next step is to seek counterevidence for that interpretation.",
+    "derivation": "P2 retained-result resumption: governing question present + P1-supported attributable canonical Interpretation -> recommend challenge/counterevidence; an unaccepted proposal or unknown-origin Interpretation does not supply that anchor (guided-study-cycle-v1.md)."
+  }
+}

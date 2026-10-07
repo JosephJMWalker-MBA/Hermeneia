@@ -1,0 +1,151 @@
+{
+  "schema": "hermeneia.synthetic-study-trajectory/v1",
+  "trajectory_id": "T1_heavy_highlighter_weak_synthesis",
+  "planned_profile": "highlights heavily, weak synthesis",
+  "fixture_class": "lawful",
+  "policy": {
+    "trajectory_policy_version": "p5-lab-1.0.0",
+    "registry_version": "1.1.0",
+    "evaluator_version": "1.1.0",
+    "guide_version": "1.0.0"
+  },
+  "documents": {
+    "A": [
+      "The lamp burned all night.",
+      "Nobody asked why it burned.",
+      "The keeper wrote nothing down.",
+      "By morning the harbor was empty.",
+      "A second lamp was lit at dusk.",
+      "The ledger records only the oil."
+    ]
+  },
+  "operations": [
+    {
+      "op": "upload",
+      "doc": "A"
+    },
+    {
+      "op": "set_governing_question",
+      "text": "What does the lamp signal to the harbor?"
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 1
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 2
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 3
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 4
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 5
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 6
+    }
+  ],
+  "current_state": {},
+  "declared_lineage": {
+    "observations|recorded|derived": 6,
+    "reader_highlights|current_snapshot|unknown": 6,
+    "source_documents|recorded|unknown": 1,
+    "source_extractions|recorded|derived": 6,
+    "workspace_investigation|current_snapshot|unknown": 1
+  },
+  "coverage": {
+    "missing_tables": [],
+    "missing_columns": {},
+    "omitted_nonzero": {}
+  },
+  "edges": [
+    "Superficially similar evidence: six saved marks without current group labels must not make organize_evidence currently supported.",
+    "Volume is not progress: re-marking is not suggested to a heavy highlighter; no saved frame keeps interpretation not_ready (known absence, not unsupported)."
+  ],
+  "expected": {
+    "capabilities": {
+      "governing_question": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "read_source": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "mark_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "record_observation": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "preserve_question": {
+        "availability": "available",
+        "status": "available",
+        "guide": "ready"
+      },
+      "organize_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "explore_perspective": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "form_interpretation": {
+        "availability": "not_yet_available",
+        "status": "not_yet_available",
+        "guide": "not_ready"
+      },
+      "challenge_interpretation": {
+        "availability": "not_yet_available",
+        "status": "not_yet_available",
+        "guide": "not_ready"
+      },
+      "review_blueprint": {
+        "availability": "not_yet_available",
+        "status": "not_yet_available",
+        "guide": "not_ready"
+      },
+      "review_lineage": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      }
+    },
+    "preferred_next": "preserve_question",
+    "permitted_next": [
+      "preserve_question"
+    ],
+    "must_not_suggest": [
+      "read_source",
+      "mark_evidence",
+      "form_interpretation",
+      "challenge_interpretation",
+      "review_blueprint"
+    ],
+    "reason": "A governing question, readable source, saved marks and compiler Observations are current material; no inquiry question is retained, so preserving a question beside an Observation is the first unsupported step.",
+    "derivation": "P2 ordinary rule (guided-study-cycle-v1.md): walk the ordered cycle and recommend the first step that is neither currently_supported nor historically_exercised; P1 owns readiness and history (capability-registry-v1.md)."
+  }
+}

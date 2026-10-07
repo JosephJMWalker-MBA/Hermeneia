@@ -1,0 +1,218 @@
+{
+  "schema": "hermeneia.synthetic-study-trajectory/v1",
+  "trajectory_id": "T7_advanced_self_directed",
+  "planned_profile": "advanced self-directed investigator who should receive almost no nudges",
+  "fixture_class": "lawful",
+  "policy": {
+    "trajectory_policy_version": "p5-lab-1.0.0",
+    "registry_version": "1.1.0",
+    "evaluator_version": "1.1.0",
+    "guide_version": "1.0.0"
+  },
+  "documents": {
+    "A": [
+      "The lamp burned all night.",
+      "Nobody asked why it burned.",
+      "The keeper wrote nothing down.",
+      "By morning the harbor was empty.",
+      "A second lamp was lit at dusk.",
+      "The ledger records only the oil."
+    ]
+  },
+  "operations": [
+    {
+      "op": "upload",
+      "doc": "A"
+    },
+    {
+      "op": "set_governing_question",
+      "text": "What does the lamp signal to the harbor?"
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 1,
+      "theme_bucket": "light"
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 5,
+      "theme_bucket": "light"
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 6,
+      "evidence_bucket": "records"
+    },
+    {
+      "op": "inquiry",
+      "doc": "A",
+      "sentence": 2,
+      "question": "Who should have asked?"
+    },
+    {
+      "op": "save_perspective",
+      "key": "P1",
+      "label": "Light and vigilance",
+      "purpose": "Read light as watchfulness.",
+      "questions": [
+        "Who is the lamp for?"
+      ]
+    },
+    {
+      "op": "retain_perspective_run",
+      "perspective": {
+        "saved": "P1"
+      },
+      "doc": "A",
+      "sentence": 1,
+      "question": "What does the vigil conceal?"
+    },
+    {
+      "op": "steward_interpretation",
+      "key": "I1",
+      "doc": "A",
+      "sentence": 1,
+      "perspective": "P1",
+      "text": "The burning lamp marks a vigil no one admits to keeping."
+    },
+    {
+      "op": "model_proposal",
+      "key": "M1",
+      "doc": "A",
+      "sentence": 6
+    },
+    {
+      "op": "accept_proposal",
+      "proposal": "M1",
+      "rationale": "Consistent with the ledger passage."
+    },
+    {
+      "op": "ratify_blueprint",
+      "title": "The unasked lamp",
+      "thesis": "The lamp records a vigil the town declines to name.",
+      "sections": [
+        {
+          "claim": "The lamp burns without explanation.",
+          "observations": [
+            {
+              "doc": "A",
+              "sentence": 1
+            },
+            {
+              "doc": "A",
+              "sentence": 6
+            }
+          ],
+          "interpretations": [
+            "I1",
+            "M1"
+          ]
+        }
+      ]
+    }
+  ],
+  "current_state": {},
+  "declared_lineage": {
+    "architect_plans|recorded|derived": 1,
+    "inquiry_notes|recorded|unknown": 1,
+    "interpretations|recorded|accepted_model": 1,
+    "interpretations|recorded|human": 1,
+    "narrative_blueprints|recorded|derived": 1,
+    "observations|recorded|derived": 6,
+    "perspective_execution_receipts|recorded|model": 1,
+    "perspectives|recorded|unknown": 1,
+    "proposed_interpretations|decision|human": 1,
+    "proposed_interpretations|recorded|model": 1,
+    "reader_highlights|current_snapshot|unknown": 3,
+    "source_documents|recorded|unknown": 1,
+    "source_extractions|recorded|derived": 6,
+    "workspace_investigation|current_snapshot|unknown": 1
+  },
+  "coverage": {
+    "missing_tables": [],
+    "missing_columns": {},
+    "omitted_nonzero": {}
+  },
+  "edges": [
+    "Advanced users stay unblocked: every earlier step is current material or narrow retained history; only Lineage inspection is recommended and no Full Cycle is claimed."
+  ],
+  "expected": {
+    "capabilities": {
+      "governing_question": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "read_source": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "mark_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "record_observation": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "preserve_question": {
+        "availability": "available",
+        "status": "already_exercised_under_supported_evidence",
+        "guide": "historically_exercised"
+      },
+      "organize_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "explore_perspective": {
+        "availability": "available",
+        "status": "already_exercised_under_supported_evidence",
+        "guide": "historically_exercised"
+      },
+      "form_interpretation": {
+        "availability": "available",
+        "status": "already_exercised_under_supported_evidence",
+        "guide": "historically_exercised"
+      },
+      "challenge_interpretation": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      },
+      "review_blueprint": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "review_lineage": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      }
+    },
+    "preferred_next": "review_lineage",
+    "permitted_next": [
+      "review_lineage"
+    ],
+    "must_not_suggest": [
+      "governing_question",
+      "read_source",
+      "mark_evidence",
+      "record_observation",
+      "preserve_question",
+      "organize_evidence",
+      "explore_perspective",
+      "form_interpretation",
+      "review_blueprint"
+    ],
+    "reason": "Question, marks, groups, an inquiry question, a retained Perspective run, attributable human and accepted-model Interpretations and a Blueprint are all retained; the guide recommends only Lineage inspection.",
+    "derivation": "P2 retained-result resumption: governing question present + attributable canonical Interpretation + eligible Blueprint -> recommend Lineage inspection; no review or complete cycle is inferred (guided-study-cycle-v1.md)."
+  }
+}

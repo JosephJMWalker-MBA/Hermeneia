@@ -1,0 +1,191 @@
+{
+  "schema": "hermeneia.synthetic-study-trajectory/v1",
+  "trajectory_id": "T6_careful_worker_unresolved_questions",
+  "planned_profile": "careful evidence worker with several unresolved questions",
+  "fixture_class": "lawful",
+  "policy": {
+    "trajectory_policy_version": "p5-lab-1.0.0",
+    "registry_version": "1.1.0",
+    "evaluator_version": "1.1.0",
+    "guide_version": "1.0.0"
+  },
+  "documents": {
+    "A": [
+      "The lamp burned all night.",
+      "Nobody asked why it burned.",
+      "The keeper wrote nothing down.",
+      "By morning the harbor was empty.",
+      "A second lamp was lit at dusk.",
+      "The ledger records only the oil."
+    ],
+    "B": [
+      "The inspector arrived in spring.",
+      "He measured the tower twice.",
+      "His report praised the glass.",
+      "No one read it aloud."
+    ]
+  },
+  "operations": [
+    {
+      "op": "upload",
+      "doc": "A"
+    },
+    {
+      "op": "upload",
+      "doc": "B"
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 1,
+      "theme_bucket": "light"
+    },
+    {
+      "op": "mark",
+      "doc": "A",
+      "sentence": 6,
+      "evidence_bucket": "records"
+    },
+    {
+      "op": "mark",
+      "doc": "B",
+      "sentence": 2,
+      "theme_bucket": "inspection"
+    },
+    {
+      "op": "mark",
+      "doc": "B",
+      "sentence": 3,
+      "theme_bucket": "inspection"
+    },
+    {
+      "op": "inquiry",
+      "doc": "A",
+      "sentence": 1,
+      "question": "Why did the lamp burn all night?"
+    },
+    {
+      "op": "inquiry",
+      "doc": "A",
+      "sentence": 3,
+      "question": "What did the keeper fail to record?"
+    },
+    {
+      "op": "inquiry",
+      "doc": "B",
+      "sentence": 4,
+      "question": "Why was the report never read?"
+    },
+    {
+      "op": "save_perspective",
+      "key": "P1",
+      "label": "Records and silence",
+      "purpose": "Read what is written against what is not.",
+      "questions": [
+        "What is missing from the record?"
+      ]
+    },
+    {
+      "op": "exclude_document",
+      "doc": "B"
+    }
+  ],
+  "current_state": {
+    "governing_question": "Which passages can bear the vigil reading?"
+  },
+  "declared_lineage": {
+    "inquiry_notes|recorded|unknown": 2,
+    "observations|recorded|derived": 6,
+    "perspectives|recorded|unknown": 1,
+    "reader_highlights|current_snapshot|unknown": 2,
+    "source_documents|recorded|unknown": 1,
+    "source_extractions|recorded|derived": 6
+  },
+  "coverage": {
+    "missing_tables": [],
+    "missing_columns": {},
+    "omitted_nonzero": {
+      "source_documents": 1,
+      "source_extractions": 4,
+      "observations": 4,
+      "reader_highlights": 2,
+      "inquiry_notes": 1
+    }
+  },
+  "edges": [
+    "Partial history: an excluded document's marks and question are omitted and recorded as coverage gaps; extant eligible records still satisfy minimums and excluded records never count.",
+    "Explicit current question: a supplied governing question replaces the workspace singleton fallback (P1 contract)."
+  ],
+  "expected": {
+    "capabilities": {
+      "governing_question": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "read_source": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "mark_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "record_observation": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "preserve_question": {
+        "availability": "available",
+        "status": "already_exercised_under_supported_evidence",
+        "guide": "historically_exercised"
+      },
+      "organize_evidence": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "explore_perspective": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "currently_supported"
+      },
+      "form_interpretation": {
+        "availability": "available",
+        "status": "available",
+        "guide": "ready"
+      },
+      "challenge_interpretation": {
+        "availability": "not_yet_available",
+        "status": "not_yet_available",
+        "guide": "not_ready"
+      },
+      "review_blueprint": {
+        "availability": "not_yet_available",
+        "status": "not_yet_available",
+        "guide": "not_ready"
+      },
+      "review_lineage": {
+        "availability": "available",
+        "status": "unsupported_due_to_missing_history",
+        "guide": "ready"
+      }
+    },
+    "preferred_next": "form_interpretation",
+    "permitted_next": [
+      "form_interpretation"
+    ],
+    "must_not_suggest": [
+      "preserve_question",
+      "organize_evidence",
+      "mark_evidence",
+      "challenge_interpretation",
+      "review_blueprint"
+    ],
+    "reason": "Evidence is marked and grouped, questions are retained and a frame is saved, but no interpretation exists yet; forming a provisional interpretation is the first unsupported step.",
+    "derivation": "P2 ordinary rule (guided-study-cycle-v1.md): walk the ordered cycle and recommend the first step that is neither currently_supported nor historically_exercised; P1 owns readiness and history (capability-registry-v1.md)."
+  }
+}

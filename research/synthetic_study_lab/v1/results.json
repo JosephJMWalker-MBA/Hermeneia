@@ -1,0 +1,1481 @@
+{
+  "aggregate": {
+    "capability_state": {
+      "correct": 231,
+      "total": 231
+    },
+    "forbidden_suggestions": {
+      "count": 0,
+      "total": 7
+    },
+    "label_invariant": {
+      "passed": 7,
+      "total": 7
+    },
+    "next_step_permitted": {
+      "passed": 7,
+      "total": 7
+    },
+    "next_step_preferred": {
+      "passed": 7,
+      "total": 7
+    },
+    "no_manufactured_history": {
+      "passed": 7,
+      "total": 7
+    },
+    "order_invariant": {
+      "passed": 7,
+      "total": 7
+    },
+    "repeatable": {
+      "passed": 7,
+      "total": 7
+    },
+    "unsupported_vs_not_yet": {
+      "correct": 75,
+      "total": 75
+    }
+  },
+  "boundaries": "Synthetic disposable workspaces; production write boundaries plus one labeled legacy-shape operation; in-process fake adapters; no network, provider, credential store, real workspace or private text; evaluation data, not study history.",
+  "policy_version": "p5-lab-1.0.0",
+  "production": {
+    "evaluator_version": "1.1.0",
+    "guide_version": "1.0.0",
+    "registry_sha256": "eafda6b4081c50bdece9540a45c54c0404d0f7c0e05fcff750cf6f19626c9f75",
+    "registry_version": "1.1.0"
+  },
+  "schema": "hermeneia.synthetic-study-lab-results/v1",
+  "trajectories": [
+    {
+      "edges": [
+        "Superficially similar evidence: six saved marks without current group labels must not make organize_evidence currently supported.",
+        "Volume is not progress: re-marking is not suggested to a heavy highlighter; no saved frame keeps interpretation not_ready (known absence, not unsupported)."
+      ],
+      "expected": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "not_yet_available",
+            "guide": "not_ready",
+            "status": "not_yet_available"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "form_interpretation": {
+            "availability": "not_yet_available",
+            "guide": "not_ready",
+            "status": "not_yet_available"
+          },
+          "governing_question": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "available"
+          },
+          "read_source": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "not_yet_available",
+            "guide": "not_ready",
+            "status": "not_yet_available"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "must_not_suggest": [
+          "read_source",
+          "mark_evidence",
+          "form_interpretation",
+          "challenge_interpretation",
+          "review_blueprint"
+        ],
+        "permitted_next": [
+          "preserve_question"
+        ],
+        "preferred_next": "preserve_question"
+      },
+      "fixture_class": "lawful",
+      "materialized": {
+        "coverage": {
+          "missing_columns": {},
+          "missing_tables": [],
+          "omitted_nonzero": {}
+        },
+        "declared_lineage": {
+          "observations|recorded|derived": 6,
+          "reader_highlights|current_snapshot|unknown": 6,
+          "source_documents|recorded|unknown": 1,
+          "source_extractions|recorded|derived": 6,
+          "workspace_investigation|current_snapshot|unknown": 1
+        }
+      },
+      "metrics": {
+        "capability_state": {
+          "correct": 33,
+          "total": 33
+        },
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_labels_and_wording": true,
+        "invariant_to_storage_order": true,
+        "next_step_permitted": true,
+        "next_step_preferred": true,
+        "no_manufactured_history": {
+          "all_references_resolve": true,
+          "coverage_matches_declared": true,
+          "lineage_matches_declared": true,
+          "workspace_unchanged_by_evaluation": true
+        },
+        "repeatable_independent_materialization": true,
+        "repeatable_same_workspace": true,
+        "unsupported_vs_not_yet": {
+          "correct": 13,
+          "total": 13
+        }
+      },
+      "mismatches": [],
+      "planned_profile": "highlights heavily, weak synthesis",
+      "production": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "not_yet_available",
+            "availability_reason_code": "NO_INTERPRETATION",
+            "guide": "not_ready",
+            "reason_code": "NO_INTERPRETATION",
+            "status": "not_yet_available"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "form_interpretation": {
+            "availability": "not_yet_available",
+            "availability_reason_code": "MISSING_PERSPECTIVE",
+            "guide": "not_ready",
+            "reason_code": "MISSING_PERSPECTIVE",
+            "status": "not_yet_available"
+          },
+          "governing_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "READY",
+            "status": "available"
+          },
+          "read_source": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "not_yet_available",
+            "availability_reason_code": "NO_BLUEPRINT",
+            "guide": "not_ready",
+            "reason_code": "NO_BLUEPRINT",
+            "status": "not_yet_available"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "recommendation_reason": "Resume at the earliest step whose current material is not supported; missing prerequisites are explained.",
+        "recommended_step_id": "preserve_question"
+      },
+      "trajectory_id": "T1_heavy_highlighter_weak_synthesis"
+    },
+    {
+      "edges": [
+        "Partial history: earlier method steps (reading, marking) remain unrecorded and are not reconstructed as completed; the guide resumes at counterevidence instead."
+      ],
+      "expected": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "form_interpretation": {
+            "availability": "available",
+            "guide": "historically_exercised",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "governing_question": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "available"
+          },
+          "read_source": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "not_yet_available",
+            "guide": "not_ready",
+            "status": "not_yet_available"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "must_not_suggest": [
+          "form_interpretation",
+          "read_source",
+          "mark_evidence",
+          "review_blueprint"
+        ],
+        "permitted_next": [
+          "challenge_interpretation"
+        ],
+        "preferred_next": "challenge_interpretation"
+      },
+      "fixture_class": "lawful",
+      "materialized": {
+        "coverage": {
+          "missing_columns": {},
+          "missing_tables": [],
+          "omitted_nonzero": {}
+        },
+        "declared_lineage": {
+          "interpretations|recorded|human": 1,
+          "observations|recorded|derived": 6,
+          "perspectives|recorded|unknown": 1,
+          "source_documents|recorded|unknown": 1,
+          "source_extractions|recorded|derived": 6,
+          "workspace_investigation|current_snapshot|unknown": 1
+        }
+      },
+      "metrics": {
+        "capability_state": {
+          "correct": 33,
+          "total": 33
+        },
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_labels_and_wording": true,
+        "invariant_to_storage_order": true,
+        "next_step_permitted": true,
+        "next_step_preferred": true,
+        "no_manufactured_history": {
+          "all_references_resolve": true,
+          "coverage_matches_declared": true,
+          "lineage_matches_declared": true,
+          "workspace_unchanged_by_evaluation": true
+        },
+        "repeatable_independent_materialization": true,
+        "repeatable_same_workspace": true,
+        "unsupported_vs_not_yet": {
+          "correct": 10,
+          "total": 10
+        }
+      },
+      "mismatches": [],
+      "planned_profile": "forms interpretations too early, little contradiction testing",
+      "production": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "form_interpretation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "historically_exercised",
+            "reason_code": "ALREADY_EXERCISED",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "governing_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "READY",
+            "status": "available"
+          },
+          "read_source": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "not_yet_available",
+            "availability_reason_code": "NO_BLUEPRINT",
+            "guide": "not_ready",
+            "reason_code": "NO_BLUEPRINT",
+            "status": "not_yet_available"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "recommendation_reason": "An attributable Interpretation is retained. Check counterevidence next; earlier method actions are not reconstructed as completed.",
+        "recommended_step_id": "challenge_interpretation"
+      },
+      "trajectory_id": "T2_early_interpreter_no_contradiction"
+    },
+    {
+      "edges": [
+        "Superficially similar evidence: separately identified inquiry questions satisfy P1 inquiry context but must not be relabeled as the governing question.",
+        "Unsupported coverage: with no perspectives table, frame readiness is unknown (unsupported_due_to_missing_history), not a known absence (contrast T1's not_yet_available)."
+      ],
+      "expected": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "not_yet_available",
+            "guide": "not_ready",
+            "status": "not_yet_available"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "form_interpretation": {
+            "availability": "unsupported_due_to_missing_history",
+            "guide": "unknown",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "governing_question": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "guide": "historically_exercised",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "read_source": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "not_yet_available",
+            "guide": "not_ready",
+            "status": "not_yet_available"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "must_not_suggest": [
+          "preserve_question",
+          "form_interpretation",
+          "challenge_interpretation",
+          "review_blueprint"
+        ],
+        "permitted_next": [
+          "governing_question"
+        ],
+        "preferred_next": "governing_question"
+      },
+      "fixture_class": "lawful_then_legacy_shape",
+      "materialized": {
+        "coverage": {
+          "missing_columns": {},
+          "missing_tables": [
+            "perspectives"
+          ],
+          "omitted_nonzero": {}
+        },
+        "declared_lineage": {
+          "inquiry_notes|recorded|unknown": 4,
+          "observations|recorded|derived": 6,
+          "source_documents|recorded|unknown": 1,
+          "source_extractions|recorded|derived": 6
+        }
+      },
+      "metrics": {
+        "capability_state": {
+          "correct": 33,
+          "total": 33
+        },
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_labels_and_wording": true,
+        "invariant_to_storage_order": true,
+        "next_step_permitted": true,
+        "next_step_preferred": true,
+        "no_manufactured_history": {
+          "all_references_resolve": true,
+          "coverage_matches_declared": true,
+          "lineage_matches_declared": true,
+          "workspace_unchanged_by_evaluation": true
+        },
+        "repeatable_independent_materialization": true,
+        "repeatable_same_workspace": true,
+        "unsupported_vs_not_yet": {
+          "correct": 13,
+          "total": 13
+        }
+      },
+      "mismatches": [],
+      "planned_profile": "asks many questions but never promotes/resolves",
+      "production": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "not_yet_available",
+            "availability_reason_code": "NO_INTERPRETATION",
+            "guide": "not_ready",
+            "reason_code": "NO_INTERPRETATION",
+            "status": "not_yet_available"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "form_interpretation": {
+            "availability": "unsupported_due_to_missing_history",
+            "availability_reason_code": "COVERAGE_UNSUPPORTED",
+            "guide": "unknown",
+            "reason_code": "COVERAGE_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "governing_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "historically_exercised",
+            "reason_code": "ALREADY_EXERCISED",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "read_source": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "not_yet_available",
+            "availability_reason_code": "NO_BLUEPRINT",
+            "guide": "not_ready",
+            "reason_code": "NO_BLUEPRINT",
+            "status": "not_yet_available"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "recommendation_reason": "Resume at the earliest step whose current material is not supported; missing prerequisites are explained.",
+        "recommended_step_id": "governing_question"
+      },
+      "trajectory_id": "T3_many_questions_never_resolved"
+    },
+    {
+      "edges": [
+        "Superficially similar evidence: an unaccepted model proposal is current material but is not attributable formation and must not trigger the counterevidence resumption anchor.",
+        "Retained runs of built-in frames establish narrow explore_perspective history but are not saved frame declarations, so form_interpretation stays not_ready."
+      ],
+      "expected": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "guide": "historically_exercised",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "form_interpretation": {
+            "availability": "not_yet_available",
+            "guide": "not_ready",
+            "status": "not_yet_available"
+          },
+          "governing_question": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "available"
+          },
+          "read_source": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "not_yet_available",
+            "guide": "not_ready",
+            "status": "not_yet_available"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "must_not_suggest": [
+          "explore_perspective",
+          "challenge_interpretation",
+          "form_interpretation",
+          "review_blueprint"
+        ],
+        "permitted_next": [
+          "read_source"
+        ],
+        "preferred_next": "read_source"
+      },
+      "fixture_class": "lawful",
+      "materialized": {
+        "coverage": {
+          "missing_columns": {},
+          "missing_tables": [],
+          "omitted_nonzero": {}
+        },
+        "declared_lineage": {
+          "observations|recorded|derived": 6,
+          "perspective_execution_receipts|recorded|model": 2,
+          "proposed_interpretations|recorded|model": 1,
+          "source_documents|recorded|unknown": 1,
+          "source_extractions|recorded|derived": 6,
+          "workspace_investigation|current_snapshot|unknown": 1
+        }
+      },
+      "metrics": {
+        "capability_state": {
+          "correct": 33,
+          "total": 33
+        },
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_labels_and_wording": true,
+        "invariant_to_storage_order": true,
+        "next_step_permitted": true,
+        "next_step_preferred": true,
+        "no_manufactured_history": {
+          "all_references_resolve": true,
+          "coverage_matches_declared": true,
+          "lineage_matches_declared": true,
+          "workspace_unchanged_by_evaluation": true
+        },
+        "repeatable_independent_materialization": true,
+        "repeatable_same_workspace": true,
+        "unsupported_vs_not_yet": {
+          "correct": 11,
+          "total": 11
+        }
+      },
+      "mismatches": [],
+      "planned_profile": "overuses model Perspectives with little user-authored analysis",
+      "production": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "historically_exercised",
+            "reason_code": "ALREADY_EXERCISED",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "form_interpretation": {
+            "availability": "not_yet_available",
+            "availability_reason_code": "MISSING_PERSPECTIVE",
+            "guide": "not_ready",
+            "reason_code": "MISSING_PERSPECTIVE",
+            "status": "not_yet_available"
+          },
+          "governing_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "READY",
+            "status": "available"
+          },
+          "read_source": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "not_yet_available",
+            "availability_reason_code": "NO_BLUEPRINT",
+            "guide": "not_ready",
+            "reason_code": "NO_BLUEPRINT",
+            "status": "not_yet_available"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "recommendation_reason": "Resume at the earliest step whose current material is not supported; missing prerequisites are explained.",
+        "recommended_step_id": "read_source"
+      },
+      "trajectory_id": "T4_model_perspective_reliance"
+    },
+    {
+      "edges": [
+        "Blueprint review is not durably recorded: a saved Blueprint is current material, never evidence of review; the guide routes to Lineage inspection rather than claiming or demanding review."
+      ],
+      "expected": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "form_interpretation": {
+            "availability": "available",
+            "guide": "historically_exercised",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "governing_question": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "guide": "historically_exercised",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "read_source": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "must_not_suggest": [
+          "organize_evidence",
+          "mark_evidence",
+          "read_source",
+          "preserve_question",
+          "form_interpretation"
+        ],
+        "permitted_next": [
+          "review_lineage"
+        ],
+        "preferred_next": "review_lineage"
+      },
+      "fixture_class": "lawful",
+      "materialized": {
+        "coverage": {
+          "missing_columns": {},
+          "missing_tables": [],
+          "omitted_nonzero": {}
+        },
+        "declared_lineage": {
+          "architect_plans|recorded|derived": 1,
+          "inquiry_notes|recorded|unknown": 1,
+          "interpretations|recorded|human": 1,
+          "narrative_blueprints|recorded|derived": 1,
+          "observations|recorded|derived": 6,
+          "perspectives|recorded|unknown": 1,
+          "reader_highlights|current_snapshot|unknown": 3,
+          "source_documents|recorded|unknown": 1,
+          "source_extractions|recorded|derived": 6,
+          "workspace_investigation|current_snapshot|unknown": 1
+        }
+      },
+      "metrics": {
+        "capability_state": {
+          "correct": 33,
+          "total": 33
+        },
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_labels_and_wording": true,
+        "invariant_to_storage_order": true,
+        "next_step_permitted": true,
+        "next_step_preferred": true,
+        "no_manufactured_history": {
+          "all_references_resolve": true,
+          "coverage_matches_declared": true,
+          "lineage_matches_declared": true,
+          "workspace_unchanged_by_evaluation": true
+        },
+        "repeatable_independent_materialization": true,
+        "repeatable_same_workspace": true,
+        "unsupported_vs_not_yet": {
+          "correct": 9,
+          "total": 9
+        }
+      },
+      "mismatches": [],
+      "planned_profile": "organizes evidence but never reviews Blueprint",
+      "production": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "form_interpretation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "historically_exercised",
+            "reason_code": "ALREADY_EXERCISED",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "governing_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "historically_exercised",
+            "reason_code": "ALREADY_EXERCISED",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "read_source": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "recommendation_reason": "An attributable Interpretation and a Blueprint are retained. Inspect their Lineage; earlier actions and review history remain unknown.",
+        "recommended_step_id": "review_lineage"
+      },
+      "trajectory_id": "T5_organizer_never_reviews_blueprint"
+    },
+    {
+      "edges": [
+        "Partial history: an excluded document's marks and question are omitted and recorded as coverage gaps; extant eligible records still satisfy minimums and excluded records never count.",
+        "Explicit current question: a supplied governing question replaces the workspace singleton fallback (P1 contract)."
+      ],
+      "expected": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "not_yet_available",
+            "guide": "not_ready",
+            "status": "not_yet_available"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "form_interpretation": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "available"
+          },
+          "governing_question": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "guide": "historically_exercised",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "read_source": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "not_yet_available",
+            "guide": "not_ready",
+            "status": "not_yet_available"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "must_not_suggest": [
+          "preserve_question",
+          "organize_evidence",
+          "mark_evidence",
+          "challenge_interpretation",
+          "review_blueprint"
+        ],
+        "permitted_next": [
+          "form_interpretation"
+        ],
+        "preferred_next": "form_interpretation"
+      },
+      "fixture_class": "lawful",
+      "materialized": {
+        "coverage": {
+          "missing_columns": {},
+          "missing_tables": [],
+          "omitted_nonzero": {
+            "inquiry_notes": 1,
+            "observations": 4,
+            "reader_highlights": 2,
+            "source_documents": 1,
+            "source_extractions": 4
+          }
+        },
+        "declared_lineage": {
+          "inquiry_notes|recorded|unknown": 2,
+          "observations|recorded|derived": 6,
+          "perspectives|recorded|unknown": 1,
+          "reader_highlights|current_snapshot|unknown": 2,
+          "source_documents|recorded|unknown": 1,
+          "source_extractions|recorded|derived": 6
+        }
+      },
+      "metrics": {
+        "capability_state": {
+          "correct": 33,
+          "total": 33
+        },
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_labels_and_wording": true,
+        "invariant_to_storage_order": true,
+        "next_step_permitted": true,
+        "next_step_preferred": true,
+        "no_manufactured_history": {
+          "all_references_resolve": true,
+          "coverage_matches_declared": true,
+          "lineage_matches_declared": true,
+          "workspace_unchanged_by_evaluation": true
+        },
+        "repeatable_independent_materialization": true,
+        "repeatable_same_workspace": true,
+        "unsupported_vs_not_yet": {
+          "correct": 11,
+          "total": 11
+        }
+      },
+      "mismatches": [],
+      "planned_profile": "careful evidence worker with several unresolved questions",
+      "production": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "not_yet_available",
+            "availability_reason_code": "NO_INTERPRETATION",
+            "guide": "not_ready",
+            "reason_code": "NO_INTERPRETATION",
+            "status": "not_yet_available"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "form_interpretation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "READY",
+            "status": "available"
+          },
+          "governing_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "historically_exercised",
+            "reason_code": "ALREADY_EXERCISED",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "read_source": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "not_yet_available",
+            "availability_reason_code": "NO_BLUEPRINT",
+            "guide": "not_ready",
+            "reason_code": "NO_BLUEPRINT",
+            "status": "not_yet_available"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "recommendation_reason": "Resume at the earliest step whose current material is not supported; missing prerequisites are explained.",
+        "recommended_step_id": "form_interpretation"
+      },
+      "trajectory_id": "T6_careful_worker_unresolved_questions"
+    },
+    {
+      "edges": [
+        "Advanced users stay unblocked: every earlier step is current material or narrow retained history; only Lineage inspection is recommended and no Full Cycle is claimed."
+      ],
+      "expected": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "guide": "historically_exercised",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "form_interpretation": {
+            "availability": "available",
+            "guide": "historically_exercised",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "governing_question": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "guide": "historically_exercised",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "read_source": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "available",
+            "guide": "currently_supported",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "guide": "ready",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "must_not_suggest": [
+          "governing_question",
+          "read_source",
+          "mark_evidence",
+          "record_observation",
+          "preserve_question",
+          "organize_evidence",
+          "explore_perspective",
+          "form_interpretation",
+          "review_blueprint"
+        ],
+        "permitted_next": [
+          "review_lineage"
+        ],
+        "preferred_next": "review_lineage"
+      },
+      "fixture_class": "lawful",
+      "materialized": {
+        "coverage": {
+          "missing_columns": {},
+          "missing_tables": [],
+          "omitted_nonzero": {}
+        },
+        "declared_lineage": {
+          "architect_plans|recorded|derived": 1,
+          "inquiry_notes|recorded|unknown": 1,
+          "interpretations|recorded|accepted_model": 1,
+          "interpretations|recorded|human": 1,
+          "narrative_blueprints|recorded|derived": 1,
+          "observations|recorded|derived": 6,
+          "perspective_execution_receipts|recorded|model": 1,
+          "perspectives|recorded|unknown": 1,
+          "proposed_interpretations|decision|human": 1,
+          "proposed_interpretations|recorded|model": 1,
+          "reader_highlights|current_snapshot|unknown": 3,
+          "source_documents|recorded|unknown": 1,
+          "source_extractions|recorded|derived": 6,
+          "workspace_investigation|current_snapshot|unknown": 1
+        }
+      },
+      "metrics": {
+        "capability_state": {
+          "correct": 33,
+          "total": 33
+        },
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_labels_and_wording": true,
+        "invariant_to_storage_order": true,
+        "next_step_permitted": true,
+        "next_step_preferred": true,
+        "no_manufactured_history": {
+          "all_references_resolve": true,
+          "coverage_matches_declared": true,
+          "lineage_matches_declared": true,
+          "workspace_unchanged_by_evaluation": true
+        },
+        "repeatable_independent_materialization": true,
+        "repeatable_same_workspace": true,
+        "unsupported_vs_not_yet": {
+          "correct": 8,
+          "total": 8
+        }
+      },
+      "mismatches": [],
+      "planned_profile": "advanced self-directed investigator who should receive almost no nudges",
+      "production": {
+        "capabilities": {
+          "challenge_interpretation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "explore_perspective": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "historically_exercised",
+            "reason_code": "ALREADY_EXERCISED",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "form_interpretation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "historically_exercised",
+            "reason_code": "ALREADY_EXERCISED",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "governing_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "mark_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "organize_evidence": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "preserve_question": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "historically_exercised",
+            "reason_code": "ALREADY_EXERCISED",
+            "status": "already_exercised_under_supported_evidence"
+          },
+          "read_source": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "record_observation": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_blueprint": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "currently_supported",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          },
+          "review_lineage": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "guide": "ready",
+            "reason_code": "HISTORY_UNSUPPORTED",
+            "status": "unsupported_due_to_missing_history"
+          }
+        },
+        "recommendation_reason": "An attributable Interpretation and a Blueprint are retained. Inspect their Lineage; earlier actions and review history remain unknown.",
+        "recommended_step_id": "review_lineage"
+      },
+      "trajectory_id": "T7_advanced_self_directed"
+    }
+  ],
+  "trajectory_schema": "hermeneia.synthetic-study-trajectory/v1"
+}
