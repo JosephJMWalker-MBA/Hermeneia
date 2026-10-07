@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermeneia.companion-coach/v1",
+  "title": "Deterministic Companion Coach result (P6 v1)",
+  "description": "A current coaching projection over production P1 (Capability Registry) and P2 (Guided Study Cycle) outputs. Not study history; not proof of exposure, acceptance or benefit. Contract: docs/design/companion-coach-v1.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "policy_version", "inputs", "decision", "quiet_reason", "suggestion", "noticed", "why_now",
+               "next_action", "uncertainty", "blocked", "withheld", "not_history"],
+  "properties": {
+    "schema": {"const": "hermeneia.companion-coach/v1"},
+    "policy_version": {"const": "1.0.0"},
+    "inputs": {
+      "type": "object", "additionalProperties": false,
+      "required": ["guide_schema", "guide_version", "registry_version", "evaluator_version", "registry_sha256", "recommended_step_id"],
+      "properties": {
+        "guide_schema": {"const": "hermeneia.guided-study-cycle/v1"},
+        "guide_version": {"type": "string"},
+        "registry_version": {"type": "string"},
+        "evaluator_version": {"type": "string"},
+        "registry_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "recommended_step_id": {"type": "string"}
+      }
+    },
+    "decision": {"enum": ["suggest", "remain_quiet"]},
+    "quiet_reason": {"enum": [null, "NEXT_STEP_BLOCKED", "NEXT_STEP_UNKNOWN", "OPTIONAL_REVIEW_ONLY"]},
+    "suggestion": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["capability_id", "definition_version", "title", "action", "target_surface", "basis", "readiness"],
+          "properties": {
+            "capability_id": {"type": "string"},
+            "definition_version": {"type": "string"},
+            "title": {"type": "string"},
+            "action": {"type": "string"},
+            "target_surface": {"type": "string"},
+            "basis": {"enum": ["current_state", "durable_history"]},
+            "readiness": {
+              "type": "object", "additionalProperties": false,
+              "required": ["availability", "availability_reason_code", "prerequisites_satisfied", "prerequisites_missing"],
+              "properties": {
+                "availability": {"const": "available"},
+                "availability_reason_code": {"type": "string"},
+                "prerequisites_satisfied": {"type": "array", "items": {"type": "string"}},
+                "prerequisites_missing": {"type": "array", "maxItems": 0}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "noticed": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["fact", "count", "basis", "authorship", "statement", "evidence"],
+        "properties": {
+          "fact": {"enum": ["governing_question_present", "saved_reader_marks", "grouped_marks", "canonical_observations",
+                            "inquiry_questions", "saved_frames", "selected_frame", "retained_perspective_executions",
+                            "interpretation_material", "blueprints"]},
+          "count": {"type": "integer", "minimum": 1},
+          "basis": {"enum": ["current_state", "durable_history"]},
+          "authorship": {"type": ["string", "null"]},
+          "statement": {"type": "string"},
+          "evidence": {"type": "array", "minItems": 1}
+        }
+      }
+    },
+    "why_now": {"type": ["string", "null"]},
+    "next_action": {"type": ["string", "null"]},
+    "uncertainty": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["code", "statement", "source"],
+        "properties": {
+          "code": {"enum": ["ABSENCE_NOT_PROOF", "HISTORY_NOT_RECORDED", "COVERAGE_INCOMPLETE", "RECORDS_OMITTED", "AUTHORSHIP_UNKNOWN"]},
+          "statement": {"type": "string"},
+          "source": {"type": "string"}
+        }
+      }
+    },
+    "blocked": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["capability_id", "availability", "reason_code", "reason", "prerequisites_missing"],
+          "properties": {
+            "capability_id": {"type": "string"},
+            "availability": {"enum": ["not_yet_available", "unsupported_due_to_missing_history"]},
+            "reason_code": {"type": "string"},
+            "reason": {"type": "string"},
+            "prerequisites_missing": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      ]
+    },
+    "withheld": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["capability_id", "code", "detail"],
+        "properties": {
+          "capability_id": {"type": "string"},
+          "code": {"enum": ["PREREQUISITE_MISSING", "COVERAGE_UNSUPPORTED", "LATER_IN_CYCLE",
+                            "NOT_RECONSTRUCTED_BY_RESUMPTION", "ALREADY_CURRENT_MATERIAL", "NARROW_HISTORY_RETAINED"]},
+          "detail": {"type": "string"}
+        }
+      }
+    },
+    "not_history": {"type": "string"}
+  }
+}
