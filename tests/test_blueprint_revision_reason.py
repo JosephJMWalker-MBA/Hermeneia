@@ -1,10 +1,12 @@
-"""Frozen witness for #241: a Blueprint revision without a reason is refused.
+"""Promoted regression for #241: a Blueprint revision without a reason is refused.
 
 `_persist_blueprint_revision_and_compile` requires a revision reason, and the
 reason is the steward's recorded rationale on an append-only, immutable
 SupersessionRelation (Constitution Art. X). JSON null means "not given",
 exactly as an absent or blank reason does; it never becomes the rationale
-"None". Synthetic workspace; no provider calls.
+"None". Commit 7e645ff preserves the negative version; the repair demonstrated
+a strict unexpected pass before the expected failure was removed.
+Synthetic workspace; no provider calls.
 """
 from __future__ import annotations
 
@@ -50,8 +52,6 @@ def _state(db) -> tuple[int, list]:
         conn.close()
 
 
-@pytest.mark.xfail(strict=True, raises=FabricatedRationale,
-                   reason="#241: reason null becomes the rationale 'None'; repair requires its own packet")
 def test_null_reason_is_refused_and_records_nothing(predecessor):
     db, client, obs, predecessor_id = predecessor
     before = _state(db)

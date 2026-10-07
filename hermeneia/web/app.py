@@ -7491,7 +7491,8 @@ Return ONLY valid JSON, no markdown, no explanation:
             return jsonify({"error": "database not found"}), 404
         payload = _json_body()
         predecessor_id = str(payload.get("predecessor_id", "")).strip()
-        reason = str(payload.get("reason", "")).strip()
+        # The steward's rationale: absent, null and blank all mean "not given" (#241).
+        reason = _optional_text(payload, "reason") or ""
         proposed = payload.get("proposed_blueprint", payload.get("candidate"))
         if not predecessor_id:
             return jsonify({"error": "predecessor_id is required"}), 400
