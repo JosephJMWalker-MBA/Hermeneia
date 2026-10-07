@@ -14,6 +14,10 @@ class Repository:
     def __init__(self, db_path: str | Path):
         self.store = SQLiteStore(db_path)
 
+    def transaction(self):
+        """One all-or-nothing transaction for a compile's evidence chain."""
+        return self.store.atomic()
+
     def register_source_document(self, doc: dict) -> None:
         self.store.insert_source_document(doc)
 

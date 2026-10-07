@@ -7,6 +7,8 @@ asserted byte-for-byte.
 """
 from __future__ import annotations
 
+import hashlib
+
 import json
 import sqlite3
 from datetime import datetime, timezone
@@ -30,7 +32,9 @@ def _now() -> str:
 
 def _seed(db_path: Path) -> str:
     SQLiteStore(db_path).close()
-    doc_id = "a" * 64
+    # The seeded SourceDocument is the uploaded source: its identity is the
+    # SHA-256 of those bytes (WBS §4; docs/15_Storage.md).
+    doc_id = hashlib.sha256(b'%PDF-1.7 fake gatsby').hexdigest()
     conn = sqlite3.connect(db_path)
     conn.execute(
         """INSERT INTO source_documents

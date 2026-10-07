@@ -21,6 +21,8 @@ Idempotent: running bootstrap twice is safe — all INSERT OR IGNORE.
 """
 from __future__ import annotations
 
+from .target import resolve_db_target
+
 import json
 import sqlite3
 import sys
@@ -44,10 +46,7 @@ def _open_db(db_path: Path) -> sqlite3.Connection:
 
 
 def _resolve_db(bundle_or_db: str | None, default: str = "build/hermeneia.db") -> Path:
-    if bundle_or_db is None:
-        return Path(default)
-    p = Path(bundle_or_db)
-    return p if (p.suffix == ".db" or p.name.endswith(".db")) else Path(default)
+    return resolve_db_target(bundle_or_db, default)
 
 
 def _obs_id_by_n(conn: sqlite3.Connection, n: int) -> str | None:

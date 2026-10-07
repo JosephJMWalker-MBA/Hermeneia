@@ -17,6 +17,7 @@ from hermeneia.web.app import create_app
 
 sys.path.insert(0, str(Path(__file__).parent))
 from test_constitutional_p0 import _seed_full_chain
+from test_ratify_draft_candidate import preview_candidates, ratify_candidate
 
 
 @pytest.fixture
@@ -28,12 +29,12 @@ def seeded(tmp_path):
     return db_path, ids, create_app(db_path=db_path).test_client()
 
 
-def test_ratified_draft_appears_in_ledger_with_provenance(seeded):
+def test_ratified_draft_appears_in_ledger_with_provenance(seeded, monkeypatch):
     _, ids, client = seeded
     exact = "The ratified artifact — exact bytes for the record ledger."
-    ratify = client.post("/api/pipeline/ratify-draft", json={
-        "plan_id": ids["plan_id"], "provider": "record-test",
-        "profile_slug": "literary-en", "text": exact})
+    [preview] = preview_candidates(client, monkeypatch, ids["plan_id"], [exact],
+                                   provider="record-test", profile="literary-en")
+    ratify = ratify_candidate(client, preview)
     assert ratify.status_code == 201, ratify.get_data(as_text=True)
     nid = ratify.get_json()["id"]
 
@@ -47,12 +48,12 @@ def test_ratified_draft_appears_in_ledger_with_provenance(seeded):
     assert row["blueprint"]["thesis"]
 
 
-def test_record_detail_returns_exact_text_and_lineage_surface(seeded):
+def test_record_detail_returns_exact_text_and_lineage_surface(seeded, monkeypatch):
     _, ids, client = seeded
     exact = "Verbatim record bytes ✦ 98765."
-    nid = client.post("/api/pipeline/ratify-draft", json={
-        "plan_id": ids["plan_id"], "provider": "record-test",
-        "profile_slug": "literary-en", "text": exact}).get_json()["id"]
+    [preview] = preview_candidates(client, monkeypatch, ids["plan_id"], [exact],
+                                   provider="record-test", profile="literary-en")
+    nid = ratify_candidate(client, preview).get_json()["id"]
 
     detail = client.get(f"/api/reader/narratives/{nid}").get_json()
     assert detail["rendered_narrative"]["text"] == exact          # exact saved bytes
@@ -87,13 +88,9 @@ def test_artist_preview_stays_out_of_record_until_exact_save(tmp_path):
     assert preview.get_json()["persisted"] is False
     assert client.get("/api/reader/narratives").get_json()["count"] == 0
 
-    exact = "Preview text saved exactly — no second Artist call."
-    ratify = client.post("/api/pipeline/ratify-draft", json={
-        "plan_id": ids["plan_id"],
-        "provider": "null",
-        "profile_slug": "literary-en",
-        "text": exact,
-    })
+    # The exact previewed bytes, named by their server-held candidate (#235).
+    exact = preview.get_json()["text"]
+    ratify = ratify_candidate(client, preview.get_json())
 
     assert ratify.status_code == 201, ratify.get_data(as_text=True)
     payload = client.get("/api/reader/narratives").get_json()

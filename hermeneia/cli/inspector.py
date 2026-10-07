@@ -13,6 +13,8 @@ OBS-N references the Nth observation ordered by (page, paragraph, sentence).
 """
 from __future__ import annotations
 
+from .target import resolve_db_target
+
 import json
 import sqlite3
 import sys
@@ -40,16 +42,7 @@ def _open_db(db_path: Path) -> sqlite3.Connection:
 
 
 def _resolve_db(bundle_or_db: str | None, default: str = "build/hermeneia.db") -> Path:
-    if bundle_or_db is None:
-        return Path(default)
-    p = Path(bundle_or_db)
-    if p.suffix == ".db" or p.name.endswith(".db"):
-        return p
-    if p.is_dir() and p.name.endswith(".herm"):
-        candidate = p.parent / "hermeneia.db"
-        if candidate.exists():
-            return candidate
-    return Path(default)
+    return resolve_db_target(bundle_or_db, default)
 
 
 def _obs_by_index(conn: sqlite3.Connection, n: int) -> Optional[dict]:
@@ -373,12 +366,12 @@ def cmd_trace(obs_ref: str, bundle_or_db: str | None = None) -> None:
 
     Layers that don't yet exist are shown as '(not yet generated)'.
     As later pipeline stages are implemented, this fills in automatically.
+    A trace is a lineage inspection: it reads tables as they are and never
+    creates schema (CI-012), so absent layer tables read as not generated.
     """
-    from ..storage.sqlite import ensure_architect_tables
-
     db_path = _resolve_db(bundle_or_db)
     conn = _open_db(db_path)
-    ensure_architect_tables(conn)
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
 
     n = _parse_obs_ref(obs_ref)
     obs = _obs_by_index(conn, n)
@@ -400,36 +393,35 @@ def cmd_trace(obs_ref: str, bundle_or_db: str | None = None) -> None:
     terms = [r[0] for r in terms_rows]
 
     # Layer 1: interpretations (steward-authored)
-    interpretations = conn.execute(
-        "SELECT perspective, evidential_status, confidence, source, text, created_at "
-        "FROM interpretations WHERE observation_id = ? ORDER BY created_at",
-        (obs["id"],),
-    ).fetchall()
-    interpretations = [dict(r) for r in interpretations]
+    interpretations = []
+    if "interpretations" in tables:
+        interpretations = [dict(r) for r in conn.execute(
+            "SELECT perspective, evidential_status, confidence, source, text, created_at "
+            "FROM interpretations WHERE observation_id = ? ORDER BY created_at",
+            (obs["id"],),
+        ).fetchall()]
 
     # Layer 3: blueprints that cite this observation
-    blueprints = conn.execute(
-        """
-        SELECT nb.id, nb.title, nb.thesis, nb.sections, nb.created_at
-        FROM narrative_blueprints nb
-        JOIN blueprint_observation_links bol ON bol.blueprint_id = nb.id
-        WHERE bol.observation_id = ?
-        ORDER BY nb.created_at
-        """,
-        (obs["id"],),
-    ).fetchall()
-    blueprints = [dict(r) for r in blueprints]
+    blueprints = []
+    if {"narrative_blueprints", "blueprint_observation_links"} <= tables:
+        blueprints = [dict(r) for r in conn.execute(
+            """
+            SELECT nb.id, nb.title, nb.thesis, nb.sections, nb.created_at
+            FROM narrative_blueprints nb
+            JOIN blueprint_observation_links bol ON bol.blueprint_id = nb.id
+            WHERE bol.observation_id = ?
+            ORDER BY nb.created_at
+            """,
+            (obs["id"],),
+        ).fetchall()]
 
     has_interpretation = len(interpretations) > 0
     has_blueprint = len(blueprints) > 0
 
-    from ..storage.sqlite import ensure_artist_tables
-    ensure_artist_tables(conn)
-
     # Layer 4: Architect Plan (Composition layer 1)
     architect_plan = None
     architect_stale = False
-    if has_blueprint:
+    if has_blueprint and "architect_plans" in tables:
         import json as _json2
         from ..storage.hashing import make_blueprint_id as _make_bp_hash
         bp = blueprints[0]
@@ -445,7 +437,7 @@ def cmd_trace(obs_ref: str, bundle_or_db: str | None = None) -> None:
 
     # Layer 4b: Rendered Narrative (Artist)
     rendered_narrative = None
-    if architect_plan is not None:
+    if architect_plan is not None and "rendered_narratives" in tables:
         rn_row = conn.execute(
             "SELECT id, provider, created_at FROM rendered_narratives "
             "WHERE architect_plan_id = ? ORDER BY created_at DESC LIMIT 1",
@@ -456,7 +448,7 @@ def cmd_trace(obs_ref: str, bundle_or_db: str | None = None) -> None:
 
     # Layer 4c: Critic validation for the selected RenderedNarrative
     validation_report = None
-    if rendered_narrative is not None:
+    if rendered_narrative is not None and "validation_reports" in tables:
         vr_row = conn.execute(
             "SELECT id, semantic_fidelity, approved, created_at "
             "FROM validation_reports WHERE rendered_narrative_id = ? "

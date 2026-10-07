@@ -727,16 +727,20 @@ class OllamaArtistProvider:
             "endpoint": self._host,
             "sdk_version": sdk_ver,
             "request_schema_version": "1",
+            "request_api": "chat",
             "constitutional_profile": CONSTITUTIONAL_PROFILE,
         }
 
     def render(self, prompt: str) -> str:
-        response = self._client.generate(
+        response = self._client.chat(
             model=self._model,
-            prompt=prompt,
+            messages=[{"role": "user", "content": prompt}],
             stream=False,
         )
-        return str(response["response"])
+        text = response["message"]["content"]
+        if not isinstance(text, str):
+            raise ValueError("Ollama chat response did not contain assistant text")
+        return text
 
     def test_connection(self) -> None:
         models = self._client.list()

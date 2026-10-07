@@ -22,7 +22,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, jsonify, make_response, request, send_from_directory
+from flask import Flask, g, jsonify, make_response, request, send_from_directory
 
 from ..concordance import (
     MATCHING_MODE,
@@ -40,6 +40,9 @@ from ..cli.health import (
     observation_count,
     perspective_count,
 )
+# Imported at load: a first import inside a request would bind artist_service's
+# provider lookup to whatever is installed at that moment.
+from ..narrative.artist_service import excluded_evidence_ids
 from ..narrative.provider_registry import (
     ModelCatalog,
     ModelCatalogEntry,
@@ -224,6 +227,11 @@ def create_app(
     # steward decision names this server-owned run. Never accept reposted output.
     perspective_execution_candidates: dict[str, dict] = {}
     perspective_execution_candidates_lock = threading.RLock()
+    # Previewed Artist drafts are held the same way: ratification names the
+    # server-owned candidate, so its bytes and CI-011 execution record are the
+    # invocation's, not a client assertion.
+    artist_preview_candidates: dict[str, dict] = {}
+    artist_preview_candidates_lock = threading.RLock()
     _connections_settings_lock = threading.RLock()
     _connections_settings_load_error: str | None = None
     try:
@@ -601,6 +609,52 @@ def create_app(
         conn.execute("PRAGMA foreign_keys=ON")
         return conn
 
+    def _request_write_conn() -> sqlite3.Connection:
+        """Read-write connection whose lifetime ends with the request.
+
+        Teardown rolls back a transaction an exception left open and closes the
+        connection, so one failed write cannot keep the workspace locked.
+        """
+        conn = _conn_rw()
+        g.setdefault("hermeneia_write_conns", []).append(conn)
+        return conn
+
+    @app.teardown_request
+    def _release_request_write_conns(_exc):
+        for conn in g.pop("hermeneia_write_conns", []):
+            try:
+                if conn.in_transaction:
+                    conn.rollback()
+            except sqlite3.ProgrammingError:
+                pass  # already closed by the route
+            conn.close()
+
+    class _JSONBodyError(Exception):
+        """A JSON request body that is not an object."""
+
+    @app.errorhandler(_JSONBodyError)
+    def _json_body_error(_exc):
+        return jsonify({"error": "request body must be a JSON object"}), 400
+
+    def _json_body(*, force: bool = False) -> dict:
+        """The request's JSON object body; {} when absent; a 400 when it is another JSON value."""
+        payload = request.get_json(force=True) if force else request.get_json(silent=True)
+        if payload and not isinstance(payload, dict):
+            raise _JSONBodyError()
+        return payload or {}
+
+    def _optional_text(payload: dict, key: str) -> str | None:
+        """An optional JSON text field: absent, null and blank all mean not given."""
+        value = payload.get(key)
+        return (str(value).strip() or None) if value is not None else None
+
+    def _int_arg(name: str, default: int) -> int:
+        """An integer query parameter; a malformed value falls back to the default."""
+        try:
+            return int(request.args.get(name, default))
+        except (TypeError, ValueError):
+            return default
+
     def _store() -> SQLiteStore:
         return SQLiteStore(db_path)
 
@@ -756,8 +810,9 @@ def create_app(
     def _normalize_blueprint_candidate(value: object) -> tuple[dict | None, str | None]:
         if not isinstance(value, dict):
             return None, "proposed_blueprint must be an object"
-        title = str(value.get("title", "")).strip()
-        thesis = str(value.get("thesis", "")).strip()
+        # null means "not given", so it meets the same refusal as an absent field (#243).
+        title = _optional_text(value, "title") or ""
+        thesis = _optional_text(value, "thesis") or ""
         raw_sections = value.get("sections")
         if not title:
             return None, "title is required"
@@ -770,7 +825,7 @@ def create_app(
         for index, raw_section in enumerate(raw_sections):
             if not isinstance(raw_section, dict):
                 return None, f"section {index + 1} must be an object"
-            claim = str(raw_section.get("claim", "")).strip()
+            claim = _optional_text(raw_section, "claim") or ""
             if not claim:
                 return None, f"section {index + 1} claim is required"
             supporting_observations = raw_section.get("supporting_observations", [])
@@ -817,6 +872,10 @@ def create_app(
             missing = [iid for iid in interp_ids if iid not in found_interps]
             if missing:
                 return "unknown supporting_interpretations: " + ", ".join(missing)
+        # Excluded evidence is a scope refusal (403), not a malformed candidate.
+        excluded = excluded_evidence_ids(conn, obs_ids, interp_ids)
+        if excluded:
+            raise _ScopeAccessError("supporting evidence is excluded_from_analysis: " + ", ".join(excluded))
         return None
 
     def _persist_exact_blueprint_and_compile(
@@ -1836,6 +1895,32 @@ def create_app(
         if selected_model:
             kwargs["model"] = selected_model
         return kwargs
+
+    def _e10_participant_adapters(participants: list[tuple[str, str, str]]) -> tuple[dict, list[dict]]:
+        """Construct every requested participant's adapter before anything is attributed to it (#234)."""
+        adapters: dict[str, object] = {}
+        unavailable: list[dict] = []
+        for key, label, _model in participants:
+            provider_id = _E10_PARTICIPANTS[key][1]
+            try:
+                adapters[key] = active_provider_registry.create(provider_id, **_provider_kwargs(provider_id))
+            except Exception as exc:
+                unavailable.append({"participant": key, "label": label, "provider_id": provider_id,
+                                    "error": str(exc)})
+        return adapters, unavailable
+
+    def _e10_unavailable_response(unavailable: list[dict]):
+        labels = ", ".join(item["label"] for item in unavailable)
+        return jsonify({
+            "error": f"Selected participants could not run: {labels}. No proposals were created.",
+            "unavailable_participants": unavailable,
+            "created_count": 0,
+        }), 409
+
+    def _e10_executed_model(adapter: object, fallback: str | None) -> str | None:
+        execution_config = getattr(adapter, "execution_config", None)
+        config = execution_config() if callable(execution_config) else {}
+        return config.get("model_id") or fallback
 
     def _provider_connection_kwargs(provider_id: str, *, api_key: str | None = None) -> dict:
         kwargs: dict[str, object] = {}
@@ -3276,7 +3361,7 @@ def create_app(
     @app.route("/api/workspaces", methods=["GET", "POST"])
     def api_workspaces():
         if request.method == "POST":
-            body = request.get_json(silent=True) or {}
+            body = _json_body()
             raw_name = body.get("name") if isinstance(body, dict) else None
             name = str(raw_name or "").strip()
             try:
@@ -3339,7 +3424,7 @@ def create_app(
     @app.route("/api/search")
     def api_search():
         q = request.args.get("q", "").strip()
-        limit = min(int(request.args.get("limit", 15)), 50)
+        limit = min(_int_arg("limit", 15), 50)
 
         if not q or not db_path.exists():
             return jsonify({**_empty_literal_concordance_response(q), "results": []})
@@ -3820,7 +3905,7 @@ def create_app(
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         status    = str(payload.get("status", "")).strip()
         rationale = str(payload.get("rationale", "")).strip()
 
@@ -3874,7 +3959,7 @@ def create_app(
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         name = str(payload.get("name") or "").strip()
         artist_prompt = str(payload.get("artist_prompt") or "").strip()
         if not name:
@@ -4323,7 +4408,7 @@ def create_app(
 
         q = request.args.get("q", "").strip()
         filter_name = request.args.get("filter", "all").strip().lower()
-        limit = min(max(int(request.args.get("limit", 40)), 1), 100)
+        limit = min(max(_int_arg("limit", 40), 1), 100)
 
         conn = _conn()
         rows = conn.execute(
@@ -4499,7 +4584,7 @@ def create_app(
 
     @app.route("/api/perspective/saved", methods=["POST"])
     def api_perspective_saved_create():
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         draft = payload.get("perspective_draft")
         try:
             declared_by = normalize_declared_by(payload.get("declared_by"))
@@ -4522,7 +4607,7 @@ def create_app(
 
     @app.route("/api/perspective/saved/<path:perspective_id>/revisions", methods=["POST"])
     def api_perspective_saved_revision(perspective_id: str):
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         draft = payload.get("perspective_draft")
         try:
             declared_by = normalize_declared_by(payload.get("declared_by"))
@@ -4662,7 +4747,7 @@ def create_app(
 
     @app.route("/api/perspective/run", methods=["POST"])
     def api_perspective_run():
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         question = str(payload.get("question") or "").strip()
         raw_model = str(payload.get("model") or "").strip()
         try:
@@ -4835,7 +4920,7 @@ def create_app(
 
     @app.route("/api/perspective/room", methods=["POST"])
     def api_perspective_room():
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         question = str(payload.get("question") or "").strip()
         raw_model = str(payload.get("model") or "").strip()
         if not question:
@@ -5001,7 +5086,7 @@ def create_app(
                 "error": f"{label} has no registered provider adapter"
             }), 409
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         provider_meta = active_provider_registry.definition(provider_id).metadata()
         source_state = _credential_source_for_provider(provider_meta)
 
@@ -5159,7 +5244,7 @@ def create_app(
                 "error": f"{label} has no registered provider adapter"
             }), 409
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         model = str(payload.get("model") or "").strip()
         if not model:
             return jsonify({"error": "model is required"}), 400
@@ -5221,7 +5306,7 @@ def create_app(
 
     @app.route("/api/e10/ollama/host", methods=["PUT"])
     def api_e10_ollama_host():
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         host = str(payload.get("host") or "").strip()
         if not host:
             return jsonify({"error": "host is required"}), 400
@@ -5251,7 +5336,7 @@ def create_app(
 
     @app.route("/api/e10/ollama/install", methods=["POST"])
     def api_e10_ollama_install_model():
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         participant = str(payload.get("participant") or "local").strip()
         participant_info = _e10_participant(participant)
         if participant_info is None:
@@ -5568,9 +5653,9 @@ def create_app(
         if role not in _CALIBRATION_ROLES:
             return jsonify({"error": f"unknown role: {role}"}), 400
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         status = payload.get("status", "").strip().lower()
-        note = str(payload.get("note", "")).strip() or None
+        note = _optional_text(payload, "note")  # absent, null and blank: no note (#245)
         valid_statuses = {"approved", "rejected", "untested", "caution"}
         if status not in valid_statuses:
             return jsonify({
@@ -5712,7 +5797,7 @@ def create_app(
             return jsonify({"error": "database not found"}), 404
 
         from ..explorer.interpreter import VALID_RESPONSE_MODES
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         observation_id = str(payload.get("observation_id", "")).strip()
         raw_participants = payload.get("participants") or []
         response_mode = str(payload.get("response_mode") or "interpretive").strip()
@@ -5750,6 +5835,9 @@ def create_app(
             "observation_source": obs_doc_row["original_filename"] if obs_doc_row else None,
             "observation_role": (obs_doc_row["source_role"] or "primary") if obs_doc_row else "primary",
         }
+        adapters, unavailable = _e10_participant_adapters(participants)
+        if unavailable:
+            return _e10_unavailable_response(unavailable)
 
         store = _store()
         try:
@@ -5761,13 +5849,7 @@ def create_app(
             for key, label, model in participants:
                 _provider_id = _E10_PARTICIPANTS[key][1]
                 selected_model, _ = _selected_model_for_provider(_provider_id, model)
-                try:
-                    _adapter = active_provider_registry.create(
-                        _provider_id,
-                        **_provider_kwargs(_provider_id),
-                    )
-                except Exception:
-                    _adapter = active_provider_registry.create("null")
+                _adapter = adapters[key]
                 import time as _time
                 _gen_start = _time.monotonic()
                 _gen_error = None
@@ -5811,7 +5893,7 @@ def create_app(
                     perspective=label,
                     text=interp_text,
                     evidential_status="speculative",
-                    generating_model=selected_model or model,
+                    generating_model=_e10_executed_model(_adapter, selected_model or model),
                     prompt_reference=prompt_used,
                     prompt_reference_type="full_text",
                     conn=store,
@@ -5879,7 +5961,7 @@ def create_app(
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         raw_obs_ids = payload.get("observation_ids") or []
         raw_participants = payload.get("participants") or []
 
@@ -5922,17 +6004,13 @@ def create_app(
             "observation_role": (obs_doc_row["source_role"] or "primary") if obs_doc_row else "primary",
         }
 
+        adapters, unavailable = _e10_participant_adapters(participants)
+        if unavailable:
+            return _e10_unavailable_response(unavailable)
+
         # Bucketing pass — ephemeral, never stored
-        bucket_provider_id = _E10_PARTICIPANTS[participants[0][0]][1]
         try:
-            _bucketing_provider = active_provider_registry.create(
-                bucket_provider_id,
-                **_provider_kwargs(bucket_provider_id),
-            )
-        except Exception:
-            _bucketing_provider = active_provider_registry.create("null")
-        try:
-            buckets = generate_candidate_buckets(obs_rows, _bucketing_provider)
+            buckets = generate_candidate_buckets(obs_rows, adapters[participants[0][0]])
         except BucketingError as exc:
             return jsonify({"error": f"Bucketing failed: {exc}"}), 400
 
@@ -5974,13 +6052,7 @@ def create_app(
 
                     _provider_id = _E10_PARTICIPANTS[key][1]
                     selected_model, _ = _selected_model_for_provider(_provider_id, model)
-                    try:
-                        _adapter = active_provider_registry.create(
-                            _provider_id,
-                            **_provider_kwargs(_provider_id),
-                        )
-                    except Exception:
-                        _adapter = active_provider_registry.create("null")
+                    _adapter = adapters[key]
 
                     try:
                         interp_text, prompt_used = generate_interpretation_from_bucket(
@@ -5997,7 +6069,7 @@ def create_app(
                         perspective=label,
                         text=interp_text,
                         evidential_status="speculative",
-                        generating_model=selected_model or model,
+                        generating_model=_e10_executed_model(_adapter, selected_model or model),
                         prompt_reference=prompt_used,
                         prompt_reference_type="full_text",
                         conn=store,
@@ -6039,7 +6111,7 @@ def create_app(
 
     @app.route("/api/e10/proposals/<proposal_id>/accept", methods=["POST"])
     def api_e10_accept_proposal(proposal_id: str):
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         steward_id = str(payload.get("steward_id") or "web-steward").strip()
         rationale = str(payload.get("comment") or payload.get("rationale") or "").strip()
         if not rationale:
@@ -6069,7 +6141,7 @@ def create_app(
 
     @app.route("/api/e10/proposals/<proposal_id>/reject", methods=["POST"])
     def api_e10_reject_proposal(proposal_id: str):
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         steward_id = str(payload.get("steward_id") or "web-steward").strip()
         rationale = str(payload.get("comment") or payload.get("rationale") or "").strip()
         if not rationale:
@@ -6094,7 +6166,7 @@ def create_app(
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         proposal_id = str(payload.get("proposal_id", "")).strip()
         policies = payload.get("policies") or ["conservative"]
         if not proposal_id:
@@ -6507,7 +6579,7 @@ def create_app(
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         directive = str(payload.get("directive", "")).strip()
         provider  = str(payload.get("provider", "")).strip()
         if not directive:
@@ -6647,8 +6719,11 @@ Return ONLY valid JSON, no markdown, no explanation:
             except json.JSONDecodeError as exc:
                 return jsonify({"error": f"AI returned invalid JSON: {exc}", "raw": raw[:500]}), 500
 
-            title   = str(bp_data.get("title", "Untitled Blueprint")).strip()
-            thesis  = str(bp_data.get("thesis", "")).strip()
+            # A null in the provider's reply is missing output, handled as an
+            # absent key: never the text "None" (#244).
+            title   = ("Untitled Blueprint" if bp_data.get("title") is None
+                       else str(bp_data["title"]).strip())
+            thesis  = _optional_text(bp_data, "thesis") or ""
             ai_sections = bp_data.get("sections", [])
             if not thesis or not ai_sections:
                 return jsonify({"error": "AI response missing thesis or sections", "raw": raw[:500]}), 500
@@ -6657,7 +6732,7 @@ Return ONLY valid JSON, no markdown, no explanation:
             interp_id_map = {i["id"][:8]: i["id"] for i in interps}
             sections_data = []
             for sec in ai_sections:
-                claim = str(sec.get("claim", "")).strip()
+                claim = _optional_text(sec, "claim") or ""
                 obs_ids_sec = []
                 for ref in sec.get("obs_refs", []):
                     m = _re.search(r"(\d+)", str(ref))
@@ -6773,9 +6848,9 @@ Return ONLY valid JSON, no markdown, no explanation:
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        payload = request.get_json(silent=True) or {}
-        title   = str(payload.get("title", "")).strip()
-        thesis  = str(payload.get("thesis", "")).strip()
+        payload = _json_body()
+        title   = _optional_text(payload, "title") or ""
+        thesis  = _optional_text(payload, "thesis") or ""
         raw_sections = payload.get("sections", [])
 
         if not title:
@@ -6794,7 +6869,7 @@ Return ONLY valid JSON, no markdown, no explanation:
 
             sections_data = []
             for sec in raw_sections:
-                claim = str(sec.get("claim", "")).strip()
+                claim = _optional_text(sec, "claim") or ""
                 if not claim:
                     continue
                 obs_ids_sec = []
@@ -6832,6 +6907,9 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "section_count": len(sections_data),
             }), 201
 
+        except _ScopeAccessError as exc:
+            conn.rollback()
+            return _scope_error_response(exc)
         except ValueError as exc:
             conn.rollback()
             return jsonify({"error": str(exc)}), 400
@@ -6888,7 +6966,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         store = _store()
         try:
             excluded = payload["excluded"] if "excluded" in payload else None
@@ -6960,11 +7038,11 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_obs_review_post(observation_id: str):
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         status = payload.get("review_status", "")
         if status not in _VALID_REVIEW_STATUSES:
             return jsonify({"error": f"review_status must be one of {sorted(_VALID_REVIEW_STATUSES)}"}), 400
-        conn = _conn_rw()
+        conn = _request_write_conn()
         try:
             require_active_observation(conn, observation_id)
         except _ScopeAccessError as exc:
@@ -7023,14 +7101,14 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_obs_inquiry_post(observation_id: str):
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         question_text = (payload.get("question_text") or "").strip()
         if not question_text:
             return jsonify({"error": "question_text is required"}), 400
         question_type = payload.get("question_type") or "unclassified"
         if question_type not in _VALID_QUESTION_TYPES:
             question_type = "unclassified"
-        conn = _conn_rw()
+        conn = _request_write_conn()
         try:
             require_active_observation(conn, observation_id)
         except _ScopeAccessError as exc:
@@ -7059,7 +7137,7 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_obs_inquiry_delete(observation_id: str, note_id: str):
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        conn = _conn_rw()
+        conn = _request_write_conn()
         try:
             require_active_observation(conn, observation_id)
         except _ScopeAccessError as exc:
@@ -7116,6 +7194,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         Idempotent: recompiling the same PDF (same SHA-256) inserts nothing.
         """
         from ..compiler.compiler import Compiler
+        from ..storage.hashing import sha256_file
 
         if "file" not in request.files:
             return jsonify({"error": "No file field in request"}), 400
@@ -7133,27 +7212,36 @@ Return ONLY valid JSON, no markdown, no explanation:
         uploads_dir = build_dir / "uploads"
         uploads_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save to a named temp file so the compiler can hash it
-        suffix = Path(f.filename).suffix or ".pdf"
+        # The client filename is metadata only, never a storage path. Source
+        # bytes live under their content hash, which is also the SourceDocument
+        # identity, so distinct documents cannot collide or overwrite each other.
+        original_filename = Path(f.filename).name
+        suffix = Path(original_filename).suffix.lower() or ".pdf"
         with tempfile.NamedTemporaryFile(
-            dir=uploads_dir, suffix=suffix, delete=False,
-            prefix=Path(f.filename).stem + "_",
+            dir=uploads_dir, suffix=suffix, delete=False, prefix=".upload-",
         ) as tmp:
-            f.save(tmp.name)
-            saved_path = Path(tmp.name)
+            f.save(tmp)
+            spooled = Path(tmp.name)
+        doc_hash = sha256_file(spooled)
+        source_path = uploads_dir / f"{doc_hash}{suffix}"
+        os.replace(spooled, source_path)
 
         try:
             compiler = Compiler(db_path=db_path, build_dir=build_dir)
-            compiler.compile(saved_path)
-            compiler.close()
+            try:
+                compiler.compile(source_path, original_filename=original_filename)
+            finally:
+                compiler.close()
         except Exception as exc:
-            saved_path.unlink(missing_ok=True)
+            # Content-addressed bytes may belong to an existing or concurrently
+            # compiled document, so they are kept rather than deleted.
             return jsonify({"error": f"Compilation failed: {exc}"}), 500
 
-        # Read back counts from the freshly compiled document
+        # Read back counts for the document this request compiled
         conn = _conn()
         doc = conn.execute(
-            "SELECT id, original_filename, total_pages FROM source_documents ORDER BY registered_at DESC LIMIT 1"
+            "SELECT id, original_filename, total_pages FROM source_documents WHERE id = ?",
+            (doc_hash,),
         ).fetchone()
         obs_count = 0
         term_count = 0
@@ -7178,16 +7266,9 @@ Return ONLY valid JSON, no markdown, no explanation:
             ).fetchone()[0]
         conn.close()
 
-        # Rename temp file to the original filename for future reference
-        final_path = uploads_dir / f.filename
-        if not final_path.exists():
-            saved_path.rename(final_path)
-        else:
-            saved_path.unlink(missing_ok=True)
-
         return jsonify({
             "status": "compiled",
-            "filename": f.filename,
+            "filename": original_filename,
             "document_id": doc["id"] if doc else None,
             "total_pages": doc["total_pages"] if doc else None,
             "observation_count": obs_count,
@@ -7321,7 +7402,7 @@ Return ONLY valid JSON, no markdown, no explanation:
           or if save=true:
           { "blueprint_id": "...", "plan_id": "...", "proposed_blueprint": {...} }
         """
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         text     = str(payload.get("text", "")).strip()
         provider = str(payload.get("provider", "null")).strip()
         save     = bool(payload.get("save", False))
@@ -7361,6 +7442,9 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "blueprint_id": result["blueprint_id"],
                 "plan_id": result["plan_id"],
             }), 201
+        except _ScopeAccessError as exc:
+            conn.rollback()
+            return _scope_error_response(exc)
         except ValueError as exc:
             conn.rollback()
             return jsonify({"error": str(exc)}), 400
@@ -7379,7 +7463,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         proposed = payload.get("proposed_blueprint", payload.get("candidate"))
         candidate, error = _normalize_blueprint_candidate(proposed)
         if error:
@@ -7389,6 +7473,9 @@ Return ONLY valid JSON, no markdown, no explanation:
             result = _persist_exact_blueprint_and_compile(conn, candidate, source="extracted")
             conn.commit()
             return jsonify(result), 201
+        except _ScopeAccessError as exc:
+            conn.rollback()
+            return _scope_error_response(exc)
         except ValueError as exc:
             conn.rollback()
             return jsonify({"error": str(exc)}), 400
@@ -7408,9 +7495,10 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         predecessor_id = str(payload.get("predecessor_id", "")).strip()
-        reason = str(payload.get("reason", "")).strip()
+        # The steward's rationale: absent, null and blank all mean "not given" (#241).
+        reason = _optional_text(payload, "reason") or ""
         proposed = payload.get("proposed_blueprint", payload.get("candidate"))
         if not predecessor_id:
             return jsonify({"error": "predecessor_id is required"}), 400
@@ -7426,6 +7514,8 @@ Return ONLY valid JSON, no markdown, no explanation:
                 reason=reason,
             )
             return jsonify(result), 201
+        except _ScopeAccessError as exc:
+            return _scope_error_response(exc)
         except KeyError as exc:
             return jsonify({"error": str(exc).strip("'")}), 404
         except ValueError as exc:
@@ -7445,7 +7535,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         plan_id  = str(payload.get("plan_id", "")).strip()
         obs_ref  = str(payload.get("obs_ref", "")).strip()
         provider = str(payload.get("provider", "openai")).strip()
@@ -7511,10 +7601,10 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
-        plan_id = str(payload.get("plan_id", "")).strip()
-        provider = str(payload.get("provider", "null")).strip() or "null"
-        profile = str(payload.get("profile", "")).strip() or None
+        payload = _json_body()
+        plan_id = _optional_text(payload, "plan_id") or ""
+        provider = _optional_text(payload, "provider") or "null"
+        profile = _optional_text(payload, "profile")
         if not plan_id:
             return jsonify({"error": "plan_id is required"}), 400
 
@@ -7534,6 +7624,17 @@ Return ONLY valid JSON, no markdown, no explanation:
                 persist=False,
             )
             prof = result.profile
+            candidate_id = uuid.uuid4().hex
+            with artist_preview_candidates_lock:
+                while len(artist_preview_candidates) >= 100:
+                    del artist_preview_candidates[next(iter(artist_preview_candidates))]
+                artist_preview_candidates[candidate_id] = {
+                    "plan_id": plan_id,
+                    "provider": result.row["provider"],
+                    "profile_slug": profile,
+                    "text": result.row["text"],
+                    "execution_config": _json_loads(result.row["execution_config"], {}),
+                }
             return jsonify({
                 "preview": True,
                 "persisted": False,
@@ -7542,6 +7643,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "profile_slug": profile,
                 "profile_name": (prof["name"] if prof else None),
                 "text": result.row["text"],
+                "candidate_id": candidate_id,
             }), 200
         except ArtistRenderError as exc:
             return jsonify({"error": str(exc), "error_type": type(exc).__name__}), 400
@@ -7558,23 +7660,41 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_pipeline_ratify_draft():
         """Ratify & save the EXACT previewed Artist draft as a RenderedNarrative.
 
-        Body: { plan_id, provider, profile_slug?, text }
+        Body: { plan_id, provider, profile_slug?, text, candidate_id }
 
         Persists the bytes the steward saw and judged — verbatim, no re-render,
         no provider call. Deterministic id means a second ratify is idempotent;
         the record is immutable (no post-save mutation). Explicit action only.
+        Only a server-held preview can be ratified: the submission must be that
+        candidate, and the record keeps its observed invocation (CI-011;
+        06_Ontology.md RenderedNarrative). ``matches_submitted`` reports whether
+        the record holds the submitted text.
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
-        plan_id = str(payload.get("plan_id", "")).strip()
-        provider = str(payload.get("provider", "")).strip() or "null"
-        profile_slug = str(payload.get("profile_slug", "")).strip() or None
+        payload = _json_body()
+        plan_id = _optional_text(payload, "plan_id") or ""
+        provider = _optional_text(payload, "provider") or "null"
+        profile_slug = _optional_text(payload, "profile_slug")
         text = payload.get("text")
         if not plan_id:
             return jsonify({"error": "plan_id is required"}), 400
         if not isinstance(text, str) or not text.strip():
             return jsonify({"error": "text is required"}), 400
+        candidate_id = str(payload.get("candidate_id") or "").strip()
+        if not candidate_id:
+            return jsonify({"error": "candidate_id is required: only a server-held Artist preview can be ratified",
+                            "canonical_status": "not_persisted"}), 400
+        with artist_preview_candidates_lock:
+            candidate = artist_preview_candidates.get(candidate_id)
+        if candidate is None:
+            return jsonify({"error": "unknown or expired preview; preview the draft again before ratifying",
+                            "canonical_status": "not_persisted"}), 404
+        submitted = {"plan_id": plan_id, "provider": provider, "profile_slug": profile_slug, "text": text}
+        if any(candidate[key] != value for key, value in submitted.items()):
+            return jsonify({"error": "the submitted draft is not the previewed draft; nothing was ratified",
+                            "canonical_status": "not_persisted"}), 409
+        execution_config = candidate["execution_config"]
 
         from ..narrative.artist_service import ArtistRenderError, ratify_draft
 
@@ -7582,7 +7702,11 @@ Return ONLY valid JSON, no markdown, no explanation:
         try:
             result = ratify_draft(
                 plan_id, conn, provider=provider, profile_slug=profile_slug, text=text,
+                execution_config=execution_config,
             )
+            recorded_text = conn.execute(
+                "SELECT text FROM rendered_narratives WHERE id = ?", (result["row"]["id"],),
+            ).fetchone()[0]
         except ArtistRenderError as exc:
             return jsonify({"error": str(exc), "error_type": type(exc).__name__}), 400
         finally:
@@ -7597,6 +7721,8 @@ Return ONLY valid JSON, no markdown, no explanation:
             "profile_slug": profile_slug,
             "plan_id": plan_id,
             "blueprint_id": result.get("blueprint_id"),
+            "matches_submitted": recorded_text == text,
+            "recorded_text_sha256": hashlib.sha256(recorded_text.encode("utf-8")).hexdigest(),
         }), (201 if result["created"] else 200)
 
     @app.route("/api/critic/voice-preview", methods=["POST"])
@@ -7612,7 +7738,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         text = str(payload.get("text", "")).strip()
         profile_slug = str(payload.get("profile_slug", "")).strip()
         if not text:
@@ -7643,7 +7769,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         plan_id  = str(payload.get("plan_id", "")).strip()
         provider = str(payload.get("provider", "openai")).strip()
 
@@ -7702,7 +7828,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         narrative_id = str(payload.get("narrative_id", "")).strip() or None
         obs_ref = str(payload.get("obs_ref", "")).strip() or None
 
@@ -7725,55 +7851,68 @@ Return ONLY valid JSON, no markdown, no explanation:
 
             report = run_critic(n, all_ids, conn, narrative_id=narrative_id)
 
-            existing = conn.execute(
-                "SELECT * FROM validation_reports WHERE id = ?", (report["id"],)
-            ).fetchone()
-            if existing:
-                return jsonify({"status": "already_exists", "report": dict(existing)}), 200
-
-            conn.execute(
-                """INSERT INTO validation_reports
-                   (id, rendered_narrative_id, architect_plan_id, expression_profile_id,
-                    semantic_fidelity, required_terms_present, required_terms_missing,
-                    unsupported_claims, omitted_observations, omitted_interpretations,
-                    semantic_drift, warnings, approved, profile_fidelity, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    report["id"], report["rendered_narrative_id"], report["architect_plan_id"],
-                    report.get("expression_profile_id"),
-                    report["semantic_fidelity"],
-                    report["required_terms_present"],
-                    report["required_terms_missing"],
-                    report.get("unsupported_claims", "[]"),
-                    report.get("omitted_observations", "[]"),
-                    report.get("omitted_interpretations", "[]"),
-                    report.get("semantic_drift", "[]"),
-                    report.get("warnings", "[]"),
-                    int(report.get("approved", False)),
-                    report.get("profile_fidelity"),
-                    report["created_at"],
-                ),
-            )
-            conn.commit()
-
-            # Run all Evaluation Functions and persist Findings
+            # ADR-0042 completeness: the report and its full Finding ledger are
+            # recorded together or not at all. Finding IDs are deterministic
+            # (ADR-0041), so a retry also completes a ledger left incomplete.
             ef_run_result = None
-            ef_errors: dict = {}
             try:
                 from ..compiler.evaluation_functions.runner import run_all_evaluation_functions
-                from ..storage.sqlite import SQLiteStore
                 ef_run_result = run_all_evaluation_functions(
                     report["rendered_narrative_id"],
                     report["architect_plan_id"],
                     conn,
                 )
-                if ef_run_result.all_findings:
-                    store = SQLiteStore(db_path)
-                    store.insert_findings_batch(ef_run_result.all_findings)
-                    store.close()
                 ef_errors = ef_run_result.errors
             except Exception as run_exc:
                 ef_errors = {"runner": str(run_exc)}
+            if ef_errors:
+                return jsonify({
+                    "status": "failed",
+                    "error": "Evaluation Functions failed; no Critic report or Findings were recorded by this run. Retry the Critic run.",
+                    "ef_errors": ef_errors,
+                }), 500
+
+            from ..storage.sqlite import SQLiteStore
+            store = SQLiteStore(db_path)
+            try:
+                with store.atomic():
+                    created = store._conn.execute(
+                        """INSERT OR IGNORE INTO validation_reports
+                           (id, rendered_narrative_id, architect_plan_id, expression_profile_id,
+                            semantic_fidelity, required_terms_present, required_terms_missing,
+                            unsupported_claims, omitted_observations, omitted_interpretations,
+                            semantic_drift, warnings, approved, profile_fidelity, created_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            report["id"], report["rendered_narrative_id"], report["architect_plan_id"],
+                            report.get("expression_profile_id"),
+                            report["semantic_fidelity"],
+                            report["required_terms_present"],
+                            report["required_terms_missing"],
+                            report.get("unsupported_claims", "[]"),
+                            report.get("omitted_observations", "[]"),
+                            report.get("omitted_interpretations", "[]"),
+                            report.get("semantic_drift", "[]"),
+                            report.get("warnings", "[]"),
+                            int(report.get("approved", False)),
+                            report.get("profile_fidelity"),
+                            report["created_at"],
+                        ),
+                    ).rowcount == 1
+                    before = store._conn.total_changes
+                    store.insert_findings_batch(ef_run_result.all_findings)
+                    findings_completed = store._conn.total_changes - before
+                existing = store._conn.execute(
+                    "SELECT * FROM validation_reports WHERE id = ?", (report["id"],)
+                ).fetchone()
+            finally:
+                store.close()
+            if not created:
+                return jsonify({
+                    "status": "already_exists",
+                    "report": dict(existing),
+                    "findings_completed": findings_completed,
+                }), 200
 
             pf = report.get("profile_fidelity")
             return jsonify({"status": "created", "report": {
@@ -7781,12 +7920,12 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "semantic_fidelity": report["semantic_fidelity"],
                 "approved": report.get("approved", False),
                 "profile_fidelity": json.loads(pf) if pf else None,
-                "total_findings": ef_run_result.total_findings if ef_run_result else 0,
+                "total_findings": ef_run_result.total_findings,
                 "findings_by_dimension": {
                     dim: len(findings)
-                    for dim, findings in (ef_run_result.findings_by_dimension if ef_run_result else {}).items()
+                    for dim, findings in ef_run_result.findings_by_dimension.items()
                 },
-                "ef_errors": ef_errors or None,
+                "ef_errors": None,
             }}), 201
 
         except Exception as exc:
@@ -8080,13 +8219,13 @@ Return ONLY valid JSON, no markdown, no explanation:
         """Save a human highlight from the Close Reading workspace."""
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(force=True) or {}
+        payload = _json_body(force=True)
         doc_id = str(payload.get("source_document_id") or "").strip()
         selected_text = str(payload.get("selected_text") or "").strip()
         if not doc_id or not selected_text:
             return jsonify({"error": "source_document_id and selected_text required"}), 400
 
-        conn = _conn_rw()
+        conn = _request_write_conn()
         try:
             doc = require_active_document(conn, doc_id)
         except _ScopeAccessError as exc:
@@ -8147,8 +8286,8 @@ Return ONLY valid JSON, no markdown, no explanation:
         """Update note, question, relevance, status, or tags on a highlight."""
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(force=True) or {}
-        conn = _conn_rw()
+        payload = _json_body(force=True)
+        conn = _request_write_conn()
         row = conn.execute(
             "SELECT id, source_document_id FROM reader_highlights WHERE id = ?",
             (highlight_id,)
@@ -8201,7 +8340,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """Dismiss (soft-delete) a highlight."""
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        conn = _conn_rw()
+        conn = _request_write_conn()
         row = conn.execute(
             "SELECT id, source_document_id FROM reader_highlights WHERE id = ?",
             (highlight_id,),
@@ -8422,13 +8561,13 @@ Return ONLY valid JSON, no markdown, no explanation:
         """Upsert reading progress for a document."""
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(force=True) or {}
+        payload = _json_body(force=True)
         doc_id = str(payload.get("document_id") or "").strip()
         page = int(payload.get("page") or 1)
         if not doc_id:
             return jsonify({"error": "document_id required"}), 400
 
-        conn = _conn_rw()
+        conn = _request_write_conn()
         try:
             doc = require_active_document(conn, doc_id)
         except _ScopeAccessError as exc:
@@ -8438,6 +8577,9 @@ Return ONLY valid JSON, no markdown, no explanation:
         total_pages = max(int(doc["total_pages"] or 1), 1)
         import uuid as _uuid
 
+        # Hold the write lock from read to write: concurrent posts for one
+        # document serialize instead of overwriting each other's page set.
+        conn.execute("BEGIN IMMEDIATE")
         existing = conn.execute(
             "SELECT id, pages_read FROM reading_progress WHERE document_id = ?", (doc_id,)
         ).fetchone()
@@ -8459,11 +8601,14 @@ Return ONLY valid JSON, no markdown, no explanation:
         else:
             pages_read = [page]
             percent = round(1 / total_pages * 100, 1)
+            completed_at = now if percent >= 100 else None
             conn.execute(
                 """INSERT INTO reading_progress
-                   (id, document_id, pages_read, last_page, total_pages, percent_read, updated_at)
-                   VALUES (?,?,?,?,?,?,?)""",
-                (_uuid.uuid4().hex, doc_id, json.dumps(pages_read), page, total_pages, percent, now)
+                   (id, document_id, pages_read, last_page, total_pages, percent_read,
+                    completed_at, updated_at)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                (_uuid.uuid4().hex, doc_id, json.dumps(pages_read), page, total_pages, percent,
+                 completed_at, now)
             )
 
         conn.commit()
@@ -8475,7 +8620,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         """Promote a highlight to observation_candidate status (does not create an Observation)."""
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        conn = _conn_rw()
+        conn = _request_write_conn()
         row = conn.execute(
             "SELECT * FROM reader_highlights WHERE id = ?", (highlight_id,)
         ).fetchone()
@@ -8515,7 +8660,7 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_companion_ask():
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         message = str(payload.get("message") or "").strip()
         if not message:
             return jsonify({"error": "message is required"}), 400
@@ -8676,7 +8821,7 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_investigation_log_create():
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         lane = str(payload.get("lane") or "corpus").strip().lower()
         if lane not in ("corpus", "instrument"):
             return jsonify({"error": "lane must be 'corpus' or 'instrument'"}), 400
@@ -8688,7 +8833,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         import uuid
         entry_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
-        conn = _conn_rw()
+        conn = _request_write_conn()
         doc_id = str(payload.get("source_document_id") or "").strip() or None
         if doc_id:
             row = conn.execute(
@@ -8742,7 +8887,7 @@ Return ONLY valid JSON, no markdown, no explanation:
     def api_investigation_put():
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         thesis = str(payload.get("thesis") or "").strip()
         if not thesis:
             return jsonify({"error": "thesis is required"}), 400
@@ -8751,7 +8896,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         lenses = payload.get("lenses")
         lenses_json = json.dumps(lenses if isinstance(lenses, list) else [])
         now = datetime.now(timezone.utc).isoformat()
-        conn = _conn_rw()
+        conn = _request_write_conn()
         # Preserve the original created_at across revisions.
         existing = conn.execute(
             "SELECT created_at FROM workspace_investigation WHERE id = 'current'"
@@ -8838,7 +8983,7 @@ Return ONLY valid JSON, no markdown, no explanation:
             return jsonify({"error": "database not found"}), 404
         from ..workspace import set_workspace_name
 
-        payload = request.get_json(silent=True) or {}
+        payload = _json_body()
         rw = _conn_rw()
         try:
             identity = set_workspace_name(rw, payload.get("workspace_name"))

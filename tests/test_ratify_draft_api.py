@@ -3,7 +3,8 @@
 Ratification is the moment a generated artifact enters the durable record. The
 core requirement: it stores the bytes the steward saw and judged, verbatim, and
 never re-renders. These tests guard that — exact text, idempotency, provenance,
-and immutability.
+and immutability. Drafts come from the real preview route, because only a
+server-held preview candidate can be ratified (#235).
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from hermeneia.web.app import create_app
 
 sys.path.insert(0, str(Path(__file__).parent))
 from test_constitutional_p0 import _seed_full_chain
+from test_ratify_draft_candidate import preview_candidates, ratify_candidate
 
 
 @pytest.fixture
@@ -41,13 +43,13 @@ def _row_text(db_path, narrative_id):
         conn.close()
 
 
-def test_ratify_persists_exact_bytes(seeded):
+def test_ratify_persists_exact_bytes(seeded, monkeypatch):
     db_path, ids, client = seeded
     profile_slug = "literary-en"
     exact = "The exact draft the steward saw — verbatim, with a ✦ marker 12345."
-    r = client.post("/api/pipeline/ratify-draft", json={
-        "plan_id": ids["plan_id"], "provider": "ratify-test",
-        "profile_slug": profile_slug, "text": exact})
+    [preview] = preview_candidates(client, monkeypatch, ids["plan_id"], [exact],
+                                   provider="ratify-test", profile=profile_slug)
+    r = ratify_candidate(client, preview)
     assert r.status_code == 201, r.get_data(as_text=True)
     body = r.get_json()
     assert body["created"] is True and body["status"] == "ratified"
@@ -63,25 +65,27 @@ def test_ratify_persists_exact_bytes(seeded):
     assert row[4]                                # prompt_used reconstructed
 
 
-def test_second_ratify_is_idempotent_and_does_not_overwrite(seeded):
+def test_second_ratify_is_idempotent_and_does_not_overwrite(seeded, monkeypatch):
     db_path, ids, client = seeded
-    payload = {"plan_id": ids["plan_id"], "provider": "ratify-test",
-               "profile_slug": "literary-en", "text": "FIRST ratified draft."}
-    first = client.post("/api/pipeline/ratify-draft", json=payload)
+    first_preview, second_preview = preview_candidates(
+        client, monkeypatch, ids["plan_id"], ["FIRST ratified draft.", "SECOND, different."],
+        provider="ratify-test", profile="literary-en")
+    first = ratify_candidate(client, first_preview)
     assert first.status_code == 201
     nid = first.get_json()["id"]
 
     # A second ratify with DIFFERENT text must not re-render or overwrite.
-    second = client.post("/api/pipeline/ratify-draft", json={**payload, "text": "SECOND, different."})
+    second = ratify_candidate(client, second_preview)
     assert second.status_code == 200
     assert second.get_json()["status"] == "already_ratified"
     assert _row_text(db_path, nid)[0] == "FIRST ratified draft."  # unchanged
 
 
-def test_ratified_narrative_is_immutable(seeded):
+def test_ratified_narrative_is_immutable(seeded, monkeypatch):
     db_path, ids, client = seeded
-    nid = client.post("/api/pipeline/ratify-draft", json={
-        "plan_id": ids["plan_id"], "provider": "null", "text": "immutable draft"}).get_json()["id"]
+    [preview] = preview_candidates(client, monkeypatch, ids["plan_id"], ["immutable draft"],
+                                   provider="null", profile=None)
+    nid = ratify_candidate(client, preview).get_json()["id"]
     conn = sqlite3.connect(db_path)
     try:
         raised = False

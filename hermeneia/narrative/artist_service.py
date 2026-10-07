@@ -8,7 +8,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from sqlite3 import Connection
-from typing import Any
+from typing import Any, Iterable
 
 from ..storage.hashing import make_rendered_narrative_id
 from .artist_providers import (
@@ -22,6 +22,68 @@ from .profiles import get_profile
 
 class ArtistRenderError(ValueError):
     """Raised when the Artist render preconditions are not satisfied."""
+
+
+class ExcludedEvidenceError(ArtistRenderError):
+    """Raised when an Architect Plan requires evidence excluded from analysis."""
+
+
+def excluded_evidence_ids(
+    conn: Connection,
+    observation_ids: Iterable[str],
+    interpretation_ids: Iterable[str] = (),
+) -> list[str]:
+    """Return the cited Observations and Interpretations resting on excluded documents.
+
+    An Interpretation is excluded when its Observation or any of its evidence
+    Observations comes from a document excluded from analysis.
+    """
+    interpretation_evidence: dict[str, set[str]] = {}
+    for iid in sorted(set(interpretation_ids)):
+        row = conn.execute(
+            "SELECT observation_id, evidence_observation_ids FROM interpretations WHERE id = ?", (iid,)
+        ).fetchone()
+        if row is None:
+            continue
+        try:
+            evidence = json.loads(row[1] or "[]")
+        except (TypeError, json.JSONDecodeError):
+            evidence = []
+        cited = {row[0]}
+        if isinstance(evidence, list):
+            cited.update(str(oid) for oid in evidence)
+        interpretation_evidence[iid] = cited
+    observation_ids = set(observation_ids)
+    candidates = sorted(observation_ids.union(*interpretation_evidence.values()))
+    if not candidates:
+        return []
+    excluded = {
+        row[0]
+        for row in conn.execute(
+            f"""
+            SELECT o.id
+            FROM observations o
+            JOIN source_documents sd ON sd.id = o.source_document_id
+            WHERE o.id IN ({','.join('?' for _ in candidates)})
+              AND COALESCE(sd.excluded_from_analysis, 0) != 0
+            """,
+            candidates,
+        )
+    }
+    return sorted(observation_ids & excluded) + sorted(
+        iid for iid, cited in interpretation_evidence.items() if cited & excluded
+    )
+
+
+def _require_active_plan_evidence(paragraphs: list[dict], conn: Connection) -> None:
+    """Refuse to construct an Artist prompt from evidence excluded after the plan was committed."""
+    observation_ids = {oid for para in paragraphs for oid in json.loads(para["required_observations"] or "[]")}
+    interpretation_ids = {iid for para in paragraphs for iid in json.loads(para["required_interpretations"] or "[]")}
+    excluded = excluded_evidence_ids(conn, observation_ids, interpretation_ids)
+    if excluded:
+        raise ExcludedEvidenceError(
+            "Architect Plan requires evidence that is excluded_from_analysis: " + ", ".join(excluded)
+        )
 
 
 @dataclass(frozen=True)
@@ -157,6 +219,7 @@ def render_for_plan(
             (plan_dict["id"],),
         ).fetchall()
     ]
+    _require_active_plan_evidence(paragraphs, conn)
     prompt = generate_prompt(plan_dict, paragraphs, conn, theme=profile)
     execution_ts = datetime.now(timezone.utc).isoformat()
     text, execution_config = _execute_render(
@@ -284,6 +347,7 @@ def render_for_observation(
             (plan_dict["id"],),
         ).fetchall()
     ]
+    _require_active_plan_evidence(paragraphs, conn)
     prompt = generate_prompt(plan_dict, paragraphs, conn, theme=profile)
     execution_ts = datetime.now(timezone.utc).isoformat()
     text, execution_config = _execute_render(
@@ -330,6 +394,7 @@ def ratify_draft(
     provider: str,
     profile_slug: str | None,
     text: str,
+    execution_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Persist the EXACT previewed draft bytes as a RenderedNarrative.
 
@@ -339,6 +404,9 @@ def ratify_draft(
     verbatim; ``prompt_used`` is reconstructed deterministically (no LLM) for
     provenance. The narrative id is deterministic on (plan, provider, profile),
     so a second ratify is idempotent and the immutable table is never rewritten.
+    ``execution_config`` is the previewed invocation's CI-011 record, kept as
+    is; without it nothing is persisted, because a RenderedNarrative carries
+    the ArtistProvider invocation that produced it (06_Ontology.md).
 
     Returns {"row": <dict>, "created": bool}.
     """
@@ -363,6 +431,11 @@ def ratify_draft(
         # immutable, so return it unchanged rather than overwriting.
         return {"row": dict(existing), "created": False}
 
+    if not execution_config:
+        raise ArtistRenderError(
+            "Ratification requires the observed Artist invocation record (CI-011); preview the draft first."
+        )
+
     paragraphs = [
         dict(row)
         for row in conn.execute(
@@ -370,6 +443,7 @@ def ratify_draft(
             (plan_dict["id"],),
         ).fetchall()
     ]
+    _require_active_plan_evidence(paragraphs, conn)
     prompt = generate_prompt(plan_dict, paragraphs, conn, theme=profile)
     now = datetime.now(timezone.utc).isoformat()
     row = {
@@ -379,7 +453,7 @@ def ratify_draft(
         "expression_profile_id": expression_profile_id,
         "text": text,
         "prompt_used": prompt,
-        "execution_config": json.dumps({"source": "ratified_preview", "provider": provider}),
+        "execution_config": json.dumps({**execution_config, "source": "ratified_preview"}),
         "created_at": now,
     }
     conn.execute(

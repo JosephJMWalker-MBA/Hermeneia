@@ -13,6 +13,8 @@ same semantic commitments as literary-en.
 """
 from __future__ import annotations
 
+from .target import resolve_db_target
+
 import sqlite3
 import sys
 from datetime import datetime, timezone
@@ -36,21 +38,23 @@ def _open_db(db_path: Path) -> sqlite3.Connection:
 
 
 def _resolve_db(bundle_or_db: str | None, default: str = "build/hermeneia.db") -> Path:
-    if bundle_or_db is None:
-        return Path(default)
-    p = Path(bundle_or_db)
-    return p if (p.suffix == ".db" or p.name.endswith(".db")) else Path(default)
+    return resolve_db_target(bundle_or_db, default)
+
+
+def _has_profile_table(conn: sqlite3.Connection) -> bool:
+    # Reading profiles never creates or seeds them (CI-012); write paths do.
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'expression_profiles'"
+    ).fetchone() is not None
 
 
 def cmd_profile_list(bundle_or_db: str | None = None) -> None:
-    from ..storage.sqlite import ensure_profile_tables
     from ..narrative.profiles import list_profiles
 
     db_path = _resolve_db(bundle_or_db)
     conn = _open_db(db_path)
-    ensure_profile_tables(conn)
 
-    profiles = list_profiles(conn)
+    profiles = list_profiles(conn) if _has_profile_table(conn) else []
     conn.close()
 
     if not profiles:
@@ -77,14 +81,12 @@ def cmd_profile_list(bundle_or_db: str | None = None) -> None:
 
 
 def cmd_profile_view(slug: str, bundle_or_db: str | None = None) -> None:
-    from ..storage.sqlite import ensure_profile_tables
     from ..narrative.profiles import get_profile
 
     db_path = _resolve_db(bundle_or_db)
     conn = _open_db(db_path)
-    ensure_profile_tables(conn)
 
-    profile = get_profile(slug, conn)
+    profile = get_profile(slug, conn) if _has_profile_table(conn) else None
     conn.close()
 
     if profile is None:

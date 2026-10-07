@@ -910,7 +910,9 @@ def build_proof(db_path: str | Path, *, config: CompositorConfig) -> dict:
 def proof_pdf(db_path: str | Path, proof_id: str) -> bytes:
     conn = _conn_ro(Path(db_path))
     try:
-        row = next(iter(store.rows(conn, "SELECT * FROM authoring_proofs WHERE id = ?", (proof_id,))), None)
+        row = None
+        if store.authoring_tables_exist(conn):
+            row = next(iter(store.rows(conn, "SELECT * FROM authoring_proofs WHERE id = ?", (proof_id,))), None)
         if row is None or not row["pdf_artifact_sha256"]:
             raise AuthoringError("NO_PROOF_PDF", "No verified PDF for that proof.", 404)
         return store.read_artifact(conn, Path(db_path), row["pdf_artifact_sha256"])
