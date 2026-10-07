@@ -6719,8 +6719,11 @@ Return ONLY valid JSON, no markdown, no explanation:
             except json.JSONDecodeError as exc:
                 return jsonify({"error": f"AI returned invalid JSON: {exc}", "raw": raw[:500]}), 500
 
-            title   = str(bp_data.get("title", "Untitled Blueprint")).strip()
-            thesis  = str(bp_data.get("thesis", "")).strip()
+            # A null in the provider's reply is missing output, handled as an
+            # absent key: never the text "None" (#244).
+            title   = ("Untitled Blueprint" if bp_data.get("title") is None
+                       else str(bp_data["title"]).strip())
+            thesis  = _optional_text(bp_data, "thesis") or ""
             ai_sections = bp_data.get("sections", [])
             if not thesis or not ai_sections:
                 return jsonify({"error": "AI response missing thesis or sections", "raw": raw[:500]}), 500
@@ -6729,7 +6732,7 @@ Return ONLY valid JSON, no markdown, no explanation:
             interp_id_map = {i["id"][:8]: i["id"] for i in interps}
             sections_data = []
             for sec in ai_sections:
-                claim = str(sec.get("claim", "")).strip()
+                claim = _optional_text(sec, "claim") or ""
                 obs_ids_sec = []
                 for ref in sec.get("obs_refs", []):
                     m = _re.search(r"(\d+)", str(ref))

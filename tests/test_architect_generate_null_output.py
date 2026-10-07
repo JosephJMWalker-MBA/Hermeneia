@@ -1,4 +1,4 @@
-"""Frozen witnesses for #244: a provider's null output never becomes "None" in a Blueprint.
+"""Promoted regressions for #244: a provider's null output never becomes "None" in a Blueprint.
 
 `/api/architect/generate` already defines how missing provider output is
 handled: a missing thesis (or no sections) is refused ("AI response missing
@@ -6,7 +6,9 @@ thesis or sections"), a section without a claim is skipped, no usable section
 is refused ("No valid sections could be built from AI response"), and an
 absent title takes the route's default "Untitled Blueprint". A null value in
 the provider's JSON reply is missing output and gets exactly that handling;
-no replacement content is invented. Offline in-process provider.
+no replacement content is invented. Commit 23c6438 preserves the negative
+versions; the repair demonstrated strict unexpected passes before the expected
+failures were removed. Offline in-process provider.
 """
 from __future__ import annotations
 
@@ -60,8 +62,6 @@ def _fabricated(db) -> list:
     return [b for b in _blueprints(db) if "None" in (b[0], b[1], *b[2])]
 
 
-@pytest.mark.xfail(strict=True, raises=NoneCommitted,
-                   reason="#244: a provider's null thesis is committed as 'None'; repair requires its own packet")
 def test_null_thesis_is_refused_as_missing(workspace):
     db, client = workspace
     before = _blueprints(db)
@@ -71,8 +71,6 @@ def test_null_thesis_is_refused_as_missing(workspace):
     assert response.get_json()["error"] == "AI response missing thesis or sections"
 
 
-@pytest.mark.xfail(strict=True, raises=NoneCommitted,
-                   reason="#244: a provider's null claim is committed as 'None'; repair requires its own packet")
 def test_null_claim_section_is_skipped_as_a_blank_one_is(workspace):
     db, client = workspace
     response = _generate(client, {"title": "AI", "thesis": "AI thesis.", "sections": [_section(None), _section("Kept.")]})
@@ -81,8 +79,6 @@ def test_null_claim_section_is_skipped_as_a_blank_one_is(workspace):
         raise NoneCommitted(f"{response.status_code} claims={mine}")
 
 
-@pytest.mark.xfail(strict=True, raises=NoneCommitted,
-                   reason="#244: provider sections with only null claims are committed as 'None'; repair requires its own packet")
 def test_only_null_claims_is_refused_as_no_valid_sections(workspace):
     db, client = workspace
     before = _blueprints(db)
@@ -92,8 +88,6 @@ def test_only_null_claims_is_refused_as_no_valid_sections(workspace):
     assert response.get_json()["error"] == "No valid sections could be built from AI response"
 
 
-@pytest.mark.xfail(strict=True, raises=NoneCommitted,
-                   reason="#244: a provider's null title is committed as 'None'; repair requires its own packet")
 def test_null_title_takes_the_absent_title_default(workspace):
     db, client = workspace
     response = _generate(client, {"title": None, "thesis": "AI thesis.", "sections": [_section("A claim.")]})
