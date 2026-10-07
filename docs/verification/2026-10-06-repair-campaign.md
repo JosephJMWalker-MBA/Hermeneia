@@ -260,11 +260,11 @@ scope.
 | --- | --- | --- |
 | Harmless / caught | provider key `api_key` (fails the 8-character check); steward `status` (not in the allowed set); voice-preview `text` and `profile_slug` (read-only) | none |
 | Input-validation weakness | E10 `observation_id`; E10 critic `proposal_id`; revise `predecessor_id`; run-artist `plan_id`, `obs_ref`, `provider`, `profile`; run-artist-all-profiles `plan_id`, `provider`; run-critic `narrative_id`, `obs_ref`; architect/generate `directive`, `provider`; extract-blueprint `text`, `provider` | a misleading error or a bypassed "required" check, with no persisted `"None"`; not filed |
-| Canonical-data corruption | Blueprint candidate `title`, `thesis`, `claim` (ratify, revise, extract-save) and architect/import `title`, `thesis`, `claim` | **#243** filed, not repaired |
-| Canonical-data corruption (machine output) | architect/generate provider `title`, `thesis`, `claim` | **#244** filed, not repaired |
+| Canonical-data corruption | Blueprint candidate `title`, `thesis`, `claim` (ratify, revise, extract-save) and architect/import `title`, `thesis`, `claim` | **#243** filed; *repaired 2026-10-07 (see below)* |
+| Canonical-data corruption (machine output) | architect/generate provider `title`, `thesis`, `claim` | **#244** filed; *repaired 2026-10-07 (see below)* |
 | Provenance / identity | preview/ratify `provider` and `profile` | fixed earlier as #240; no other persisted identity found |
 | Governance state | revise `reason` | **#241 repaired** |
-| Governance state | provider role calibration `note` (API-only) | **#245** filed, not repaired |
+| Governance state | provider role calibration `note` (API-only) | **#245** filed; *repaired 2026-10-07 (see below)* |
 | Governance state | narrative steward `rationale` | cannot persist, because the route always fails; see #246 |
 
 **Incidental finding.** Filed as **#246**, not repaired. `PATCH
@@ -276,3 +276,53 @@ All four new issues were reproduced on `bdf280a` and at `b6c8fd4`, and each
 reproduction was verified as written. Campaign regressions at `b6c8fd4`: 130
 passed (the 125 above plus 5 for #241). #243–#246 are reported, not
 implemented, because the narrow #241 boundary does not resolve them.
+
+## Final normalization packet: #243–#245, and #246 adjudication — 2026-10-07
+
+All three repairs use the existing `_optional_text()` boundary helper, because
+they share its meaning exactly: JSON `null` is "not given", the same as an
+absent key. Every route keeps its existing refusal, skip or default, and no
+replacement content is introduced.
+
+| Bug | Witness | Repair | Regression test | Result |
+| --- | --- | --- | --- | --- |
+| #243 null Blueprint title/thesis/claim | `b27b4e8` | `d03a81b` | `test_blueprint_null_fields.py` (13) | Ratify, revise and extract-save refuse a null field; import refuses a null title or thesis and skips a null-claim section, as it skips a blank one. The extractor's provider-reply check counts null as missing (422). Filed reproduction: 400 "title is required", 0 Blueprints holding `"None"`. |
+| #244 provider null in architect/generate | `23c6438` | `bfa6c09` | `test_architect_generate_null_output.py` (5) | A null thesis gets "AI response missing thesis or sections"; a null claim is skipped (only-null claims get "No valid sections"); a null title takes the existing absent-title default. Blank titles are unchanged. Filed reproduction: 500, nothing committed. |
+| #245 null calibration note | `74883be` | `68b40b7` | `test_calibration_note_null.py` (5) | A null note is stored as no note (null), like absent and blank notes. Filed reproduction: `steward_note` is null. |
+
+**Test-isolation fix (`aaa4cc4`).** In `cfa9423` (#232),
+`_validate_blueprint_references` imported `artist_service` lazily. If that
+first import happened inside a test that had patched
+`artist_providers.get_provider`, the patched function stayed bound for the
+rest of the process, and
+`pytest tests/test_blueprint_exact_commit.py tests/test_blueprint_exclusion_scope.py`
+failed 2 tests at `42cbac5`. The full suite hid this because another module
+imports `artist_service` during collection. The rule is now imported with
+`app.py`. There is no behavior change, and every file that patches the
+provider lookup passes in isolation.
+
+**#246 adjudication (not repaired).** Classification (1):
+- RenderedNarrative is append-only (Constitution Art. I and X;
+  `06_Ontology.md` table; CI-005), so the trigger is correct and the route's
+  in-place UPDATE does not conform.
+- The mutable `narrative_status` design appears only in the explicitly
+  non-authoritative `FUTURE_ARCHITECTURE_NOTES.md`.
+- No ratified object records a narrative-level rejection, so a conforming
+  repair needs an owner decision: either `ratification_records` for
+  acceptance only, or a new ADR-ratified append-only narrative
+  steward-decision record.
+- The route fails closed, so no state is corrupted. It is pre-existing (root
+  commit `b3441b5`) and outside this merge.
+
+**Final gate at `68b40b7`.**
+
+- Campaign regressions: 153 passed across 18 files, with no xfail markers
+  left.
+- Clean full suite on a detached worktree: 2833 passed, 21 skipped, 6
+  failed. The six are the inherited static Reader baselines, identical to
+  `bdf280a`.
+- The real-study round trip was not rerun: these repairs change only
+  request and provider input normalization, not persistence, export or
+  ratification semantics.
+- The unrelated Reader edits remain uncommitted and are absent from every
+  commit.
