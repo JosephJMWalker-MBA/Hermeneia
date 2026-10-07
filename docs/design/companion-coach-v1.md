@@ -128,7 +128,7 @@ Absence is never stated as a fact.
 | `ABSENCE_NOT_PROOF` | every `suggest` whose step is not `historically_exercised` | P1's own note: "Absence of an extant record is not proof that an operation never occurred." |
 | `HISTORY_NOT_RECORDED` | the suggested step's P2 `history_support.status` is `unsupported` | P2 `history_support.reason` |
 | `COVERAGE_INCOMPLETE` | `lineage_coverage` reports missing tables or columns | the missing tables/columns, stated as records Hermeneia cannot inspect |
-| `RECORDS_OMITTED` | `lineage_coverage.omitted` is nonzero | Some records are omitted from this projection (for example, records from sources excluded from analysis, or records whose parents are unavailable) and do not inform this suggestion. This follows Lineage's own omission categories. |
+| `RECORDS_OMITTED` | `lineage_coverage.omitted` is nonzero | Some records are omitted from this projection (for example, records from sources excluded from analysis, or records whose parents are unavailable) and do not inform this coaching result. This follows Lineage's own omission categories. |
 | `AUTHORSHIP_UNKNOWN` | any P1 note reports unknown canonical Interpretation authorship | the P1 note |
 
 ### Withheld codes
@@ -170,8 +170,8 @@ Absence is never stated as a fact.
 `GET /api/companion/coach` mirrors `GET /api/guided-study-cycle`: the same
 optional single current frame selection, a read-only snapshot, the same
 refusals, `Cache-Control: no-store`, and no store initialization. It returns
-the coach result together with the P2 `guide_version` it consumed. It writes
-nothing. Companion rendering is outside this packet.
+the coach result plus the validated `current_frame_selection`, as the guide route
+does. It writes nothing. Companion rendering is outside this packet.
 
 ## Evaluation
 

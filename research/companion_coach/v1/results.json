@@ -1,0 +1,1614 @@
+{
+  "aggregate": {
+    "authorship_distinctions": {
+      "passed": 9,
+      "total": 9
+    },
+    "blocked": {
+      "passed": 9,
+      "total": 9
+    },
+    "decision": {
+      "passed": 9,
+      "total": 9
+    },
+    "evidence_corresponds": {
+      "passed": 9,
+      "total": 9
+    },
+    "follows_p2_recommendation": {
+      "passed": 9,
+      "total": 9
+    },
+    "forbidden_facts_absent": {
+      "passed": 9,
+      "total": 9
+    },
+    "forbidden_suggestions": {
+      "count": 0,
+      "total": 9
+    },
+    "invariant_to_item_order": {
+      "passed": 9,
+      "total": 9
+    },
+    "invariant_to_storage_order": {
+      "passed": 9,
+      "total": 9
+    },
+    "invariant_to_text_and_labels": {
+      "passed": 9,
+      "total": 9
+    },
+    "never_suggests_unavailable": {
+      "passed": 9,
+      "total": 9
+    },
+    "no_engagement_language": {
+      "passed": 9,
+      "total": 9
+    },
+    "repeatable": {
+      "passed": 9,
+      "total": 9
+    },
+    "required_facts": {
+      "passed": 9,
+      "total": 9
+    },
+    "required_uncertainty": {
+      "passed": 9,
+      "total": 9
+    },
+    "required_withheld": {
+      "passed": 9,
+      "total": 9
+    },
+    "schema_valid": {
+      "passed": 9,
+      "total": 9
+    },
+    "silence_honored": {
+      "passed": 9,
+      "total": 9
+    },
+    "statement_fragments": {
+      "passed": 9,
+      "total": 9
+    },
+    "suggestion": {
+      "passed": 9,
+      "total": 9
+    },
+    "unsupported_wording_clean": {
+      "passed": 9,
+      "total": 9
+    },
+    "workspace_unchanged": {
+      "passed": 9,
+      "total": 9
+    }
+  },
+  "boundaries": "Synthetic disposable workspaces from the frozen P5 trajectories (unchanged) and two P6 negatives; production coach over production P1/P2; no network, provider, persistence or telemetry; evaluation data only.",
+  "coach_schema": "hermeneia.companion-coach/v1",
+  "policy_version": "1.0.0",
+  "scenarios": [
+    {
+      "checks": {
+        "authorship_distinctions": true,
+        "blocked": true,
+        "decision": true,
+        "evidence_corresponds": true,
+        "follows_p2_recommendation": true,
+        "forbidden_facts_absent": true,
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_storage_order": true,
+        "invariant_to_text_and_labels": true,
+        "never_suggests_unavailable": true,
+        "no_engagement_language": true,
+        "repeatable": true,
+        "required_facts": true,
+        "required_uncertainty": true,
+        "required_withheld": true,
+        "schema_valid": true,
+        "silence_honored": true,
+        "statement_fragments": true,
+        "suggestion": true,
+        "unsupported_wording_clean": true,
+        "workspace_unchanged": true
+      },
+      "coach": {
+        "blocked": null,
+        "decision": "suggest",
+        "inputs": {
+          "evaluator_version": "1.1.0",
+          "guide_schema": "hermeneia.guided-study-cycle/v1",
+          "guide_version": "1.0.0",
+          "recommended_step_id": "preserve_question",
+          "registry_sha256": "eafda6b4081c50bdece9540a45c54c0404d0f7c0e05fcff750cf6f19626c9f75",
+          "registry_version": "1.1.0"
+        },
+        "next_action": "Preserve a question beside an Observation",
+        "not_history": "This is a current coaching projection, not study history. It does not record that a suggestion was shown, accepted or helpful.",
+        "noticed": [
+          {
+            "authorship": null,
+            "basis": "current_state",
+            "count": 1,
+            "fact": "governing_question_present",
+            "statement": "A governing question is present now."
+          },
+          {
+            "authorship": "unknown",
+            "basis": "current_state",
+            "count": 6,
+            "fact": "saved_reader_marks",
+            "statement": "6 saved Reader mark(s) are present as current snapshots; when or by whom they were made is not recorded."
+          },
+          {
+            "authorship": "derived",
+            "basis": "durable_history",
+            "count": 6,
+            "fact": "canonical_observations",
+            "statement": "6 canonical Observation(s) are available as compiler-derived source units."
+          }
+        ],
+        "policy_version": "1.0.0",
+        "quiet_reason": null,
+        "schema": "hermeneia.companion-coach/v1",
+        "suggestion": {
+          "action": "Preserve a question beside an Observation",
+          "basis": "current_state",
+          "capability_id": "preserve_question",
+          "definition_version": "1.0.0",
+          "readiness": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "prerequisites_missing": [],
+            "prerequisites_satisfied": [
+              "evidence"
+            ]
+          },
+          "target_surface": "inquiry",
+          "title": "Preserve an inquiry question"
+        },
+        "uncertainty": [
+          {
+            "code": "ABSENCE_NOT_PROOF",
+            "source": "P1 preserve_question.coverage_or_unknown_notes",
+            "statement": "Absence of an extant record is not proof that an operation never occurred."
+          },
+          {
+            "code": "HISTORY_NOT_RECORDED",
+            "source": "P2 preserve_question.history_support",
+            "statement": "Without an extant supported inquiry note, historical question preservation is unknown; mutable highlight question fields are not separate question identities."
+          }
+        ],
+        "why_now": "Retain a separately identified question without forcing a conclusion. Keep uncertainty beside its evidence. A separately identified inquiry question is not established by this snapshot. Resume at the earliest step whose current material is not supported; missing prerequisites are explained.",
+        "withheld": [
+          {
+            "capability_id": "governing_question",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "A governing question is present now; its formulation history is not recorded."
+          },
+          {
+            "capability_id": "read_source",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Readable source material is available. Reading and comprehension are not measured."
+          },
+          {
+            "capability_id": "mark_evidence",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Saved Reader marks are available; historical marking and authorship remain unknown."
+          },
+          {
+            "capability_id": "record_observation",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Canonical source units are available for inspection; compiler segmentation is distinct from human attention."
+          },
+          {
+            "capability_id": "organize_evidence",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          },
+          {
+            "capability_id": "explore_perspective",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          },
+          {
+            "capability_id": "form_interpretation",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "MISSING_PERSPECTIVE: A named saved or explicitly supplied current Perspective frame is required."
+          },
+          {
+            "capability_id": "challenge_interpretation",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "NO_INTERPRETATION: An eligible canonical Interpretation or staged interpretation proposal is required."
+          },
+          {
+            "capability_id": "review_blueprint",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "NO_BLUEPRINT: An eligible saved Blueprint is required."
+          },
+          {
+            "capability_id": "review_lineage",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          }
+        ]
+      },
+      "diagnostics": {
+        "authorship": [],
+        "correspondence": [],
+        "engagement": [],
+        "schema": [],
+        "unsupported_wording": []
+      },
+      "expected_silence": "not_acceptable",
+      "fact_counts": {
+        "canonical_observations": 6,
+        "governing_question_present": 1,
+        "saved_reader_marks": 6
+      },
+      "p2_recommended_step_id": "preserve_question",
+      "scenario_id": "T1_heavy_highlighter_weak_synthesis",
+      "source": "p5"
+    },
+    {
+      "checks": {
+        "authorship_distinctions": true,
+        "blocked": true,
+        "decision": true,
+        "evidence_corresponds": true,
+        "follows_p2_recommendation": true,
+        "forbidden_facts_absent": true,
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_storage_order": true,
+        "invariant_to_text_and_labels": true,
+        "never_suggests_unavailable": true,
+        "no_engagement_language": true,
+        "repeatable": true,
+        "required_facts": true,
+        "required_uncertainty": true,
+        "required_withheld": true,
+        "schema_valid": true,
+        "silence_honored": true,
+        "statement_fragments": true,
+        "suggestion": true,
+        "unsupported_wording_clean": true,
+        "workspace_unchanged": true
+      },
+      "coach": {
+        "blocked": null,
+        "decision": "suggest",
+        "inputs": {
+          "evaluator_version": "1.1.0",
+          "guide_schema": "hermeneia.guided-study-cycle/v1",
+          "guide_version": "1.0.0",
+          "recommended_step_id": "challenge_interpretation",
+          "registry_sha256": "eafda6b4081c50bdece9540a45c54c0404d0f7c0e05fcff750cf6f19626c9f75",
+          "registry_version": "1.1.0"
+        },
+        "next_action": "Search source passages for counterevidence",
+        "not_history": "This is a current coaching projection, not study history. It does not record that a suggestion was shown, accepted or helpful.",
+        "noticed": [
+          {
+            "authorship": null,
+            "basis": "current_state",
+            "count": 1,
+            "fact": "governing_question_present",
+            "statement": "A governing question is present now."
+          },
+          {
+            "authorship": "derived",
+            "basis": "durable_history",
+            "count": 6,
+            "fact": "canonical_observations",
+            "statement": "6 canonical Observation(s) are available as compiler-derived source units."
+          },
+          {
+            "authorship": "unknown",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "saved_frames",
+            "statement": "1 saved Perspective frame(s) are declared; a frame declaration is not a run."
+          },
+          {
+            "authorship": "human",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "interpretation_material",
+            "statement": "1 steward-authored Interpretation(s) are retained."
+          }
+        ],
+        "policy_version": "1.0.0",
+        "quiet_reason": null,
+        "schema": "hermeneia.companion-coach/v1",
+        "suggestion": {
+          "action": "Search source passages for counterevidence",
+          "basis": "durable_history",
+          "capability_id": "challenge_interpretation",
+          "definition_version": "1.0.0",
+          "readiness": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "prerequisites_missing": [],
+            "prerequisites_satisfied": [
+              "interpretation",
+              "observation"
+            ]
+          },
+          "target_surface": "search",
+          "title": "Challenge an interpretation"
+        },
+        "uncertainty": [
+          {
+            "code": "ABSENCE_NOT_PROOF",
+            "source": "P1 challenge_interpretation.coverage_or_unknown_notes",
+            "statement": "Absence of an extant record is not proof that an operation never occurred."
+          },
+          {
+            "code": "HISTORY_NOT_RECORDED",
+            "source": "P2 challenge_interpretation.history_support",
+            "statement": "A proposal-scoped Critic report proves evaluation output, not human review or deliberate contradiction-seeking; rejection alone is not a challenge event."
+          }
+        ],
+        "why_now": "Check a proposal or interpretation against its supporting evidence and alternatives. Examine counterevidence and alternatives. Current records do not establish that human review occurred. An attributable Interpretation is retained. Check counterevidence next; earlier method actions are not reconstructed as completed.",
+        "withheld": [
+          {
+            "capability_id": "governing_question",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "A governing question is present now; its formulation history is not recorded."
+          },
+          {
+            "capability_id": "read_source",
+            "code": "NOT_RECONSTRUCTED_BY_RESUMPTION",
+            "detail": "An attributable Interpretation is retained. Check counterevidence next; earlier method actions are not reconstructed as completed."
+          },
+          {
+            "capability_id": "mark_evidence",
+            "code": "NOT_RECONSTRUCTED_BY_RESUMPTION",
+            "detail": "An attributable Interpretation is retained. Check counterevidence next; earlier method actions are not reconstructed as completed."
+          },
+          {
+            "capability_id": "record_observation",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Canonical source units are available for inspection; compiler segmentation is distinct from human attention."
+          },
+          {
+            "capability_id": "preserve_question",
+            "code": "NOT_RECONSTRUCTED_BY_RESUMPTION",
+            "detail": "An attributable Interpretation is retained. Check counterevidence next; earlier method actions are not reconstructed as completed."
+          },
+          {
+            "capability_id": "organize_evidence",
+            "code": "NOT_RECONSTRUCTED_BY_RESUMPTION",
+            "detail": "An attributable Interpretation is retained. Check counterevidence next; earlier method actions are not reconstructed as completed."
+          },
+          {
+            "capability_id": "explore_perspective",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "A saved or explicitly selected frame is available. A frame is not a recorded Perspective execution."
+          },
+          {
+            "capability_id": "form_interpretation",
+            "code": "NARROW_HISTORY_RETAINED",
+            "detail": "The narrowly defined retained result is supported; no mastery, complete history or unrecorded human action is inferred."
+          },
+          {
+            "capability_id": "review_blueprint",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "NO_BLUEPRINT: An eligible saved Blueprint is required."
+          },
+          {
+            "capability_id": "review_lineage",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          }
+        ]
+      },
+      "diagnostics": {
+        "authorship": [],
+        "correspondence": [],
+        "engagement": [],
+        "schema": [],
+        "unsupported_wording": []
+      },
+      "expected_silence": "not_acceptable",
+      "fact_counts": {
+        "canonical_observations": 6,
+        "governing_question_present": 1,
+        "interpretation_material": {
+          "human": 1
+        },
+        "saved_frames": 1
+      },
+      "p2_recommended_step_id": "challenge_interpretation",
+      "scenario_id": "T2_early_interpreter_no_contradiction",
+      "source": "p5"
+    },
+    {
+      "checks": {
+        "authorship_distinctions": true,
+        "blocked": true,
+        "decision": true,
+        "evidence_corresponds": true,
+        "follows_p2_recommendation": true,
+        "forbidden_facts_absent": true,
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_storage_order": true,
+        "invariant_to_text_and_labels": true,
+        "never_suggests_unavailable": true,
+        "no_engagement_language": true,
+        "repeatable": true,
+        "required_facts": true,
+        "required_uncertainty": true,
+        "required_withheld": true,
+        "schema_valid": true,
+        "silence_honored": true,
+        "statement_fragments": true,
+        "suggestion": true,
+        "unsupported_wording_clean": true,
+        "workspace_unchanged": true
+      },
+      "coach": {
+        "blocked": null,
+        "decision": "suggest",
+        "inputs": {
+          "evaluator_version": "1.1.0",
+          "guide_schema": "hermeneia.guided-study-cycle/v1",
+          "guide_version": "1.0.0",
+          "recommended_step_id": "governing_question",
+          "registry_sha256": "eafda6b4081c50bdece9540a45c54c0404d0f7c0e05fcff750cf6f19626c9f75",
+          "registry_version": "1.1.0"
+        },
+        "next_action": "Set or revisit the governing question",
+        "not_history": "This is a current coaching projection, not study history. It does not record that a suggestion was shown, accepted or helpful.",
+        "noticed": [
+          {
+            "authorship": "derived",
+            "basis": "durable_history",
+            "count": 6,
+            "fact": "canonical_observations",
+            "statement": "6 canonical Observation(s) are available as compiler-derived source units."
+          },
+          {
+            "authorship": "unknown",
+            "basis": "durable_history",
+            "count": 4,
+            "fact": "inquiry_questions",
+            "statement": "4 inquiry question(s) are retained beside Observations."
+          }
+        ],
+        "policy_version": "1.0.0",
+        "quiet_reason": null,
+        "schema": "hermeneia.companion-coach/v1",
+        "suggestion": {
+          "action": "Set or revisit the governing question",
+          "basis": "current_state",
+          "capability_id": "governing_question",
+          "definition_version": "1.0.0",
+          "readiness": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "prerequisites_missing": [],
+            "prerequisites_satisfied": []
+          },
+          "target_surface": "question",
+          "title": "Set a governing question"
+        },
+        "uncertainty": [
+          {
+            "code": "ABSENCE_NOT_PROOF",
+            "source": "P1 governing_question.coverage_or_unknown_notes",
+            "statement": "Absence of an extant record is not proof that an operation never occurred."
+          },
+          {
+            "code": "HISTORY_NOT_RECORDED",
+            "source": "P2 governing_question.history_support",
+            "statement": "Current governing questions are mutable snapshots; their formulation and revisions are not recorded as a complete historical act."
+          },
+          {
+            "code": "COVERAGE_INCOMPLETE",
+            "source": "P2 lineage_coverage",
+            "statement": "This workspace's records do not include: perspectives. Hermeneia cannot establish what those records would show."
+          }
+        ],
+        "why_now": "Give inquiry an explicit human purpose. A current governing question is not established by this snapshot. Set a compass, not a conclusion. Resume at the earliest step whose current material is not supported; missing prerequisites are explained.",
+        "withheld": [
+          {
+            "capability_id": "read_source",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          },
+          {
+            "capability_id": "mark_evidence",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          },
+          {
+            "capability_id": "record_observation",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Canonical source units are available for inspection; compiler segmentation is distinct from human attention."
+          },
+          {
+            "capability_id": "preserve_question",
+            "code": "NARROW_HISTORY_RETAINED",
+            "detail": "The narrowly defined retained result is supported; no mastery, complete history or unrecorded human action is inferred."
+          },
+          {
+            "capability_id": "organize_evidence",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          },
+          {
+            "capability_id": "explore_perspective",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          },
+          {
+            "capability_id": "form_interpretation",
+            "code": "COVERAGE_UNSUPPORTED",
+            "detail": "Required readiness evidence has incomplete coverage."
+          },
+          {
+            "capability_id": "challenge_interpretation",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "NO_INTERPRETATION: An eligible canonical Interpretation or staged interpretation proposal is required."
+          },
+          {
+            "capability_id": "review_blueprint",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "NO_BLUEPRINT: An eligible saved Blueprint is required."
+          },
+          {
+            "capability_id": "review_lineage",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          }
+        ]
+      },
+      "diagnostics": {
+        "authorship": [],
+        "correspondence": [],
+        "engagement": [],
+        "schema": [],
+        "unsupported_wording": []
+      },
+      "expected_silence": "not_acceptable",
+      "fact_counts": {
+        "canonical_observations": 6,
+        "inquiry_questions": 4
+      },
+      "p2_recommended_step_id": "governing_question",
+      "scenario_id": "T3_many_questions_never_resolved",
+      "source": "p5"
+    },
+    {
+      "checks": {
+        "authorship_distinctions": true,
+        "blocked": true,
+        "decision": true,
+        "evidence_corresponds": true,
+        "follows_p2_recommendation": true,
+        "forbidden_facts_absent": true,
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_storage_order": true,
+        "invariant_to_text_and_labels": true,
+        "never_suggests_unavailable": true,
+        "no_engagement_language": true,
+        "repeatable": true,
+        "required_facts": true,
+        "required_uncertainty": true,
+        "required_withheld": true,
+        "schema_valid": true,
+        "silence_honored": true,
+        "statement_fragments": true,
+        "suggestion": true,
+        "unsupported_wording_clean": true,
+        "workspace_unchanged": true
+      },
+      "coach": {
+        "blocked": null,
+        "decision": "suggest",
+        "inputs": {
+          "evaluator_version": "1.1.0",
+          "guide_schema": "hermeneia.guided-study-cycle/v1",
+          "guide_version": "1.0.0",
+          "recommended_step_id": "read_source",
+          "registry_sha256": "eafda6b4081c50bdece9540a45c54c0404d0f7c0e05fcff750cf6f19626c9f75",
+          "registry_version": "1.1.0"
+        },
+        "next_action": "Open the source and read a small passage",
+        "not_history": "This is a current coaching projection, not study history. It does not record that a suggestion was shown, accepted or helpful.",
+        "noticed": [
+          {
+            "authorship": null,
+            "basis": "current_state",
+            "count": 1,
+            "fact": "governing_question_present",
+            "statement": "A governing question is present now."
+          },
+          {
+            "authorship": "derived",
+            "basis": "durable_history",
+            "count": 6,
+            "fact": "canonical_observations",
+            "statement": "6 canonical Observation(s) are available as compiler-derived source units."
+          },
+          {
+            "authorship": "model",
+            "basis": "durable_history",
+            "count": 2,
+            "fact": "retained_perspective_executions",
+            "statement": "2 retained Perspective execution(s) are model-generated; keeping them is not agreement."
+          },
+          {
+            "authorship": "model",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "interpretation_material",
+            "statement": "1 model proposal(s) are present; a proposal is not a steward-authored Interpretation."
+          }
+        ],
+        "policy_version": "1.0.0",
+        "quiet_reason": null,
+        "schema": "hermeneia.companion-coach/v1",
+        "suggestion": {
+          "action": "Open the source and read a small passage",
+          "basis": "current_state",
+          "capability_id": "read_source",
+          "definition_version": "1.0.0",
+          "readiness": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "prerequisites_missing": [],
+            "prerequisites_satisfied": [
+              "reader_material"
+            ]
+          },
+          "target_surface": "reader",
+          "title": "Read source material"
+        },
+        "uncertainty": [
+          {
+            "code": "ABSENCE_NOT_PROOF",
+            "source": "P1 read_source.coverage_or_unknown_notes",
+            "statement": "Absence of an extant record is not proof that an operation never occurred."
+          },
+          {
+            "code": "HISTORY_NOT_RECORDED",
+            "source": "P2 read_source.history_support",
+            "statement": "Registration, extraction and aggregate progress do not prove a reading session or comprehension."
+          }
+        ],
+        "why_now": "Encounter the source before interpretation. Readable source material is available. Reading and comprehension are not measured. Resume at the earliest step whose current material is not supported; missing prerequisites are explained.",
+        "withheld": [
+          {
+            "capability_id": "governing_question",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "A governing question is present now; its formulation history is not recorded."
+          },
+          {
+            "capability_id": "mark_evidence",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          },
+          {
+            "capability_id": "record_observation",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Canonical source units are available for inspection; compiler segmentation is distinct from human attention."
+          },
+          {
+            "capability_id": "preserve_question",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          },
+          {
+            "capability_id": "organize_evidence",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          },
+          {
+            "capability_id": "explore_perspective",
+            "code": "NARROW_HISTORY_RETAINED",
+            "detail": "The narrowly defined retained result is supported; no mastery, complete history or unrecorded human action is inferred."
+          },
+          {
+            "capability_id": "form_interpretation",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "MISSING_PERSPECTIVE: A named saved or explicitly supplied current Perspective frame is required."
+          },
+          {
+            "capability_id": "challenge_interpretation",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          },
+          {
+            "capability_id": "review_blueprint",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "NO_BLUEPRINT: An eligible saved Blueprint is required."
+          },
+          {
+            "capability_id": "review_lineage",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          }
+        ]
+      },
+      "diagnostics": {
+        "authorship": [],
+        "correspondence": [],
+        "engagement": [],
+        "schema": [],
+        "unsupported_wording": []
+      },
+      "expected_silence": "not_acceptable",
+      "fact_counts": {
+        "canonical_observations": 6,
+        "governing_question_present": 1,
+        "interpretation_material": {
+          "model": 1
+        },
+        "retained_perspective_executions": {
+          "model": 2
+        }
+      },
+      "p2_recommended_step_id": "read_source",
+      "scenario_id": "T4_model_perspective_reliance",
+      "source": "p5"
+    },
+    {
+      "checks": {
+        "authorship_distinctions": true,
+        "blocked": true,
+        "decision": true,
+        "evidence_corresponds": true,
+        "follows_p2_recommendation": true,
+        "forbidden_facts_absent": true,
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_storage_order": true,
+        "invariant_to_text_and_labels": true,
+        "never_suggests_unavailable": true,
+        "no_engagement_language": true,
+        "repeatable": true,
+        "required_facts": true,
+        "required_uncertainty": true,
+        "required_withheld": true,
+        "schema_valid": true,
+        "silence_honored": true,
+        "statement_fragments": true,
+        "suggestion": true,
+        "unsupported_wording_clean": true,
+        "workspace_unchanged": true
+      },
+      "coach": {
+        "blocked": null,
+        "decision": "remain_quiet",
+        "inputs": {
+          "evaluator_version": "1.1.0",
+          "guide_schema": "hermeneia.guided-study-cycle/v1",
+          "guide_version": "1.0.0",
+          "recommended_step_id": "review_lineage",
+          "registry_sha256": "eafda6b4081c50bdece9540a45c54c0404d0f7c0e05fcff750cf6f19626c9f75",
+          "registry_version": "1.1.0"
+        },
+        "next_action": null,
+        "not_history": "This is a current coaching projection, not study history. It does not record that a suggestion was shown, accepted or helpful.",
+        "noticed": [
+          {
+            "authorship": null,
+            "basis": "current_state",
+            "count": 1,
+            "fact": "governing_question_present",
+            "statement": "A governing question is present now."
+          },
+          {
+            "authorship": "unknown",
+            "basis": "current_state",
+            "count": 3,
+            "fact": "saved_reader_marks",
+            "statement": "3 saved Reader mark(s) are present as current snapshots; when or by whom they were made is not recorded."
+          },
+          {
+            "authorship": null,
+            "basis": "current_state",
+            "count": 3,
+            "fact": "grouped_marks",
+            "statement": "3 saved Reader mark(s) currently carry group labels; labels are not organization history."
+          },
+          {
+            "authorship": "derived",
+            "basis": "durable_history",
+            "count": 6,
+            "fact": "canonical_observations",
+            "statement": "6 canonical Observation(s) are available as compiler-derived source units."
+          },
+          {
+            "authorship": "unknown",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "inquiry_questions",
+            "statement": "1 inquiry question(s) are retained beside Observations."
+          },
+          {
+            "authorship": "unknown",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "saved_frames",
+            "statement": "1 saved Perspective frame(s) are declared; a frame declaration is not a run."
+          },
+          {
+            "authorship": "human",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "interpretation_material",
+            "statement": "1 steward-authored Interpretation(s) are retained."
+          },
+          {
+            "authorship": "derived",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "blueprints",
+            "statement": "1 saved Blueprint(s) are retained; review of a Blueprint is not recorded."
+          }
+        ],
+        "policy_version": "1.0.0",
+        "quiet_reason": "OPTIONAL_REVIEW_ONLY",
+        "schema": "hermeneia.companion-coach/v1",
+        "suggestion": null,
+        "uncertainty": [],
+        "why_now": "An attributable Interpretation and a Blueprint are retained. Inspect their Lineage; earlier actions and review history remain unknown. The remaining guide step is optional review, which is not recorded, so the coach does not interrupt.",
+        "withheld": [
+          {
+            "capability_id": "governing_question",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "A governing question is present now; its formulation history is not recorded."
+          },
+          {
+            "capability_id": "read_source",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Readable source material is available. Reading and comprehension are not measured."
+          },
+          {
+            "capability_id": "mark_evidence",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Saved Reader marks are available; historical marking and authorship remain unknown."
+          },
+          {
+            "capability_id": "record_observation",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Canonical source units are available for inspection; compiler segmentation is distinct from human attention."
+          },
+          {
+            "capability_id": "preserve_question",
+            "code": "NARROW_HISTORY_RETAINED",
+            "detail": "The narrowly defined retained result is supported; no mastery, complete history or unrecorded human action is inferred."
+          },
+          {
+            "capability_id": "organize_evidence",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "At least two saved marks have current group labels. These labels are neither bucket history nor Scope admission."
+          },
+          {
+            "capability_id": "explore_perspective",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "A saved or explicitly selected frame is available. A frame is not a recorded Perspective execution."
+          },
+          {
+            "capability_id": "form_interpretation",
+            "code": "NARROW_HISTORY_RETAINED",
+            "detail": "The narrowly defined retained result is supported; no mastery, complete history or unrecorded human action is inferred."
+          },
+          {
+            "capability_id": "challenge_interpretation",
+            "code": "NOT_RECONSTRUCTED_BY_RESUMPTION",
+            "detail": "An attributable Interpretation and a Blueprint are retained. Inspect their Lineage; earlier actions and review history remain unknown."
+          },
+          {
+            "capability_id": "review_blueprint",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "A saved Blueprint is available. Creation or supersession does not establish review or evidence-driven revision."
+          }
+        ]
+      },
+      "diagnostics": {
+        "authorship": [],
+        "correspondence": [],
+        "engagement": [],
+        "schema": [],
+        "unsupported_wording": []
+      },
+      "expected_silence": "preferred",
+      "fact_counts": {
+        "blueprints": 1,
+        "canonical_observations": 6,
+        "governing_question_present": 1,
+        "grouped_marks": 3,
+        "inquiry_questions": 1,
+        "interpretation_material": {
+          "human": 1
+        },
+        "saved_frames": 1,
+        "saved_reader_marks": 3
+      },
+      "p2_recommended_step_id": "review_lineage",
+      "scenario_id": "T5_organizer_never_reviews_blueprint",
+      "source": "p5"
+    },
+    {
+      "checks": {
+        "authorship_distinctions": true,
+        "blocked": true,
+        "decision": true,
+        "evidence_corresponds": true,
+        "follows_p2_recommendation": true,
+        "forbidden_facts_absent": true,
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_storage_order": true,
+        "invariant_to_text_and_labels": true,
+        "never_suggests_unavailable": true,
+        "no_engagement_language": true,
+        "repeatable": true,
+        "required_facts": true,
+        "required_uncertainty": true,
+        "required_withheld": true,
+        "schema_valid": true,
+        "silence_honored": true,
+        "statement_fragments": true,
+        "suggestion": true,
+        "unsupported_wording_clean": true,
+        "workspace_unchanged": true
+      },
+      "coach": {
+        "blocked": null,
+        "decision": "suggest",
+        "inputs": {
+          "evaluator_version": "1.1.0",
+          "guide_schema": "hermeneia.guided-study-cycle/v1",
+          "guide_version": "1.0.0",
+          "recommended_step_id": "form_interpretation",
+          "registry_sha256": "eafda6b4081c50bdece9540a45c54c0404d0f7c0e05fcff750cf6f19626c9f75",
+          "registry_version": "1.1.0"
+        },
+        "next_action": "Form or inspect a provisional interpretation",
+        "not_history": "This is a current coaching projection, not study history. It does not record that a suggestion was shown, accepted or helpful.",
+        "noticed": [
+          {
+            "authorship": null,
+            "basis": "current_state",
+            "count": 1,
+            "fact": "governing_question_present",
+            "statement": "A governing question is present now."
+          },
+          {
+            "authorship": "unknown",
+            "basis": "current_state",
+            "count": 2,
+            "fact": "saved_reader_marks",
+            "statement": "2 saved Reader mark(s) are present as current snapshots; when or by whom they were made is not recorded."
+          },
+          {
+            "authorship": null,
+            "basis": "current_state",
+            "count": 2,
+            "fact": "grouped_marks",
+            "statement": "2 saved Reader mark(s) currently carry group labels; labels are not organization history."
+          },
+          {
+            "authorship": "derived",
+            "basis": "durable_history",
+            "count": 6,
+            "fact": "canonical_observations",
+            "statement": "6 canonical Observation(s) are available as compiler-derived source units."
+          },
+          {
+            "authorship": "unknown",
+            "basis": "durable_history",
+            "count": 2,
+            "fact": "inquiry_questions",
+            "statement": "2 inquiry question(s) are retained beside Observations."
+          },
+          {
+            "authorship": "unknown",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "saved_frames",
+            "statement": "1 saved Perspective frame(s) are declared; a frame declaration is not a run."
+          }
+        ],
+        "policy_version": "1.0.0",
+        "quiet_reason": null,
+        "schema": "hermeneia.companion-coach/v1",
+        "suggestion": {
+          "action": "Form or inspect a provisional interpretation",
+          "basis": "current_state",
+          "capability_id": "form_interpretation",
+          "definition_version": "1.0.0",
+          "readiness": {
+            "availability": "available",
+            "availability_reason_code": "READY",
+            "prerequisites_missing": [],
+            "prerequisites_satisfied": [
+              "observation",
+              "perspective_frame"
+            ]
+          },
+          "target_surface": "interpretation",
+          "title": "Form a supported interpretation"
+        },
+        "uncertainty": [
+          {
+            "code": "ABSENCE_NOT_PROOF",
+            "source": "P1 form_interpretation.coverage_or_unknown_notes",
+            "statement": "Absence of an extant record is not proof that an operation never occurred."
+          },
+          {
+            "code": "HISTORY_NOT_RECORDED",
+            "source": "P2 form_interpretation.history_support",
+            "statement": "A proposal is not a canonical Interpretation; unknown origin cannot establish attributable formation. Extant records are not complete formation history."
+          },
+          {
+            "code": "RECORDS_OMITTED",
+            "source": "P2 lineage_coverage.omitted",
+            "statement": "Some records are omitted from this projection (for example, records from sources excluded from analysis, or records whose parents are unavailable) and do not inform this coaching result."
+          }
+        ],
+        "why_now": "Develop an attributable interpretation anchored in canonical evidence. Use the preserved Observation and a frame to develop a provisional interpretation; retain what supports it. Resume at the earliest step whose current material is not supported; missing prerequisites are explained.",
+        "withheld": [
+          {
+            "capability_id": "governing_question",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "A governing question is present now; its formulation history is not recorded."
+          },
+          {
+            "capability_id": "read_source",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Readable source material is available. Reading and comprehension are not measured."
+          },
+          {
+            "capability_id": "mark_evidence",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Saved Reader marks are available; historical marking and authorship remain unknown."
+          },
+          {
+            "capability_id": "record_observation",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Canonical source units are available for inspection; compiler segmentation is distinct from human attention."
+          },
+          {
+            "capability_id": "preserve_question",
+            "code": "NARROW_HISTORY_RETAINED",
+            "detail": "The narrowly defined retained result is supported; no mastery, complete history or unrecorded human action is inferred."
+          },
+          {
+            "capability_id": "organize_evidence",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "At least two saved marks have current group labels. These labels are neither bucket history nor Scope admission."
+          },
+          {
+            "capability_id": "explore_perspective",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "A saved or explicitly selected frame is available. A frame is not a recorded Perspective execution."
+          },
+          {
+            "capability_id": "challenge_interpretation",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "NO_INTERPRETATION: An eligible canonical Interpretation or staged interpretation proposal is required."
+          },
+          {
+            "capability_id": "review_blueprint",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "NO_BLUEPRINT: An eligible saved Blueprint is required."
+          },
+          {
+            "capability_id": "review_lineage",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          }
+        ]
+      },
+      "diagnostics": {
+        "authorship": [],
+        "correspondence": [],
+        "engagement": [],
+        "schema": [],
+        "unsupported_wording": []
+      },
+      "expected_silence": "not_acceptable",
+      "fact_counts": {
+        "canonical_observations": 6,
+        "governing_question_present": 1,
+        "grouped_marks": 2,
+        "inquiry_questions": 2,
+        "saved_frames": 1,
+        "saved_reader_marks": 2
+      },
+      "p2_recommended_step_id": "form_interpretation",
+      "scenario_id": "T6_careful_worker_unresolved_questions",
+      "source": "p5"
+    },
+    {
+      "checks": {
+        "authorship_distinctions": true,
+        "blocked": true,
+        "decision": true,
+        "evidence_corresponds": true,
+        "follows_p2_recommendation": true,
+        "forbidden_facts_absent": true,
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_storage_order": true,
+        "invariant_to_text_and_labels": true,
+        "never_suggests_unavailable": true,
+        "no_engagement_language": true,
+        "repeatable": true,
+        "required_facts": true,
+        "required_uncertainty": true,
+        "required_withheld": true,
+        "schema_valid": true,
+        "silence_honored": true,
+        "statement_fragments": true,
+        "suggestion": true,
+        "unsupported_wording_clean": true,
+        "workspace_unchanged": true
+      },
+      "coach": {
+        "blocked": null,
+        "decision": "remain_quiet",
+        "inputs": {
+          "evaluator_version": "1.1.0",
+          "guide_schema": "hermeneia.guided-study-cycle/v1",
+          "guide_version": "1.0.0",
+          "recommended_step_id": "review_lineage",
+          "registry_sha256": "eafda6b4081c50bdece9540a45c54c0404d0f7c0e05fcff750cf6f19626c9f75",
+          "registry_version": "1.1.0"
+        },
+        "next_action": null,
+        "not_history": "This is a current coaching projection, not study history. It does not record that a suggestion was shown, accepted or helpful.",
+        "noticed": [
+          {
+            "authorship": null,
+            "basis": "current_state",
+            "count": 1,
+            "fact": "governing_question_present",
+            "statement": "A governing question is present now."
+          },
+          {
+            "authorship": "unknown",
+            "basis": "current_state",
+            "count": 3,
+            "fact": "saved_reader_marks",
+            "statement": "3 saved Reader mark(s) are present as current snapshots; when or by whom they were made is not recorded."
+          },
+          {
+            "authorship": null,
+            "basis": "current_state",
+            "count": 3,
+            "fact": "grouped_marks",
+            "statement": "3 saved Reader mark(s) currently carry group labels; labels are not organization history."
+          },
+          {
+            "authorship": "derived",
+            "basis": "durable_history",
+            "count": 6,
+            "fact": "canonical_observations",
+            "statement": "6 canonical Observation(s) are available as compiler-derived source units."
+          },
+          {
+            "authorship": "unknown",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "inquiry_questions",
+            "statement": "1 inquiry question(s) are retained beside Observations."
+          },
+          {
+            "authorship": "unknown",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "saved_frames",
+            "statement": "1 saved Perspective frame(s) are declared; a frame declaration is not a run."
+          },
+          {
+            "authorship": "model",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "retained_perspective_executions",
+            "statement": "1 retained Perspective execution(s) are model-generated; keeping them is not agreement."
+          },
+          {
+            "authorship": "accepted_model",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "interpretation_material",
+            "statement": "1 accepted model contribution(s) are retained as Interpretations."
+          },
+          {
+            "authorship": "human",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "interpretation_material",
+            "statement": "1 steward-authored Interpretation(s) are retained."
+          },
+          {
+            "authorship": "model",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "interpretation_material",
+            "statement": "1 model proposal(s) are present; a proposal is not a steward-authored Interpretation."
+          },
+          {
+            "authorship": "derived",
+            "basis": "durable_history",
+            "count": 1,
+            "fact": "blueprints",
+            "statement": "1 saved Blueprint(s) are retained; review of a Blueprint is not recorded."
+          }
+        ],
+        "policy_version": "1.0.0",
+        "quiet_reason": "OPTIONAL_REVIEW_ONLY",
+        "schema": "hermeneia.companion-coach/v1",
+        "suggestion": null,
+        "uncertainty": [],
+        "why_now": "An attributable Interpretation and a Blueprint are retained. Inspect their Lineage; earlier actions and review history remain unknown. The remaining guide step is optional review, which is not recorded, so the coach does not interrupt.",
+        "withheld": [
+          {
+            "capability_id": "governing_question",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "A governing question is present now; its formulation history is not recorded."
+          },
+          {
+            "capability_id": "read_source",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Readable source material is available. Reading and comprehension are not measured."
+          },
+          {
+            "capability_id": "mark_evidence",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Saved Reader marks are available; historical marking and authorship remain unknown."
+          },
+          {
+            "capability_id": "record_observation",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "Canonical source units are available for inspection; compiler segmentation is distinct from human attention."
+          },
+          {
+            "capability_id": "preserve_question",
+            "code": "NARROW_HISTORY_RETAINED",
+            "detail": "The narrowly defined retained result is supported; no mastery, complete history or unrecorded human action is inferred."
+          },
+          {
+            "capability_id": "organize_evidence",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "At least two saved marks have current group labels. These labels are neither bucket history nor Scope admission."
+          },
+          {
+            "capability_id": "explore_perspective",
+            "code": "NARROW_HISTORY_RETAINED",
+            "detail": "The narrowly defined retained result is supported; no mastery, complete history or unrecorded human action is inferred."
+          },
+          {
+            "capability_id": "form_interpretation",
+            "code": "NARROW_HISTORY_RETAINED",
+            "detail": "The narrowly defined retained result is supported; no mastery, complete history or unrecorded human action is inferred."
+          },
+          {
+            "capability_id": "challenge_interpretation",
+            "code": "NOT_RECONSTRUCTED_BY_RESUMPTION",
+            "detail": "An attributable Interpretation and a Blueprint are retained. Inspect their Lineage; earlier actions and review history remain unknown."
+          },
+          {
+            "capability_id": "review_blueprint",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "A saved Blueprint is available. Creation or supersession does not establish review or evidence-driven revision."
+          }
+        ]
+      },
+      "diagnostics": {
+        "authorship": [],
+        "correspondence": [],
+        "engagement": [],
+        "schema": [],
+        "unsupported_wording": []
+      },
+      "expected_silence": "preferred",
+      "fact_counts": {
+        "blueprints": 1,
+        "canonical_observations": 6,
+        "governing_question_present": 1,
+        "grouped_marks": 3,
+        "inquiry_questions": 1,
+        "interpretation_material": {
+          "accepted_model": 1,
+          "human": 1,
+          "model": 1
+        },
+        "retained_perspective_executions": {
+          "model": 1
+        },
+        "saved_frames": 1,
+        "saved_reader_marks": 3
+      },
+      "p2_recommended_step_id": "review_lineage",
+      "scenario_id": "T7_advanced_self_directed",
+      "source": "p5"
+    },
+    {
+      "checks": {
+        "authorship_distinctions": true,
+        "blocked": true,
+        "decision": true,
+        "evidence_corresponds": true,
+        "follows_p2_recommendation": true,
+        "forbidden_facts_absent": true,
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_storage_order": true,
+        "invariant_to_text_and_labels": true,
+        "never_suggests_unavailable": true,
+        "no_engagement_language": true,
+        "repeatable": true,
+        "required_facts": true,
+        "required_uncertainty": true,
+        "required_withheld": true,
+        "schema_valid": true,
+        "silence_honored": true,
+        "statement_fragments": true,
+        "suggestion": true,
+        "unsupported_wording_clean": true,
+        "workspace_unchanged": true
+      },
+      "coach": {
+        "blocked": {
+          "availability": "not_yet_available",
+          "capability_id": "read_source",
+          "prerequisites_missing": [
+            "reader_material"
+          ],
+          "reason": "An eligible source extraction with readable text is required.",
+          "reason_code": "MISSING_SOURCE"
+        },
+        "decision": "remain_quiet",
+        "inputs": {
+          "evaluator_version": "1.1.0",
+          "guide_schema": "hermeneia.guided-study-cycle/v1",
+          "guide_version": "1.0.0",
+          "recommended_step_id": "read_source",
+          "registry_sha256": "eafda6b4081c50bdece9540a45c54c0404d0f7c0e05fcff750cf6f19626c9f75",
+          "registry_version": "1.1.0"
+        },
+        "next_action": null,
+        "not_history": "This is a current coaching projection, not study history. It does not record that a suggestion was shown, accepted or helpful.",
+        "noticed": [
+          {
+            "authorship": null,
+            "basis": "current_state",
+            "count": 1,
+            "fact": "governing_question_present",
+            "statement": "A governing question is present now."
+          }
+        ],
+        "policy_version": "1.0.0",
+        "quiet_reason": "NEXT_STEP_BLOCKED",
+        "schema": "hermeneia.companion-coach/v1",
+        "suggestion": null,
+        "uncertainty": [],
+        "why_now": "The guide's next step, Read source material, is not available now: An eligible source extraction with readable text is required.",
+        "withheld": [
+          {
+            "capability_id": "governing_question",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "A governing question is present now; its formulation history is not recorded."
+          },
+          {
+            "capability_id": "mark_evidence",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "MISSING_SOURCE: An eligible source extraction with readable text is required."
+          },
+          {
+            "capability_id": "record_observation",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "INSUFFICIENT_EVIDENCE: Retain eligible evidence with a stable source anchor first."
+          },
+          {
+            "capability_id": "preserve_question",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "INSUFFICIENT_EVIDENCE: Retain eligible evidence with a stable source anchor first."
+          },
+          {
+            "capability_id": "organize_evidence",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "INSUFFICIENT_EVIDENCE: At least two distinct eligible evidence identities are required."
+          },
+          {
+            "capability_id": "explore_perspective",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "INSUFFICIENT_EVIDENCE: Retain eligible evidence with a stable source anchor first."
+          },
+          {
+            "capability_id": "form_interpretation",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "INSUFFICIENT_EVIDENCE: An eligible canonical Observation is required."
+          },
+          {
+            "capability_id": "challenge_interpretation",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "NO_INTERPRETATION: An eligible canonical Interpretation or staged interpretation proposal is required."
+          },
+          {
+            "capability_id": "review_blueprint",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "NO_BLUEPRINT: An eligible saved Blueprint is required."
+          },
+          {
+            "capability_id": "review_lineage",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          }
+        ]
+      },
+      "diagnostics": {
+        "authorship": [],
+        "correspondence": [],
+        "engagement": [],
+        "schema": [],
+        "unsupported_wording": []
+      },
+      "expected_silence": "required",
+      "fact_counts": {
+        "governing_question_present": 1
+      },
+      "p2_recommended_step_id": "read_source",
+      "scenario_id": "N1_question_without_source",
+      "source": "p6_negative"
+    },
+    {
+      "checks": {
+        "authorship_distinctions": true,
+        "blocked": true,
+        "decision": true,
+        "evidence_corresponds": true,
+        "follows_p2_recommendation": true,
+        "forbidden_facts_absent": true,
+        "forbidden_suggestion": false,
+        "invariant_to_item_order": true,
+        "invariant_to_storage_order": true,
+        "invariant_to_text_and_labels": true,
+        "never_suggests_unavailable": true,
+        "no_engagement_language": true,
+        "repeatable": true,
+        "required_facts": true,
+        "required_uncertainty": true,
+        "required_withheld": true,
+        "schema_valid": true,
+        "silence_honored": true,
+        "statement_fragments": true,
+        "suggestion": true,
+        "unsupported_wording_clean": true,
+        "workspace_unchanged": true
+      },
+      "coach": {
+        "blocked": {
+          "availability": "unsupported_due_to_missing_history",
+          "capability_id": "read_source",
+          "prerequisites_missing": [
+            "reader_material"
+          ],
+          "reason": "Required readiness evidence has incomplete coverage.",
+          "reason_code": "COVERAGE_UNSUPPORTED"
+        },
+        "decision": "remain_quiet",
+        "inputs": {
+          "evaluator_version": "1.1.0",
+          "guide_schema": "hermeneia.guided-study-cycle/v1",
+          "guide_version": "1.0.0",
+          "recommended_step_id": "read_source",
+          "registry_sha256": "eafda6b4081c50bdece9540a45c54c0404d0f7c0e05fcff750cf6f19626c9f75",
+          "registry_version": "1.1.0"
+        },
+        "next_action": null,
+        "not_history": "This is a current coaching projection, not study history. It does not record that a suggestion was shown, accepted or helpful.",
+        "noticed": [
+          {
+            "authorship": null,
+            "basis": "current_state",
+            "count": 1,
+            "fact": "governing_question_present",
+            "statement": "A governing question is present now."
+          }
+        ],
+        "policy_version": "1.0.0",
+        "quiet_reason": "NEXT_STEP_UNKNOWN",
+        "schema": "hermeneia.companion-coach/v1",
+        "suggestion": null,
+        "uncertainty": [
+          {
+            "code": "COVERAGE_INCOMPLETE",
+            "source": "P2 lineage_coverage",
+            "statement": "This workspace's records do not include: source_extractions. Hermeneia cannot establish what those records would show."
+          },
+          {
+            "code": "RECORDS_OMITTED",
+            "source": "P2 lineage_coverage.omitted",
+            "statement": "Some records are omitted from this projection (for example, records from sources excluded from analysis, or records whose parents are unavailable) and do not inform this coaching result."
+          }
+        ],
+        "why_now": "Readiness for the guide's next step, Read source material, cannot be established from this workspace's records. Required readiness evidence has incomplete coverage.",
+        "withheld": [
+          {
+            "capability_id": "governing_question",
+            "code": "ALREADY_CURRENT_MATERIAL",
+            "detail": "A governing question is present now; its formulation history is not recorded."
+          },
+          {
+            "capability_id": "mark_evidence",
+            "code": "COVERAGE_UNSUPPORTED",
+            "detail": "Required readiness evidence has incomplete coverage."
+          },
+          {
+            "capability_id": "record_observation",
+            "code": "COVERAGE_UNSUPPORTED",
+            "detail": "Required readiness evidence has incomplete coverage."
+          },
+          {
+            "capability_id": "preserve_question",
+            "code": "COVERAGE_UNSUPPORTED",
+            "detail": "Required readiness evidence has incomplete coverage."
+          },
+          {
+            "capability_id": "organize_evidence",
+            "code": "COVERAGE_UNSUPPORTED",
+            "detail": "Required readiness evidence has incomplete coverage."
+          },
+          {
+            "capability_id": "explore_perspective",
+            "code": "COVERAGE_UNSUPPORTED",
+            "detail": "Required readiness evidence has incomplete coverage."
+          },
+          {
+            "capability_id": "form_interpretation",
+            "code": "COVERAGE_UNSUPPORTED",
+            "detail": "Required readiness evidence has incomplete coverage."
+          },
+          {
+            "capability_id": "challenge_interpretation",
+            "code": "COVERAGE_UNSUPPORTED",
+            "detail": "Required readiness evidence has incomplete coverage."
+          },
+          {
+            "capability_id": "review_blueprint",
+            "code": "PREREQUISITE_MISSING",
+            "detail": "NO_BLUEPRINT: An eligible saved Blueprint is required."
+          },
+          {
+            "capability_id": "review_lineage",
+            "code": "LATER_IN_CYCLE",
+            "detail": "The guide suggests the earliest step that is not current material first."
+          }
+        ]
+      },
+      "diagnostics": {
+        "authorship": [],
+        "correspondence": [],
+        "engagement": [],
+        "schema": [],
+        "unsupported_wording": []
+      },
+      "expected_silence": "required",
+      "fact_counts": {
+        "governing_question_present": 1
+      },
+      "p2_recommended_step_id": "read_source",
+      "scenario_id": "N2_legacy_missing_extractions",
+      "source": "p6_negative"
+    }
+  ],
+  "schema": "hermeneia.companion-coach-lab-results/v1"
+}
