@@ -6,6 +6,7 @@ here. A typed source key remains the identity; an event is only a view of it.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import json
 import sqlite3
 from typing import Any
@@ -17,6 +18,7 @@ from hermeneia.perspective_execution_receipts import (
 
 SCHEMA = "hermeneia.study-lineage/v1"
 _AWARD_TABLE = "achievement_awards"
+_ACCEPTED_TABLE = "accepted_perspective_comparisons"
 
 # table: (record type, title, historical time field, content field)
 _SPECS = {
@@ -31,6 +33,7 @@ _SPECS = {
     "perspectives": ("perspective", "Saved Perspective", "created_at", "name"),
     EXECUTION_TABLE: ("retained_perspective_execution", "Retained Perspective execution", "retained_at", None),
     _AWARD_TABLE: ("perspective_achievement_award", "Perspective achievement award", "awarded_at", None),
+    _ACCEPTED_TABLE: ("accepted_perspective_comparison", "Accepted Perspective comparison", "accepted_at", None),
     "proposed_interpretations": ("proposed_interpretation", "Model interpretation proposal", "created_at", "text"),
     "interpretations": ("interpretation", "Canonical Interpretation", "created_at", "text"),
     "narrative_blueprints": ("blueprint", "Saved Blueprint", "created_at", "thesis"),
@@ -190,6 +193,8 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
             required = documented = {"id", "run_id", "receipt_json"}
         if table == _AWARD_TABLE:
             required = documented = {"id", "achievement_id", "rule_id", "rule_version", "receipt_json"}
+        if table == _ACCEPTED_TABLE:
+            required = documented = {"id", "candidate_id", "comparison_json"}
         absent = sorted(documented - set(columns))
         if absent:
             missing_columns[table] = absent
@@ -204,6 +209,7 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
     checking: set[tuple[str, str]] = set()
     execution_receipts: dict[str, dict] = {}
     award_receipts: dict[str, dict] = {}
+    accepted_comparisons: dict[str, dict] = {}
     diagnostics: list[dict] = []
 
     def parent(table: str, identifier: Any) -> dict | None:
@@ -362,11 +368,35 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
                                     "state": "unsupported" if isinstance(exc, UnsupportedAward) else "invalid",
                                     "reason_code": "AWARD_RECEIPT_UNSUPPORTED" if isinstance(exc, UnsupportedAward)
                                                    else "AWARD_RECEIPT_INVALID"})
+        elif table == _ACCEPTED_TABLE:
+            # Spans quote participant responses, so every bound receipt must be
+            # eligible here; envelope validity is not a replay verification.
+            from hermeneia.accepted_perspective_comparisons import record_from_row as comparison_from_row
+            try:
+                record = comparison_from_row(row)
+                ok = sum(candidate.get("id") == row["id"] for candidate in data[table]) == 1
+                for binding in record["binding"]["receipts"]:
+                    receipt_row = parent(EXECUTION_TABLE, binding["receipt_id"])
+                    ok = (ok and receipt_row is not None and eligible(EXECUTION_TABLE, receipt_row)
+                          and "sha256:" + hashlib.sha256(receipt_row["receipt_json"].encode("utf-8")).hexdigest()
+                          == binding["receipt_sha256"])
+                if ok:
+                    accepted_comparisons[row["id"]] = record
+            except (ValueError, TypeError, KeyError, UnicodeError, OverflowError):
+                ok = False
+                diagnostics.append({"record": {"table": table, "key": {"id": row["id"]}}, "state": "invalid",
+                                    "reason_code": "ACCEPTED_COMPARISON_INVALID"})
         checking.remove(token)
         allowed[token] = bool(ok)
         return bool(ok)
 
     def authorship(table: str, row: dict) -> tuple[str, str]:
+        if table == _ACCEPTED_TABLE:
+            if accepted_comparisons[row["id"]]["acceptance"]["decision"] == "accept":
+                return "accepted_model", ("Model-proposed comparison structure accepted exactly by a local steward; acceptance "
+                                          "is not truth, adjudication or agreement with any Perspective.")
+            return "human", ("Steward-edited or steward-authored comparison structure; acceptance is not truth, "
+                             "adjudication or agreement with any Perspective.")
         if table == _AWARD_TABLE:
             return "derived", "Recorded deterministic system assessment; no agreement, mastery, human authorship or current evidence verification is established."
         if table == EXECUTION_TABLE:
@@ -403,6 +433,9 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
         return "unknown", "Authorship is not established by the stored record."
 
     def context(table: str, row: dict) -> list[dict]:
+        if table == _ACCEPTED_TABLE:
+            return [{"kind": "perspective_execution", "receipt_id": binding["receipt_id"]}
+                    for binding in accepted_comparisons[row["id"]]["binding"]["receipts"]]
         if table == _AWARD_TABLE:
             from hermeneia.perspective_achievement_evidence import _EvidenceProblem, _check_frame_and_prompt
             import hashlib
@@ -443,6 +476,10 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
         return []
 
     def provenance(table: str, row: dict, basis: str) -> dict:
+        if table == _ACCEPTED_TABLE:
+            return {"basis": basis, "records": [],
+                    "references": [{"table": EXECUTION_TABLE, "key": {"id": binding["receipt_id"]}}
+                                   for binding in accepted_comparisons[row["id"]]["binding"]["receipts"]]}
         if table == _AWARD_TABLE:
             finding = award_receipts[row["id"]]["evidence_package"]["assessment"]["finding"]
             return {"basis": basis, "references": [ref["record"] for ref in finding["evidence_refs"]], "records": []}
@@ -528,6 +565,22 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
                 item["record_data"] = safe
                 item["content"] = "Recorded earned system assessment; agreement, mastery and current eligibility are not established."
                 item["timestamp"] = _timestamp("awarded_at", receipt["awarded_at"])
+            elif table == _ACCEPTED_TABLE:
+                record = accepted_comparisons[row["id"]]
+                relations = record["structure"]["relations"]
+                item["record_data"] = {
+                    "id": record["id"], "origin": record["origin"]["kind"], "decision": record["acceptance"]["decision"],
+                    "accepted_at": record["acceptance"]["accepted_at"],
+                    "participants": [binding["receipt_id"] for binding in record["binding"]["receipts"]],
+                    "propositions": len(record["structure"]["propositions"]), "agreement": len(relations["agreement"]),
+                    "disagreement": len(relations["disagreement"]), "unknown_positions": len(relations["unknown_positions"]),
+                    "extraction_model": (record["candidate"]["extraction"]["execution"]["model_id"]
+                                         if record["candidate"] else None),
+                    "meaning": record["acceptance"]["meaning"],
+                    "verification": {"record_integrity": "valid", "replay": "not_performed",
+                                     "reason_code": "LINEAGE_SUMMARY_ONLY"}}
+                item["content"] = "Steward-accepted comparison structure; not truth, adjudication or agreement with any Perspective."
+                item["timestamp"] = _timestamp("acceptance.accepted_at", record["acceptance"]["accepted_at"])
             items.append(item)
             if (table == "proposed_interpretations" and row.get("status") in ("accepted", "rejected")
                     and row.get("decided_at") and row.get("steward_id")):
@@ -556,6 +609,7 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
                 "Unknown authorship remains unknown. Artifact references are recorded metadata, not a fresh integrity verification.",
                 "Retained Perspective receipts prove exact execution and explicit retention only; empty coverage cannot prove no past Perspective activity.",
                 "Award summaries validate receipt integrity only; evidence verification and historical snapshot replay are not performed by Lineage.",
+                "Accepted Perspective comparisons record a steward's acceptance of a structure, not truth or agreement; Lineage does not replay them.",
             ],
         },
     }

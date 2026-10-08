@@ -49,6 +49,10 @@ _ACHIEVEMENT_AWARD_TABLE = "achievement_awards"
 _ACHIEVEMENT_AWARD_COLUMNS = frozenset({
     "id", "achievement_id", "rule_id", "rule_version", "receipt_json",
 })
+ACCEPTED_COMPARISON_CAPABILITY = "accepted-perspective-comparison-v1"
+ACCEPTED_COMPARISON_FILE = "study/accepted_perspective_comparisons.json"
+_ACCEPTED_COMPARISON_TABLE = "accepted_perspective_comparisons"
+_ACCEPTED_COMPARISON_COLUMNS = frozenset({"id", "candidate_id", "comparison_json"})
 
 # Role of each file on restore (see spec §3).
 CANONICAL = "canonical"
@@ -146,6 +150,34 @@ def _achievement_awards(conn: sqlite3.Connection) -> list[dict] | None:
             validate_award_references(conn, receipt)
     except (ValueError, TypeError, KeyError, sqlite3.Error) as exc:
         raise AchievementAwardExportError(f"invalid achievement award: {exc}") from exc
+    return rows
+
+
+class AcceptedComparisonExportError(RuntimeError):
+    """Accepted comparisons cannot be exported with their exact receipt closure."""
+
+
+def _accepted_comparisons(conn: sqlite3.Connection) -> list[dict] | None:
+    """Exact extant rows with receipt closure; never re-decides acceptance.
+
+    A missing legacy table is unsupported coverage, not zero accepted
+    comparisons. Excluded participants remain archivable.
+    """
+    if not _table_exists(conn, _ACCEPTED_COMPARISON_TABLE):
+        return None
+    columns = {row[1] for row in conn.execute(f"PRAGMA table_info({_ACCEPTED_COMPARISON_TABLE})")}
+    if not _ACCEPTED_COMPARISON_COLUMNS <= columns:
+        return None
+    from ..accepted_perspective_comparisons import record_from_row, validate_record_references
+
+    try:
+        rows = _rows(conn, f"SELECT * FROM {_ACCEPTED_COMPARISON_TABLE} ORDER BY id")
+        for row in rows:
+            if set(row) != _ACCEPTED_COMPARISON_COLUMNS:
+                raise ValueError("malformed accepted comparison row")
+            validate_record_references(conn, record_from_row(row))
+    except (ValueError, TypeError, KeyError, sqlite3.Error) as exc:
+        raise AcceptedComparisonExportError(f"invalid accepted Perspective comparison: {exc}") from exc
     return rows
 
 
@@ -348,6 +380,7 @@ def _build_bundle_files_snapshot(
     investigation = _investigation(conn)
     perspective_executions = _perspective_executions(conn)
     achievement_awards = _achievement_awards(conn)
+    accepted_comparisons = _accepted_comparisons(conn)
     projections = _study_projections(highlights, field_notes)
     derived = _derived(
         conn,
@@ -379,6 +412,8 @@ def _build_bundle_files_snapshot(
         content[PERSPECTIVE_EXECUTION_FILE] = (CANONICAL, _dumps(perspective_executions))
     if achievement_awards is not None:
         content[ACHIEVEMENT_AWARD_FILE] = (CANONICAL, _dumps(achievement_awards))
+    if accepted_comparisons is not None:
+        content[ACCEPTED_COMPARISON_FILE] = (CANONICAL, _dumps(accepted_comparisons))
 
     # Uploads: the exact source bytes of the documents in this snapshot,
     # content-hash named (§4, §5.1). Other files are not canonical evidence.
@@ -433,6 +468,10 @@ def _build_bundle_files_snapshot(
         manifest.setdefault("required_capabilities", []).append(ACHIEVEMENT_AWARD_CAPABILITY)
         manifest["required_capabilities"].sort()
         manifest["counts"][_ACHIEVEMENT_AWARD_TABLE] = len(achievement_awards)
+    if accepted_comparisons is not None:
+        manifest.setdefault("required_capabilities", []).append(ACCEPTED_COMPARISON_CAPABILITY)
+        manifest["required_capabilities"].sort()
+        manifest["counts"][_ACCEPTED_COMPARISON_TABLE] = len(accepted_comparisons)
 
     out: dict[str, bytes] = {path: data for path, (_role, data) in content.items()}
     out["manifest.json"] = _dumps(manifest)

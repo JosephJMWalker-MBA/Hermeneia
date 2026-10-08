@@ -9785,6 +9785,171 @@ Return ONLY valid JSON, no markdown, no explanation:
             conn.close()
         return _no_store(payload)
 
+    # P7 Layer 2: transient model-proposed comparison candidates. Disposable
+    # server state with no history authority; only a steward decision writes.
+    perspective_comparison_candidates: dict[str, dict] = {}
+    perspective_comparison_candidates_lock = threading.RLock()
+    _SHAPE_REFUSALS = ("DUPLICATE_PARTICIPANT", "TOO_FEW_PARTICIPANTS", "TOO_MANY_PARTICIPANTS")
+
+    @app.route("/api/perspective/comparison/candidates", methods=["POST"])
+    def api_perspective_comparison_candidate():
+        """Propose structure over a Layer 1 comparison with the local model; nothing is written."""
+        from ..perspective_achievement_evidence import read_perspective_achievement_evidence
+        from ..perspective_comparison import ComparisonRefused
+        from ..perspective_comparison_candidates import (
+            ExtractionRefused, build_candidate, build_prompt, candidate_inputs, text_digest,
+        )
+
+        payload = request.get_json(silent=True)
+        if (not isinstance(payload, dict) or set(payload) != {"receipt_ids", "model"}
+                or not isinstance(payload["receipt_ids"], list) or not all(isinstance(i, str) for i in payload["receipt_ids"])
+                or not isinstance(payload["model"], str)):
+            return jsonify({"error": "Exactly receipt_ids (a list) and model are required", "code": "INVALID_REQUEST"}), 400
+        conn = _conn() if db_path.exists() else sqlite3.connect(":memory:")
+        try:
+            conn.execute("PRAGMA query_only=ON")
+            conn.execute("BEGIN")
+            inputs = candidate_inputs(conn, read_perspective_achievement_evidence(conn), payload["receipt_ids"])
+        except ComparisonRefused as refusal:
+            return jsonify({"error": "These receipts are not an admissible comparison; nothing was proposed",
+                            "code": refusal.code}), 400 if refusal.code in _SHAPE_REFUSALS else 409
+        except (sqlite3.Error, ValueError):
+            return jsonify({"error": "Comparison inputs could not be read; nothing was proposed", "code": "EVALUATION_FAILED"}), 409
+        finally:
+            conn.close()
+        context, error = _local_perspective_execution_context(payload["model"].strip())
+        if error is not None:
+            body, status = error
+            return jsonify(body), status
+        prompt = build_prompt(inputs["view"], inputs["texts"])
+        created_at = utc_now_iso()
+        try:
+            adapter = active_provider_registry.create(context["provider_id"], model=context["model_id"], host=context["runtime_host"])
+            output = adapter.render(prompt)
+            execution = adapter.execution_config()
+        except Exception:
+            return jsonify({"error": "Local semantic extraction failed. Check Ollama runtime and selected model.",
+                            "code": "PROVIDER_FAILED", "provider_id": context["provider_id"], "model_id": context["model_id"]}), 502
+        if not isinstance(output, str) or not isinstance(execution, dict):
+            return jsonify({"error": "Local semantic extraction returned no text", "code": "PROVIDER_FAILED"}), 502
+        execution.update({"provider_id": context["provider_id"], "model_id": context["model_id"],
+                          "runtime_host": context["runtime_host"], "selection_source": "per_run"})
+        try:
+            candidate = build_candidate(inputs, prompt=prompt, execution=execution, output=output,
+                                        created_at=created_at, completed_at=utc_now_iso())
+        except ExtractionRefused as refusal:
+            return jsonify({"error": "The model output violates the extraction contract; no candidate exists",
+                            "code": refusal.code, "output": output, "output_sha256": text_digest(output),
+                            "canonical_status": "not_persisted"}), 422
+        with perspective_comparison_candidates_lock:
+            while len(perspective_comparison_candidates) >= 100:
+                del perspective_comparison_candidates[next(iter(perspective_comparison_candidates))]
+            perspective_comparison_candidates[candidate["candidate_id"]] = {"candidate": candidate, "record": None}
+        return jsonify({**candidate, "canonical_status": "not_persisted"}), 201
+
+    def _held_comparison_candidate(candidate_id: str, payload, fields: set):
+        if not isinstance(payload, dict) or set(payload) != fields:
+            return None, (jsonify({"error": "Exact decision fields are required; candidate content is server-owned",
+                                   "code": "INVALID_REQUEST"}), 400)
+        held = perspective_comparison_candidates.get(candidate_id)
+        if held is None:
+            return None, (jsonify({"error": "Unknown, discarded or expired candidate; propose again",
+                                   "code": "UNKNOWN_CANDIDATE"}), 404)
+        if payload["candidate_id"] != candidate_id or held["candidate"]["candidate_id"] != candidate_id:
+            return None, (jsonify({"error": "The reviewed candidate is not the held candidate", "code": "CANDIDATE_MISMATCH"}), 409)
+        return held, None
+
+    @app.route("/api/perspective/comparison/candidates/<path:candidate_id>/accept", methods=["POST"])
+    def api_accept_perspective_comparison(candidate_id):
+        """Steward acceptance of one exact candidate, as given or as edited; stale candidates are refused."""
+        from ..accepted_perspective_comparisons import make_accepted_record, store_accepted_comparison
+        from ..perspective_achievement_evidence import read_perspective_achievement_evidence
+        from ..perspective_comparison import ComparisonRefused
+        from ..perspective_comparison_candidates import StructureRefused, candidate_inputs, structure_from_edit
+        from ..study_lineage import project_study_lineage
+
+        payload = request.get_json(silent=True)
+        decision = payload.get("decision") if isinstance(payload, dict) else None
+        fields = {"accept": {"decision", "candidate_id"},
+                  "edit_and_accept": {"decision", "candidate_id", "structure"}}.get(decision, {"decision"})
+        with perspective_comparison_candidates_lock:
+            held, refusal = _held_comparison_candidate(candidate_id, payload if decision in ("accept", "edit_and_accept") else None, fields)
+            if refusal is not None:
+                return refusal
+            if held["record"] is not None:
+                return jsonify(held["record"]), 200
+            if not db_path.exists():
+                return jsonify({"error": "database not found", "code": "NOT_RECORDED"}), 404
+            candidate = held["candidate"]
+            conn = _conn_rw()
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    inputs = candidate_inputs(conn, read_perspective_achievement_evidence(conn),
+                                              [binding["receipt_id"] for binding in candidate["binding"]["receipts"]])
+                except ComparisonRefused:
+                    inputs = None
+                if inputs is None or inputs["binding"] != candidate["binding"]:
+                    conn.rollback()
+                    return jsonify({"error": "The candidate's bound receipts, Layer 1 comparison or governing question "
+                                             "changed; nothing was accepted", "code": "STALE_CANDIDATE"}), 409
+                structure = (candidate["structure"] if decision == "accept"
+                             else structure_from_edit(payload["structure"], inputs["view"]))
+                record = store_accepted_comparison(conn, make_accepted_record(
+                    candidate, decision=decision, structure=structure, accepted_at=utc_now_iso()))
+                if not any(item["record"] == {"table": "accepted_perspective_comparisons", "key": {"id": record["id"]}}
+                           for item in project_study_lineage(conn)["items"]):
+                    raise ValueError("accepted comparison is not eligible under the study's exclusions")
+                conn.commit()
+            except StructureRefused as exc:
+                conn.rollback()
+                return jsonify({"error": str(exc), "code": exc.code}), 422
+            except (ValueError, sqlite3.DatabaseError) as exc:
+                conn.rollback()
+                return jsonify({"error": str(exc), "code": "NOT_RECORDED"}), 409
+            finally:
+                conn.close()
+            held["record"] = record
+        return jsonify(record), 201
+
+    @app.route("/api/perspective/comparison/candidates/<path:candidate_id>/discard", methods=["POST"])
+    def api_discard_perspective_comparison(candidate_id):
+        """Discard a transient candidate; no canonical comparison and no negative event exist."""
+        payload = request.get_json(silent=True)
+        with perspective_comparison_candidates_lock:
+            held, refusal = _held_comparison_candidate(
+                candidate_id, payload if isinstance(payload, dict) and payload.get("decision") == "discard" else None,
+                {"decision", "candidate_id"})
+            if refusal is not None:
+                return refusal
+            if held["record"] is not None:
+                return jsonify({"error": "An accepted comparison cannot be discarded", "code": "ALREADY_ACCEPTED"}), 409
+            del perspective_comparison_candidates[candidate_id]
+        return jsonify({"candidate_id": candidate_id, "state": "discarded", "canonical_status": "not_persisted"})
+
+    @app.route("/api/perspective/comparison/accepted/<path:comparison_id>")
+    def api_accepted_perspective_comparison(comparison_id):
+        """Read one accepted comparison; an ineligible record is indistinguishable from an unknown one."""
+        from ..accepted_perspective_comparisons import load_accepted_comparison
+        from ..study_lineage import project_study_lineage, serialize_projection
+
+        record = None
+        if db_path.exists():
+            conn = _conn()
+            try:
+                conn.execute("PRAGMA query_only=ON")
+                conn.execute("BEGIN")
+                if any(item["record"] == {"table": "accepted_perspective_comparisons", "key": {"id": comparison_id}}
+                       for item in project_study_lineage(conn)["items"]):
+                    record = load_accepted_comparison(conn, comparison_id)
+            except (sqlite3.Error, ValueError):
+                record = None
+            finally:
+                conn.close()
+        if record is None:
+            return jsonify({"error": "Unknown or unavailable accepted comparison", "code": "NOT_AVAILABLE"}), 404
+        return _no_store(serialize_projection(record))
+
     def _award_json(payload, status=200):
         response = jsonify(payload)
         response.headers["Cache-Control"] = "no-store"

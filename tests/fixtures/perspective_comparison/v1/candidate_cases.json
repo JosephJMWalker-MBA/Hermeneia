@@ -30,7 +30,8 @@
     },
     {
       "base_case": "N2_legacy_without_receipt_table",
-      "code": "COVERAGE_UNSUPPORTED"
+      "code": "INELIGIBLE_RECEIPT",
+      "correction": "Corrected after freeze: through the app, P3's documented startup initializer re-creates an empty receipt table before any request, so the dropped receipts are ineligible (INELIGIBLE_RECEIPT). The read-only Layer 1 path reports COVERAGE_UNSUPPORTED for the same shape. Either way nothing is proposed and no model is called. This is P3's known limitation that an app-migrated legacy workspace cannot report unsupported receipt coverage, not a Layer 2 defect."
     }
   ],
   "adversarial": [
