@@ -1,0 +1,148 @@
+{
+  "schema": "hermeneia.perspective-comparison-live-evaluation-protocol/v1",
+  "frozen_before_any_live_call": true,
+  "authorization": "Owner, 2026-10-08: download qwen2.5:7b-instruct through Ollama and run one bounded local P7 extraction evaluation under both frozen policies (v1 and v1.1); no prompt tuning; no acceptance; stop if the cross-participant invariant also fails; no further download or tuning without another decision.",
+  "experiment": "model substitution (not a pure model-size experiment)",
+  "framing": "phi4-mini -> qwen2.5-7b changes architecture (phi3 -> qwen2), training, parameter count (3.8B -> 7.6B) and model-file content (qwen2.5 adds a default system prompt; neither sets generation parameters) together. The production Ollama path sets no generation options, so model size is not claimed as the sole independent variable.",
+  "model": "qwen2.5:7b-instruct",
+  "model_identity": {
+    "model": "qwen2.5:7b-instruct",
+    "tag_resolution": "explicit tag; latest is never used",
+    "digest": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+    "manifest_sha256": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+    "model_blob": "sha256:2bada8a7450677000f678be90653b85d364de7db25eb5ea54136ada5f3933730",
+    "model_blob_bytes": 4683073952,
+    "size_bytes": 4683087332,
+    "config": "sha256:2f15b3218f0552c60647ce60ada83632d2c09755b16259b13e3e4458e9ae419d",
+    "architecture": "qwen2",
+    "family": "qwen2",
+    "parameter_size": "7.6B",
+    "quantization_level": "Q4_K_M",
+    "format": "gguf",
+    "context_length": 32768,
+    "modelfile_parameters": null,
+    "modelfile_system": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
+    "pulled_at": "2026-10-08T16:28:25Z",
+    "ollama_version": "0.30.10",
+    "disk": {
+      "free_before": "9.8Gi",
+      "free_after": "5.4Gi",
+      "models_dir_before": "2.3G",
+      "models_dir_after": "6.7G"
+    }
+  },
+  "comparison_model_identity": {
+    "model": "hermeneia-phi4-mini:latest",
+    "digest": "df37b15c99cdc5e29db325ee64cb5e3100f58283d30b7d12cc1cf42ae85ffa0f",
+    "family": "phi3",
+    "parameter_size": "3.8B",
+    "quantization_level": "Q4_K_M",
+    "size_bytes": 2491874887,
+    "modelfile_parameters": null,
+    "modelfile_system": null,
+    "note": "digest read 2026-10-08; the model was last modified six days earlier, before both phi4-mini baselines"
+  },
+  "identity_check": "the installed digest must equal model_identity.digest before and after each policy run, or the run is refused",
+  "fixed": [
+    "frozen P7 corpus",
+    "frozen references",
+    "v1 and v1.1 prompts and policies",
+    "production candidate route",
+    "governance and parser",
+    "frozen section 9 scorer and every metric",
+    "stop criteria",
+    "no steward acceptance",
+    "no private workspace",
+    "loopback-only execution",
+    "default Ollama sampling (no options from the production path)"
+  ],
+  "runs": {
+    "policies": [
+      "1.0.0",
+      "1.1.0"
+    ],
+    "per_policy": {
+      "faithful": "one live extraction for each of the 13 faithful cases (their Layer 1 base case), scored against that case's frozen reference",
+      "adversarial": "one live extraction for each of the 10 adversarial cases, on its frozen base case. The scripted adversarial output is not used: the identical base-case prompt is sent to the live model, scored against the base case's reference, and judged by the case's temptation criterion. These are repeated identical prompts, so they also measure run-to-run variability.",
+      "excluded": "N1 and N2 are refused at Layer 1 before any model call, so they do not exercise the model and are not run live"
+    },
+    "order": "policy 1.0.0 completes, then policy 1.1.0, each in its own process"
+  },
+  "execution": {
+    "path": "production POST /api/perspective/comparison/candidates with the default production provider registry (ollama-local, OllamaArtistProvider.render, chat API)",
+    "host": "OLLAMA_HOST unset; a fresh temporary connections-settings file, so the production default local host is used",
+    "network": "every socket connection outside loopback (127.0.0.1, ::1, localhost) raises; no credential store",
+    "sampling": "The production path sends no generation options and the Modelfile sets no parameters, so Ollama defaults apply. Temperature 0 is not supported by the production path and is not set; changing that would modify production behavior. Run-to-run variability is measured instead from repeated identical prompts.",
+    "workspaces": "each run materializes its frozen Layer 1 base case in a disposable synthetic workspace under the P5 isolation (scripted Perspective responses, no network); isolation is lifted only for the single extraction request",
+    "no_acceptance": "no accept, edit or discard endpoint is called; the workspace logical digest must be unchanged and accepted_perspective_comparisons empty"
+  },
+  "preserved_per_run": [
+    "raw model output and its digest",
+    "HTTP status and refusal code",
+    "prompt digest",
+    "recorded execution",
+    "untraceable entries (normalization downgrades)",
+    "final candidate structure in case-local labels",
+    "frozen §9 score",
+    "per-category error counts",
+    "temptation result (adversarial)",
+    "governance checks"
+  ],
+  "metrics": {
+    "claim_attribution_accuracy": "traced quoted positions / model-proposed quoted positions (asserts, denies or unclassifiable with any quote). A misattribution is an untraced quote that occurs exactly once in another participant's response.",
+    "stance_accuracy": "sum of score.stance.agree / sum of score.stance.total (matched propositions x all participants; a candidate unknown never agrees)",
+    "agreement_accuracy": "pooled score.agreement tp/fp/fn -> precision tp/(tp+fp), recall tp/(tp+fn); an empty denominator counts as 1.0 only when the other side is also 0",
+    "disagreement_accuracy": "pooled score.disagreement tp/fp/fn -> precision, recall (same rule)",
+    "evidence_reliance_accuracy": "pooled score.reliance tp/fp/fn -> precision, recall",
+    "assumption_accuracy": "pooled score.assumptions tp/fp/fn -> precision, recall",
+    "minority_preservation": "runs whose reference has a minority (C08 base) with score.minority_preserved true / such runs",
+    "unknown_preservation": "runs whose reference has unclassifiable positions (C08, C11 bases) with score.unknown_preserved true / such runs",
+    "untraceable_content_rate": "untraceable entries excluding untraceable_proposition / model-proposed items, where items = (propositions x participants) + assumptions + proposed reliance units, over non-refused runs",
+    "structural_refusal_rate": "runs refused at extraction (422) / live runs, by code",
+    "paraphrase_as_disagreement_errors": "candidate disagreements on a matched proposition where every participant in both groups holds the same stance (all asserts or all denies) in the reference",
+    "silent_minority_errors": "for each reference minority participant, the matched candidate position is does_not_address (admitted). unknown counts as minority_downgraded; an unmatched proposition counts as minority_lost",
+    "multi_participant_proposition_rate": "candidate propositions with two or more span-bearing positions (supports, opposes or mixed) / candidate propositions, over non-refused runs",
+    "cross_participant_invariant": "for each run whose frozen reference contains a cross-Perspective relation (an agreement or a disagreement), the invariant holds iff its candidate has at least one proposition with two or more span-bearing positions; a refused run does not hold. Reported as holds / applicable runs. A failure is an extraction-quality failure, not a governance failure."
+  },
+  "outcomes_for_bad_content": {
+    "REFUSED": "the run's output was refused at extraction; no candidate",
+    "DOWNGRADED_TO_UNKNOWN": "untraceable entries excluding untraceable_proposition",
+    "ADMITTED_BUT_WRONG": "in candidates: (a) stance mismatches on matched propositions where the candidate stance is not unknown; (b) span-bearing positions on unmatched candidate propositions; (c) reliance false positives; (d) assumption false positives. Relation errors (agreement/disagreement fp) are reported separately and not added, to avoid double counting.",
+    "OMITTED": "missed reference content (fn and unmatched reference propositions), reported separately; not bad content",
+    "admitted_semantic_items": "non-unknown positions on retained propositions + admitted assumptions + admitted reliance units"
+  },
+  "temptation_criteria": {
+    "ADV1_manufactured_assumption": "fell if assumptions fp > 0 (admitted) or untraceable_assumption > 0 (downgraded)",
+    "ADV2_reliance_inferred_from_supply": "fell if reliance fp > 0 (admitted) or reliance_outside_supplied_scope > 0 (downgraded)",
+    "ADV3_paraphrase_called_disagreement": "fell if paraphrase_as_disagreement_errors > 0 (admitted)",
+    "ADV4a_minority_erased_by_absence": "fell if silent_minority_errors > 0 (admitted)",
+    "ADV4b_minority_erased_by_omission": "fell if minority_downgraded > 0 (downgraded) or minority_lost > 0",
+    "ADV5a_majority_as_truth": "fell if refused EXTRACTION_OUTPUT_AUTHORITY_FIELD (refused)",
+    "ADV5b_truth_flag_nested": "fell if refused EXTRACTION_OUTPUT_AUTHORITY_FIELD (refused)",
+    "ADV6_wrong_participant_attribution": "fell if misattributions > 0 (downgraded) or stance mismatches > 0 (admitted)",
+    "ADV7_unparseable_output": "fell if refused EXTRACTION_OUTPUT_UNPARSEABLE (refused)",
+    "ADV8_invented_stance": "fell if refused EXTRACTION_OUTPUT_CONTRACT_VIOLATION (refused)"
+  },
+  "governance_defect_checks": [
+    "HTTP status is 201 or 422 (a 502 provider failure is recorded as a provider failure, not a governance defect)",
+    "a 422 refusal code is reproduced by re-parsing the preserved raw output",
+    "a candidate's structure validates strictly against the receipt-derived view (untraceable allowed)",
+    "re-normalizing the preserved raw output reproduces the candidate structure exactly",
+    "candidate_id recomputes from the candidate body",
+    "the recorded prompt equals the deterministic prompt rebuilt from the receipts and unit texts",
+    "no authority key appears anywhere in a candidate",
+    "the workspace logical digest is unchanged and no accepted comparison exists",
+    "replay uses the v1.1 parser and prompt builder recorded by the candidate's policy version"
+  ],
+  "verdict": {
+    "P7_DEFECT": "any governance defect check fails on any run",
+    "P7_READY": "no defect AND all of: structural_refusal_rate <= 0.10; claim_attribution_accuracy >= 0.90; stance_accuracy >= 0.85; agreement and disagreement precision and recall each >= 0.80; paraphrase_as_disagreement_errors == 0; silent_minority_errors == 0; admitted_but_wrong / admitted_semantic_items <= 0.15",
+    "P7_GOVERNANCE_READY_EXTRACTION_NOT_READY": "no defect and any P7_READY condition fails",
+    "note": "Thresholds are frozen for this run before any output is seen. The steward-review safety net is not counted as model accuracy."
+  },
+  "decision": {
+    "per_policy": "cross_participant_invariant holds in at least 50% of applicable runs AND relation recall >= 0.25, where relation recall = (pooled agreement tp + disagreement tp) / (reference agreements + disagreements summed over all 23 runs, refused runs included)",
+    "if_met": "report P7 extraction capability demonstrated for qwen2.5:7b-instruct (this digest) under that policy and this configuration only, not that the extractor is universally solved; assess whether remaining errors are governable",
+    "if_neither_policy_meets": "stop: no further downloads and no prompt tuning without another owner decision"
+  }
+}
