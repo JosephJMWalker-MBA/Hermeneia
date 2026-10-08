@@ -9,7 +9,7 @@
     "schema": {"const": "hermeneia.perspective-comparison-candidate/v1"},
     "candidate_id": {"type": "string", "pattern": "^perspective-comparison-candidate:sha256:[0-9a-f]{64}$"},
     "binding": {"$ref": "#/$defs/binding"},
-    "extraction": {"$ref": "#/$defs/extraction"},
+    "extraction": {"oneOf": [{"$ref": "#/$defs/extraction"}, {"$ref": "#/$defs/extraction_v1_1"}]},
     "structure": {"$ref": "comparison-structure.schema.json"}
   },
   "$defs": {
@@ -42,6 +42,19 @@
       "properties": {
         "policy_version": {"const": "1.0.0"},
         "prompt_version": {"const": "perspective-comparison-extraction/v1"},
+        "prompt": {"type": "string", "minLength": 1}, "prompt_sha256": {"$ref": "#/$defs/digest"},
+        "execution": {"type": "object", "required": ["provider_id", "model_id"]},
+        "created_at": {"type": "string"}, "completed_at": {"type": "string"},
+        "output": {"type": "string"}, "output_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "extraction_v1_1": {
+      "description": "Experimental policy 1.1.0: candidates only; never admitted into an accepted comparison.",
+      "type": "object", "additionalProperties": false,
+      "required": ["policy_version", "prompt_version", "prompt", "prompt_sha256", "execution", "created_at", "completed_at", "output", "output_sha256"],
+      "properties": {
+        "policy_version": {"const": "1.1.0"},
+        "prompt_version": {"const": "perspective-comparison-extraction/v1.1"},
         "prompt": {"type": "string", "minLength": 1}, "prompt_sha256": {"$ref": "#/$defs/digest"},
         "execution": {"type": "object", "required": ["provider_id", "model_id"]},
         "created_at": {"type": "string"}, "completed_at": {"type": "string"},

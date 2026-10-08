@@ -1,0 +1,84 @@
+{
+  "schema": "hermeneia.perspective-comparison-extraction-policy/v1",
+  "policy_version": "1.1.0",
+  "prompt_version": "perspective-comparison-extraction/v1.1",
+  "status": "experimental: candidates are never acceptable into study history under this policy",
+  "supersedes": null,
+  "coexists_with": {
+    "policy_version": "1.0.0",
+    "prompt_version": "perspective-comparison-extraction/v1",
+    "status": "unchanged default"
+  },
+  "prompt": {
+    "header": [
+      "You are building a structured comparison across retained Hermeneia Perspective readings.",
+      "This is a proposal for a steward to review. It is not a synthesis, a verdict or an adjudication.",
+      "Do not decide which Perspective is correct. Do not count votes."
+    ],
+    "body": "identical to v1: the question, the evidence units with canonical text, and each participant block (label, Perspective, supplied units with roles, exact response between <<< and >>>)",
+    "work_order": [
+      "Work in this order:",
+      "1. Find the claims that can be compared across the Perspectives. Write each as one neutral proposition about the passage, not about any one Perspective.",
+      "   Two responses that make the same claim in different words share ONE proposition. Two responses that make opposite claims share ONE proposition that one supports and the other opposes.",
+      "   Never write one proposition per Perspective by restating each response separately.",
+      "2. For each proposition, classify EVERY participant ({participant_labels}) with exactly one value:",
+      "   supports = the response asserts the proposition; opposes = the response denies it; mixed = the response speaks to it but is qualified or undecided; silent = the response does not speak to it; unknown = you cannot tell.",
+      "3. For supports, opposes and mixed, copy the quote exactly, character for character, from that participant's own response. For silent and unknown, quote is null.",
+      "4. Only then fill relies_on with the evidence units that the participant's quoted words explicitly draw on. relies_on: [] means no reliance established. Supplied evidence is not reliance.",
+      "5. Only then list assumptions that a response explicitly states, each with an exact quote. If there are none, use [].",
+      "Leave a classification unknown rather than inventing support."
+    ],
+    "output_rules": [
+      "Output rules:",
+      "- Output one JSON object only. No markdown, no code fences, no text before or after it.",
+      "- Include every field shown in the example in every object. Use [] for an empty list; never omit a field.",
+      "- Allowed classification values: \"supports\", \"opposes\", \"mixed\", \"silent\", \"unknown\".",
+      "- Participant labels: {participant_labels}. Evidence unit labels: {unit_labels}.",
+      "- At most {proposition_bound} propositions."
+    ],
+    "example_intro": "Example of the exact shape (illustrative content, not about this passage):",
+    "example": "{\"propositions\":[{\"id\":\"p1\",\"statement\":\"The bridge was closed for repairs.\",\"classifications\":[{\"participant\":\"P1\",\"classification\":\"supports\",\"quote\":\"the bridge was shut for repairs\",\"relies_on\":[\"U1\"]},{\"participant\":\"P2\",\"classification\":\"opposes\",\"quote\":\"nothing shows the bridge was closed\",\"relies_on\":[]}]}],\"assumptions\":[{\"participant\":\"P1\",\"quote\":\"assuming the notice was official\"}]}",
+    "assembly": "header, blank, the v1 body lines, blank, work_order, blank, output_rules, blank, example_intro, example; lines joined with a newline; {participant_labels} = 'P1, P2[, P3…]', {unit_labels} = 'U1, U2, …', {proposition_bound} = 2 x participants"
+  },
+  "wire": {
+    "schema": "hermeneia.perspective-comparison-extraction-output/v1.1",
+    "top_level": [
+      "propositions",
+      "assumptions"
+    ],
+    "proposition": [
+      "id",
+      "statement",
+      "classifications"
+    ],
+    "classification": [
+      "participant",
+      "classification",
+      "quote",
+      "relies_on"
+    ],
+    "assumption": [
+      "participant",
+      "quote"
+    ],
+    "classification_values": [
+      "supports",
+      "opposes",
+      "mixed",
+      "silent",
+      "unknown"
+    ],
+    "proposition_bound": "2 x participants; more is EXTRACTION_OUTPUT_CONTRACT_VIOLATION",
+    "fence": "as v1: one surrounding fenced block is tolerated by the parser (the prompt prohibits it)",
+    "refusals": "as v1: UNPARSEABLE, AUTHORITY_FIELD (same key set, any depth), CONTRACT_VIOLATION (any other key, missing key, unknown value or label, duplicate participant in a proposition, blank statement or assumption quote, bound exceeded)"
+  },
+  "mapping_to_canonical_stance": {
+    "supports": "asserts",
+    "opposes": "denies",
+    "mixed": "unclassifiable",
+    "silent": "does_not_address",
+    "unknown": "unknown"
+  },
+  "normalization": "unchanged v1 traceability rules on the canonical stance. An explicit unknown with quote null and relies_on [] becomes a canonical unknown position without an untraceable entry. An unknown or silent classification with a quote or reliance is a contradictory_position. A missing participant is position_not_classified. Nothing is relaxed.",
+  "acceptance": "candidates under 1.1.0 are refused at accept and edit-and-accept with 409 POLICY_NOT_ACCEPTABLE; discard works"
+}
