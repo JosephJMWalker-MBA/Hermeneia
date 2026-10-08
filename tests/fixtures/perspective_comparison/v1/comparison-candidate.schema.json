@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermeneia.perspective-comparison-candidate/v1",
+  "title": "Structured Perspective comparison candidate v1 (#215 P7 Layer 2) — transient, model-proposed",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "candidate_id", "binding", "extraction", "structure"],
+  "properties": {
+    "schema": {"const": "hermeneia.perspective-comparison-candidate/v1"},
+    "candidate_id": {"type": "string", "pattern": "^perspective-comparison-candidate:sha256:[0-9a-f]{64}$"},
+    "binding": {"$ref": "#/$defs/binding"},
+    "extraction": {"$ref": "#/$defs/extraction"},
+    "structure": {"$ref": "comparison-structure.schema.json"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "binding": {
+      "type": "object", "additionalProperties": false, "required": ["receipts", "question", "governing_question", "layer1"],
+      "properties": {
+        "receipts": {
+          "type": "array", "minItems": 2, "maxItems": 8,
+          "items": {"type": "object", "additionalProperties": false, "required": ["receipt_id", "receipt_sha256", "response_sha256", "scope_sha256"],
+                    "properties": {"receipt_id": {"type": "string"}, "receipt_sha256": {"$ref": "#/$defs/digest"},
+                                   "response_sha256": {"$ref": "#/$defs/digest"}, "scope_sha256": {"$ref": "#/$defs/digest"}}}
+        },
+        "question": {"type": "object", "additionalProperties": false, "required": ["text", "sha256"],
+                     "properties": {"text": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}}},
+        "governing_question": {
+          "type": "object", "additionalProperties": false, "required": ["status", "text", "sha256", "basis"],
+          "properties": {"status": {"enum": ["captured", "absent"]}, "text": {"type": ["string", "null"]},
+                         "sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/digest"}]},
+                         "basis": {"const": "current_snapshot_at_generation"}}
+        },
+        "layer1": {"type": "object", "additionalProperties": false, "required": ["schema", "policy_version", "comparison_id", "digest"],
+                   "properties": {"schema": {"const": "hermeneia.perspective-comparison/v1"}, "policy_version": {"const": "1.0.0"},
+                                  "comparison_id": {"type": "string"}, "digest": {"$ref": "#/$defs/digest"}}}
+      }
+    },
+    "extraction": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policy_version", "prompt_version", "prompt", "prompt_sha256", "execution", "created_at", "completed_at", "output", "output_sha256"],
+      "properties": {
+        "policy_version": {"const": "1.0.0"},
+        "prompt_version": {"const": "perspective-comparison-extraction/v1"},
+        "prompt": {"type": "string", "minLength": 1}, "prompt_sha256": {"$ref": "#/$defs/digest"},
+        "execution": {"type": "object", "required": ["provider_id", "model_id"]},
+        "created_at": {"type": "string"}, "completed_at": {"type": "string"},
+        "output": {"type": "string"}, "output_sha256": {"$ref": "#/$defs/digest"}
+      }
+    }
+  }
+}

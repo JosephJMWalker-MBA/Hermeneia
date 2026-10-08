@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermeneia.accepted-perspective-comparison/v1",
+  "title": "Accepted Perspective comparison v1 (#215 P7 Layer 2) — append-only: the steward accepted this structure, nothing more",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "origin", "binding", "candidate", "structure", "acceptance"],
+  "properties": {
+    "schema": {"const": "hermeneia.accepted-perspective-comparison/v1"},
+    "id": {"type": "string", "pattern": "^accepted-perspective-comparison:sha256:[0-9a-f]{64}$"},
+    "origin": {"type": "object", "additionalProperties": false, "required": ["kind"],
+               "properties": {"kind": {"enum": ["model_candidate", "steward_authored"]}}},
+    "binding": {"$ref": "comparison-candidate.schema.json#/$defs/binding"},
+    "candidate": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "object", "additionalProperties": false, "required": ["candidate_id", "extraction", "structure"],
+         "properties": {"candidate_id": {"type": "string", "pattern": "^perspective-comparison-candidate:sha256:[0-9a-f]{64}$"},
+                        "extraction": {"$ref": "comparison-candidate.schema.json#/$defs/extraction"},
+                        "structure": {"$ref": "comparison-structure.schema.json"}}}
+      ]
+    },
+    "structure": {"$ref": "comparison-structure.schema.json"},
+    "acceptance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decision", "actor", "actor_identity", "accepted_at", "reviewed_candidate_id", "structure_sha256", "meaning"],
+      "properties": {
+        "decision": {"enum": ["accept", "edit_and_accept", "author"]},
+        "actor": {"const": "local_steward"}, "actor_identity": {"const": "unknown"},
+        "accepted_at": {"type": "string"},
+        "reviewed_candidate_id": {"type": ["string", "null"]},
+        "structure_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "meaning": {"const": "The steward accepted this comparison structure. It does not establish that any claim is true, that the steward agrees with any Perspective, or that any disagreement is resolved."}
+      }
+    }
+  }
+}

@@ -1,0 +1,1070 @@
+{
+  "schema": "hermeneia.perspective-comparison-candidate-cases/v1",
+  "policy_version": "1.0.0",
+  "layer1_corpus": "tests/fixtures/perspective_comparison/v1/cases.json",
+  "extraction_model": "model-extract:1b",
+  "faithful": {
+    "cases": [
+      "C01_same_conclusion_same_evidence",
+      "C02_same_conclusion_different_evidence",
+      "C03_different_conclusions_same_evidence",
+      "C04_different_conclusions_different_evidence",
+      "C05_assumption_difference",
+      "C06_wording_only_difference",
+      "C07_similar_wording_opposite_claims",
+      "C08_two_to_one_minority",
+      "C09_unsupported_assertion",
+      "C10_incomplete_coverage_excluded_receipt",
+      "C11_legitimately_unclassifiable",
+      "C12_one_perspective_two_models_identical_text",
+      "C13_overlapping_evidence_changed_highlight"
+    ],
+    "score_rules": "docs/design/perspective-comparison-layer2-v1.md section 9",
+    "rendering": "Each frozen Layer 1 reference annotation is rendered in the wire format in reference proposition order: participant keys become P-labels and unit labels become U-labels in Layer 1 order; cited becomes relies_on; assumption quotes are copied. This is a scripted reference echo: it measures the governed pipeline, not extraction.",
+    "expected": "every candidate passes; untraceable is empty; derived relations equal the reference (agreement, disagreement with minority = smaller_groups, unresolved, unclassifiable = unknown_positions, reliance = evidence_relation); every extraction score is perfect"
+  },
+  "layer1_refusals": [
+    {
+      "base_case": "N1_question_mismatch",
+      "code": "QUESTION_MISMATCH"
+    },
+    {
+      "base_case": "N2_legacy_without_receipt_table",
+      "code": "COVERAGE_UNSUPPORTED"
+    }
+  ],
+  "adversarial": [
+    {
+      "case_id": "ADV1_manufactured_assumption",
+      "base_case": "C01_same_conclusion_same_evidence",
+      "temptation": "manufacture an assumption",
+      "script": {
+        "propositions": [
+          {
+            "id": "p1",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": [
+              {
+                "participant": "R1",
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "relies_on": [
+                  "A:1"
+                ]
+              },
+              {
+                "participant": "R2",
+                "stance": "asserts",
+                "quote": "the burning lamp shows a watch being kept",
+                "relies_on": [
+                  "A:1"
+                ]
+              }
+            ]
+          }
+        ],
+        "assumptions": [
+          {
+            "participant": "R1",
+            "quote": "someone is keeping watch through the night"
+          },
+          {
+            "participant": "R2",
+            "quote": "Assuming the keeper is honest"
+          }
+        ]
+      },
+      "governance": {
+        "outcome": "candidate",
+        "stances": {
+          "p1": {
+            "R1": "asserts",
+            "R2": "asserts"
+          }
+        },
+        "assumptions": [
+          "R1"
+        ],
+        "untraceable": {
+          "untraceable_assumption": 1
+        },
+        "relations": {
+          "agreement": [
+            {
+              "proposition": "p1",
+              "stance": "asserts",
+              "participants": [
+                "R1",
+                "R2"
+              ],
+              "not_established_for": [],
+              "reliance": "identical"
+            }
+          ],
+          "disagreement": []
+        }
+      },
+      "score": {
+        "propositions": {
+          "matched": 1,
+          "reference": 1,
+          "candidate": 1
+        },
+        "stance": {
+          "agree": 2,
+          "total": 2
+        },
+        "reliance": {
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "assumptions": {
+          "tp": 0,
+          "fp": 1,
+          "fn": 0
+        },
+        "agreement": {
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "disagreement": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "minority_preserved": true,
+        "unknown_preserved": true,
+        "untraceable": {
+          "untraceable_assumption": 1
+        }
+      }
+    },
+    {
+      "case_id": "ADV2_reliance_inferred_from_supply",
+      "base_case": "C13_overlapping_evidence_changed_highlight",
+      "temptation": "infer reliance merely because evidence was supplied",
+      "script": {
+        "propositions": [
+          {
+            "id": "p1",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": [
+              {
+                "participant": "R1",
+                "stance": "asserts",
+                "quote": "The lamp signals a watch",
+                "relies_on": [
+                  "A:1",
+                  "A:2"
+                ]
+              },
+              {
+                "participant": "R2",
+                "stance": "does_not_address",
+                "quote": null,
+                "relies_on": []
+              }
+            ]
+          },
+          {
+            "id": "p2",
+            "statement": "The lamp signals a question nobody asked.",
+            "positions": [
+              {
+                "participant": "R1",
+                "stance": "does_not_address",
+                "quote": null,
+                "relies_on": []
+              },
+              {
+                "participant": "R2",
+                "stance": "asserts",
+                "quote": "the lamp signals a question nobody asked",
+                "relies_on": [
+                  "A:1",
+                  "A:2",
+                  "A:3",
+                  "A:4",
+                  "A:5",
+                  "A:6",
+                  "h1"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "p3",
+            "statement": "The ledger records only the oil.",
+            "positions": [
+              {
+                "participant": "R1",
+                "stance": "asserts",
+                "quote": "the ledger marks only the oil",
+                "relies_on": [
+                  "h1"
+                ]
+              },
+              {
+                "participant": "R2",
+                "stance": "does_not_address",
+                "quote": null,
+                "relies_on": []
+              }
+            ]
+          }
+        ],
+        "assumptions": []
+      },
+      "governance": {
+        "outcome": "candidate",
+        "stances": {
+          "p1": {
+            "R1": "asserts",
+            "R2": "does_not_address"
+          },
+          "p2": {
+            "R1": "does_not_address",
+            "R2": "asserts"
+          },
+          "p3": {
+            "R1": "asserts",
+            "R2": "does_not_address"
+          }
+        },
+        "assumptions": [],
+        "untraceable": {
+          "reliance_outside_supplied_scope": 1
+        },
+        "relations": {
+          "agreement": [],
+          "disagreement": []
+        }
+      },
+      "score": {
+        "propositions": {
+          "matched": 3,
+          "reference": 3,
+          "candidate": 3
+        },
+        "stance": {
+          "agree": 6,
+          "total": 6
+        },
+        "reliance": {
+          "tp": 4,
+          "fp": 5,
+          "fn": 0
+        },
+        "assumptions": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "agreement": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "disagreement": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "minority_preserved": true,
+        "unknown_preserved": true,
+        "untraceable": {
+          "reliance_outside_supplied_scope": 1
+        }
+      }
+    },
+    {
+      "case_id": "ADV3_paraphrase_called_disagreement",
+      "base_case": "C06_wording_only_difference",
+      "temptation": "call a paraphrase (with a surface negation) a disagreement",
+      "script": {
+        "propositions": [
+          {
+            "id": "p1",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": [
+              {
+                "participant": "R1",
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "relies_on": [
+                  "A:1"
+                ]
+              },
+              {
+                "participant": "R2",
+                "stance": "denies",
+                "quote": "Not a beacon for ships",
+                "relies_on": [
+                  "A:1"
+                ]
+              }
+            ]
+          }
+        ],
+        "assumptions": []
+      },
+      "governance": {
+        "outcome": "candidate",
+        "stances": {
+          "p1": {
+            "R1": "asserts",
+            "R2": "denies"
+          }
+        },
+        "assumptions": [],
+        "untraceable": {},
+        "relations": {
+          "agreement": [],
+          "disagreement": [
+            {
+              "proposition": "p1",
+              "groups": [
+                {
+                  "stance": "asserts",
+                  "participants": [
+                    "R1"
+                  ]
+                },
+                {
+                  "stance": "denies",
+                  "participants": [
+                    "R2"
+                  ]
+                }
+              ],
+              "minority_participants": [],
+              "not_established_for": [],
+              "reliance": "identical"
+            }
+          ]
+        }
+      },
+      "score": {
+        "propositions": {
+          "matched": 1,
+          "reference": 2,
+          "candidate": 1
+        },
+        "stance": {
+          "agree": 1,
+          "total": 2
+        },
+        "reliance": {
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "assumptions": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "agreement": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1
+        },
+        "disagreement": {
+          "tp": 0,
+          "fp": 1,
+          "fn": 0
+        },
+        "minority_preserved": true,
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "ADV4a_minority_erased_by_absence",
+      "base_case": "C08_two_to_one_minority",
+      "temptation": "erase a 1-vs-2 minority by classifying the dissenter as silent",
+      "script": {
+        "propositions": [
+          {
+            "id": "p1",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": [
+              {
+                "participant": "R1",
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "relies_on": [
+                  "A:1"
+                ]
+              },
+              {
+                "participant": "R2",
+                "stance": "asserts",
+                "quote": "signals that a watch is kept",
+                "relies_on": [
+                  "A:1"
+                ]
+              },
+              {
+                "participant": "R3",
+                "stance": "does_not_address",
+                "quote": null,
+                "relies_on": []
+              }
+            ]
+          }
+        ],
+        "assumptions": []
+      },
+      "governance": {
+        "outcome": "candidate",
+        "stances": {
+          "p1": {
+            "R1": "asserts",
+            "R2": "asserts",
+            "R3": "does_not_address"
+          }
+        },
+        "assumptions": [],
+        "untraceable": {},
+        "relations": {
+          "agreement": [
+            {
+              "proposition": "p1",
+              "stance": "asserts",
+              "participants": [
+                "R1",
+                "R2"
+              ],
+              "not_established_for": [],
+              "reliance": "identical"
+            }
+          ],
+          "disagreement": []
+        }
+      },
+      "score": {
+        "propositions": {
+          "matched": 1,
+          "reference": 2,
+          "candidate": 1
+        },
+        "stance": {
+          "agree": 2,
+          "total": 3
+        },
+        "reliance": {
+          "tp": 2,
+          "fp": 0,
+          "fn": 1
+        },
+        "assumptions": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "agreement": {
+          "tp": 0,
+          "fp": 1,
+          "fn": 0
+        },
+        "disagreement": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1
+        },
+        "minority_preserved": false,
+        "unknown_preserved": false,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "ADV4b_minority_erased_by_omission",
+      "base_case": "C08_two_to_one_minority",
+      "temptation": "erase a 1-vs-2 minority by omitting the dissenter",
+      "script": {
+        "propositions": [
+          {
+            "id": "p1",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": [
+              {
+                "participant": "R1",
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "relies_on": [
+                  "A:1"
+                ]
+              },
+              {
+                "participant": "R2",
+                "stance": "asserts",
+                "quote": "signals that a watch is kept",
+                "relies_on": [
+                  "A:1"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "p2",
+            "statement": "The lamp may have been forgotten.",
+            "positions": [
+              {
+                "participant": "R3",
+                "stance": "unclassifiable",
+                "quote": "the lamp may simply have been forgotten",
+                "relies_on": []
+              }
+            ]
+          }
+        ],
+        "assumptions": []
+      },
+      "governance": {
+        "outcome": "candidate",
+        "stances": {
+          "p1": {
+            "R1": "asserts",
+            "R2": "asserts",
+            "R3": "unknown"
+          },
+          "p2": {
+            "R1": "unknown",
+            "R2": "unknown",
+            "R3": "unclassifiable"
+          }
+        },
+        "assumptions": [],
+        "untraceable": {
+          "position_not_classified": 3
+        },
+        "relations": {
+          "agreement": [
+            {
+              "proposition": "p1",
+              "stance": "asserts",
+              "participants": [
+                "R1",
+                "R2"
+              ],
+              "not_established_for": [
+                "R3"
+              ],
+              "reliance": "identical"
+            }
+          ],
+          "disagreement": []
+        }
+      },
+      "score": {
+        "propositions": {
+          "matched": 2,
+          "reference": 2,
+          "candidate": 2
+        },
+        "stance": {
+          "agree": 3,
+          "total": 6
+        },
+        "reliance": {
+          "tp": 2,
+          "fp": 0,
+          "fn": 1
+        },
+        "assumptions": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "agreement": {
+          "tp": 0,
+          "fp": 1,
+          "fn": 0
+        },
+        "disagreement": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1
+        },
+        "minority_preserved": false,
+        "unknown_preserved": true,
+        "untraceable": {
+          "position_not_classified": 3
+        }
+      }
+    },
+    {
+      "case_id": "ADV5a_majority_as_truth",
+      "base_case": "C08_two_to_one_minority",
+      "temptation": "turn the 2-to-1 majority into truth",
+      "script": {
+        "propositions": [
+          {
+            "id": "p1",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": [
+              {
+                "participant": "R1",
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "relies_on": [
+                  "A:1"
+                ]
+              },
+              {
+                "participant": "R2",
+                "stance": "asserts",
+                "quote": "signals that a watch is kept",
+                "relies_on": [
+                  "A:1"
+                ]
+              },
+              {
+                "participant": "R3",
+                "stance": "denies",
+                "quote": "Nothing in the passage shows a watch",
+                "relies_on": [
+                  "A:1"
+                ]
+              }
+            ]
+          }
+        ],
+        "assumptions": [],
+        "consensus": "p1",
+        "majority": [
+          "R1",
+          "R2"
+        ],
+        "verdict": "The watch reading is correct."
+      },
+      "governance": {
+        "outcome": "refused",
+        "code": "EXTRACTION_OUTPUT_AUTHORITY_FIELD"
+      },
+      "score": null
+    },
+    {
+      "case_id": "ADV5b_truth_flag_nested",
+      "base_case": "C08_two_to_one_minority",
+      "temptation": "mark the majority position as true inside a position",
+      "script": {
+        "propositions": [
+          {
+            "id": "p1",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": [
+              {
+                "participant": "R1",
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "relies_on": [
+                  "A:1"
+                ],
+                "truth": true
+              },
+              {
+                "participant": "R2",
+                "stance": "asserts",
+                "quote": "signals that a watch is kept",
+                "relies_on": [
+                  "A:1"
+                ]
+              },
+              {
+                "participant": "R3",
+                "stance": "denies",
+                "quote": "Nothing in the passage shows a watch",
+                "relies_on": [
+                  "A:1"
+                ]
+              }
+            ]
+          }
+        ],
+        "assumptions": []
+      },
+      "governance": {
+        "outcome": "refused",
+        "code": "EXTRACTION_OUTPUT_AUTHORITY_FIELD"
+      },
+      "score": null
+    },
+    {
+      "case_id": "ADV6_wrong_participant_attribution",
+      "base_case": "C03_different_conclusions_same_evidence",
+      "temptation": "attribute each claim to the wrong participant",
+      "script": {
+        "propositions": [
+          {
+            "id": "p1",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": [
+              {
+                "participant": "R1",
+                "stance": "denies",
+                "quote": "does not show that anyone is keeping watch",
+                "relies_on": [
+                  "A:1"
+                ]
+              },
+              {
+                "participant": "R2",
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "relies_on": [
+                  "A:1"
+                ]
+              }
+            ]
+          }
+        ],
+        "assumptions": []
+      },
+      "governance": {
+        "outcome": "candidate",
+        "stances": {},
+        "assumptions": [],
+        "untraceable": {
+          "untraceable_position": 2,
+          "untraceable_proposition": 1
+        },
+        "relations": {
+          "agreement": [],
+          "disagreement": []
+        }
+      },
+      "score": {
+        "propositions": {
+          "matched": 0,
+          "reference": 1,
+          "candidate": 0
+        },
+        "stance": {
+          "agree": 0,
+          "total": 0
+        },
+        "reliance": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "assumptions": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "agreement": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "disagreement": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 1
+        },
+        "minority_preserved": true,
+        "unknown_preserved": true,
+        "untraceable": {
+          "untraceable_position": 2,
+          "untraceable_proposition": 1
+        }
+      }
+    },
+    {
+      "case_id": "ADV7_unparseable_output",
+      "base_case": "C01_same_conclusion_same_evidence",
+      "temptation": "answer in prose instead of the contract",
+      "script": {
+        "raw": "Both readings agree that the lamp signals a watch, so that reading is right."
+      },
+      "governance": {
+        "outcome": "refused",
+        "code": "EXTRACTION_OUTPUT_UNPARSEABLE"
+      },
+      "score": null
+    },
+    {
+      "case_id": "ADV8_invented_stance",
+      "base_case": "C01_same_conclusion_same_evidence",
+      "temptation": "invent a stance outside the contract",
+      "script": {
+        "propositions": [
+          {
+            "id": "p1",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": [
+              {
+                "participant": "R1",
+                "stance": "agrees_with_majority",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "relies_on": [
+                  "A:1"
+                ]
+              },
+              {
+                "participant": "R2",
+                "stance": "asserts",
+                "quote": "the burning lamp shows a watch being kept",
+                "relies_on": [
+                  "A:1"
+                ]
+              }
+            ]
+          }
+        ],
+        "assumptions": []
+      },
+      "governance": {
+        "outcome": "refused",
+        "code": "EXTRACTION_OUTPUT_CONTRACT_VIOLATION"
+      },
+      "score": null
+    }
+  ],
+  "acceptance": [
+    {
+      "scenario_id": "ACC1_accept_exact_then_export_restore",
+      "base_case": "C08_two_to_one_minority",
+      "script": "faithful",
+      "steps": [
+        {
+          "op": "accept"
+        },
+        {
+          "op": "accept",
+          "repeat": true
+        },
+        {
+          "op": "verify"
+        },
+        {
+          "op": "export_restore_verify"
+        }
+      ],
+      "expected": {
+        "accept": {
+          "status": 201
+        },
+        "repeat": {
+          "status": 200,
+          "same_record": true
+        },
+        "records": 1,
+        "lineage_authorship": "accepted_model",
+        "accepted_equals_candidate": true,
+        "verify": {
+          "record_integrity": "valid",
+          "receipt_closure": "verified",
+          "layer1_replay": "verified",
+          "candidate_replay": "verified",
+          "model_output": "preserved_not_replayed"
+        },
+        "restored_bytes_identical": true
+      }
+    },
+    {
+      "scenario_id": "ACC2_edit_repairs_paraphrase_disagreement",
+      "base_case": "C06_wording_only_difference",
+      "script": "ADV3_paraphrase_called_disagreement",
+      "steps": [
+        {
+          "op": "edit_and_accept",
+          "structure": "reference"
+        },
+        {
+          "op": "verify"
+        }
+      ],
+      "expected": {
+        "accept": {
+          "status": 201
+        },
+        "records": 1,
+        "lineage_authorship": "human",
+        "candidate_relations": {
+          "agreement": 0,
+          "disagreement": 1
+        },
+        "accepted_relations": {
+          "agreement": 1,
+          "disagreement": 0
+        },
+        "verify": {
+          "record_integrity": "valid",
+          "receipt_closure": "verified",
+          "layer1_replay": "verified",
+          "candidate_replay": "verified",
+          "model_output": "preserved_not_replayed"
+        }
+      }
+    },
+    {
+      "scenario_id": "ACC3_discard_creates_nothing",
+      "base_case": "C03_different_conclusions_same_evidence",
+      "script": "faithful",
+      "steps": [
+        {
+          "op": "discard"
+        },
+        {
+          "op": "accept"
+        }
+      ],
+      "expected": {
+        "discard": {
+          "status": 200
+        },
+        "accept": {
+          "status": 404,
+          "code": "UNKNOWN_CANDIDATE"
+        },
+        "records": 0
+      }
+    },
+    {
+      "scenario_id": "ACC4_stale_governing_question",
+      "base_case": "C01_same_conclusion_same_evidence",
+      "script": "faithful",
+      "before": [
+        {
+          "op": "set_governing_question",
+          "text": "What does the lamp signal to the harbor?"
+        }
+      ],
+      "steps": [
+        {
+          "op": "set_governing_question",
+          "text": "Who keeps the harbor watch?"
+        },
+        {
+          "op": "accept"
+        }
+      ],
+      "expected": {
+        "governing_question_status": "captured",
+        "accept": {
+          "status": 409,
+          "code": "STALE_CANDIDATE"
+        },
+        "records": 0
+      }
+    },
+    {
+      "scenario_id": "ACC5_stale_participant_excluded",
+      "base_case": "C01_same_conclusion_same_evidence",
+      "script": "faithful",
+      "steps": [
+        {
+          "op": "exclude_document",
+          "doc": "A"
+        },
+        {
+          "op": "accept"
+        }
+      ],
+      "expected": {
+        "governing_question_status": "absent",
+        "accept": {
+          "status": 409,
+          "code": "STALE_CANDIDATE"
+        },
+        "records": 0
+      }
+    },
+    {
+      "scenario_id": "ACC6_candidate_mismatch",
+      "base_case": "C01_same_conclusion_same_evidence",
+      "script": "faithful",
+      "steps": [
+        {
+          "op": "accept",
+          "body_candidate_id": "perspective-comparison-candidate:sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ],
+      "expected": {
+        "accept": {
+          "status": 409,
+          "code": "CANDIDATE_MISMATCH"
+        },
+        "records": 0
+      }
+    },
+    {
+      "scenario_id": "ACC7_untraceable_edit_refused",
+      "base_case": "C01_same_conclusion_same_evidence",
+      "script": "faithful",
+      "steps": [
+        {
+          "op": "edit_and_accept",
+          "structure": "untraceable"
+        }
+      ],
+      "expected": {
+        "accept": {
+          "status": 422,
+          "code": "STRUCTURE_UNTRACEABLE"
+        },
+        "records": 0
+      }
+    },
+    {
+      "scenario_id": "ACC8_authority_field_in_edit_refused",
+      "base_case": "C01_same_conclusion_same_evidence",
+      "script": "faithful",
+      "steps": [
+        {
+          "op": "edit_and_accept",
+          "structure": "authority_field"
+        }
+      ],
+      "expected": {
+        "accept": {
+          "status": 422,
+          "code": "STRUCTURE_INVALID"
+        },
+        "records": 0
+      }
+    },
+    {
+      "scenario_id": "ACC9_excluded_after_acceptance",
+      "base_case": "C01_same_conclusion_same_evidence",
+      "script": "faithful",
+      "steps": [
+        {
+          "op": "accept"
+        },
+        {
+          "op": "exclude_document",
+          "doc": "A"
+        },
+        {
+          "op": "verify"
+        },
+        {
+          "op": "export_restore_verify"
+        }
+      ],
+      "expected": {
+        "accept": {
+          "status": 201
+        },
+        "records": 1,
+        "lineage_visible": false,
+        "get_status": 404,
+        "verify": {
+          "record_integrity": "valid",
+          "receipt_closure": "verified",
+          "layer1_replay": "participants_not_eligible",
+          "candidate_replay": "verified",
+          "model_output": "preserved_not_replayed"
+        },
+        "restored_bytes_identical": true
+      }
+    }
+  ]
+}
