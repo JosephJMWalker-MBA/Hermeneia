@@ -1,0 +1,1114 @@
+{
+  "schema": "hermeneia.blueprint-proposal-cases/v1",
+  "policy_version": "1.0.0",
+  "documents": {
+    "A": [
+      "The lamp burned all night.",
+      "Nobody asked why it burned.",
+      "The keeper wrote nothing down.",
+      "By morning the harbor was empty.",
+      "A second lamp was lit at dusk.",
+      "The ledger records only the oil."
+    ],
+    "B": [
+      "The bell rang twice at noon.",
+      "The square fell silent.",
+      "No one claimed the bell.",
+      "The clerk noted the hour.",
+      "Children counted the rings.",
+      "The tower door stayed shut."
+    ]
+  },
+  "extraction_model": "model-blueprint:1b",
+  "script_references": {
+    "A:n": "Observation n of document A, rendered as its O-label",
+    "I:key": "the Interpretation created by setup key, rendered as its I-label",
+    "raw:B:n": "the real record ID of Observation n of document B (never exposed)",
+    "O99": "a label that was never exposed"
+  },
+  "cases": [
+    {
+      "case_id": "P01_create_simple_goal",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        }
+      ],
+      "generate": {
+        "mode": "create",
+        "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+        "script": {
+          "title": "The lamp as vigil or absence",
+          "thesis": "The burning lamp records a vigil the harbor never explains.",
+          "sections": [
+            {
+              "claim": "The lamp burns through the night without explanation.",
+              "observations": [
+                "A:1",
+                "A:2"
+              ],
+              "interpretations": []
+            },
+            {
+              "claim": "A second lamp at dusk shows the burning is deliberate.",
+              "observations": [
+                "A:5"
+              ],
+              "interpretations": []
+            }
+          ]
+        }
+      },
+      "between": [],
+      "decisions": [],
+      "expected": {
+        "generation": {
+          "status": 201,
+          "generation_writes_nothing": true,
+          "references": {
+            "observations": [
+              "A:1",
+              "A:2",
+              "A:5"
+            ],
+            "interpretations": []
+          },
+          "exposed": {
+            "observations": 6,
+            "interpretations": 0
+          }
+        }
+      }
+    },
+    {
+      "case_id": "P02_goal_grounded_in_interpretations",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        },
+        {
+          "op": "save_perspective",
+          "key": "P1",
+          "label": "Light and vigilance",
+          "purpose": "Read light as watchfulness.",
+          "questions": [
+            "Who is the lamp for?"
+          ]
+        },
+        {
+          "op": "steward_interpretation",
+          "key": "I1",
+          "doc": "A",
+          "sentence": 1,
+          "perspective": "P1",
+          "text": "The burning lamp marks a vigil no one admits to keeping."
+        },
+        {
+          "op": "steward_interpretation",
+          "key": "I2",
+          "doc": "A",
+          "sentence": 6,
+          "perspective": "P1",
+          "text": "The ledger's silence about the keeper is deliberate."
+        },
+        {
+          "op": "model_proposal",
+          "key": "M1",
+          "doc": "A",
+          "sentence": 4
+        },
+        {
+          "op": "accept_proposal",
+          "proposal": "M1",
+          "rationale": "Consistent with the empty harbor."
+        }
+      ],
+      "generate": {
+        "mode": "create",
+        "intent": "Build an argument from my interpretations about what the lamp means for the harbor.",
+        "script": {
+          "title": "What the lamp keeps",
+          "thesis": "The lamp keeps a vigil that the record refuses to name.",
+          "sections": [
+            {
+              "claim": "The burning lamp marks an unadmitted vigil.",
+              "observations": [
+                "A:1"
+              ],
+              "interpretations": [
+                "I:I1"
+              ]
+            },
+            {
+              "claim": "The ledger's silence is part of the vigil.",
+              "observations": [
+                "A:6"
+              ],
+              "interpretations": [
+                "I:I2"
+              ]
+            },
+            {
+              "claim": "The empty harbor frames what the lamp watches over.",
+              "observations": [
+                "A:4"
+              ],
+              "interpretations": [
+                "I:M1"
+              ]
+            }
+          ]
+        }
+      },
+      "between": [],
+      "decisions": [],
+      "expected": {
+        "generation": {
+          "status": 201,
+          "generation_writes_nothing": true,
+          "references": {
+            "observations": [
+              "A:1",
+              "A:4",
+              "A:6"
+            ],
+            "interpretations": [
+              "I:I1",
+              "I:I2",
+              "I:M1"
+            ]
+          },
+          "exposed": {
+            "observations": 6,
+            "interpretations": 3
+          },
+          "interpretation_authorship_in_prompt": {
+            "I1": "steward-authored",
+            "I2": "steward-authored",
+            "M1": "accepted model contribution"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "P03_invented_reference",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        }
+      ],
+      "generate": {
+        "mode": "create",
+        "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+        "script": {
+          "title": "The lamp as vigil or absence",
+          "thesis": "The burning lamp records a vigil the harbor never explains.",
+          "sections": [
+            {
+              "claim": "The lamp burns.",
+              "observations": [
+                "A:1",
+                "O99"
+              ],
+              "interpretations": []
+            }
+          ]
+        }
+      },
+      "between": [],
+      "decisions": [],
+      "expected": {
+        "generation": {
+          "status": 422,
+          "code": "PROPOSAL_REFERENCE_UNKNOWN",
+          "generation_writes_nothing": true
+        }
+      }
+    },
+    {
+      "case_id": "P04_excluded_reference",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        },
+        {
+          "op": "upload",
+          "doc": "B"
+        },
+        {
+          "op": "exclude_document",
+          "doc": "B"
+        }
+      ],
+      "generate": {
+        "mode": "create",
+        "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+        "script": {
+          "title": "The lamp as vigil or absence",
+          "thesis": "The burning lamp records a vigil the harbor never explains.",
+          "sections": [
+            {
+              "claim": "The bell answers the lamp.",
+              "observations": [
+                "A:1",
+                "raw:B:2"
+              ],
+              "interpretations": []
+            }
+          ]
+        }
+      },
+      "between": [],
+      "decisions": [],
+      "expected": {
+        "generation": {
+          "status": 422,
+          "code": "PROPOSAL_REFERENCE_EXCLUDED",
+          "generation_writes_nothing": true,
+          "prompt_excludes_document": "B"
+        }
+      }
+    },
+    {
+      "case_id": "P05_exact_accept",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        }
+      ],
+      "generate": {
+        "mode": "create",
+        "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+        "script": {
+          "title": "The lamp as vigil or absence",
+          "thesis": "The burning lamp records a vigil the harbor never explains.",
+          "sections": [
+            {
+              "claim": "The lamp burns through the night without explanation.",
+              "observations": [
+                "A:1",
+                "A:2"
+              ],
+              "interpretations": []
+            },
+            {
+              "claim": "A second lamp at dusk shows the burning is deliberate.",
+              "observations": [
+                "A:5"
+              ],
+              "interpretations": []
+            }
+          ]
+        }
+      },
+      "between": [],
+      "decisions": [
+        {
+          "decision": "accept",
+          "expect": {
+            "status": 201
+          }
+        }
+      ],
+      "expected": {
+        "generation": {
+          "status": 201,
+          "generation_writes_nothing": true
+        },
+        "result": {
+          "blueprint_source": "proposal-accepted",
+          "receipt_origin": "model_proposed_steward_accepted",
+          "edited": false,
+          "plan_compiled": true,
+          "accepted_equals_proposal": true,
+          "lineage": {
+            "blueprint": "accepted_model",
+            "receipt": "accepted_model"
+          },
+          "counts": {
+            "receipts": 1,
+            "blueprints": 1
+          },
+          "verify": {
+            "record_integrity": "valid",
+            "candidate_replay": "verified",
+            "result_closure": "verified",
+            "model_output": "preserved_not_replayed"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "P06_edit_and_accept",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        }
+      ],
+      "generate": {
+        "mode": "create",
+        "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+        "script": {
+          "title": "The lamp as vigil or absence",
+          "thesis": "The burning lamp records a vigil the harbor never explains.",
+          "sections": [
+            {
+              "claim": "The lamp burns through the night without explanation.",
+              "observations": [
+                "A:1",
+                "A:2"
+              ],
+              "interpretations": []
+            },
+            {
+              "claim": "A second lamp at dusk shows the burning is deliberate.",
+              "observations": [
+                "A:5"
+              ],
+              "interpretations": []
+            }
+          ]
+        }
+      },
+      "between": [],
+      "decisions": [
+        {
+          "decision": "edit_and_accept",
+          "edit": {
+            "title": "The lamp, read narrowly",
+            "drop_last_section": true
+          },
+          "expect": {
+            "status": 201
+          }
+        }
+      ],
+      "expected": {
+        "generation": {
+          "status": 201,
+          "generation_writes_nothing": true
+        },
+        "result": {
+          "blueprint_source": "proposal-edited",
+          "receipt_origin": "model_proposed_steward_edited",
+          "edited": true,
+          "plan_compiled": true,
+          "accepted_equals_proposal": false,
+          "proposal_preserved": true,
+          "accepted_title": "The lamp, read narrowly",
+          "accepted_sections": 1,
+          "lineage": {
+            "blueprint": "human",
+            "receipt": "human"
+          },
+          "counts": {
+            "receipts": 1,
+            "blueprints": 1
+          }
+        }
+      }
+    },
+    {
+      "case_id": "P07_discard",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        }
+      ],
+      "generate": {
+        "mode": "create",
+        "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+        "script": {
+          "title": "The lamp as vigil or absence",
+          "thesis": "The burning lamp records a vigil the harbor never explains.",
+          "sections": [
+            {
+              "claim": "The lamp burns through the night without explanation.",
+              "observations": [
+                "A:1",
+                "A:2"
+              ],
+              "interpretations": []
+            },
+            {
+              "claim": "A second lamp at dusk shows the burning is deliberate.",
+              "observations": [
+                "A:5"
+              ],
+              "interpretations": []
+            }
+          ]
+        }
+      },
+      "between": [],
+      "decisions": [
+        {
+          "decision": "discard",
+          "expect": {
+            "status": 200
+          }
+        },
+        {
+          "decision": "accept",
+          "expect": {
+            "status": 404,
+            "code": "UNKNOWN_CANDIDATE"
+          }
+        }
+      ],
+      "expected": {
+        "generation": {
+          "status": 201,
+          "generation_writes_nothing": true
+        },
+        "result": {
+          "counts": {
+            "receipts": 0,
+            "blueprints": 0
+          },
+          "workspace_unchanged": true
+        }
+      }
+    },
+    {
+      "case_id": "P08_stale_evidence",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        }
+      ],
+      "generate": {
+        "mode": "create",
+        "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+        "script": {
+          "title": "The lamp as vigil or absence",
+          "thesis": "The burning lamp records a vigil the harbor never explains.",
+          "sections": [
+            {
+              "claim": "The lamp burns through the night without explanation.",
+              "observations": [
+                "A:1",
+                "A:2"
+              ],
+              "interpretations": []
+            },
+            {
+              "claim": "A second lamp at dusk shows the burning is deliberate.",
+              "observations": [
+                "A:5"
+              ],
+              "interpretations": []
+            }
+          ]
+        }
+      },
+      "between": [
+        {
+          "op": "exclude_document",
+          "doc": "A"
+        }
+      ],
+      "decisions": [
+        {
+          "decision": "accept",
+          "expect": {
+            "status": 409,
+            "code": "STALE_CANDIDATE"
+          }
+        }
+      ],
+      "expected": {
+        "generation": {
+          "status": 201,
+          "generation_writes_nothing": true
+        },
+        "result": {
+          "counts": {
+            "receipts": 0,
+            "blueprints": 0
+          }
+        }
+      }
+    },
+    {
+      "case_id": "P09_predecessor_superseded",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        },
+        {
+          "op": "ratify_blueprint_exact",
+          "key": "BP0",
+          "blueprint": {
+            "title": "The unexplained lamp",
+            "thesis": "The lamp burns without explanation.",
+            "sections": [
+              {
+                "claim": "The lamp burns all night.",
+                "observations": [
+                  "A:1"
+                ],
+                "interpretations": []
+              }
+            ]
+          }
+        }
+      ],
+      "generate": {
+        "mode": "revise",
+        "predecessor": "BP0",
+        "intent": "Revise my Blueprint to include the second lamp.",
+        "script": {
+          "title": "The unexplained lamp, relit",
+          "thesis": "The lamp burns without explanation, and is lit again at dusk.",
+          "sections": [
+            {
+              "claim": "The lamp burns all night.",
+              "observations": [
+                "A:1"
+              ],
+              "interpretations": []
+            },
+            {
+              "claim": "A second lamp is lit at dusk.",
+              "observations": [
+                "A:5"
+              ],
+              "interpretations": []
+            }
+          ],
+          "change_summary": "Adds the second lamp interpretation."
+        }
+      },
+      "between": [
+        {
+          "op": "legacy_revise",
+          "predecessor": "BP0",
+          "reason": "Steward revised directly.",
+          "blueprint": {
+            "title": "The unexplained lamp, steward revision",
+            "thesis": "The lamp burns without explanation all night.",
+            "sections": [
+              {
+                "claim": "The lamp burns all night.",
+                "observations": [
+                  "A:1"
+                ],
+                "interpretations": []
+              }
+            ]
+          }
+        }
+      ],
+      "decisions": [
+        {
+          "decision": "accept",
+          "reason": "Adds the second lamp.",
+          "expect": {
+            "status": 409,
+            "code": "STALE_CANDIDATE"
+          }
+        }
+      ],
+      "expected": {
+        "generation": {
+          "status": 201,
+          "generation_writes_nothing": true
+        },
+        "result": {
+          "counts": {
+            "receipts": 0,
+            "blueprints": 2
+          },
+          "legacy_revision_source": "steward-authored"
+        }
+      }
+    },
+    {
+      "case_id": "P10_revision_with_new_evidence",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        },
+        {
+          "op": "save_perspective",
+          "key": "P1",
+          "label": "Light and vigilance",
+          "purpose": "Read light as watchfulness.",
+          "questions": [
+            "Who is the lamp for?"
+          ]
+        },
+        {
+          "op": "ratify_blueprint_exact",
+          "key": "BP0",
+          "blueprint": {
+            "title": "The unexplained lamp",
+            "thesis": "The lamp burns without explanation.",
+            "sections": [
+              {
+                "claim": "The lamp burns all night.",
+                "observations": [
+                  "A:1"
+                ],
+                "interpretations": []
+              }
+            ]
+          }
+        },
+        {
+          "op": "steward_interpretation",
+          "key": "INEW",
+          "doc": "A",
+          "sentence": 5,
+          "perspective": "P1",
+          "text": "Lighting a second lamp shows the vigil is deliberate."
+        }
+      ],
+      "generate": {
+        "mode": "revise",
+        "predecessor": "BP0",
+        "intent": "Revise my Blueprint to include the second lamp.",
+        "script": {
+          "title": "The unexplained lamp, relit",
+          "thesis": "The lamp burns without explanation, and is lit again at dusk.",
+          "sections": [
+            {
+              "claim": "The lamp burns all night.",
+              "observations": [
+                "A:1"
+              ],
+              "interpretations": []
+            },
+            {
+              "claim": "A second lamp is lit at dusk.",
+              "observations": [
+                "A:5"
+              ],
+              "interpretations": [
+                "I:INEW"
+              ]
+            }
+          ],
+          "change_summary": "Adds the second lamp interpretation."
+        }
+      },
+      "between": [],
+      "decisions": [
+        {
+          "decision": "accept",
+          "expect": {
+            "status": 422,
+            "code": "REASON_REQUIRED"
+          }
+        },
+        {
+          "decision": "accept",
+          "reason": "Incorporates the new reading of the second lamp.",
+          "expect": {
+            "status": 201
+          }
+        }
+      ],
+      "expected": {
+        "generation": {
+          "status": 201,
+          "generation_writes_nothing": true,
+          "references": {
+            "observations": [
+              "A:1",
+              "A:5"
+            ],
+            "interpretations": [
+              "I:INEW"
+            ]
+          }
+        },
+        "result": {
+          "blueprint_source": "proposal-accepted",
+          "receipt_origin": "model_proposed_steward_accepted",
+          "plan_compiled": true,
+          "predecessor_unchanged": true,
+          "supersession_reason": "Incorporates the new reading of the second lamp.",
+          "lineage": {
+            "blueprint": "accepted_model",
+            "receipt": "accepted_model"
+          },
+          "counts": {
+            "receipts": 1,
+            "blueprints": 2
+          },
+          "verify": {
+            "record_integrity": "valid",
+            "candidate_replay": "verified",
+            "result_closure": "verified",
+            "model_output": "preserved_not_replayed"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "P11_model_rationale_differs_from_steward",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        },
+        {
+          "op": "save_perspective",
+          "key": "P1",
+          "label": "Light and vigilance",
+          "purpose": "Read light as watchfulness.",
+          "questions": [
+            "Who is the lamp for?"
+          ]
+        },
+        {
+          "op": "ratify_blueprint_exact",
+          "key": "BP0",
+          "blueprint": {
+            "title": "The unexplained lamp",
+            "thesis": "The lamp burns without explanation.",
+            "sections": [
+              {
+                "claim": "The lamp burns all night.",
+                "observations": [
+                  "A:1"
+                ],
+                "interpretations": []
+              }
+            ]
+          }
+        },
+        {
+          "op": "steward_interpretation",
+          "key": "INEW",
+          "doc": "A",
+          "sentence": 5,
+          "perspective": "P1",
+          "text": "Lighting a second lamp shows the vigil is deliberate."
+        }
+      ],
+      "generate": {
+        "mode": "revise",
+        "predecessor": "BP0",
+        "intent": "Revise my Blueprint to include the second lamp.",
+        "script": {
+          "title": "The unexplained lamp, relit",
+          "thesis": "The lamp burns without explanation, and is lit again at dusk.",
+          "sections": [
+            {
+              "claim": "The lamp burns all night.",
+              "observations": [
+                "A:1"
+              ],
+              "interpretations": []
+            },
+            {
+              "claim": "A second lamp is lit at dusk.",
+              "observations": [
+                "A:5"
+              ],
+              "interpretations": [
+                "I:INEW"
+              ]
+            }
+          ],
+          "change_summary": "The ledger proves the keeper kept watch."
+        }
+      },
+      "between": [],
+      "decisions": [
+        {
+          "decision": "accept",
+          "reason": "Narrows the claim to what the passages show.",
+          "expect": {
+            "status": 201
+          }
+        }
+      ],
+      "expected": {
+        "generation": {
+          "status": 201,
+          "generation_writes_nothing": true
+        },
+        "result": {
+          "supersession_reason": "Narrows the claim to what the passages show.",
+          "model_explanation": "The ledger proves the keeper kept watch.",
+          "rationale_is_not_model_explanation": true,
+          "counts": {
+            "receipts": 1,
+            "blueprints": 2
+          }
+        }
+      }
+    },
+    {
+      "case_id": "P12_provider_unavailable",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        }
+      ],
+      "generate": {
+        "mode": "create",
+        "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+        "script": {
+          "title": "The lamp as vigil or absence",
+          "thesis": "The burning lamp records a vigil the harbor never explains.",
+          "sections": [
+            {
+              "claim": "The lamp burns through the night without explanation.",
+              "observations": [
+                "A:1",
+                "A:2"
+              ],
+              "interpretations": []
+            },
+            {
+              "claim": "A second lamp at dusk shows the burning is deliberate.",
+              "observations": [
+                "A:5"
+              ],
+              "interpretations": []
+            }
+          ]
+        },
+        "model": "model-missing:1b"
+      },
+      "between": [],
+      "decisions": [],
+      "expected": {
+        "generation": {
+          "status": 409,
+          "generation_writes_nothing": true,
+          "no_provider_call": true
+        }
+      }
+    },
+    {
+      "case_id": "P13_malformed_output",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        }
+      ],
+      "generate": {
+        "mode": "create",
+        "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+        "script": {
+          "title": "The lamp as vigil or absence",
+          "thesis": null,
+          "sections": [
+            {
+              "claim": "The lamp burns through the night without explanation.",
+              "observations": [
+                "A:1",
+                "A:2"
+              ],
+              "interpretations": []
+            },
+            {
+              "claim": "A second lamp at dusk shows the burning is deliberate.",
+              "observations": [
+                "A:5"
+              ],
+              "interpretations": []
+            }
+          ]
+        }
+      },
+      "variants": [
+        {
+          "script": {
+            "raw": "The lamp means a vigil; here is my essay."
+          },
+          "expect": {
+            "status": 422,
+            "code": "PROPOSAL_OUTPUT_UNPARSEABLE"
+          }
+        }
+      ],
+      "between": [],
+      "decisions": [],
+      "expected": {
+        "generation": {
+          "status": 422,
+          "code": "PROPOSAL_OUTPUT_INVALID",
+          "generation_writes_nothing": true
+        }
+      }
+    },
+    {
+      "case_id": "P14_repeated_acceptance",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        }
+      ],
+      "generate": {
+        "mode": "create",
+        "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+        "script": {
+          "title": "The lamp as vigil or absence",
+          "thesis": "The burning lamp records a vigil the harbor never explains.",
+          "sections": [
+            {
+              "claim": "The lamp burns through the night without explanation.",
+              "observations": [
+                "A:1",
+                "A:2"
+              ],
+              "interpretations": []
+            },
+            {
+              "claim": "A second lamp at dusk shows the burning is deliberate.",
+              "observations": [
+                "A:5"
+              ],
+              "interpretations": []
+            }
+          ]
+        }
+      },
+      "between": [],
+      "decisions": [
+        {
+          "decision": "accept",
+          "expect": {
+            "status": 201
+          }
+        },
+        {
+          "decision": "accept",
+          "expect": {
+            "status": 200,
+            "same_receipt": true
+          }
+        },
+        {
+          "decision": "edit_and_accept",
+          "edit": {
+            "title": "Changed after acceptance"
+          },
+          "expect": {
+            "status": 200,
+            "same_receipt": true
+          }
+        }
+      ],
+      "expected": {
+        "generation": {
+          "status": 201,
+          "generation_writes_nothing": true
+        },
+        "result": {
+          "counts": {
+            "receipts": 1,
+            "blueprints": 1
+          }
+        }
+      }
+    },
+    {
+      "case_id": "P15_export_restore_declared_unsupported",
+      "setup": [
+        {
+          "op": "upload",
+          "doc": "A"
+        }
+      ],
+      "generate": {
+        "mode": "create",
+        "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+        "script": {
+          "title": "The lamp as vigil or absence",
+          "thesis": "The burning lamp records a vigil the harbor never explains.",
+          "sections": [
+            {
+              "claim": "The lamp burns through the night without explanation.",
+              "observations": [
+                "A:1",
+                "A:2"
+              ],
+              "interpretations": []
+            },
+            {
+              "claim": "A second lamp at dusk shows the burning is deliberate.",
+              "observations": [
+                "A:5"
+              ],
+              "interpretations": []
+            }
+          ]
+        }
+      },
+      "between": [],
+      "decisions": [
+        {
+          "decision": "accept",
+          "expect": {
+            "status": 201
+          }
+        }
+      ],
+      "expected": {
+        "generation": {
+          "status": 201,
+          "generation_writes_nothing": true
+        },
+        "portability": {
+          "component_exported": false,
+          "coverage_status": "unsupported",
+          "restored_receipts": 0,
+          "reason_mentions": [
+            "P10",
+            "Blueprint"
+          ]
+        }
+      }
+    }
+  ],
+  "further_checks": [
+    {
+      "check_id": "F1_client_substitution",
+      "case": "P05_exact_accept",
+      "expect": {
+        "status": 409,
+        "code": "CANDIDATE_MISMATCH"
+      }
+    },
+    {
+      "check_id": "F2_edit_cites_excluded",
+      "expect": {
+        "status": 403
+      }
+    },
+    {
+      "check_id": "F3_generation_disabled_by_default",
+      "expect": {
+        "status": 403,
+        "code": "BLUEPRINT_PROPOSAL_DISABLED"
+      }
+    },
+    {
+      "check_id": "F4_legacy_revise_parity",
+      "expect": {
+        "source": "steward-authored"
+      }
+    }
+  ]
+}

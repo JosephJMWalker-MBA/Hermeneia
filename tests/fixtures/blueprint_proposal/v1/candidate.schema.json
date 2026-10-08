@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermeneia.blueprint-proposal-candidate/v1",
+  "title": "Blueprint proposal candidate v1 (#215 P8): transient, server-held, model-proposed; writes nothing canonical",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "candidate_id", "mode", "binding", "extraction", "proposal"],
+  "properties": {
+    "schema": {"const": "hermeneia.blueprint-proposal-candidate/v1"},
+    "candidate_id": {"type": "string", "pattern": "^blueprint-proposal-candidate:sha256:[0-9a-f]{64}$"},
+    "mode": {"enum": ["create", "revise"]},
+    "binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["intent", "governing_question", "basis", "predecessor"],
+      "properties": {
+        "intent": {"$ref": "#/$defs/text_digest"},
+        "governing_question": {
+          "type": "object", "additionalProperties": false, "required": ["status", "text", "sha256"],
+          "properties": {"status": {"enum": ["captured", "absent"]}, "text": {"type": ["string", "null"]},
+                         "sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/digest"}]}}
+        },
+        "basis": {
+          "type": "object", "additionalProperties": false, "required": ["policy_version", "observations", "interpretations"],
+          "properties": {
+            "policy_version": {"const": "blueprint-proposal-basis/v1"},
+            "observations": {"type": "array", "maxItems": 200, "items": {"$ref": "#/$defs/exposed"}},
+            "interpretations": {"type": "array", "maxItems": 100, "items": {
+              "allOf": [{"$ref": "#/$defs/exposed"}],
+              "properties": {"authorship": {"enum": ["human", "accepted_model", "unknown"]}}, "required": ["authorship"]}}
+          }
+        },
+        "predecessor": {
+          "oneOf": [{"type": "null"},
+                    {"type": "object", "additionalProperties": false, "required": ["id", "sha256", "successors_at_generation"],
+                     "properties": {"id": {"type": "string"}, "sha256": {"$ref": "#/$defs/digest"},
+                                    "successors_at_generation": {"type": "array", "items": {"type": "string"}}}}]
+        }
+      }
+    },
+    "extraction": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policy_version", "prompt_version", "prompt", "prompt_sha256", "execution", "created_at", "completed_at", "output", "output_sha256"],
+      "properties": {
+        "policy_version": {"const": "1.0.0"}, "prompt_version": {"const": "blueprint-proposal/v1"},
+        "prompt": {"type": "string", "minLength": 1}, "prompt_sha256": {"$ref": "#/$defs/digest"},
+        "execution": {"type": "object", "required": ["provider_id", "model_id", "adapter"]},
+        "created_at": {"type": "string"}, "completed_at": {"type": "string"},
+        "output": {"type": "string"}, "output_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "proposal": {
+      "type": "object", "additionalProperties": false, "required": ["blueprint", "model_explanation"],
+      "properties": {"blueprint": {"$ref": "#/$defs/blueprint"}, "model_explanation": {"type": ["string", "null"]}}
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "text_digest": {"type": "object", "additionalProperties": false, "required": ["text", "sha256"],
+                    "properties": {"text": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "exposed": {"type": "object", "required": ["label", "id", "sha256"],
+                "properties": {"label": {"type": "string", "pattern": "^[OI][1-9][0-9]*$"}, "id": {"type": "string"}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "blueprint": {
+      "type": "object", "additionalProperties": false, "required": ["title", "thesis", "sections"],
+      "properties": {
+        "title": {"type": "string", "minLength": 1}, "thesis": {"type": "string", "minLength": 1},
+        "sections": {"type": "array", "minItems": 1, "maxItems": 12, "items": {
+          "type": "object", "additionalProperties": false, "required": ["claim", "supporting_observations", "supporting_interpretations"],
+          "properties": {"claim": {"type": "string", "minLength": 1},
+                         "supporting_observations": {"type": "array", "items": {"type": "string"}},
+                         "supporting_interpretations": {"type": "array", "items": {"type": "string"}}}}}
+      }
+    }
+  }
+}
