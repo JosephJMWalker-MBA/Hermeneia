@@ -9797,14 +9797,17 @@ Return ONLY valid JSON, no markdown, no explanation:
         from ..perspective_achievement_evidence import read_perspective_achievement_evidence
         from ..perspective_comparison import ComparisonRefused
         from ..perspective_comparison_candidates import (
-            ExtractionRefused, build_candidate, build_prompt, candidate_inputs, text_digest,
+            EXTRACTION_POLICY_VERSION, POLICIES, ExtractionRefused, build_candidate, candidate_inputs, prompt_for, text_digest,
         )
 
         payload = request.get_json(silent=True)
-        if (not isinstance(payload, dict) or set(payload) != {"receipt_ids", "model"}
+        if (not isinstance(payload, dict) or not {"receipt_ids", "model"} <= set(payload) <= {"receipt_ids", "model", "policy_version"}
                 or not isinstance(payload["receipt_ids"], list) or not all(isinstance(i, str) for i in payload["receipt_ids"])
-                or not isinstance(payload["model"], str)):
-            return jsonify({"error": "Exactly receipt_ids (a list) and model are required", "code": "INVALID_REQUEST"}), 400
+                or not isinstance(payload["model"], str)
+                or payload.get("policy_version", EXTRACTION_POLICY_VERSION) not in POLICIES):
+            return jsonify({"error": "receipt_ids (a list), model and an optional supported policy_version are required",
+                            "code": "INVALID_REQUEST"}), 400
+        policy_version = payload.get("policy_version", EXTRACTION_POLICY_VERSION)
         conn = _conn() if db_path.exists() else sqlite3.connect(":memory:")
         try:
             conn.execute("PRAGMA query_only=ON")
@@ -9821,7 +9824,7 @@ Return ONLY valid JSON, no markdown, no explanation:
         if error is not None:
             body, status = error
             return jsonify(body), status
-        prompt = build_prompt(inputs["view"], inputs["texts"])
+        prompt = prompt_for(policy_version, inputs["view"], inputs["texts"])
         created_at = utc_now_iso()
         try:
             adapter = active_provider_registry.create(context["provider_id"], model=context["model_id"], host=context["runtime_host"])
@@ -9836,7 +9839,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                           "runtime_host": context["runtime_host"], "selection_source": "per_run"})
         try:
             candidate = build_candidate(inputs, prompt=prompt, execution=execution, output=output,
-                                        created_at=created_at, completed_at=utc_now_iso())
+                                        created_at=created_at, completed_at=utc_now_iso(), policy_version=policy_version)
         except ExtractionRefused as refusal:
             return jsonify({"error": "The model output violates the extraction contract; no candidate exists",
                             "code": refusal.code, "output": output, "output_sha256": text_digest(output),
@@ -9878,9 +9881,12 @@ Return ONLY valid JSON, no markdown, no explanation:
                 return refusal
             if held["record"] is not None:
                 return jsonify(held["record"]), 200
+            candidate = held["candidate"]
+            if candidate["extraction"]["policy_version"] != "1.0.0":
+                return jsonify({"error": "Candidates from an experimental extraction policy cannot be accepted into study history",
+                                "code": "POLICY_NOT_ACCEPTABLE"}), 409
             if not db_path.exists():
                 return jsonify({"error": "database not found", "code": "NOT_RECORDED"}), 404
-            candidate = held["candidate"]
             conn = _conn_rw()
             try:
                 conn.execute("BEGIN IMMEDIATE")

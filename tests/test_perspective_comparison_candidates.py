@@ -227,3 +227,75 @@ def test_provider_failure_and_refused_output_create_no_candidate(study):
     unknown = s.client.post(f"/api/perspective/comparison/candidates/{bogus}/accept", json={"decision": "accept", "candidate_id": bogus})
     assert (unknown.status_code, unknown.get_json()["code"]) == (404, "UNKNOWN_CANDIDATE")
     assert lab._logical_digest(s.db) == before
+
+
+# ── Experimental extraction policy v1.1 (docs/design/perspective-comparison-extraction-v1.1.md) ──
+
+V1_1_POLICY = json.loads((ROOT / "tests" / "fixtures" / "perspective_comparison" / "v1" / "extraction_policy_v1.1.json").read_text())
+
+
+def test_v1_1_prompt_constants_equal_the_frozen_policy():
+    from hermeneia.perspective_comparison_candidates import (
+        V1_1_CLASSIFICATIONS, V1_1_EXAMPLE, V1_1_EXAMPLE_INTRO, V1_1_HEADER, V1_1_OUTPUT_RULES, V1_1_WORK_ORDER,
+    )
+    prompt = V1_1_POLICY["prompt"]
+    assert (list(V1_1_HEADER), list(V1_1_WORK_ORDER), list(V1_1_OUTPUT_RULES)) == (
+        prompt["header"], prompt["work_order"], prompt["output_rules"])
+    assert (V1_1_EXAMPLE_INTRO, V1_1_EXAMPLE) == (prompt["example_intro"], prompt["example"])
+    assert V1_1_CLASSIFICATIONS == V1_1_POLICY["mapping_to_canonical_stance"]
+
+
+def test_v1_1_wire_normalizes_to_the_same_canonical_structure_and_v1_is_unchanged(study):
+    import perspective_comparison_live_eval_v1_1 as v11
+    from hermeneia.perspective_comparison_candidates import build_prompt, parse_output_v1_1, prompt_for
+    s = study("C08_two_to_one_minority")
+    inputs = _inputs(s.db, s.receipt_ids)
+    view = inputs["view"]
+    wire = s.wire(candidate_lab.faithful_script(s.case["reference"], ["R1", "R2", "R3"]))
+    assert normalize(parse_output_v1_1(v11.to_v1_1_wire(wire), view), view) == normalize(parse_output(wire, view), view)
+    assert prompt_for("1.0.0", view, inputs["texts"]) == build_prompt(view, inputs["texts"])
+    assert prompt_for("1.1.0", view, inputs["texts"]) != build_prompt(view, inputs["texts"])
+
+
+def test_v1_1_enforces_its_bound_and_keeps_explicit_unknowns_honest(study):
+    from hermeneia.perspective_comparison_candidates import parse_output_v1_1
+    s = study("C01_same_conclusion_same_evidence")
+    view = _inputs(s.db, s.receipt_ids)["view"]
+    quote = s.case["steps"][0]["response"]
+
+    def proposition(index, second):
+        return {"id": f"p{index}", "statement": "The lamp signals a watch.", "classifications": [
+            {"participant": "P1", "classification": "supports", "quote": quote, "relies_on": []}, second]}
+
+    unknown = {"participant": "P2", "classification": "unknown", "quote": None, "relies_on": []}
+    structure = normalize(parse_output_v1_1(json.dumps({"propositions": [proposition(1, unknown)], "assumptions": []}), view), view)
+    assert [p["stance"] for p in structure["propositions"][0]["positions"]] == ["asserts", "unknown"]
+    assert structure["untraceable"] == []
+    silent_quoted = {"participant": "P2", "classification": "silent", "quote": "Read narrowly", "relies_on": []}
+    structure = normalize(parse_output_v1_1(json.dumps({"propositions": [proposition(1, silent_quoted)], "assumptions": []}), view), view)
+    assert [u["kind"] for u in structure["untraceable"]] == ["contradictory_position"]
+    with pytest.raises(ExtractionRefused) as refused:
+        parse_output_v1_1(json.dumps({"propositions": [proposition(i, unknown) for i in range(1, 6)], "assumptions": []}), view)
+    assert refused.value.code == "EXTRACTION_OUTPUT_CONTRACT_VIOLATION"
+
+
+def test_v1_1_candidates_can_be_discarded_but_never_accepted(study):
+    import perspective_comparison_live_eval_v1_1 as v11
+    s = study("C03_different_conclusions_same_evidence")
+    before = lab._logical_digest(s.db)
+    wire = v11.to_v1_1_wire(s.wire(candidate_lab.faithful_script(s.case["reference"], ["R1", "R2"])))
+    _CapturingProvider.render_responses = [wire]
+    candidate = v11._post(s.client, s.receipt_ids, CORPUS["extraction_model"]).get_json()
+    assert candidate["extraction"]["policy_version"] == "1.1.0"
+    assert candidate["extraction"]["prompt_version"] == "perspective-comparison-extraction/v1.1"
+    url = f"/api/perspective/comparison/candidates/{candidate['candidate_id']}"
+    for body in ({"decision": "accept", "candidate_id": candidate["candidate_id"]},
+                 {"decision": "edit_and_accept", "candidate_id": candidate["candidate_id"],
+                  "structure": candidate_lab._edit(s, s.case["reference"], "reference")}):
+        refused = s.client.post(url + "/accept", json=body)
+        assert (refused.status_code, refused.get_json()["code"]) == (409, "POLICY_NOT_ACCEPTABLE")
+    assert s.client.post(url + "/discard", json={"decision": "discard", "candidate_id": candidate["candidate_id"]}).status_code == 200
+    unsupported = s.client.post("/api/perspective/comparison/candidates",
+                                json={"receipt_ids": s.receipt_ids, "model": CORPUS["extraction_model"], "policy_version": "9.9.9"})
+    assert (unsupported.status_code, unsupported.get_json()["code"]) == (400, "INVALID_REQUEST")
+    assert lab._logical_digest(s.db) == before

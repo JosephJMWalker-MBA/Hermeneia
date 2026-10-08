@@ -26,6 +26,9 @@ STRUCTURE_SCHEMA = "hermeneia.perspective-comparison-structure/v1"
 CANDIDATE_SCHEMA = "hermeneia.perspective-comparison-candidate/v1"
 EXTRACTION_POLICY_VERSION = "1.0.0"
 PROMPT_VERSION = "perspective-comparison-extraction/v1"
+# Experimental policy 1.1.0 (docs/design/perspective-comparison-extraction-v1.1.md): opt-in, never acceptable.
+EXPERIMENTAL_POLICY_VERSION = "1.1.0"
+PROMPT_VERSION_V1_1 = "perspective-comparison-extraction/v1.1"
 MAX_ITEMS = 50
 STANCES = ("asserts", "denies", "unclassifiable", "does_not_address", "unknown")
 SPAN_STANCES = frozenset({"asserts", "denies", "unclassifiable"})
@@ -155,19 +158,11 @@ def candidate_inputs(conn: sqlite3.Connection, evidence, receipt_ids: list[str])
 
 # ── Prompt (perspective-comparison-extraction/v1) ────────────────────────────
 
-def build_prompt(view: dict, texts: dict) -> str:
+def _prompt_body(view: dict, texts: dict) -> list[str]:
+    """The shared question, evidence-unit and participant blocks (identical in every policy version)."""
     plabel = {p["receipt_id"]: f"P{index}" for index, p in enumerate(view["participants"], 1)}
     ulabel = {key: f"U{index}" for index, key in enumerate(view["units"], 1)}
-    lines = [
-        "You are proposing a structured comparison of retained Hermeneia Perspective readings.",
-        "This is a proposal for a steward to review. It is not a synthesis, a verdict or an adjudication.",
-        "Do not decide which Perspective is correct. Do not count votes. Do not output any field that is not listed below.",
-        "",
-        "Question every Perspective answered:",
-        view["question"],
-        "",
-        "Evidence units:",
-    ]
+    lines = ["", "Question every Perspective answered:", view["question"], "", "Evidence units:"]
     for key in view["units"]:
         kind = "source extraction" if key[0] == "source_extractions" else "Reader highlight"
         lines.append(f"{ulabel[key]} ({kind}): {texts[key]}")
@@ -175,6 +170,16 @@ def build_prompt(view: dict, texts: dict) -> str:
         supplied = ", ".join(f"{ulabel[key]} [{'/'.join(p['units'][key])}]" for key in view["units"] if key in p["units"])
         lines += ["", f"{plabel[p['receipt_id']]}: {p['label']} (Perspective {p['perspective_id']})",
                   f"Supplied evidence: {supplied}", "Response (quote exactly from this text only):", "<<<", p["response"], ">>>"]
+    return lines
+
+
+def build_prompt(view: dict, texts: dict) -> str:
+    lines = [
+        "You are proposing a structured comparison of retained Hermeneia Perspective readings.",
+        "This is a proposal for a steward to review. It is not a synthesis, a verdict or an adjudication.",
+        "Do not decide which Perspective is correct. Do not count votes. Do not output any field that is not listed below.",
+        *_prompt_body(view, texts),
+    ]
     lines += [
         "",
         "Return only JSON of exactly this shape:",
@@ -191,6 +196,122 @@ def build_prompt(view: dict, texts: dict) -> str:
         "- Record an assumption only when the response states it.",
     ]
     return "\n".join(lines)
+
+
+# ── Experimental prompt and wire format v1.1 (frozen in extraction_policy_v1.1.json) ──
+
+V1_1_HEADER = (
+    "You are building a structured comparison across retained Hermeneia Perspective readings.",
+    "This is a proposal for a steward to review. It is not a synthesis, a verdict or an adjudication.",
+    "Do not decide which Perspective is correct. Do not count votes.",
+)
+V1_1_WORK_ORDER = (
+    "Work in this order:",
+    "1. Find the claims that can be compared across the Perspectives. Write each as one neutral proposition about the passage, not about any one Perspective.",
+    "   Two responses that make the same claim in different words share ONE proposition. Two responses that make opposite claims share ONE proposition that one supports and the other opposes.",
+    "   Never write one proposition per Perspective by restating each response separately.",
+    "2. For each proposition, classify EVERY participant ({participant_labels}) with exactly one value:",
+    "   supports = the response asserts the proposition; opposes = the response denies it; mixed = the response speaks to it but is qualified or undecided; silent = the response does not speak to it; unknown = you cannot tell.",
+    "3. For supports, opposes and mixed, copy the quote exactly, character for character, from that participant's own response. For silent and unknown, quote is null.",
+    "4. Only then fill relies_on with the evidence units that the participant's quoted words explicitly draw on. relies_on: [] means no reliance established. Supplied evidence is not reliance.",
+    "5. Only then list assumptions that a response explicitly states, each with an exact quote. If there are none, use [].",
+    "Leave a classification unknown rather than inventing support.",
+)
+V1_1_OUTPUT_RULES = (
+    "Output rules:",
+    "- Output one JSON object only. No markdown, no code fences, no text before or after it.",
+    "- Include every field shown in the example in every object. Use [] for an empty list; never omit a field.",
+    "- Allowed classification values: \"supports\", \"opposes\", \"mixed\", \"silent\", \"unknown\".",
+    "- Participant labels: {participant_labels}. Evidence unit labels: {unit_labels}.",
+    "- At most {proposition_bound} propositions.",
+)
+V1_1_EXAMPLE_INTRO = "Example of the exact shape (illustrative content, not about this passage):"
+V1_1_EXAMPLE = ('{"propositions":[{"id":"p1","statement":"The bridge was closed for repairs.","classifications":['
+                '{"participant":"P1","classification":"supports","quote":"the bridge was shut for repairs","relies_on":["U1"]},'
+                '{"participant":"P2","classification":"opposes","quote":"nothing shows the bridge was closed","relies_on":[]}]}],'
+                '"assumptions":[{"participant":"P1","quote":"assuming the notice was official"}]}')
+V1_1_CLASSIFICATIONS = {"supports": "asserts", "opposes": "denies", "mixed": "unclassifiable",
+                        "silent": "does_not_address", "unknown": "unknown"}
+
+
+def _v1_1_values(view: dict) -> dict:
+    n = len(view["participants"])
+    return {"participant_labels": ", ".join(f"P{i}" for i in range(1, n + 1)),
+            "unit_labels": ", ".join(f"U{i}" for i in range(1, len(view["units"]) + 1)),
+            "proposition_bound": 2 * n}
+
+
+def build_prompt_v1_1(view: dict, texts: dict) -> str:
+    values = _v1_1_values(view)
+    lines = [*V1_1_HEADER, *_prompt_body(view, texts), "",
+             *(line.format(**values) for line in V1_1_WORK_ORDER), "",
+             *(line.format(**values) for line in V1_1_OUTPUT_RULES), "",
+             V1_1_EXAMPLE_INTRO, V1_1_EXAMPLE]
+    return "\n".join(lines)
+
+
+def parse_output_v1_1(text: str, view: dict) -> dict:
+    """Strict v1.1 wire parsing; returns the internal shape that normalize() consumes."""
+    match = _FENCE.match(text) if isinstance(text, str) else None
+    body = match.group(1) if match else text
+    try:
+        value = json.loads(body, object_pairs_hook=_strict)
+    except (ValueError, TypeError) as exc:
+        raise ExtractionRefused("EXTRACTION_OUTPUT_UNPARSEABLE") from exc
+    if not isinstance(value, dict):
+        raise ExtractionRefused("EXTRACTION_OUTPUT_UNPARSEABLE")
+    if _authority(value):
+        raise ExtractionRefused("EXTRACTION_OUTPUT_AUTHORITY_FIELD")
+    participants = {f"P{index}" for index in range(1, len(view["participants"]) + 1)}
+    units = {f"U{index}" for index in range(1, len(view["units"]) + 1)}
+
+    def require(condition):
+        if not condition:
+            raise ExtractionRefused("EXTRACTION_OUTPUT_CONTRACT_VIOLATION")
+
+    def nonblank(item):
+        return isinstance(item, str) and bool(item.strip())
+
+    require(set(value) == {"propositions", "assumptions"})
+    require(isinstance(value["propositions"], list) and len(value["propositions"]) <= 2 * len(participants))
+    require(isinstance(value["assumptions"], list) and len(value["assumptions"]) <= MAX_ITEMS)
+    ids, propositions = set(), []
+    for proposition in value["propositions"]:
+        require(isinstance(proposition, dict) and set(proposition) == {"id", "statement", "classifications"})
+        require(nonblank(proposition["id"]) and proposition["id"] not in ids and nonblank(proposition["statement"]))
+        ids.add(proposition["id"])
+        require(isinstance(proposition["classifications"], list))
+        seen, positions = set(), []
+        for item in proposition["classifications"]:
+            require(isinstance(item, dict) and set(item) == {"participant", "classification", "quote", "relies_on"})
+            require(item["participant"] in participants and item["participant"] not in seen)
+            seen.add(item["participant"])
+            require(item["classification"] in V1_1_CLASSIFICATIONS)
+            require(item["quote"] is None or isinstance(item["quote"], str))
+            require(isinstance(item["relies_on"], list) and all(label in units for label in item["relies_on"]))
+            positions.append({"participant": item["participant"], "stance": V1_1_CLASSIFICATIONS[item["classification"]],
+                              "quote": item["quote"], "relies_on": item["relies_on"]})
+        propositions.append({"id": proposition["id"], "statement": proposition["statement"], "positions": positions})
+    for assumption in value["assumptions"]:
+        require(isinstance(assumption, dict) and set(assumption) == {"participant", "quote"})
+        require(assumption["participant"] in participants and nonblank(assumption["quote"]))
+    return {"propositions": propositions, "assumptions": value["assumptions"]}
+
+
+POLICIES = {
+    EXTRACTION_POLICY_VERSION: {"prompt_version": PROMPT_VERSION, "build_prompt": build_prompt, "parse": None},
+    EXPERIMENTAL_POLICY_VERSION: {"prompt_version": PROMPT_VERSION_V1_1, "build_prompt": build_prompt_v1_1,
+                                  "parse": parse_output_v1_1},
+}
+
+
+def prompt_for(policy_version: str, view: dict, texts: dict) -> str:
+    return POLICIES[policy_version]["build_prompt"](view, texts)
+
+
+def parse_for(policy_version: str, text: str, view: dict) -> dict:
+    parse = POLICIES[policy_version]["parse"] or parse_output
+    return parse(text, view)
 
 
 # ── Model output: strict parsing, then traceability normalization ────────────
@@ -289,9 +410,10 @@ def normalize(output: dict, view: dict) -> dict:
                 continue
             proposed = {"proposed_stance": position["stance"], "quote": position["quote"],
                         "relies_on": [_ref(units[label]) for label in position["relies_on"]]}
-            if position["stance"] == "does_not_address":
+            if position["stance"] in ("does_not_address", "unknown"):
+                # v1 output never carries "unknown"; a v1.1 explicit unknown is kept without inventing support.
                 if position["quote"] is None and not position["relies_on"]:
-                    positions.append({"participant": rid, "stance": "does_not_address", "span": None, "reliance": []})
+                    positions.append({"participant": rid, "stance": position["stance"], "span": None, "reliance": []})
                 else:
                     positions.append(_unknown(rid))
                     untraceable.append({"kind": "contradictory_position", "proposition": pid, "participant": rid, **proposed})
@@ -490,16 +612,19 @@ def candidate_id(candidate: dict) -> str:
     return "perspective-comparison-candidate:sha256:" + hashlib.sha256(_CANDIDATE_DOMAIN + canonical_bytes(body)).hexdigest()
 
 
-def build_candidate(inputs: dict, *, prompt: str, execution: dict, output: str, created_at: str, completed_at: str) -> dict:
+def build_candidate(inputs: dict, *, prompt: str, execution: dict, output: str, created_at: str, completed_at: str,
+                    policy_version: str = EXTRACTION_POLICY_VERSION) -> dict:
     """Parse and normalize one model output into a transient candidate (raises ExtractionRefused)."""
+    if policy_version not in POLICIES:
+        raise ValueError("Unsupported extraction policy")
     if not (isinstance(execution, dict) and isinstance(execution.get("provider_id"), str) and execution["provider_id"]
             and isinstance(execution.get("model_id"), str) and execution["model_id"]):
         raise ValueError("Execution must record provider_id and model_id")
-    structure = normalize(parse_output(output, inputs["view"]), inputs["view"])
+    structure = normalize(parse_for(policy_version, output, inputs["view"]), inputs["view"])
     candidate = {
         "schema": CANDIDATE_SCHEMA,
         "binding": inputs["binding"],
-        "extraction": {"policy_version": EXTRACTION_POLICY_VERSION, "prompt_version": PROMPT_VERSION,
+        "extraction": {"policy_version": policy_version, "prompt_version": POLICIES[policy_version]["prompt_version"],
                        "prompt": prompt, "prompt_sha256": text_digest(prompt), "execution": json.loads(canonical_bytes(execution)),
                        "created_at": created_at, "completed_at": completed_at,
                        "output": output, "output_sha256": text_digest(output)},
