@@ -1,0 +1,3050 @@
+{
+  "schema": "hermeneia.perspective-comparison-cases/v1",
+  "policy_version": "1.0.0",
+  "question": "What does the lamp signal to the harbor?",
+  "documents": {
+    "A": [
+      "The lamp burned all night.",
+      "Nobody asked why it burned.",
+      "The keeper wrote nothing down.",
+      "By morning the harbor was empty.",
+      "A second lamp was lit at dusk.",
+      "The ledger records only the oil."
+    ],
+    "B": [
+      "The bell rang twice at noon.",
+      "The square fell silent.",
+      "No one claimed the bell.",
+      "The clerk noted the hour.",
+      "Children counted the rings.",
+      "The tower door stayed shut."
+    ]
+  },
+  "models": [
+    "model-a:1b",
+    "model-b:1b",
+    "model-z:9b"
+  ],
+  "cases": [
+    {
+      "case_id": "C01_same_conclusion_same_evidence",
+      "controls": "Two distinct Perspectives, one model, the same single-sentence focus; both conclude that the lamp signals a watch, in different words.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {},
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that someone is keeping watch through the night.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "skeptical-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "Read narrowly, the burning lamp shows a watch being kept.",
+          "decision": "retain"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          },
+          "R2": {
+            "origin": "built_in",
+            "perspective": "skeptical-reader",
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          }
+        },
+        "evidence": {
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          },
+          "snapshot_varies": [],
+          "shared_by_all": [
+            "A:1"
+          ],
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical"
+        },
+        "relations": [
+          {
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "same_provider_model",
+            "response_text": "different",
+            "evidence_units": "identical",
+            "evidence_focus": "identical",
+            "same_source_document": true
+          }
+        ],
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ],
+        "coverage": {
+          "extant_records": 2,
+          "eligible_records": 2,
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          }
+        }
+      },
+      "reference": {
+        "author": "P7 contract fixture (evaluation reference)",
+        "propositions": [
+          {
+            "id": "W",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": {
+              "R1": {
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "cited": [
+                  "A:1"
+                ]
+              },
+              "R2": {
+                "stance": "asserts",
+                "quote": "the burning lamp shows a watch being kept",
+                "cited": [
+                  "A:1"
+                ]
+              }
+            }
+          }
+        ],
+        "agreement": [
+          {
+            "proposition": "W",
+            "stance": "asserts",
+            "participants": [
+              "R1",
+              "R2"
+            ],
+            "evidence_relation": "identical"
+          }
+        ],
+        "disagreement": [],
+        "assumptions": [],
+        "unresolved": [],
+        "unclassifiable": []
+      },
+      "probes": [
+        {
+          "compare": [
+            "R1",
+            "R1"
+          ],
+          "refusal": "DUPLICATE_PARTICIPANT"
+        },
+        {
+          "compare": [
+            "R1"
+          ],
+          "refusal": "TOO_FEW_PARTICIPANTS"
+        }
+      ],
+      "variants": [
+        {
+          "variant_id": "model_change",
+          "modify": {
+            "R2": {
+              "model": "model-b:1b"
+            }
+          },
+          "expect": "substantive_unchanged",
+          "execution_relations": [
+            "different_provider_model"
+          ]
+        },
+        {
+          "variant_id": "model_relabel",
+          "modify": {
+            "R1": {
+              "model": "model-z:9b"
+            },
+            "R2": {
+              "model": "model-z:9b"
+            }
+          },
+          "expect": "substantive_unchanged",
+          "execution_relations": [
+            "same_provider_model"
+          ]
+        },
+        {
+          "variant_id": "evidence_change",
+          "modify": {
+            "R2": {
+              "focus": [
+                5,
+                5
+              ]
+            }
+          },
+          "expect": "evidence_changed",
+          "evidence": {
+            "units": {
+              "A:1": {
+                "R1": [
+                  "focus"
+                ]
+              },
+              "A:5": {
+                "R2": [
+                  "focus"
+                ]
+              }
+            },
+            "snapshot_varies": [],
+            "shared_by_all": [],
+            "only": {
+              "R1": [
+                "A:1"
+              ],
+              "R2": [
+                "A:5"
+              ]
+            },
+            "overall": "disjoint"
+          },
+          "evidence_relations": [
+            {
+              "evidence_units": "disjoint",
+              "evidence_focus": "disjoint"
+            }
+          ]
+        },
+        {
+          "variant_id": "conclusion_flip",
+          "modify": {
+            "R2": {
+              "response": "A lamp left burning does not show that anyone is keeping watch."
+            }
+          },
+          "expect": "deterministic_unchanged_beyond_response_text",
+          "reference": {
+            "author": "P7 contract fixture (evaluation reference)",
+            "propositions": [
+              {
+                "id": "W",
+                "statement": "The lamp signals that someone is keeping watch.",
+                "positions": {
+                  "R1": {
+                    "stance": "asserts",
+                    "quote": "The lamp signals that someone is keeping watch through the night.",
+                    "cited": [
+                      "A:1"
+                    ]
+                  },
+                  "R2": {
+                    "stance": "denies",
+                    "quote": "does not show that anyone is keeping watch",
+                    "cited": [
+                      "A:1"
+                    ]
+                  }
+                }
+              }
+            ],
+            "agreement": [],
+            "disagreement": [
+              {
+                "proposition": "W",
+                "groups": [
+                  {
+                    "stance": "asserts",
+                    "participants": [
+                      "R1"
+                    ]
+                  },
+                  {
+                    "stance": "denies",
+                    "participants": [
+                      "R2"
+                    ]
+                  }
+                ],
+                "smaller_groups": [],
+                "evidence_relation": "identical"
+              }
+            ],
+            "assumptions": [],
+            "unresolved": [
+              "W"
+            ],
+            "unclassifiable": []
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "C02_same_conclusion_different_evidence",
+      "controls": "Two distinct Perspectives on different sentences reach the same conclusion from different evidence.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {},
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that someone is keeping watch through the night.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "contextual-reader",
+          "model": "model-b:1b",
+          "doc": "A",
+          "focus": [
+            5,
+            5
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "Lighting a second lamp at dusk shows that a watch is being kept.",
+          "decision": "retain"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          },
+          "R2": {
+            "origin": "built_in",
+            "perspective": "contextual-reader",
+            "family": [
+              "built_in",
+              "contextual-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-b:1b",
+            "focus": [
+              "A:5"
+            ],
+            "context": [],
+            "highlights": []
+          }
+        },
+        "evidence": {
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ]
+            },
+            "A:5": {
+              "R2": [
+                "focus"
+              ]
+            }
+          },
+          "snapshot_varies": [],
+          "shared_by_all": [],
+          "only": {
+            "R1": [
+              "A:1"
+            ],
+            "R2": [
+              "A:5"
+            ]
+          },
+          "overall": "disjoint"
+        },
+        "relations": [
+          {
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "different_provider_model",
+            "response_text": "different",
+            "evidence_units": "disjoint",
+            "evidence_focus": "disjoint",
+            "same_source_document": true
+          }
+        ],
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ],
+        "coverage": {
+          "extant_records": 2,
+          "eligible_records": 2,
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          }
+        }
+      },
+      "reference": {
+        "author": "P7 contract fixture (evaluation reference)",
+        "propositions": [
+          {
+            "id": "W",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": {
+              "R1": {
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "cited": [
+                  "A:1"
+                ]
+              },
+              "R2": {
+                "stance": "asserts",
+                "quote": "shows that a watch is being kept",
+                "cited": [
+                  "A:5"
+                ]
+              }
+            }
+          }
+        ],
+        "agreement": [
+          {
+            "proposition": "W",
+            "stance": "asserts",
+            "participants": [
+              "R1",
+              "R2"
+            ],
+            "evidence_relation": "disjoint"
+          }
+        ],
+        "disagreement": [],
+        "assumptions": [],
+        "unresolved": [],
+        "unclassifiable": []
+      },
+      "probes": [],
+      "variants": []
+    },
+    {
+      "case_id": "C03_different_conclusions_same_evidence",
+      "controls": "Two distinct Perspectives on the same sentence reach opposite conclusions; a third run is discarded and never becomes comparable.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {},
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that someone is keeping watch through the night.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "skeptical-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "A lamp left burning does not show that anyone is keeping watch.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R3",
+          "perspective": "contextual-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp is a beacon guiding ships home.",
+          "decision": "discard"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          },
+          "R2": {
+            "origin": "built_in",
+            "perspective": "skeptical-reader",
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          }
+        },
+        "evidence": {
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          },
+          "snapshot_varies": [],
+          "shared_by_all": [
+            "A:1"
+          ],
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical"
+        },
+        "relations": [
+          {
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "same_provider_model",
+            "response_text": "different",
+            "evidence_units": "identical",
+            "evidence_focus": "identical",
+            "same_source_document": true
+          }
+        ],
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ],
+        "coverage": {
+          "extant_records": 2,
+          "eligible_records": 2,
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          }
+        }
+      },
+      "reference": {
+        "author": "P7 contract fixture (evaluation reference)",
+        "propositions": [
+          {
+            "id": "W",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": {
+              "R1": {
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "cited": [
+                  "A:1"
+                ]
+              },
+              "R2": {
+                "stance": "denies",
+                "quote": "does not show that anyone is keeping watch",
+                "cited": [
+                  "A:1"
+                ]
+              }
+            }
+          }
+        ],
+        "agreement": [],
+        "disagreement": [
+          {
+            "proposition": "W",
+            "groups": [
+              {
+                "stance": "asserts",
+                "participants": [
+                  "R1"
+                ]
+              },
+              {
+                "stance": "denies",
+                "participants": [
+                  "R2"
+                ]
+              }
+            ],
+            "smaller_groups": [],
+            "evidence_relation": "identical"
+          }
+        ],
+        "assumptions": [],
+        "unresolved": [
+          "W"
+        ],
+        "unclassifiable": []
+      },
+      "probes": [
+        {
+          "compare": [
+            "R1",
+            "R3"
+          ],
+          "refusal": "INELIGIBLE_RECEIPT"
+        }
+      ],
+      "variants": []
+    },
+    {
+      "case_id": "C04_different_conclusions_different_evidence",
+      "controls": "Opposite conclusions grounded in different sentences: the disagreement follows an evidence difference.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {},
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that someone is keeping watch through the night.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "skeptical-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            6,
+            6
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The ledger records only the oil, so nothing shows that anyone kept watch.",
+          "decision": "retain"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          },
+          "R2": {
+            "origin": "built_in",
+            "perspective": "skeptical-reader",
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:6"
+            ],
+            "context": [],
+            "highlights": []
+          }
+        },
+        "evidence": {
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ]
+            },
+            "A:6": {
+              "R2": [
+                "focus"
+              ]
+            }
+          },
+          "snapshot_varies": [],
+          "shared_by_all": [],
+          "only": {
+            "R1": [
+              "A:1"
+            ],
+            "R2": [
+              "A:6"
+            ]
+          },
+          "overall": "disjoint"
+        },
+        "relations": [
+          {
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "same_provider_model",
+            "response_text": "different",
+            "evidence_units": "disjoint",
+            "evidence_focus": "disjoint",
+            "same_source_document": true
+          }
+        ],
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ],
+        "coverage": {
+          "extant_records": 2,
+          "eligible_records": 2,
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          }
+        }
+      },
+      "reference": {
+        "author": "P7 contract fixture (evaluation reference)",
+        "propositions": [
+          {
+            "id": "W",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": {
+              "R1": {
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "cited": [
+                  "A:1"
+                ]
+              },
+              "R2": {
+                "stance": "denies",
+                "quote": "nothing shows that anyone kept watch",
+                "cited": [
+                  "A:6"
+                ]
+              }
+            }
+          }
+        ],
+        "agreement": [],
+        "disagreement": [
+          {
+            "proposition": "W",
+            "groups": [
+              {
+                "stance": "asserts",
+                "participants": [
+                  "R1"
+                ]
+              },
+              {
+                "stance": "denies",
+                "participants": [
+                  "R2"
+                ]
+              }
+            ],
+            "smaller_groups": [],
+            "evidence_relation": "disjoint"
+          }
+        ],
+        "assumptions": [],
+        "unresolved": [
+          "W"
+        ],
+        "unclassifiable": []
+      },
+      "probes": [],
+      "variants": []
+    },
+    {
+      "case_id": "C05_assumption_difference",
+      "controls": "Same focus and the same current page; the readings differ through explicitly stated assumptions, not a direct contradiction.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {},
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": true,
+          "highlights": [],
+          "response": "Assuming the keeper lit it, the lamp signals that someone is keeping watch.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "contextual-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": true,
+          "highlights": [],
+          "response": "If the empty harbor means the boats fled, the lamp signals a warning to stay away.",
+          "decision": "retain"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [
+              "A:1",
+              "A:2",
+              "A:3",
+              "A:4",
+              "A:5",
+              "A:6"
+            ],
+            "highlights": []
+          },
+          "R2": {
+            "origin": "built_in",
+            "perspective": "contextual-reader",
+            "family": [
+              "built_in",
+              "contextual-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [
+              "A:1",
+              "A:2",
+              "A:3",
+              "A:4",
+              "A:5",
+              "A:6"
+            ],
+            "highlights": []
+          }
+        },
+        "evidence": {
+          "units": {
+            "A:1": {
+              "R1": [
+                "context",
+                "focus"
+              ],
+              "R2": [
+                "context",
+                "focus"
+              ]
+            },
+            "A:2": {
+              "R1": [
+                "context"
+              ],
+              "R2": [
+                "context"
+              ]
+            },
+            "A:3": {
+              "R1": [
+                "context"
+              ],
+              "R2": [
+                "context"
+              ]
+            },
+            "A:4": {
+              "R1": [
+                "context"
+              ],
+              "R2": [
+                "context"
+              ]
+            },
+            "A:5": {
+              "R1": [
+                "context"
+              ],
+              "R2": [
+                "context"
+              ]
+            },
+            "A:6": {
+              "R1": [
+                "context"
+              ],
+              "R2": [
+                "context"
+              ]
+            }
+          },
+          "snapshot_varies": [],
+          "shared_by_all": [
+            "A:1",
+            "A:2",
+            "A:3",
+            "A:4",
+            "A:5",
+            "A:6"
+          ],
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical"
+        },
+        "relations": [
+          {
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "same_provider_model",
+            "response_text": "different",
+            "evidence_units": "identical",
+            "evidence_focus": "identical",
+            "same_source_document": true
+          }
+        ],
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ],
+        "coverage": {
+          "extant_records": 2,
+          "eligible_records": 2,
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          }
+        }
+      },
+      "reference": {
+        "author": "P7 contract fixture (evaluation reference)",
+        "propositions": [
+          {
+            "id": "W",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": {
+              "R1": {
+                "stance": "asserts",
+                "quote": "the lamp signals that someone is keeping watch",
+                "cited": [
+                  "A:1"
+                ]
+              },
+              "R2": {
+                "stance": "does_not_address",
+                "quote": null,
+                "cited": []
+              }
+            }
+          },
+          {
+            "id": "WARN",
+            "statement": "The lamp signals a warning to stay away.",
+            "positions": {
+              "R1": {
+                "stance": "does_not_address",
+                "quote": null,
+                "cited": []
+              },
+              "R2": {
+                "stance": "asserts",
+                "quote": "the lamp signals a warning to stay away",
+                "cited": [
+                  "A:1",
+                  "A:4"
+                ]
+              }
+            }
+          }
+        ],
+        "agreement": [],
+        "disagreement": [],
+        "assumptions": [
+          {
+            "id": "AS1",
+            "participant": "R1",
+            "quote": "Assuming the keeper lit it"
+          },
+          {
+            "id": "AS2",
+            "participant": "R2",
+            "quote": "If the empty harbor means the boats fled"
+          }
+        ],
+        "unresolved": [],
+        "unclassifiable": []
+      },
+      "probes": [],
+      "variants": []
+    },
+    {
+      "case_id": "C06_wording_only_difference",
+      "controls": "Very different wording, including a surface negation, for the same claim on the same evidence.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {},
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that someone is keeping watch through the night.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "skeptical-reader",
+          "model": "model-b:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "Not a beacon for ships: the light burning till morning marks a vigil.",
+          "decision": "retain"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          },
+          "R2": {
+            "origin": "built_in",
+            "perspective": "skeptical-reader",
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-b:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          }
+        },
+        "evidence": {
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          },
+          "snapshot_varies": [],
+          "shared_by_all": [
+            "A:1"
+          ],
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical"
+        },
+        "relations": [
+          {
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "different_provider_model",
+            "response_text": "different",
+            "evidence_units": "identical",
+            "evidence_focus": "identical",
+            "same_source_document": true
+          }
+        ],
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ],
+        "coverage": {
+          "extant_records": 2,
+          "eligible_records": 2,
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          }
+        }
+      },
+      "reference": {
+        "author": "P7 contract fixture (evaluation reference)",
+        "propositions": [
+          {
+            "id": "W",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": {
+              "R1": {
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "cited": [
+                  "A:1"
+                ]
+              },
+              "R2": {
+                "stance": "asserts",
+                "quote": "the light burning till morning marks a vigil",
+                "cited": [
+                  "A:1"
+                ]
+              }
+            }
+          },
+          {
+            "id": "BEACON",
+            "statement": "The lamp is a beacon for ships.",
+            "positions": {
+              "R1": {
+                "stance": "does_not_address",
+                "quote": null,
+                "cited": []
+              },
+              "R2": {
+                "stance": "denies",
+                "quote": "Not a beacon for ships",
+                "cited": []
+              }
+            }
+          }
+        ],
+        "agreement": [
+          {
+            "proposition": "W",
+            "stance": "asserts",
+            "participants": [
+              "R1",
+              "R2"
+            ],
+            "evidence_relation": "identical"
+          }
+        ],
+        "disagreement": [],
+        "assumptions": [],
+        "unresolved": [],
+        "unclassifiable": []
+      },
+      "probes": [],
+      "variants": []
+    },
+    {
+      "case_id": "C07_similar_wording_opposite_claims",
+      "controls": "Nearly identical wording that makes opposite claims on the same evidence.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {},
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            4,
+            4
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that the harbor is safe to enter.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "skeptical-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            4,
+            4
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that the harbor is not safe to enter.",
+          "decision": "retain"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:4"
+            ],
+            "context": [],
+            "highlights": []
+          },
+          "R2": {
+            "origin": "built_in",
+            "perspective": "skeptical-reader",
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:4"
+            ],
+            "context": [],
+            "highlights": []
+          }
+        },
+        "evidence": {
+          "units": {
+            "A:4": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          },
+          "snapshot_varies": [],
+          "shared_by_all": [
+            "A:4"
+          ],
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical"
+        },
+        "relations": [
+          {
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "same_provider_model",
+            "response_text": "different",
+            "evidence_units": "identical",
+            "evidence_focus": "identical",
+            "same_source_document": true
+          }
+        ],
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ],
+        "coverage": {
+          "extant_records": 2,
+          "eligible_records": 2,
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          }
+        }
+      },
+      "reference": {
+        "author": "P7 contract fixture (evaluation reference)",
+        "propositions": [
+          {
+            "id": "SAFE",
+            "statement": "The lamp signals that the harbor is safe to enter.",
+            "positions": {
+              "R1": {
+                "stance": "asserts",
+                "quote": "The lamp signals that the harbor is safe to enter.",
+                "cited": [
+                  "A:4"
+                ]
+              },
+              "R2": {
+                "stance": "denies",
+                "quote": "The lamp signals that the harbor is not safe to enter.",
+                "cited": [
+                  "A:4"
+                ]
+              }
+            }
+          }
+        ],
+        "agreement": [],
+        "disagreement": [
+          {
+            "proposition": "SAFE",
+            "groups": [
+              {
+                "stance": "asserts",
+                "participants": [
+                  "R1"
+                ]
+              },
+              {
+                "stance": "denies",
+                "participants": [
+                  "R2"
+                ]
+              }
+            ],
+            "smaller_groups": [],
+            "evidence_relation": "identical"
+          }
+        ],
+        "assumptions": [],
+        "unresolved": [
+          "SAFE"
+        ],
+        "unclassifiable": []
+      },
+      "probes": [],
+      "variants": []
+    },
+    {
+      "case_id": "C08_two_to_one_minority",
+      "controls": "Three distinct Perspectives on one sentence: two assert the watch reading, one denies it and adds a hedged alternative.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {},
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that someone is keeping watch through the night.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "contextual-reader",
+          "model": "model-b:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The light burning through the night signals that a watch is kept.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R3",
+          "perspective": "skeptical-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "Nothing in the passage shows a watch; the lamp may simply have been forgotten.",
+          "decision": "retain"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2",
+        "R3"
+      ],
+      "expected": {
+        "order": [
+          "R1",
+          "R2",
+          "R3"
+        ],
+        "participants": {
+          "R1": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          },
+          "R2": {
+            "origin": "built_in",
+            "perspective": "contextual-reader",
+            "family": [
+              "built_in",
+              "contextual-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-b:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          },
+          "R3": {
+            "origin": "built_in",
+            "perspective": "skeptical-reader",
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          }
+        },
+        "evidence": {
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ],
+              "R3": [
+                "focus"
+              ]
+            }
+          },
+          "snapshot_varies": [],
+          "shared_by_all": [
+            "A:1"
+          ],
+          "only": {
+            "R1": [],
+            "R2": [],
+            "R3": []
+          },
+          "overall": "identical"
+        },
+        "relations": [
+          {
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "different_provider_model",
+            "response_text": "different",
+            "evidence_units": "identical",
+            "evidence_focus": "identical",
+            "same_source_document": true
+          },
+          {
+            "pair": [
+              "R1",
+              "R3"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "same_provider_model",
+            "response_text": "different",
+            "evidence_units": "identical",
+            "evidence_focus": "identical",
+            "same_source_document": true
+          },
+          {
+            "pair": [
+              "R2",
+              "R3"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "different_provider_model",
+            "response_text": "different",
+            "evidence_units": "identical",
+            "evidence_focus": "identical",
+            "same_source_document": true
+          }
+        ],
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ],
+        "coverage": {
+          "extant_records": 3,
+          "eligible_records": 3,
+          "classified_records": {
+            "eligible": 3,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          }
+        }
+      },
+      "reference": {
+        "author": "P7 contract fixture (evaluation reference)",
+        "propositions": [
+          {
+            "id": "W",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": {
+              "R1": {
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "cited": [
+                  "A:1"
+                ]
+              },
+              "R2": {
+                "stance": "asserts",
+                "quote": "signals that a watch is kept",
+                "cited": [
+                  "A:1"
+                ]
+              },
+              "R3": {
+                "stance": "denies",
+                "quote": "Nothing in the passage shows a watch",
+                "cited": [
+                  "A:1"
+                ]
+              }
+            }
+          },
+          {
+            "id": "FORGOT",
+            "statement": "The lamp may have been forgotten.",
+            "positions": {
+              "R1": {
+                "stance": "does_not_address",
+                "quote": null,
+                "cited": []
+              },
+              "R2": {
+                "stance": "does_not_address",
+                "quote": null,
+                "cited": []
+              },
+              "R3": {
+                "stance": "unclassifiable",
+                "quote": "the lamp may simply have been forgotten",
+                "cited": []
+              }
+            }
+          }
+        ],
+        "agreement": [],
+        "disagreement": [
+          {
+            "proposition": "W",
+            "groups": [
+              {
+                "stance": "asserts",
+                "participants": [
+                  "R1",
+                  "R2"
+                ]
+              },
+              {
+                "stance": "denies",
+                "participants": [
+                  "R3"
+                ]
+              }
+            ],
+            "smaller_groups": [
+              "R3"
+            ],
+            "evidence_relation": "identical"
+          }
+        ],
+        "assumptions": [],
+        "unresolved": [
+          "W"
+        ],
+        "unclassifiable": [
+          {
+            "proposition": "FORGOT",
+            "participant": "R3"
+          }
+        ]
+      },
+      "probes": [],
+      "variants": [
+        {
+          "variant_id": "model_swap",
+          "modify": {
+            "R1": {
+              "model": "model-b:1b"
+            },
+            "R2": {
+              "model": "model-a:1b"
+            },
+            "R3": {
+              "model": "model-b:1b"
+            }
+          },
+          "expect": "substantive_unchanged",
+          "execution_relations": [
+            "different_provider_model",
+            "same_provider_model",
+            "different_provider_model"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "C09_unsupported_assertion",
+      "controls": "A saved Perspective asserts a claim that nothing in its supplied Scope supports.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {},
+        "saved_perspectives": {
+          "S1": {
+            "label": "Harbor trade",
+            "purpose": "Read signals as commerce.",
+            "questions": [
+              "Who profits from the light?"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that someone is keeping watch through the night.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": {
+            "saved": "S1"
+          },
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The keeper was signalling smugglers, as the town's records of his debts make clear.",
+          "decision": "retain"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          },
+          "R2": {
+            "origin": "canonical_saved",
+            "perspective": "S1",
+            "family": [
+              "canonical_saved",
+              "S1"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          }
+        },
+        "evidence": {
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          },
+          "snapshot_varies": [],
+          "shared_by_all": [
+            "A:1"
+          ],
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical"
+        },
+        "relations": [
+          {
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "same_provider_model",
+            "response_text": "different",
+            "evidence_units": "identical",
+            "evidence_focus": "identical",
+            "same_source_document": true
+          }
+        ],
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ],
+        "coverage": {
+          "extant_records": 2,
+          "eligible_records": 2,
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          }
+        }
+      },
+      "reference": {
+        "author": "P7 contract fixture (evaluation reference)",
+        "propositions": [
+          {
+            "id": "W",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": {
+              "R1": {
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "cited": [
+                  "A:1"
+                ]
+              },
+              "R2": {
+                "stance": "does_not_address",
+                "quote": null,
+                "cited": []
+              }
+            }
+          },
+          {
+            "id": "SMUGGLE",
+            "statement": "The keeper was signalling smugglers.",
+            "positions": {
+              "R1": {
+                "stance": "does_not_address",
+                "quote": null,
+                "cited": []
+              },
+              "R2": {
+                "stance": "asserts",
+                "quote": "The keeper was signalling smugglers",
+                "cited": []
+              }
+            }
+          }
+        ],
+        "agreement": [],
+        "disagreement": [],
+        "assumptions": [],
+        "unresolved": [],
+        "unclassifiable": []
+      },
+      "probes": [],
+      "variants": []
+    },
+    {
+      "case_id": "C10_incomplete_coverage_excluded_receipt",
+      "controls": "Three retained runs; the third's source is then excluded from analysis, so its receipt is ineligible.",
+      "setup": {
+        "documents": [
+          "A",
+          "B"
+        ],
+        "highlights": {},
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that someone is keeping watch through the night.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "skeptical-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "A lamp left burning does not show that anyone is keeping watch.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R3",
+          "perspective": "contextual-reader",
+          "model": "model-a:1b",
+          "doc": "B",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The bell, not the lamp, is what the town listens for.",
+          "decision": "retain"
+        },
+        {
+          "op": "exclude_document",
+          "doc": "B"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          },
+          "R2": {
+            "origin": "built_in",
+            "perspective": "skeptical-reader",
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          }
+        },
+        "evidence": {
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          },
+          "snapshot_varies": [],
+          "shared_by_all": [
+            "A:1"
+          ],
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical"
+        },
+        "relations": [
+          {
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "same_provider_model",
+            "response_text": "different",
+            "evidence_units": "identical",
+            "evidence_focus": "identical",
+            "same_source_document": true
+          }
+        ],
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION",
+          "RECEIPTS_NOT_ELIGIBLE"
+        ],
+        "coverage": {
+          "extant_records": 3,
+          "eligible_records": 2,
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 1,
+            "invalid": 0,
+            "unsupported": 0
+          }
+        }
+      },
+      "reference": {
+        "author": "P7 contract fixture (evaluation reference)",
+        "propositions": [
+          {
+            "id": "W",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": {
+              "R1": {
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "cited": [
+                  "A:1"
+                ]
+              },
+              "R2": {
+                "stance": "denies",
+                "quote": "does not show that anyone is keeping watch",
+                "cited": [
+                  "A:1"
+                ]
+              }
+            }
+          }
+        ],
+        "agreement": [],
+        "disagreement": [
+          {
+            "proposition": "W",
+            "groups": [
+              {
+                "stance": "asserts",
+                "participants": [
+                  "R1"
+                ]
+              },
+              {
+                "stance": "denies",
+                "participants": [
+                  "R2"
+                ]
+              }
+            ],
+            "smaller_groups": [],
+            "evidence_relation": "identical"
+          }
+        ],
+        "assumptions": [],
+        "unresolved": [
+          "W"
+        ],
+        "unclassifiable": []
+      },
+      "probes": [
+        {
+          "compare": [
+            "R1",
+            "R2",
+            "R3"
+          ],
+          "refusal": "INELIGIBLE_RECEIPT"
+        },
+        {
+          "compare": [
+            "R1",
+            "R3"
+          ],
+          "refusal": "INELIGIBLE_RECEIPT"
+        }
+      ],
+      "variants": []
+    },
+    {
+      "case_id": "C11_legitimately_unclassifiable",
+      "controls": "Both responses decline to commit; their stance toward the watch reading is unclassifiable.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {},
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            2,
+            2
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "Nobody asked why it burned, so what it signals is left open.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "skeptical-reader",
+          "model": "model-b:1b",
+          "doc": "A",
+          "focus": [
+            2,
+            2
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "Perhaps it signals something; perhaps nothing at all.",
+          "decision": "retain"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:2"
+            ],
+            "context": [],
+            "highlights": []
+          },
+          "R2": {
+            "origin": "built_in",
+            "perspective": "skeptical-reader",
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-b:1b",
+            "focus": [
+              "A:2"
+            ],
+            "context": [],
+            "highlights": []
+          }
+        },
+        "evidence": {
+          "units": {
+            "A:2": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          },
+          "snapshot_varies": [],
+          "shared_by_all": [
+            "A:2"
+          ],
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical"
+        },
+        "relations": [
+          {
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "different_provider_model",
+            "response_text": "different",
+            "evidence_units": "identical",
+            "evidence_focus": "identical",
+            "same_source_document": true
+          }
+        ],
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ],
+        "coverage": {
+          "extant_records": 2,
+          "eligible_records": 2,
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          }
+        }
+      },
+      "reference": {
+        "author": "P7 contract fixture (evaluation reference)",
+        "propositions": [
+          {
+            "id": "W",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": {
+              "R1": {
+                "stance": "unclassifiable",
+                "quote": "what it signals is left open",
+                "cited": [
+                  "A:2"
+                ]
+              },
+              "R2": {
+                "stance": "unclassifiable",
+                "quote": "Perhaps it signals something; perhaps nothing at all.",
+                "cited": []
+              }
+            }
+          }
+        ],
+        "agreement": [],
+        "disagreement": [],
+        "assumptions": [],
+        "unresolved": [],
+        "unclassifiable": [
+          {
+            "proposition": "W",
+            "participant": "R1"
+          },
+          {
+            "proposition": "W",
+            "participant": "R2"
+          }
+        ]
+      },
+      "probes": [],
+      "variants": []
+    },
+    {
+      "case_id": "C12_one_perspective_two_models_identical_text",
+      "controls": "The same built-in Perspective run by two models returns byte-identical text.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {},
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that someone is keeping watch through the night.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "close-reader",
+          "model": "model-b:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that someone is keeping watch through the night.",
+          "decision": "retain"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          },
+          "R2": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-b:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": []
+          }
+        },
+        "evidence": {
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          },
+          "snapshot_varies": [],
+          "shared_by_all": [
+            "A:1"
+          ],
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical"
+        },
+        "relations": [
+          {
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "same_family",
+            "execution": "different_provider_model",
+            "response_text": "identical",
+            "evidence_units": "identical",
+            "evidence_focus": "identical",
+            "same_source_document": true
+          }
+        ],
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION",
+          "MODEL_DIFFERENCE_NOT_PERSPECTIVE",
+          "IDENTICAL_TEXT_NOT_AGREEMENT"
+        ],
+        "coverage": {
+          "extant_records": 2,
+          "eligible_records": 2,
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          }
+        }
+      },
+      "reference": {
+        "author": "P7 contract fixture (evaluation reference)",
+        "propositions": [
+          {
+            "id": "W",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": {
+              "R1": {
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "cited": [
+                  "A:1"
+                ]
+              },
+              "R2": {
+                "stance": "asserts",
+                "quote": "The lamp signals that someone is keeping watch through the night.",
+                "cited": [
+                  "A:1"
+                ]
+              }
+            }
+          }
+        ],
+        "agreement": [
+          {
+            "proposition": "W",
+            "stance": "asserts",
+            "participants": [
+              "R1",
+              "R2"
+            ],
+            "evidence_relation": "identical"
+          }
+        ],
+        "disagreement": [],
+        "assumptions": [],
+        "unresolved": [],
+        "unclassifiable": []
+      },
+      "probes": [],
+      "variants": []
+    },
+    {
+      "case_id": "C13_overlapping_evidence_changed_highlight",
+      "controls": "Overlapping Scopes: a narrow focus plus a highlight versus a two-sentence focus with the current page and the same highlight, whose relevance is changed between runs.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {
+          "h1": {
+            "doc": "A",
+            "sentence": 6
+          }
+        },
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [
+            "h1"
+          ],
+          "response": "The lamp signals a watch, though the ledger marks only the oil.",
+          "decision": "retain"
+        },
+        {
+          "op": "patch_highlight",
+          "highlight": "h1",
+          "relevance": "contradicts"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "contextual-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            2
+          ],
+          "current_page": true,
+          "highlights": [
+            "h1"
+          ],
+          "response": "Burning all night and never explained, the lamp signals a question nobody asked.",
+          "decision": "retain"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "origin": "built_in",
+            "perspective": "close-reader",
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1"
+            ],
+            "context": [],
+            "highlights": [
+              "h1"
+            ]
+          },
+          "R2": {
+            "origin": "built_in",
+            "perspective": "contextual-reader",
+            "family": [
+              "built_in",
+              "contextual-reader"
+            ],
+            "family_state": "supported",
+            "model_id": "model-a:1b",
+            "focus": [
+              "A:1",
+              "A:2"
+            ],
+            "context": [
+              "A:1",
+              "A:2",
+              "A:3",
+              "A:4",
+              "A:5",
+              "A:6"
+            ],
+            "highlights": [
+              "h1"
+            ]
+          }
+        },
+        "evidence": {
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "context",
+                "focus"
+              ]
+            },
+            "A:2": {
+              "R2": [
+                "context",
+                "focus"
+              ]
+            },
+            "A:3": {
+              "R2": [
+                "context"
+              ]
+            },
+            "A:4": {
+              "R2": [
+                "context"
+              ]
+            },
+            "A:5": {
+              "R2": [
+                "context"
+              ]
+            },
+            "A:6": {
+              "R2": [
+                "context"
+              ]
+            },
+            "h1": {
+              "R1": [
+                "highlight"
+              ],
+              "R2": [
+                "highlight"
+              ]
+            }
+          },
+          "snapshot_varies": [
+            "h1"
+          ],
+          "shared_by_all": [
+            "A:1",
+            "h1"
+          ],
+          "only": {
+            "R1": [],
+            "R2": [
+              "A:2",
+              "A:3",
+              "A:4",
+              "A:5",
+              "A:6"
+            ]
+          },
+          "overall": "overlapping"
+        },
+        "relations": [
+          {
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "execution": "same_provider_model",
+            "response_text": "different",
+            "evidence_units": "overlapping",
+            "evidence_focus": "overlapping",
+            "same_source_document": true
+          }
+        ],
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION",
+          "HIGHLIGHT_SNAPSHOT_VARIES"
+        ],
+        "coverage": {
+          "extant_records": 2,
+          "eligible_records": 2,
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          }
+        }
+      },
+      "reference": {
+        "author": "P7 contract fixture (evaluation reference)",
+        "propositions": [
+          {
+            "id": "W",
+            "statement": "The lamp signals that someone is keeping watch.",
+            "positions": {
+              "R1": {
+                "stance": "asserts",
+                "quote": "The lamp signals a watch",
+                "cited": [
+                  "A:1"
+                ]
+              },
+              "R2": {
+                "stance": "does_not_address",
+                "quote": null,
+                "cited": []
+              }
+            }
+          },
+          {
+            "id": "UNASKED",
+            "statement": "The lamp signals a question nobody asked.",
+            "positions": {
+              "R1": {
+                "stance": "does_not_address",
+                "quote": null,
+                "cited": []
+              },
+              "R2": {
+                "stance": "asserts",
+                "quote": "the lamp signals a question nobody asked",
+                "cited": [
+                  "A:1",
+                  "A:2"
+                ]
+              }
+            }
+          },
+          {
+            "id": "LEDGER",
+            "statement": "The ledger records only the oil.",
+            "positions": {
+              "R1": {
+                "stance": "asserts",
+                "quote": "the ledger marks only the oil",
+                "cited": [
+                  "h1"
+                ]
+              },
+              "R2": {
+                "stance": "does_not_address",
+                "quote": null,
+                "cited": []
+              }
+            }
+          }
+        ],
+        "agreement": [],
+        "disagreement": [],
+        "assumptions": [],
+        "unresolved": [],
+        "unclassifiable": []
+      },
+      "probes": [],
+      "variants": []
+    },
+    {
+      "case_id": "N1_question_mismatch",
+      "controls": "Two retained runs answer different questions; comparing them is refused.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {},
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that someone is keeping watch through the night.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "skeptical-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "Because no one wanted the answer.",
+          "decision": "retain",
+          "question": "Why did nobody ask about the lamp?"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "refusal": "QUESTION_MISMATCH"
+      },
+      "reference": null,
+      "probes": [],
+      "variants": []
+    },
+    {
+      "case_id": "N2_legacy_without_receipt_table",
+      "controls": "A labeled legacy shape: the receipt table is absent, so receipt coverage is unsupported and comparison is refused.",
+      "setup": {
+        "documents": [
+          "A"
+        ],
+        "highlights": {},
+        "saved_perspectives": {}
+      },
+      "steps": [
+        {
+          "op": "run",
+          "key": "R1",
+          "perspective": "close-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "The lamp signals that someone is keeping watch through the night.",
+          "decision": "retain"
+        },
+        {
+          "op": "run",
+          "key": "R2",
+          "perspective": "skeptical-reader",
+          "model": "model-a:1b",
+          "doc": "A",
+          "focus": [
+            1,
+            1
+          ],
+          "current_page": false,
+          "highlights": [],
+          "response": "A lamp left burning does not show that anyone is keeping watch.",
+          "decision": "retain"
+        },
+        {
+          "op": "drop_receipts_table",
+          "label": "legacy shape: a workspace without the P3 receipt table"
+        }
+      ],
+      "compare": [
+        "R1",
+        "R2"
+      ],
+      "expected": {
+        "refusal": "COVERAGE_UNSUPPORTED"
+      },
+      "reference": null,
+      "probes": [],
+      "variants": []
+    }
+  ]
+}

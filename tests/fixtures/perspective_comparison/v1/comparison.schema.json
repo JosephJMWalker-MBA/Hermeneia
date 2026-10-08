@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermeneia.perspective-comparison/v1",
+  "title": "Structured Perspective Comparison v1 (#215 P7)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "policy_version", "comparison_id", "inputs", "coverage", "question", "participants",
+               "evidence", "relations", "semantic", "uncertainty", "not_synthesis"],
+  "properties": {
+    "schema": {"const": "hermeneia.perspective-comparison/v1"},
+    "policy_version": {"const": "1.0.0"},
+    "comparison_id": {"type": "string", "pattern": "^perspective-comparison:sha256:[0-9a-f]{64}$"},
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_source", "receipt_schema", "eligibility", "receipt_ids"],
+      "properties": {
+        "evidence_source": {"type": "string"},
+        "receipt_schema": {"const": "hermeneia.perspective-execution-receipt/v1"},
+        "eligibility": {"const": "perspective-achievement-rules-v1 E(r) via read_perspective_achievement_evidence"},
+        "receipt_ids": {"type": "array", "minItems": 2, "maxItems": 8, "uniqueItems": true, "items": {"$ref": "#/$defs/receipt_id"}}
+      }
+    },
+    "coverage": {"type": "object"},
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "sha256", "binding", "governing_question"],
+      "properties": {
+        "text": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "binding": {"const": "exact_execution_question"},
+        "governing_question": {"const": "not_bound"}
+      }
+    },
+    "participants": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"$ref": "#/$defs/participant"}},
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["basis", "statement", "units", "shared_by_all", "supplied_only_to", "overall"],
+      "properties": {
+        "basis": {"const": "supplied_scope"},
+        "statement": {"type": "string"},
+        "units": {"type": "array", "items": {"$ref": "#/$defs/unit"}},
+        "shared_by_all": {"type": "array", "items": {"$ref": "#/$defs/ref"}},
+        "supplied_only_to": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["receipt_id", "refs"],
+            "properties": {"receipt_id": {"$ref": "#/$defs/receipt_id"}, "refs": {"type": "array", "items": {"$ref": "#/$defs/ref"}}}
+          }
+        },
+        "overall": {"$ref": "#/$defs/set_relation"}
+      }
+    },
+    "relations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/relation"}},
+    "semantic": {"oneOf": [{"$ref": "#/$defs/semantic_not_established"}, {"$ref": "#/$defs/semantic_populated"}]},
+    "uncertainty": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["code", "statement"],
+        "properties": {
+          "code": {"enum": ["GOVERNING_QUESTION_NOT_BOUND", "SUPPLIED_NOT_RELIED_ON", "EXECUTION_SETTINGS_UNDISCLOSED",
+                            "NO_ADJUDICATION", "MODEL_DIFFERENCE_NOT_PERSPECTIVE", "IDENTICAL_TEXT_NOT_AGREEMENT",
+                            "FAMILY_UNSUPPORTED", "HIGHLIGHT_SNAPSHOT_VARIES", "RECEIPTS_NOT_ELIGIBLE"]},
+          "statement": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "not_synthesis": {"type": "string", "minLength": 1}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "receipt_id": {"type": "string", "pattern": "^perspective-execution-receipt:sha256:[0-9a-f]{64}$"},
+    "set_relation": {"enum": ["identical", "overlapping", "disjoint"]},
+    "ref": {
+      "type": "object", "additionalProperties": false, "required": ["table", "key"],
+      "properties": {
+        "table": {"enum": ["source_extractions", "reader_highlights"]},
+        "key": {"type": "object", "additionalProperties": false, "required": ["id"], "properties": {"id": {"type": "string", "minLength": 1}}}
+      }
+    },
+    "participant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt_id", "run_id", "lineage_record", "authorship", "retention", "executed", "perspective",
+                   "execution", "digests", "response", "evidence_supplied"],
+      "properties": {
+        "receipt_id": {"$ref": "#/$defs/receipt_id"},
+        "run_id": {"type": "string", "minLength": 1},
+        "lineage_record": {
+          "type": "object", "additionalProperties": false, "required": ["table", "key"],
+          "properties": {"table": {"const": "perspective_execution_receipts"}, "key": {"type": "object"}}
+        },
+        "authorship": {"const": "model"},
+        "retention": {
+          "type": "object", "additionalProperties": false, "required": ["decision", "actor", "actor_identity", "retained_at"],
+          "properties": {"decision": {"const": "retain"}, "actor": {"const": "local_steward"},
+                         "actor_identity": {"const": "unknown"}, "retained_at": {"type": "string"}}
+        },
+        "executed": {
+          "type": "object", "additionalProperties": false, "required": ["created_at", "completed_at"],
+          "properties": {"created_at": {"type": "string"}, "completed_at": {"type": "string"}}
+        },
+        "perspective": {
+          "type": "object", "additionalProperties": false,
+          "required": ["origin", "id", "version", "label", "definition_fingerprint", "methodology_sha256", "family"],
+          "properties": {
+            "origin": {"enum": ["built_in", "canonical_saved"]},
+            "id": {"type": "string"}, "version": {"type": "string"}, "label": {"type": "string"},
+            "definition_fingerprint": {"$ref": "#/$defs/digest"},
+            "methodology_sha256": {"$ref": "#/$defs/digest"},
+            "family": {
+              "type": "object", "additionalProperties": false, "required": ["state", "key"],
+              "properties": {"state": {"enum": ["supported", "unsupported", "invalid"]},
+                             "key": {"oneOf": [{"type": "null"}, {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}}]}}
+            }
+          }
+        },
+        "execution": {"type": "object", "required": ["provider_id", "model_id"]},
+        "digests": {
+          "type": "object", "additionalProperties": false,
+          "required": ["question_sha256", "scope_sha256", "prompt_sha256", "response_sha256"],
+          "properties": {"question_sha256": {"$ref": "#/$defs/digest"}, "scope_sha256": {"$ref": "#/$defs/digest"},
+                         "prompt_sha256": {"$ref": "#/$defs/digest"}, "response_sha256": {"$ref": "#/$defs/digest"}}
+        },
+        "response": {"type": "string", "minLength": 1},
+        "evidence_supplied": {
+          "type": "object", "additionalProperties": false,
+          "required": ["source_document", "focus", "focus_locator", "context", "highlights"],
+          "properties": {
+            "source_document": {
+              "type": "object", "additionalProperties": false, "required": ["id", "file_hash"],
+              "properties": {"id": {"type": "string"}, "file_hash": {"type": "string"}}
+            },
+            "focus": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+            "focus_locator": {"type": "string"},
+            "context": {"type": "array", "items": {"type": "string"}},
+            "highlights": {
+              "type": "array",
+              "items": {"type": "object", "additionalProperties": false, "required": ["id", "page", "captured_sha256"],
+                        "properties": {"id": {"type": "string"}, "page": {"type": "integer"}, "captured_sha256": {"$ref": "#/$defs/digest"}}}
+            }
+          }
+        }
+      }
+    },
+    "unit": {
+      "type": "object", "additionalProperties": false, "required": ["ref", "supplied_to", "captured_snapshot_varies"],
+      "properties": {
+        "ref": {"$ref": "#/$defs/ref"},
+        "supplied_to": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["receipt_id", "roles", "captured_sha256"],
+            "properties": {
+              "receipt_id": {"$ref": "#/$defs/receipt_id"},
+              "roles": {"type": "array", "minItems": 1, "items": {"enum": ["focus", "context", "highlight"]}},
+              "captured_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/digest"}]}
+            }
+          }
+        },
+        "captured_snapshot_varies": {"type": "boolean"}
+      }
+    },
+    "relation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["participants", "perspective", "execution", "response_text", "evidence_units", "evidence_focus", "same_source_document"],
+      "properties": {
+        "participants": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/receipt_id"}},
+        "perspective": {"enum": ["same_family", "distinct_family_distinct_methodology", "distinct_family_same_methodology", "family_unsupported"]},
+        "execution": {"enum": ["same_provider_model", "different_provider_model"]},
+        "response_text": {"enum": ["identical", "different"]},
+        "evidence_units": {"$ref": "#/$defs/set_relation"},
+        "evidence_focus": {"$ref": "#/$defs/set_relation"},
+        "same_source_document": {"type": "boolean"}
+      }
+    },
+    "semantic_not_established": {
+      "type": "object", "additionalProperties": false, "required": ["status", "reason_code", "fields", "statement"],
+      "properties": {
+        "status": {"const": "not_established"},
+        "reason_code": {"const": "SEMANTIC_EXTRACTION_REQUIRED"},
+        "fields": {"const": ["claims", "agreement", "disagreement", "evidence_reliance", "assumptions", "unresolved"]},
+        "statement": {"type": "string", "minLength": 1}
+      }
+    },
+    "quote": {
+      "type": "object", "additionalProperties": false, "required": ["start", "end", "text"],
+      "properties": {"start": {"type": "integer", "minimum": 0}, "end": {"type": "integer", "minimum": 0}, "text": {"type": "string", "minLength": 1}}
+    },
+    "participant_group": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/receipt_id"}},
+    "cited_relation": {"enum": ["identical", "overlapping", "disjoint", "some_uncited"]},
+    "semantic_populated": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "origin", "acceptance", "propositions", "agreement", "disagreement", "assumptions", "unresolved", "unclassifiable"],
+      "properties": {
+        "status": {"const": "proposed_unaccepted"},
+        "origin": {
+          "type": "object", "additionalProperties": false, "required": ["kind", "author"],
+          "properties": {"kind": {"const": "evaluation_reference"}, "author": {"type": "string", "minLength": 1}}
+        },
+        "acceptance": {"const": "none"},
+        "propositions": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["id", "statement", "positions"],
+            "properties": {
+              "id": {"type": "string", "minLength": 1},
+              "statement": {"type": "string", "minLength": 1},
+              "positions": {
+                "type": "array", "minItems": 2,
+                "items": {
+                  "type": "object", "additionalProperties": false, "required": ["participant", "stance", "quote", "cited_evidence"],
+                  "properties": {
+                    "participant": {"$ref": "#/$defs/receipt_id"},
+                    "stance": {"enum": ["asserts", "denies", "does_not_address", "unclassifiable"]},
+                    "quote": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/quote"}]},
+                    "cited_evidence": {"type": "array", "items": {"$ref": "#/$defs/ref"}}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "agreement": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["proposition", "stance", "participants", "evidence_relation"],
+            "properties": {"proposition": {"type": "string"}, "stance": {"enum": ["asserts", "denies"]},
+                           "participants": {"$ref": "#/$defs/participant_group"}, "evidence_relation": {"$ref": "#/$defs/cited_relation"}}
+          }
+        },
+        "disagreement": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["proposition", "groups", "smaller_groups", "evidence_relation", "resolution"],
+            "properties": {
+              "proposition": {"type": "string"},
+              "groups": {
+                "type": "array", "minItems": 2,
+                "items": {"type": "object", "additionalProperties": false, "required": ["stance", "participants"],
+                          "properties": {"stance": {"enum": ["asserts", "denies"]}, "participants": {"$ref": "#/$defs/participant_group"}}}
+              },
+              "smaller_groups": {"type": "array", "items": {"$ref": "#/$defs/receipt_id"}},
+              "evidence_relation": {"$ref": "#/$defs/cited_relation"},
+              "resolution": {"const": "none_recorded"}
+            }
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["id", "participant", "quote"],
+            "properties": {"id": {"type": "string"}, "participant": {"$ref": "#/$defs/receipt_id"}, "quote": {"$ref": "#/$defs/quote"}}
+          }
+        },
+        "unresolved": {"type": "array", "items": {"type": "string"}},
+        "unclassifiable": {
+          "type": "array",
+          "items": {"type": "object", "additionalProperties": false, "required": ["proposition", "participant"],
+                    "properties": {"proposition": {"type": "string"}, "participant": {"$ref": "#/$defs/receipt_id"}}}
+        }
+      }
+    }
+  }
+}
