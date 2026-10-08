@@ -1,0 +1,472 @@
+{
+  "schema": "hermeneia.companion-coach-expectations/v1",
+  "policy_version": "1.0.0",
+  "coach_result_schema": "hermeneia.companion-coach/v1",
+  "p5_trajectories": "tests/fixtures/synthetic_study_lab/v1/trajectories (unchanged; facts are not modified for P6)",
+  "silence_values": {
+    "preferred": "remain_quiet is the expected outcome",
+    "acceptable": "either outcome is lawful",
+    "not_acceptable": "an intervention is expected",
+    "required": "no lawful suggestion exists"
+  },
+  "wording_rules": {
+    "unsupported_as_not_done_forbidden": [
+      "you haven't",
+      "you have not",
+      "you didn't",
+      "you did not",
+      "not yet done",
+      "never did",
+      "you still need to"
+    ],
+    "engagement_forbidden": [
+      "streak",
+      "great job",
+      "well done",
+      "keep going",
+      "keep it up",
+      "don't miss",
+      "hurry",
+      "badge",
+      "points",
+      "level up",
+      "unlock",
+      "!"
+    ],
+    "model_authorship_forbidden": [
+      "you wrote",
+      "your interpretation",
+      "your reasoning",
+      "user-authored",
+      "steward-authored model"
+    ]
+  },
+  "scenarios": [
+    {
+      "scenario_id": "T1_heavy_highlighter_weak_synthesis",
+      "source": "p5",
+      "expected": {
+        "decision": "suggest",
+        "quiet_reason": null,
+        "suggestion": "preserve_question",
+        "basis": "current_state",
+        "silence": "not_acceptable",
+        "forbidden_suggestions": [
+          "organize_evidence",
+          "read_source",
+          "mark_evidence",
+          "governing_question",
+          "form_interpretation",
+          "challenge_interpretation",
+          "review_blueprint"
+        ],
+        "required_facts": {
+          "governing_question_present": 1,
+          "saved_reader_marks": 6,
+          "canonical_observations": 6
+        },
+        "forbidden_facts": [
+          "grouped_marks",
+          "saved_frames",
+          "interpretation_material"
+        ],
+        "required_uncertainty": [
+          "ABSENCE_NOT_PROOF"
+        ],
+        "required_withheld": {
+          "organize_evidence": "LATER_IN_CYCLE",
+          "read_source": "ALREADY_CURRENT_MATERIAL",
+          "mark_evidence": "ALREADY_CURRENT_MATERIAL",
+          "form_interpretation": "PREREQUISITE_MISSING",
+          "challenge_interpretation": "PREREQUISITE_MISSING",
+          "review_blueprint": "PREREQUISITE_MISSING"
+        },
+        "note": "P5 observation T1: P2 orders preserving an inquiry question before organizing evidence; the coach keeps P2's step and does not jump to organization; six unlabeled marks are noticed only as current snapshots, never as grouped evidence."
+      }
+    },
+    {
+      "scenario_id": "T2_early_interpreter_no_contradiction",
+      "source": "p5",
+      "expected": {
+        "decision": "suggest",
+        "quiet_reason": null,
+        "suggestion": "challenge_interpretation",
+        "basis": "durable_history",
+        "silence": "not_acceptable",
+        "forbidden_suggestions": [
+          "form_interpretation",
+          "read_source",
+          "mark_evidence",
+          "preserve_question",
+          "organize_evidence",
+          "review_blueprint"
+        ],
+        "required_facts": {
+          "governing_question_present": 1,
+          "interpretation_material": {
+            "human": 1
+          },
+          "saved_frames": 1,
+          "canonical_observations": 6
+        },
+        "forbidden_facts": [
+          "saved_reader_marks",
+          "blueprints"
+        ],
+        "required_uncertainty": [
+          "ABSENCE_NOT_PROOF",
+          "HISTORY_NOT_RECORDED"
+        ],
+        "required_withheld": {
+          "form_interpretation": "NARROW_HISTORY_RETAINED",
+          "read_source": "NOT_RECONSTRUCTED_BY_RESUMPTION",
+          "mark_evidence": "NOT_RECONSTRUCTED_BY_RESUMPTION",
+          "review_blueprint": "PREREQUISITE_MISSING",
+          "review_lineage": "LATER_IN_CYCLE"
+        },
+        "note": "The #215 example: a supported steward-authored interpretation, so the coach suggests checking counterevidence; skipped earlier steps are not reconstructed as done."
+      }
+    },
+    {
+      "scenario_id": "T3_many_questions_never_resolved",
+      "source": "p5",
+      "expected": {
+        "decision": "suggest",
+        "quiet_reason": null,
+        "suggestion": "governing_question",
+        "basis": "current_state",
+        "silence": "not_acceptable",
+        "forbidden_suggestions": [
+          "preserve_question",
+          "explore_perspective",
+          "form_interpretation",
+          "challenge_interpretation",
+          "review_blueprint"
+        ],
+        "required_facts": {
+          "inquiry_questions": 4,
+          "canonical_observations": 6
+        },
+        "forbidden_facts": [
+          "governing_question_present",
+          "saved_frames"
+        ],
+        "required_uncertainty": [
+          "ABSENCE_NOT_PROOF",
+          "COVERAGE_INCOMPLETE"
+        ],
+        "required_withheld": {
+          "form_interpretation": "COVERAGE_UNSUPPORTED",
+          "preserve_question": "NARROW_HISTORY_RETAINED",
+          "challenge_interpretation": "PREREQUISITE_MISSING"
+        },
+        "note": "P5 observation T3: legacy frame readiness is unknown, not false; the coach withholds interpretation as COVERAGE_UNSUPPORTED and states the missing records without saying a frame was never saved; inquiry questions are not presented as a governing question."
+      }
+    },
+    {
+      "scenario_id": "T4_model_perspective_reliance",
+      "source": "p5",
+      "expected": {
+        "decision": "suggest",
+        "quiet_reason": null,
+        "suggestion": "read_source",
+        "basis": "current_state",
+        "silence": "not_acceptable",
+        "forbidden_suggestions": [
+          "explore_perspective",
+          "challenge_interpretation",
+          "form_interpretation",
+          "review_blueprint"
+        ],
+        "required_facts": {
+          "governing_question_present": 1,
+          "retained_perspective_executions": {
+            "model": 2
+          },
+          "interpretation_material": {
+            "model": 1
+          },
+          "canonical_observations": 6
+        },
+        "forbidden_facts": [
+          "saved_frames",
+          "saved_reader_marks"
+        ],
+        "required_uncertainty": [
+          "ABSENCE_NOT_PROOF"
+        ],
+        "required_withheld": {
+          "explore_perspective": "NARROW_HISTORY_RETAINED",
+          "form_interpretation": "PREREQUISITE_MISSING",
+          "challenge_interpretation": "LATER_IN_CYCLE"
+        },
+        "note": "P5 observation T4: model Perspective runs and a model proposal are noticed only as model-generated; they do not substitute for user-authored interpretation, and the coach returns to the source."
+      }
+    },
+    {
+      "scenario_id": "T5_organizer_never_reviews_blueprint",
+      "source": "p5",
+      "expected": {
+        "decision": "remain_quiet",
+        "quiet_reason": "OPTIONAL_REVIEW_ONLY",
+        "suggestion": null,
+        "basis": null,
+        "silence": "preferred",
+        "allowed_if_speaking": [
+          "review_lineage"
+        ],
+        "forbidden_suggestions": [
+          "governing_question",
+          "read_source",
+          "mark_evidence",
+          "record_observation",
+          "preserve_question",
+          "organize_evidence",
+          "explore_perspective",
+          "form_interpretation",
+          "challenge_interpretation",
+          "review_blueprint"
+        ],
+        "required_facts": {
+          "governing_question_present": 1,
+          "saved_reader_marks": 3,
+          "grouped_marks": 3,
+          "inquiry_questions": 1,
+          "saved_frames": 1,
+          "interpretation_material": {
+            "human": 1
+          },
+          "blueprints": 1,
+          "canonical_observations": 6
+        },
+        "forbidden_facts": [
+          "retained_perspective_executions"
+        ],
+        "required_uncertainty": [],
+        "required_withheld": {
+          "review_blueprint": "ALREADY_CURRENT_MATERIAL",
+          "challenge_interpretation": "NOT_RECONSTRUCTED_BY_RESUMPTION",
+          "organize_evidence": "ALREADY_CURRENT_MATERIAL",
+          "form_interpretation": "NARROW_HISTORY_RETAINED"
+        },
+        "required_statement_fragments": {
+          "blueprints": "review of a Blueprint is not recorded"
+        },
+        "note": "P5 observation T5: no durable review evidence exists, so the Blueprint is never represented as reviewed or unreviewed; only optional Lineage review remains and the coach stays quiet."
+      }
+    },
+    {
+      "scenario_id": "T6_careful_worker_unresolved_questions",
+      "source": "p5",
+      "expected": {
+        "decision": "suggest",
+        "quiet_reason": null,
+        "suggestion": "form_interpretation",
+        "basis": "current_state",
+        "silence": "not_acceptable",
+        "forbidden_suggestions": [
+          "preserve_question",
+          "organize_evidence",
+          "mark_evidence",
+          "challenge_interpretation",
+          "review_blueprint"
+        ],
+        "required_facts": {
+          "governing_question_present": 1,
+          "saved_reader_marks": 2,
+          "grouped_marks": 2,
+          "inquiry_questions": 2,
+          "saved_frames": 1,
+          "canonical_observations": 6
+        },
+        "forbidden_facts": [
+          "interpretation_material",
+          "blueprints"
+        ],
+        "required_uncertainty": [
+          "ABSENCE_NOT_PROOF",
+          "RECORDS_OMITTED"
+        ],
+        "required_withheld": {
+          "preserve_question": "NARROW_HISTORY_RETAINED",
+          "organize_evidence": "ALREADY_CURRENT_MATERIAL",
+          "challenge_interpretation": "PREREQUISITE_MISSING",
+          "review_blueprint": "PREREQUISITE_MISSING"
+        },
+        "note": "Excluded-source marks and questions are omitted; counts reflect only eligible records (2 marks, 2 questions), and the omission is qualified."
+      }
+    },
+    {
+      "scenario_id": "T7_advanced_self_directed",
+      "source": "p5",
+      "expected": {
+        "decision": "remain_quiet",
+        "quiet_reason": "OPTIONAL_REVIEW_ONLY",
+        "suggestion": null,
+        "basis": null,
+        "silence": "preferred",
+        "allowed_if_speaking": [
+          "review_lineage"
+        ],
+        "forbidden_suggestions": [
+          "governing_question",
+          "read_source",
+          "mark_evidence",
+          "record_observation",
+          "preserve_question",
+          "organize_evidence",
+          "explore_perspective",
+          "form_interpretation",
+          "challenge_interpretation",
+          "review_blueprint"
+        ],
+        "required_facts": {
+          "governing_question_present": 1,
+          "saved_reader_marks": 3,
+          "grouped_marks": 3,
+          "inquiry_questions": 1,
+          "saved_frames": 1,
+          "retained_perspective_executions": {
+            "model": 1
+          },
+          "interpretation_material": {
+            "human": 1,
+            "accepted_model": 1,
+            "model": 1
+          },
+          "blueprints": 1,
+          "canonical_observations": 6
+        },
+        "forbidden_facts": [],
+        "required_uncertainty": [],
+        "required_withheld": {
+          "challenge_interpretation": "NOT_RECONSTRUCTED_BY_RESUMPTION",
+          "explore_perspective": "NARROW_HISTORY_RETAINED",
+          "form_interpretation": "NARROW_HISTORY_RETAINED",
+          "review_blueprint": "ALREADY_CURRENT_MATERIAL"
+        },
+        "note": "Advanced user: silence is the preferred outcome; it is not claimed as evidence of independence."
+      }
+    },
+    {
+      "scenario_id": "N1_question_without_source",
+      "source": "p6_negative",
+      "fixture_class": "lawful",
+      "documents": {},
+      "current_state": {},
+      "operations": [
+        {
+          "op": "set_governing_question",
+          "text": "What does the lamp signal to the harbor?"
+        }
+      ],
+      "expected": {
+        "decision": "remain_quiet",
+        "quiet_reason": "NEXT_STEP_BLOCKED",
+        "suggestion": null,
+        "basis": null,
+        "silence": "required",
+        "blocked": {
+          "capability_id": "read_source",
+          "availability": "not_yet_available",
+          "reason_code": "MISSING_SOURCE"
+        },
+        "forbidden_suggestions": [
+          "governing_question",
+          "read_source",
+          "mark_evidence",
+          "record_observation",
+          "preserve_question",
+          "organize_evidence",
+          "explore_perspective",
+          "form_interpretation",
+          "challenge_interpretation",
+          "review_blueprint",
+          "review_lineage"
+        ],
+        "required_facts": {
+          "governing_question_present": 1
+        },
+        "forbidden_facts": [
+          "canonical_observations",
+          "saved_reader_marks"
+        ],
+        "required_uncertainty": [],
+        "required_withheld": {
+          "mark_evidence": "PREREQUISITE_MISSING",
+          "record_observation": "PREREQUISITE_MISSING",
+          "form_interpretation": "PREREQUISITE_MISSING"
+        },
+        "note": "Negative: P2's next step is blocked by a missing P1 prerequisite; the coach cannot recommend it and reports the prerequisite instead."
+      }
+    },
+    {
+      "scenario_id": "N2_legacy_missing_extractions",
+      "source": "p6_negative",
+      "fixture_class": "lawful_then_legacy_shape",
+      "documents": {
+        "A": [
+          "The lamp burned all night.",
+          "Nobody asked why it burned.",
+          "The keeper wrote nothing down.",
+          "By morning the harbor was empty.",
+          "A second lamp was lit at dusk.",
+          "The ledger records only the oil."
+        ]
+      },
+      "current_state": {},
+      "operations": [
+        {
+          "op": "upload",
+          "doc": "A"
+        },
+        {
+          "op": "set_governing_question",
+          "text": "What does the lamp signal to the harbor?"
+        },
+        {
+          "op": "legacy_drop_table",
+          "table": "source_extractions",
+          "label": "Labeled legacy-shape fixture: source extractions are unavailable. Direct SQL; not proof a user workflow produces this state."
+        }
+      ],
+      "expected": {
+        "decision": "remain_quiet",
+        "quiet_reason": "NEXT_STEP_UNKNOWN",
+        "suggestion": null,
+        "basis": null,
+        "silence": "required",
+        "blocked": {
+          "capability_id": "read_source",
+          "availability": "unsupported_due_to_missing_history",
+          "reason_code": "COVERAGE_UNSUPPORTED"
+        },
+        "forbidden_suggestions": [
+          "governing_question",
+          "read_source",
+          "mark_evidence",
+          "record_observation",
+          "preserve_question",
+          "organize_evidence",
+          "explore_perspective",
+          "form_interpretation",
+          "challenge_interpretation",
+          "review_blueprint",
+          "review_lineage"
+        ],
+        "required_facts": {
+          "governing_question_present": 1
+        },
+        "forbidden_facts": [
+          "canonical_observations"
+        ],
+        "required_uncertainty": [
+          "COVERAGE_INCOMPLETE",
+          "RECORDS_OMITTED"
+        ],
+        "required_withheld": {},
+        "note": "Negative: readiness is unknown, not absent; the coach stays quiet and never phrases unsupported state as something left undone."
+      }
+    }
+  ]
+}
