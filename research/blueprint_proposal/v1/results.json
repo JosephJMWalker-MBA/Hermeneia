@@ -1,0 +1,659 @@
+{
+  "aggregate": {
+    "cases": {
+      "all_checks_passed": 15,
+      "items": 15
+    },
+    "further_checks": {
+      "all_checks_passed": 4,
+      "items": 4
+    }
+  },
+  "cases": [
+    {
+      "case_id": "P01_create_simple_goal",
+      "checks": {
+        "candidate_binds_adapter_execution": true,
+        "exposed_basis": true,
+        "generation_outcome": true,
+        "generation_writes_nothing": true,
+        "references_resolve_to_exposed_records": true
+      },
+      "observed": {
+        "decisions": [],
+        "generation": {
+          "code": null,
+          "references": {
+            "interpretations": [],
+            "observations": [
+              "A:1",
+              "A:2",
+              "A:5"
+            ]
+          },
+          "status": 201
+        }
+      }
+    },
+    {
+      "case_id": "P02_goal_grounded_in_interpretations",
+      "checks": {
+        "candidate_binds_adapter_execution": true,
+        "exposed_basis": true,
+        "generation_outcome": true,
+        "generation_writes_nothing": true,
+        "prompt_labels_interpretation_authorship": true,
+        "references_resolve_to_exposed_records": true
+      },
+      "observed": {
+        "decisions": [],
+        "generation": {
+          "code": null,
+          "references": {
+            "interpretations": [
+              "I:I1",
+              "I:I2",
+              "I:M1"
+            ],
+            "observations": [
+              "A:1",
+              "A:4",
+              "A:6"
+            ]
+          },
+          "status": 201
+        }
+      }
+    },
+    {
+      "case_id": "P03_invented_reference",
+      "checks": {
+        "generation_outcome": true,
+        "generation_writes_nothing": true
+      },
+      "observed": {
+        "decisions": [],
+        "generation": {
+          "code": "PROPOSAL_REFERENCE_UNKNOWN",
+          "status": 422
+        }
+      }
+    },
+    {
+      "case_id": "P04_excluded_reference",
+      "checks": {
+        "excluded_text_never_exposed": true,
+        "generation_outcome": true,
+        "generation_writes_nothing": true
+      },
+      "observed": {
+        "decisions": [],
+        "generation": {
+          "code": "PROPOSAL_REFERENCE_EXCLUDED",
+          "status": 422
+        }
+      }
+    },
+    {
+      "case_id": "P05_exact_accept",
+      "checks": {
+        "candidate_binds_adapter_execution": true,
+        "counts": true,
+        "decision_1_accept": true,
+        "generation_outcome": true,
+        "generation_writes_nothing": true,
+        "result_accepted_equals_proposal": true,
+        "result_blueprint_source": true,
+        "result_edited": true,
+        "result_lineage": true,
+        "result_plan_compiled": true,
+        "result_receipt_origin": true,
+        "result_verify": true
+      },
+      "observed": {
+        "counts": {
+          "blueprints": 1,
+          "receipts": 1
+        },
+        "decisions": [
+          {
+            "code": null,
+            "decision": "accept",
+            "status": 201
+          }
+        ],
+        "generation": {
+          "code": null,
+          "references": {
+            "interpretations": [],
+            "observations": [
+              "A:1",
+              "A:2",
+              "A:5"
+            ]
+          },
+          "status": 201
+        },
+        "result": {
+          "accepted_equals_proposal": true,
+          "accepted_sections": 2,
+          "accepted_title": "The lamp as vigil or absence",
+          "blueprint_source": "proposal-accepted",
+          "edited": false,
+          "lineage": {
+            "blueprint": "accepted_model",
+            "receipt": "accepted_model"
+          },
+          "plan_compiled": true,
+          "proposal_preserved": true,
+          "receipt_origin": "model_proposed_steward_accepted",
+          "verify": {
+            "candidate_replay": "verified",
+            "model_output": "preserved_not_replayed",
+            "record_integrity": "valid",
+            "result_closure": "verified"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "P06_edit_and_accept",
+      "checks": {
+        "candidate_binds_adapter_execution": true,
+        "counts": true,
+        "decision_1_edit_and_accept": true,
+        "generation_outcome": true,
+        "generation_writes_nothing": true,
+        "result_accepted_equals_proposal": true,
+        "result_accepted_sections": true,
+        "result_accepted_title": true,
+        "result_blueprint_source": true,
+        "result_edited": true,
+        "result_lineage": true,
+        "result_plan_compiled": true,
+        "result_proposal_preserved": true,
+        "result_receipt_origin": true
+      },
+      "observed": {
+        "counts": {
+          "blueprints": 1,
+          "receipts": 1
+        },
+        "decisions": [
+          {
+            "code": null,
+            "decision": "edit_and_accept",
+            "status": 201
+          }
+        ],
+        "generation": {
+          "code": null,
+          "references": {
+            "interpretations": [],
+            "observations": [
+              "A:1",
+              "A:2",
+              "A:5"
+            ]
+          },
+          "status": 201
+        },
+        "result": {
+          "accepted_equals_proposal": false,
+          "accepted_sections": 1,
+          "accepted_title": "The lamp, read narrowly",
+          "blueprint_source": "proposal-edited",
+          "edited": true,
+          "lineage": {
+            "blueprint": "human",
+            "receipt": "human"
+          },
+          "plan_compiled": true,
+          "proposal_preserved": true,
+          "receipt_origin": "model_proposed_steward_edited",
+          "verify": {
+            "candidate_replay": "verified",
+            "model_output": "preserved_not_replayed",
+            "record_integrity": "valid",
+            "result_closure": "verified"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "P07_discard",
+      "checks": {
+        "candidate_binds_adapter_execution": true,
+        "counts": true,
+        "decision_1_discard": true,
+        "decision_2_accept": true,
+        "generation_outcome": true,
+        "generation_writes_nothing": true,
+        "workspace_unchanged": true
+      },
+      "observed": {
+        "counts": {
+          "blueprints": 0,
+          "receipts": 0
+        },
+        "decisions": [
+          {
+            "code": null,
+            "decision": "discard",
+            "status": 200
+          },
+          {
+            "code": "UNKNOWN_CANDIDATE",
+            "decision": "accept",
+            "status": 404
+          }
+        ],
+        "generation": {
+          "code": null,
+          "references": {
+            "interpretations": [],
+            "observations": [
+              "A:1",
+              "A:2",
+              "A:5"
+            ]
+          },
+          "status": 201
+        }
+      }
+    },
+    {
+      "case_id": "P08_stale_evidence",
+      "checks": {
+        "candidate_binds_adapter_execution": true,
+        "counts": true,
+        "decision_1_accept": true,
+        "generation_outcome": true,
+        "generation_writes_nothing": true
+      },
+      "observed": {
+        "counts": {
+          "blueprints": 0,
+          "receipts": 0
+        },
+        "decisions": [
+          {
+            "code": "STALE_CANDIDATE",
+            "decision": "accept",
+            "status": 409
+          }
+        ],
+        "generation": {
+          "code": null,
+          "references": {
+            "interpretations": [],
+            "observations": [
+              "A:1",
+              "A:2",
+              "A:5"
+            ]
+          },
+          "status": 201
+        }
+      }
+    },
+    {
+      "case_id": "P09_predecessor_superseded",
+      "checks": {
+        "candidate_binds_adapter_execution": true,
+        "counts": true,
+        "decision_1_accept": true,
+        "generation_outcome": true,
+        "generation_writes_nothing": true,
+        "legacy_revise_parity": true
+      },
+      "observed": {
+        "counts": {
+          "blueprints": 2,
+          "receipts": 0
+        },
+        "decisions": [
+          {
+            "code": "STALE_CANDIDATE",
+            "decision": "accept",
+            "status": 409
+          }
+        ],
+        "generation": {
+          "code": null,
+          "references": {
+            "interpretations": [],
+            "observations": [
+              "A:1",
+              "A:5"
+            ]
+          },
+          "status": 201
+        }
+      }
+    },
+    {
+      "case_id": "P10_revision_with_new_evidence",
+      "checks": {
+        "candidate_binds_adapter_execution": true,
+        "counts": true,
+        "decision_1_accept": true,
+        "decision_2_accept": true,
+        "generation_outcome": true,
+        "generation_writes_nothing": true,
+        "references_resolve_to_exposed_records": true,
+        "result_blueprint_source": true,
+        "result_lineage": true,
+        "result_plan_compiled": true,
+        "result_predecessor_unchanged": true,
+        "result_receipt_origin": true,
+        "result_supersession_reason": true,
+        "result_verify": true
+      },
+      "observed": {
+        "counts": {
+          "blueprints": 2,
+          "receipts": 1
+        },
+        "decisions": [
+          {
+            "code": "REASON_REQUIRED",
+            "decision": "accept",
+            "status": 422
+          },
+          {
+            "code": null,
+            "decision": "accept",
+            "status": 201
+          }
+        ],
+        "generation": {
+          "code": null,
+          "references": {
+            "interpretations": [
+              "I:INEW"
+            ],
+            "observations": [
+              "A:1",
+              "A:5"
+            ]
+          },
+          "status": 201
+        },
+        "result": {
+          "accepted_equals_proposal": true,
+          "accepted_sections": 2,
+          "accepted_title": "The unexplained lamp, relit",
+          "blueprint_source": "proposal-accepted",
+          "edited": false,
+          "lineage": {
+            "blueprint": "accepted_model",
+            "receipt": "accepted_model"
+          },
+          "model_explanation": "Adds the second lamp interpretation.",
+          "plan_compiled": true,
+          "predecessor_unchanged": true,
+          "proposal_preserved": true,
+          "rationale_is_not_model_explanation": true,
+          "receipt_origin": "model_proposed_steward_accepted",
+          "supersession_reason": "Incorporates the new reading of the second lamp.",
+          "verify": {
+            "candidate_replay": "verified",
+            "model_output": "preserved_not_replayed",
+            "record_integrity": "valid",
+            "result_closure": "verified"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "P11_model_rationale_differs_from_steward",
+      "checks": {
+        "candidate_binds_adapter_execution": true,
+        "counts": true,
+        "decision_1_accept": true,
+        "generation_outcome": true,
+        "generation_writes_nothing": true,
+        "result_model_explanation": true,
+        "result_rationale_is_not_model_explanation": true,
+        "result_supersession_reason": true
+      },
+      "observed": {
+        "counts": {
+          "blueprints": 2,
+          "receipts": 1
+        },
+        "decisions": [
+          {
+            "code": null,
+            "decision": "accept",
+            "status": 201
+          }
+        ],
+        "generation": {
+          "code": null,
+          "references": {
+            "interpretations": [
+              "I:INEW"
+            ],
+            "observations": [
+              "A:1",
+              "A:5"
+            ]
+          },
+          "status": 201
+        },
+        "result": {
+          "accepted_equals_proposal": true,
+          "accepted_sections": 2,
+          "accepted_title": "The unexplained lamp, relit",
+          "blueprint_source": "proposal-accepted",
+          "edited": false,
+          "lineage": {
+            "blueprint": "accepted_model",
+            "receipt": "accepted_model"
+          },
+          "model_explanation": "The ledger proves the keeper kept watch.",
+          "plan_compiled": true,
+          "predecessor_unchanged": true,
+          "proposal_preserved": true,
+          "rationale_is_not_model_explanation": true,
+          "receipt_origin": "model_proposed_steward_accepted",
+          "supersession_reason": "Narrows the claim to what the passages show.",
+          "verify": {
+            "candidate_replay": "verified",
+            "model_output": "preserved_not_replayed",
+            "record_integrity": "valid",
+            "result_closure": "verified"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "P12_provider_unavailable",
+      "checks": {
+        "generation_outcome": true,
+        "generation_writes_nothing": true,
+        "no_provider_call": true
+      },
+      "observed": {
+        "decisions": [],
+        "generation": {
+          "code": null,
+          "status": 409
+        }
+      }
+    },
+    {
+      "case_id": "P13_malformed_output",
+      "checks": {
+        "generation_outcome": true,
+        "generation_writes_nothing": true,
+        "variant_PROPOSAL_OUTPUT_UNPARSEABLE": true
+      },
+      "observed": {
+        "decisions": [],
+        "generation": {
+          "code": "PROPOSAL_OUTPUT_INVALID",
+          "status": 422
+        }
+      }
+    },
+    {
+      "case_id": "P14_repeated_acceptance",
+      "checks": {
+        "candidate_binds_adapter_execution": true,
+        "counts": true,
+        "decision_1_accept": true,
+        "decision_2_accept": true,
+        "decision_3_edit_and_accept": true,
+        "generation_outcome": true,
+        "generation_writes_nothing": true
+      },
+      "observed": {
+        "counts": {
+          "blueprints": 1,
+          "receipts": 1
+        },
+        "decisions": [
+          {
+            "code": null,
+            "decision": "accept",
+            "status": 201
+          },
+          {
+            "code": null,
+            "decision": "accept",
+            "status": 200
+          },
+          {
+            "code": null,
+            "decision": "edit_and_accept",
+            "status": 200
+          }
+        ],
+        "generation": {
+          "code": null,
+          "references": {
+            "interpretations": [],
+            "observations": [
+              "A:1",
+              "A:2",
+              "A:5"
+            ]
+          },
+          "status": 201
+        },
+        "result": {
+          "accepted_equals_proposal": true,
+          "accepted_sections": 2,
+          "accepted_title": "The lamp as vigil or absence",
+          "blueprint_source": "proposal-accepted",
+          "edited": false,
+          "lineage": {
+            "blueprint": "accepted_model",
+            "receipt": "accepted_model"
+          },
+          "plan_compiled": true,
+          "proposal_preserved": true,
+          "receipt_origin": "model_proposed_steward_accepted",
+          "verify": {
+            "candidate_replay": "verified",
+            "model_output": "preserved_not_replayed",
+            "record_integrity": "valid",
+            "result_closure": "verified"
+          }
+        }
+      }
+    },
+    {
+      "case_id": "P15_export_restore_declared_unsupported",
+      "checks": {
+        "candidate_binds_adapter_execution": true,
+        "decision_1_accept": true,
+        "generation_outcome": true,
+        "generation_writes_nothing": true,
+        "portability_declared": true
+      },
+      "observed": {
+        "decisions": [
+          {
+            "code": null,
+            "decision": "accept",
+            "status": 201
+          }
+        ],
+        "generation": {
+          "code": null,
+          "references": {
+            "interpretations": [],
+            "observations": [
+              "A:1",
+              "A:2",
+              "A:5"
+            ]
+          },
+          "status": 201
+        },
+        "portability": {
+          "component_exported": false,
+          "coverage_status": "unsupported",
+          "restored_receipts": 0
+        },
+        "result": {
+          "accepted_equals_proposal": true,
+          "accepted_sections": 2,
+          "accepted_title": "The lamp as vigil or absence",
+          "blueprint_source": "proposal-accepted",
+          "edited": false,
+          "lineage": {
+            "blueprint": "accepted_model",
+            "receipt": "accepted_model"
+          },
+          "plan_compiled": true,
+          "proposal_preserved": true,
+          "receipt_origin": "model_proposed_steward_accepted",
+          "verify": {
+            "candidate_replay": "verified",
+            "model_output": "preserved_not_replayed",
+            "record_integrity": "valid",
+            "result_closure": "verified"
+          }
+        }
+      }
+    }
+  ],
+  "contract": "docs/design/blueprint-proposal-v1.md",
+  "further_checks": [
+    {
+      "check_id": "F1_client_substitution",
+      "checks": {
+        "mismatch_refused": true,
+        "nothing_recorded": true,
+        "proposal_cannot_be_posted_with_accept": true
+      }
+    },
+    {
+      "check_id": "F2_edit_cites_excluded",
+      "checks": {
+        "nothing_recorded": true,
+        "scope_refusal": true
+      }
+    },
+    {
+      "check_id": "F3_generation_disabled_by_default",
+      "checks": {
+        "no_provider_call": true,
+        "refused": true
+      }
+    },
+    {
+      "check_id": "F4_legacy_revise_parity",
+      "checks": {
+        "legacy_successor_steward_authored": true
+      }
+    }
+  ],
+  "method": "disposable synthetic workspaces through production write boundaries; scripted in-process fake adapter; no network; no real model",
+  "schema": "hermeneia.blueprint-proposal-lab-results/v1"
+}

@@ -19,6 +19,7 @@ from hermeneia.perspective_execution_receipts import (
 SCHEMA = "hermeneia.study-lineage/v1"
 _AWARD_TABLE = "achievement_awards"
 _ACCEPTED_TABLE = "accepted_perspective_comparisons"
+_PROPOSAL_TABLE = "blueprint_proposal_acceptances"
 
 # table: (record type, title, historical time field, content field)
 _SPECS = {
@@ -34,6 +35,7 @@ _SPECS = {
     EXECUTION_TABLE: ("retained_perspective_execution", "Retained Perspective execution", "retained_at", None),
     _AWARD_TABLE: ("perspective_achievement_award", "Perspective achievement award", "awarded_at", None),
     _ACCEPTED_TABLE: ("accepted_perspective_comparison", "Accepted Perspective comparison", "accepted_at", None),
+    _PROPOSAL_TABLE: ("blueprint_proposal_acceptance", "Blueprint proposal accepted", "accepted_at", None),
     "proposed_interpretations": ("proposed_interpretation", "Model interpretation proposal", "created_at", "text"),
     "interpretations": ("interpretation", "Canonical Interpretation", "created_at", "text"),
     "narrative_blueprints": ("blueprint", "Saved Blueprint", "created_at", "thesis"),
@@ -195,6 +197,8 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
             required = documented = {"id", "achievement_id", "rule_id", "rule_version", "receipt_json"}
         if table == _ACCEPTED_TABLE:
             required = documented = {"id", "candidate_id", "comparison_json"}
+        if table == _PROPOSAL_TABLE:
+            required = documented = {"id", "candidate_id", "receipt_json"}
         absent = sorted(documented - set(columns))
         if absent:
             missing_columns[table] = absent
@@ -210,6 +214,17 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
     execution_receipts: dict[str, dict] = {}
     award_receipts: dict[str, dict] = {}
     accepted_comparisons: dict[str, dict] = {}
+    proposal_receipts: dict[str, dict] = {}
+    # Integrity-valid receipts by resulting Blueprint: the only proof of P8 Blueprint authorship.
+    receipts_by_blueprint: dict[str, list[dict]] = {}
+    if data[_PROPOSAL_TABLE]:
+        from hermeneia.blueprint_proposals import receipt_from_row as proposal_receipt_from_row
+        for proposal_row in data[_PROPOSAL_TABLE]:
+            try:
+                proposal = proposal_receipt_from_row(proposal_row)
+            except (ValueError, TypeError, KeyError, UnicodeError, OverflowError):
+                continue
+            receipts_by_blueprint.setdefault(proposal["result"]["resulting_blueprint_id"], []).append(proposal)
     diagnostics: list[dict] = []
 
     def parent(table: str, identifier: Any) -> dict | None:
@@ -386,11 +401,44 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
                 ok = False
                 diagnostics.append({"record": {"table": table, "key": {"id": row["id"]}}, "state": "invalid",
                                     "reason_code": "ACCEPTED_COMPARISON_INVALID"})
+        elif table == _PROPOSAL_TABLE:
+            # The receipt's prompt quotes every exposed record, so all of them, the
+            # resulting Blueprint and the predecessor must be eligible.
+            from hermeneia.blueprint_proposals import receipt_from_row as proposal_receipt_from_row
+            try:
+                proposal = proposal_receipt_from_row(row)
+                basis = proposal["candidate"]["binding"]["basis"]
+                needed = [("narrative_blueprints", proposal["result"]["resulting_blueprint_id"])]
+                if proposal["result"]["predecessor_id"]:
+                    needed.append(("narrative_blueprints", proposal["result"]["predecessor_id"]))
+                needed += [("observations", entry["id"]) for entry in basis["observations"]]
+                needed += [("interpretations", entry["id"]) for entry in basis["interpretations"]]
+                ok = sum(candidate.get("id") == row["id"] for candidate in data[table]) == 1 and all(
+                    parent(target, identifier) is not None and eligible(target, parent(target, identifier))
+                    for target, identifier in needed)
+                if ok:
+                    proposal_receipts[row["id"]] = proposal
+            except (ValueError, TypeError, KeyError, UnicodeError, OverflowError):
+                ok = False
+                diagnostics.append({"record": {"table": table, "key": {"id": row["id"]}}, "state": "invalid",
+                                    "reason_code": "BLUEPRINT_PROPOSAL_ACCEPTANCE_INVALID"})
         checking.remove(token)
         allowed[token] = bool(ok)
         return bool(ok)
 
     def authorship(table: str, row: dict) -> tuple[str, str]:
+        if table == _PROPOSAL_TABLE:
+            if proposal_receipts[row["id"]]["acceptance"]["decision"] == "accept":
+                return "accepted_model", ("Model-proposed Blueprint accepted exactly by a local steward; acceptance is not "
+                                          "a claim that the Blueprint is true.")
+            return "human", "Steward-edited Blueprint from a model proposal; the model proposal is preserved in the receipt."
+        if table == "narrative_blueprints" and row.get("source") in ("proposal-accepted", "proposal-edited"):
+            decision = "accept" if row["source"] == "proposal-accepted" else "edit_and_accept"
+            if any(r["acceptance"]["decision"] == decision for r in receipts_by_blueprint.get(row["id"], [])):
+                return (("accepted_model", "Model-proposed Blueprint accepted exactly; proven by its acceptance receipt.")
+                        if decision == "accept" else
+                        ("human", "Steward-edited Blueprint from a model proposal; proven by its acceptance receipt."))
+            return "unknown", "A proposal source without a valid acceptance receipt does not establish authorship."
         if table == _ACCEPTED_TABLE:
             if accepted_comparisons[row["id"]]["acceptance"]["decision"] == "accept":
                 return "accepted_model", ("Model-proposed comparison structure accepted exactly by a local steward; acceptance "
@@ -433,6 +481,9 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
         return "unknown", "Authorship is not established by the stored record."
 
     def context(table: str, row: dict) -> list[dict]:
+        if table == _PROPOSAL_TABLE:
+            return [{"kind": "lineage", "epistemic_class": "blueprint",
+                     "object_id": proposal_receipts[row["id"]]["result"]["resulting_blueprint_id"]}]
         if table == _ACCEPTED_TABLE:
             return [{"kind": "perspective_execution", "receipt_id": binding["receipt_id"]}
                     for binding in accepted_comparisons[row["id"]]["binding"]["receipts"]]
@@ -476,6 +527,12 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
         return []
 
     def provenance(table: str, row: dict, basis: str) -> dict:
+        if table == _PROPOSAL_TABLE:
+            proposal = proposal_receipts[row["id"]]
+            refs = [{"table": "narrative_blueprints", "key": {"id": proposal["result"]["resulting_blueprint_id"]}}]
+            if proposal["result"]["predecessor_id"]:
+                refs.append({"table": "narrative_blueprints", "key": {"id": proposal["result"]["predecessor_id"]}, "role": "predecessor"})
+            return {"basis": basis, "references": refs, "records": []}
         if table == _ACCEPTED_TABLE:
             return {"basis": basis, "records": [],
                     "references": [{"table": EXECUTION_TABLE, "key": {"id": binding["receipt_id"]}}
@@ -565,6 +622,19 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
                 item["record_data"] = safe
                 item["content"] = "Recorded earned system assessment; agreement, mastery and current eligibility are not established."
                 item["timestamp"] = _timestamp("awarded_at", receipt["awarded_at"])
+            elif table == _PROPOSAL_TABLE:
+                proposal = proposal_receipts[row["id"]]
+                item["record_data"] = {
+                    "id": proposal["id"], "mode": proposal["mode"], "origin": proposal["origin"]["kind"],
+                    "decision": proposal["acceptance"]["decision"], "edited": proposal["acceptance"]["edited"],
+                    "resulting_blueprint_id": proposal["result"]["resulting_blueprint_id"],
+                    "predecessor_id": proposal["result"]["predecessor_id"],
+                    "rationale_recorded": proposal["acceptance"]["rationale"] is not None,
+                    "model_id": proposal["candidate"]["extraction"]["execution"].get("model_id"),
+                    "accepted_at": proposal["acceptance"]["accepted_at"], "meaning": proposal["acceptance"]["meaning"],
+                    "verification": {"record_integrity": "valid", "replay": "not_performed", "reason_code": "LINEAGE_SUMMARY_ONLY"}}
+                item["content"] = "Steward decision on a model Blueprint proposal; not a claim that the Blueprint is true."
+                item["timestamp"] = _timestamp("acceptance.accepted_at", proposal["acceptance"]["accepted_at"])
             elif table == _ACCEPTED_TABLE:
                 record = accepted_comparisons[row["id"]]
                 relations = record["structure"]["relations"]
@@ -610,6 +680,7 @@ def project_study_lineage(conn: sqlite3.Connection) -> dict:
                 "Retained Perspective receipts prove exact execution and explicit retention only; empty coverage cannot prove no past Perspective activity.",
                 "Award summaries validate receipt integrity only; evidence verification and historical snapshot replay are not performed by Lineage.",
                 "Accepted Perspective comparisons record a steward's acceptance of a structure, not truth or agreement; Lineage does not replay them.",
+                "Blueprint proposal receipts record a steward decision on a model proposal; Lineage does not replay them.",
             ],
         },
     }

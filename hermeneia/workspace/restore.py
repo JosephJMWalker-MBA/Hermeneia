@@ -56,6 +56,11 @@ _ACCEPTED_COMPARISON_CAPABILITY = "accepted-perspective-comparison-v1"
 _ACCEPTED_COMPARISON_TABLE = "accepted_perspective_comparisons"
 _ACCEPTED_COMPARISON_COLUMNS = frozenset({"id", "candidate_id", "comparison_json"})
 
+_BLUEPRINT_PROPOSAL_TABLE = "blueprint_proposal_acceptances"
+_BLUEPRINT_PROPOSAL_REASON = ("Blueprint proposal acceptances are not covered by WBS 1.x: their closure (Blueprints, "
+                              "ArchitectPlans, Blueprint supersessions and Interpretations) is not exported; "
+                              "round-tripping is scheduled for P10 (#215).")
+
 # Required capabilities this restorer can reconstruct (see export.py).
 _PUBLICATION_CAPABILITY = "publication-authoring-v0"
 _PUBLICATION_PREFIX = "publication/"
@@ -163,7 +168,9 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
         "accepted_comparisons": accepted_comparisons,
         "coverage": {_PERSPECTIVE_EXECUTION_TABLE: receipt_coverage,
                      _ACHIEVEMENT_AWARD_TABLE: award_coverage,
-                     _ACCEPTED_COMPARISON_TABLE: comparison_coverage},
+                     _ACCEPTED_COMPARISON_TABLE: comparison_coverage,
+                     # Declared, never silently omitted: WBS 1.x carries no Blueprint closure (P8 §5).
+                     _BLUEPRINT_PROPOSAL_TABLE: {"status": "unsupported", "reason": _BLUEPRINT_PROPOSAL_REASON}},
         "investigation": investigation,
         "uploads": uploads,
         "publication": publication,

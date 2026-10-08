@@ -14,7 +14,7 @@ from ..perspective_identity import (
 )
 from .hashing import make_semantic_hash
 
-SCHEMA_VERSION = 20  # explicit append-only accepted Perspective comparisons (P7 Layer 2)
+SCHEMA_VERSION = 21  # append-only Blueprint proposal acceptance receipts (P8)
 
 # Supersession triggers must be dropped and recreated whenever the canonical object
 # list grows. SQLite has no ALTER TRIGGER.
@@ -1203,6 +1203,8 @@ CREATE TABLE IF NOT EXISTS workspace_identity (
     ensure_achievement_award_tables(conn)
     from ..accepted_perspective_comparisons import ensure_accepted_comparison_tables
     ensure_accepted_comparison_tables(conn)
+    from ..blueprint_proposals import ensure_blueprint_proposal_tables
+    ensure_blueprint_proposal_tables(conn)
     conn.commit()
 
 

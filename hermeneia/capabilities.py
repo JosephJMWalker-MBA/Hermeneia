@@ -142,7 +142,7 @@ class _Fact:
         return len({_canonical(ref.get("record", ref)) for ref in self.refs})
 
 
-_TERMINAL_TABLES = frozenset({"achievement_awards", "accepted_perspective_comparisons"})
+_TERMINAL_TABLES = frozenset({"achievement_awards", "accepted_perspective_comparisons", "blueprint_proposal_acceptances"})
 
 
 def _fact_inputs(lineage: dict, current_state: dict) -> dict[str, _Fact]:
