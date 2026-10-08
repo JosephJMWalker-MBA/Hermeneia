@@ -1,0 +1,74 @@
+{
+  "governance_defects": [],
+  "metrics": {
+    "agreement": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 4
+    },
+    "assumptions": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 2
+    },
+    "claim_attribution_accuracy": 1.0,
+    "disagreement": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 5
+    },
+    "evidence_reliance": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tp": 28
+    },
+    "live_runs": 13,
+    "minority_downgraded": 0,
+    "minority_lost": 0,
+    "minority_preservation": {
+      "preserved": 1,
+      "runs": 1
+    },
+    "misattributions": 0,
+    "outcomes": {
+      "ADMITTED_BUT_WRONG_items": 0,
+      "DOWNGRADED_TO_UNKNOWN_items": 0,
+      "OMITTED_reference_propositions": 0,
+      "REFUSED_runs": 0,
+      "admitted_but_wrong_rate": 0.0,
+      "admitted_semantic_items": 70,
+      "unmatched_candidate_claims": 0
+    },
+    "paraphrase_as_disagreement_errors": 0,
+    "provider_failures": 0,
+    "refusals_by_code": {},
+    "scored_candidates": 13,
+    "silent_minority_errors": 0,
+    "stance_accuracy": 1.0,
+    "structural_refusal_rate": 0.0,
+    "unknown_preservation": {
+      "preserved": 2,
+      "runs": 2
+    },
+    "untraceable_content_rate": 0.0
+  },
+  "ready_conditions": {
+    "admitted_but_wrong_rate<=0.15": true,
+    "agreement_precision_recall>=0.80": true,
+    "claim_attribution_accuracy>=0.90": true,
+    "disagreement_precision_recall>=0.80": true,
+    "paraphrase_as_disagreement_errors==0": true,
+    "silent_minority_errors==0": true,
+    "stance_accuracy>=0.85": true,
+    "structural_refusal_rate<=0.10": true
+  },
+  "verdict": "P7 READY"
+}
