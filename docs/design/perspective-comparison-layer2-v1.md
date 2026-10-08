@@ -1,5 +1,12 @@
 # Structured Perspective Comparison v1, Layer 2 — governed candidate and accepted comparison
 
+> **Amended 2026-10-08** by [the P7 disposition](perspective-comparison-p7-disposition.md):
+> - `origin.kind` has three values: `model_proposed_steward_accepted`,
+>   `model_proposed_steward_edited` and `steward_authored`;
+> - option (b) steward authoring is a product route;
+> - provider-backed generation is disabled by default behind a
+>   configuration gate.
+
 Date: 2026-10-07. This contract was frozen before any provider, candidate or
 storage code, on branch `p7-perspective-comparison` at `9027af7`. It
 continues P7 of [#215](https://github.com/JosephJMWalker-MBA/Hermeneia/issues/215)

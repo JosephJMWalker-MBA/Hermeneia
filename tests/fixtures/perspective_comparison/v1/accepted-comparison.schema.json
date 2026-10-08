@@ -9,7 +9,7 @@
     "schema": {"const": "hermeneia.accepted-perspective-comparison/v1"},
     "id": {"type": "string", "pattern": "^accepted-perspective-comparison:sha256:[0-9a-f]{64}$"},
     "origin": {"type": "object", "additionalProperties": false, "required": ["kind"],
-               "properties": {"kind": {"enum": ["model_candidate", "steward_authored"]}}},
+               "properties": {"kind": {"enum": ["model_proposed_steward_accepted", "model_proposed_steward_edited", "steward_authored"]}}},
     "binding": {"$ref": "comparison-candidate.schema.json#/$defs/binding"},
     "candidate": {
       "oneOf": [
