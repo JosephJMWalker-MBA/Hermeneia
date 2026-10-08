@@ -171,6 +171,17 @@ Checks applied to every compared case:
 Focused and neighboring suites (P1–P7, Lineage, receipts, achievements,
 export, E10 vertical slice; 37 files): 985 passed.
 
+Full suite on a clean worktree of `43f7327`: 2859 passed, 21 skipped, 6
+failed. The six failures are exactly the inherited Reader failures:
+
+- `test_reader_accessibility` ×2
+- `test_reader_blueprint_workstation`
+- `test_reader_record_view` ×2
+- `test_reader_voice_profile`
+
+No new failure was introduced (P6 baseline: 2849 passed, plus 10 new P7
+tests).
+
 ## Persistence decision
 
 v1 is a read-only projection. Receipts are immutable, so the comparison is
