@@ -1,0 +1,2555 @@
+{
+  "aggregate": {
+    "coverage_preserved": {
+      "passed": 13,
+      "total": 13
+    },
+    "evidence_overlap": {
+      "passed": 13,
+      "total": 13
+    },
+    "independent_rebuild_identical": {
+      "passed": 13,
+      "total": 13
+    },
+    "manufactured_semantic_fields": {
+      "count": 0,
+      "total": 13
+    },
+    "minority_preserved": {
+      "passed": 13,
+      "total": 13
+    },
+    "no_consensus_truth_or_claim_fields": {
+      "passed": 13,
+      "total": 13
+    },
+    "order_invariant": {
+      "passed": 13,
+      "total": 13
+    },
+    "participant_attribution": {
+      "passed": 13,
+      "total": 13
+    },
+    "probes_refused_as_frozen": {
+      "passed": 15,
+      "total": 15
+    },
+    "provenance_closed": {
+      "passed": 13,
+      "total": 13
+    },
+    "reference_adequate_and_closed": {
+      "passed": 13,
+      "total": 13
+    },
+    "refused_as_frozen": {
+      "passed": 2,
+      "total": 2
+    },
+    "relations": {
+      "passed": 13,
+      "total": 13
+    },
+    "repeatable": {
+      "passed": 13,
+      "total": 13
+    },
+    "schema_valid": {
+      "passed": 13,
+      "total": 13
+    },
+    "semantic_abstention": {
+      "passed": 13,
+      "total": 13
+    },
+    "storage_order_invariant": {
+      "passed": 13,
+      "total": 13
+    },
+    "uncertainty": {
+      "passed": 13,
+      "total": 13
+    },
+    "variants_as_frozen": {
+      "passed": 13,
+      "total": 13
+    },
+    "workspace_unchanged": {
+      "passed": 15,
+      "total": 15
+    }
+  },
+  "cases": [
+    {
+      "case_id": "C01_same_conclusion_same_evidence",
+      "checks": {
+        "coverage_preserved": true,
+        "evidence_overlap": true,
+        "independent_rebuild_identical": true,
+        "minority_preserved": true,
+        "no_consensus_truth_or_claim_fields": true,
+        "order_invariant": true,
+        "participant_attribution": true,
+        "probes_refused_as_frozen": true,
+        "provenance_closed": true,
+        "reference_adequate_and_closed": true,
+        "relations": true,
+        "repeatable": true,
+        "schema_valid": true,
+        "semantic_abstention": true,
+        "storage_order_invariant": true,
+        "uncertainty": true,
+        "variants_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "coverage": {
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          },
+          "eligible_records": 2,
+          "extant_records": 2
+        },
+        "evidence": {
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical",
+          "shared_by_all": [
+            "A:1"
+          ],
+          "snapshot_varies": [],
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          }
+        },
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "context": [],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          },
+          "R2": {
+            "context": [],
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "skeptical-reader"
+          }
+        },
+        "question": "What does the lamp signal to the harbor?",
+        "relations": [
+          {
+            "evidence_focus": "identical",
+            "evidence_units": "identical",
+            "execution": "same_provider_model",
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          }
+        ],
+        "semantic": {
+          "fields": [
+            "claims",
+            "agreement",
+            "disagreement",
+            "evidence_reliance",
+            "assumptions",
+            "unresolved"
+          ],
+          "reason_code": "SEMANTIC_EXTRACTION_REQUIRED",
+          "statement": "Retained Perspective responses are free prose under perspective-run/v1. Claims, agreement, disagreement, the evidence a response relied on, assumptions and unresolved disagreement cannot be established from receipt structure without semantic extraction, which this deterministic policy does not perform.",
+          "status": "not_established"
+        },
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ]
+      },
+      "controls": "Two distinct Perspectives, one model, the same single-sentence focus; both conclude that the lamp signals a watch, in different words.",
+      "reference": {
+        "acceptance": "none",
+        "agreement": [
+          {
+            "evidence_relation": "identical",
+            "participants": [
+              "R1",
+              "R2"
+            ],
+            "proposition": "W",
+            "stance": "asserts"
+          }
+        ],
+        "assumptions": [],
+        "disagreement": [],
+        "origin": {
+          "author": "P7 contract fixture (evaluation reference)",
+          "kind": "evaluation_reference"
+        },
+        "propositions": [
+          {
+            "id": "W",
+            "stances": [
+              "R1:asserts",
+              "R2:asserts"
+            ],
+            "statement": "The lamp signals that someone is keeping watch.",
+            "uncited": []
+          }
+        ],
+        "status": "proposed_unaccepted",
+        "unclassifiable": [],
+        "unresolved": []
+      },
+      "reference_problems": [],
+      "variants": [
+        {
+          "expect": "substantive_unchanged",
+          "passed": true,
+          "variant_id": "model_change"
+        },
+        {
+          "expect": "substantive_unchanged",
+          "passed": true,
+          "variant_id": "model_relabel"
+        },
+        {
+          "expect": "evidence_changed",
+          "passed": true,
+          "variant_id": "evidence_change"
+        },
+        {
+          "boundary": "The conclusion flip changed the reference claim structure but not the deterministic comparison beyond response text.",
+          "expect": "deterministic_unchanged_beyond_response_text",
+          "passed": true,
+          "variant_id": "conclusion_flip"
+        }
+      ]
+    },
+    {
+      "case_id": "C02_same_conclusion_different_evidence",
+      "checks": {
+        "coverage_preserved": true,
+        "evidence_overlap": true,
+        "independent_rebuild_identical": true,
+        "minority_preserved": true,
+        "no_consensus_truth_or_claim_fields": true,
+        "order_invariant": true,
+        "participant_attribution": true,
+        "probes_refused_as_frozen": true,
+        "provenance_closed": true,
+        "reference_adequate_and_closed": true,
+        "relations": true,
+        "repeatable": true,
+        "schema_valid": true,
+        "semantic_abstention": true,
+        "storage_order_invariant": true,
+        "uncertainty": true,
+        "variants_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "coverage": {
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          },
+          "eligible_records": 2,
+          "extant_records": 2
+        },
+        "evidence": {
+          "only": {
+            "R1": [
+              "A:1"
+            ],
+            "R2": [
+              "A:5"
+            ]
+          },
+          "overall": "disjoint",
+          "shared_by_all": [],
+          "snapshot_varies": [],
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ]
+            },
+            "A:5": {
+              "R2": [
+                "focus"
+              ]
+            }
+          }
+        },
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "context": [],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          },
+          "R2": {
+            "context": [],
+            "family": [
+              "built_in",
+              "contextual-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:5"
+            ],
+            "highlights": [],
+            "model_id": "model-b:1b",
+            "origin": "built_in",
+            "perspective": "contextual-reader"
+          }
+        },
+        "question": "What does the lamp signal to the harbor?",
+        "relations": [
+          {
+            "evidence_focus": "disjoint",
+            "evidence_units": "disjoint",
+            "execution": "different_provider_model",
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          }
+        ],
+        "semantic": {
+          "fields": [
+            "claims",
+            "agreement",
+            "disagreement",
+            "evidence_reliance",
+            "assumptions",
+            "unresolved"
+          ],
+          "reason_code": "SEMANTIC_EXTRACTION_REQUIRED",
+          "statement": "Retained Perspective responses are free prose under perspective-run/v1. Claims, agreement, disagreement, the evidence a response relied on, assumptions and unresolved disagreement cannot be established from receipt structure without semantic extraction, which this deterministic policy does not perform.",
+          "status": "not_established"
+        },
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ]
+      },
+      "controls": "Two distinct Perspectives on different sentences reach the same conclusion from different evidence.",
+      "reference": {
+        "acceptance": "none",
+        "agreement": [
+          {
+            "evidence_relation": "disjoint",
+            "participants": [
+              "R1",
+              "R2"
+            ],
+            "proposition": "W",
+            "stance": "asserts"
+          }
+        ],
+        "assumptions": [],
+        "disagreement": [],
+        "origin": {
+          "author": "P7 contract fixture (evaluation reference)",
+          "kind": "evaluation_reference"
+        },
+        "propositions": [
+          {
+            "id": "W",
+            "stances": [
+              "R1:asserts",
+              "R2:asserts"
+            ],
+            "statement": "The lamp signals that someone is keeping watch.",
+            "uncited": []
+          }
+        ],
+        "status": "proposed_unaccepted",
+        "unclassifiable": [],
+        "unresolved": []
+      },
+      "reference_problems": [],
+      "variants": []
+    },
+    {
+      "case_id": "C03_different_conclusions_same_evidence",
+      "checks": {
+        "coverage_preserved": true,
+        "evidence_overlap": true,
+        "independent_rebuild_identical": true,
+        "minority_preserved": true,
+        "no_consensus_truth_or_claim_fields": true,
+        "order_invariant": true,
+        "participant_attribution": true,
+        "probes_refused_as_frozen": true,
+        "provenance_closed": true,
+        "reference_adequate_and_closed": true,
+        "relations": true,
+        "repeatable": true,
+        "schema_valid": true,
+        "semantic_abstention": true,
+        "storage_order_invariant": true,
+        "uncertainty": true,
+        "variants_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "coverage": {
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          },
+          "eligible_records": 2,
+          "extant_records": 2
+        },
+        "evidence": {
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical",
+          "shared_by_all": [
+            "A:1"
+          ],
+          "snapshot_varies": [],
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          }
+        },
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "context": [],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          },
+          "R2": {
+            "context": [],
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "skeptical-reader"
+          }
+        },
+        "question": "What does the lamp signal to the harbor?",
+        "relations": [
+          {
+            "evidence_focus": "identical",
+            "evidence_units": "identical",
+            "execution": "same_provider_model",
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          }
+        ],
+        "semantic": {
+          "fields": [
+            "claims",
+            "agreement",
+            "disagreement",
+            "evidence_reliance",
+            "assumptions",
+            "unresolved"
+          ],
+          "reason_code": "SEMANTIC_EXTRACTION_REQUIRED",
+          "statement": "Retained Perspective responses are free prose under perspective-run/v1. Claims, agreement, disagreement, the evidence a response relied on, assumptions and unresolved disagreement cannot be established from receipt structure without semantic extraction, which this deterministic policy does not perform.",
+          "status": "not_established"
+        },
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ]
+      },
+      "controls": "Two distinct Perspectives on the same sentence reach opposite conclusions; a third run is discarded and never becomes comparable.",
+      "reference": {
+        "acceptance": "none",
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [
+          {
+            "evidence_relation": "identical",
+            "groups": [
+              {
+                "participants": [
+                  "R1"
+                ],
+                "stance": "asserts"
+              },
+              {
+                "participants": [
+                  "R2"
+                ],
+                "stance": "denies"
+              }
+            ],
+            "proposition": "W",
+            "resolution": "none_recorded",
+            "smaller_groups": []
+          }
+        ],
+        "origin": {
+          "author": "P7 contract fixture (evaluation reference)",
+          "kind": "evaluation_reference"
+        },
+        "propositions": [
+          {
+            "id": "W",
+            "stances": [
+              "R1:asserts",
+              "R2:denies"
+            ],
+            "statement": "The lamp signals that someone is keeping watch.",
+            "uncited": []
+          }
+        ],
+        "status": "proposed_unaccepted",
+        "unclassifiable": [],
+        "unresolved": [
+          "W"
+        ]
+      },
+      "reference_problems": [],
+      "variants": []
+    },
+    {
+      "case_id": "C04_different_conclusions_different_evidence",
+      "checks": {
+        "coverage_preserved": true,
+        "evidence_overlap": true,
+        "independent_rebuild_identical": true,
+        "minority_preserved": true,
+        "no_consensus_truth_or_claim_fields": true,
+        "order_invariant": true,
+        "participant_attribution": true,
+        "probes_refused_as_frozen": true,
+        "provenance_closed": true,
+        "reference_adequate_and_closed": true,
+        "relations": true,
+        "repeatable": true,
+        "schema_valid": true,
+        "semantic_abstention": true,
+        "storage_order_invariant": true,
+        "uncertainty": true,
+        "variants_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "coverage": {
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          },
+          "eligible_records": 2,
+          "extant_records": 2
+        },
+        "evidence": {
+          "only": {
+            "R1": [
+              "A:1"
+            ],
+            "R2": [
+              "A:6"
+            ]
+          },
+          "overall": "disjoint",
+          "shared_by_all": [],
+          "snapshot_varies": [],
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ]
+            },
+            "A:6": {
+              "R2": [
+                "focus"
+              ]
+            }
+          }
+        },
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "context": [],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          },
+          "R2": {
+            "context": [],
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:6"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "skeptical-reader"
+          }
+        },
+        "question": "What does the lamp signal to the harbor?",
+        "relations": [
+          {
+            "evidence_focus": "disjoint",
+            "evidence_units": "disjoint",
+            "execution": "same_provider_model",
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          }
+        ],
+        "semantic": {
+          "fields": [
+            "claims",
+            "agreement",
+            "disagreement",
+            "evidence_reliance",
+            "assumptions",
+            "unresolved"
+          ],
+          "reason_code": "SEMANTIC_EXTRACTION_REQUIRED",
+          "statement": "Retained Perspective responses are free prose under perspective-run/v1. Claims, agreement, disagreement, the evidence a response relied on, assumptions and unresolved disagreement cannot be established from receipt structure without semantic extraction, which this deterministic policy does not perform.",
+          "status": "not_established"
+        },
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ]
+      },
+      "controls": "Opposite conclusions grounded in different sentences: the disagreement follows an evidence difference.",
+      "reference": {
+        "acceptance": "none",
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [
+          {
+            "evidence_relation": "disjoint",
+            "groups": [
+              {
+                "participants": [
+                  "R1"
+                ],
+                "stance": "asserts"
+              },
+              {
+                "participants": [
+                  "R2"
+                ],
+                "stance": "denies"
+              }
+            ],
+            "proposition": "W",
+            "resolution": "none_recorded",
+            "smaller_groups": []
+          }
+        ],
+        "origin": {
+          "author": "P7 contract fixture (evaluation reference)",
+          "kind": "evaluation_reference"
+        },
+        "propositions": [
+          {
+            "id": "W",
+            "stances": [
+              "R1:asserts",
+              "R2:denies"
+            ],
+            "statement": "The lamp signals that someone is keeping watch.",
+            "uncited": []
+          }
+        ],
+        "status": "proposed_unaccepted",
+        "unclassifiable": [],
+        "unresolved": [
+          "W"
+        ]
+      },
+      "reference_problems": [],
+      "variants": []
+    },
+    {
+      "case_id": "C05_assumption_difference",
+      "checks": {
+        "coverage_preserved": true,
+        "evidence_overlap": true,
+        "independent_rebuild_identical": true,
+        "minority_preserved": true,
+        "no_consensus_truth_or_claim_fields": true,
+        "order_invariant": true,
+        "participant_attribution": true,
+        "probes_refused_as_frozen": true,
+        "provenance_closed": true,
+        "reference_adequate_and_closed": true,
+        "relations": true,
+        "repeatable": true,
+        "schema_valid": true,
+        "semantic_abstention": true,
+        "storage_order_invariant": true,
+        "uncertainty": true,
+        "variants_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "coverage": {
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          },
+          "eligible_records": 2,
+          "extant_records": 2
+        },
+        "evidence": {
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical",
+          "shared_by_all": [
+            "A:1",
+            "A:2",
+            "A:3",
+            "A:4",
+            "A:5",
+            "A:6"
+          ],
+          "snapshot_varies": [],
+          "units": {
+            "A:1": {
+              "R1": [
+                "context",
+                "focus"
+              ],
+              "R2": [
+                "context",
+                "focus"
+              ]
+            },
+            "A:2": {
+              "R1": [
+                "context"
+              ],
+              "R2": [
+                "context"
+              ]
+            },
+            "A:3": {
+              "R1": [
+                "context"
+              ],
+              "R2": [
+                "context"
+              ]
+            },
+            "A:4": {
+              "R1": [
+                "context"
+              ],
+              "R2": [
+                "context"
+              ]
+            },
+            "A:5": {
+              "R1": [
+                "context"
+              ],
+              "R2": [
+                "context"
+              ]
+            },
+            "A:6": {
+              "R1": [
+                "context"
+              ],
+              "R2": [
+                "context"
+              ]
+            }
+          }
+        },
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "context": [
+              "A:1",
+              "A:2",
+              "A:3",
+              "A:4",
+              "A:5",
+              "A:6"
+            ],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          },
+          "R2": {
+            "context": [
+              "A:1",
+              "A:2",
+              "A:3",
+              "A:4",
+              "A:5",
+              "A:6"
+            ],
+            "family": [
+              "built_in",
+              "contextual-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "contextual-reader"
+          }
+        },
+        "question": "What does the lamp signal to the harbor?",
+        "relations": [
+          {
+            "evidence_focus": "identical",
+            "evidence_units": "identical",
+            "execution": "same_provider_model",
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          }
+        ],
+        "semantic": {
+          "fields": [
+            "claims",
+            "agreement",
+            "disagreement",
+            "evidence_reliance",
+            "assumptions",
+            "unresolved"
+          ],
+          "reason_code": "SEMANTIC_EXTRACTION_REQUIRED",
+          "statement": "Retained Perspective responses are free prose under perspective-run/v1. Claims, agreement, disagreement, the evidence a response relied on, assumptions and unresolved disagreement cannot be established from receipt structure without semantic extraction, which this deterministic policy does not perform.",
+          "status": "not_established"
+        },
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ]
+      },
+      "controls": "Same focus and the same current page; the readings differ through explicitly stated assumptions, not a direct contradiction.",
+      "reference": {
+        "acceptance": "none",
+        "agreement": [],
+        "assumptions": [
+          {
+            "id": "AS1",
+            "participant": "R1",
+            "quote": {
+              "end": 26,
+              "start": 0,
+              "text": "Assuming the keeper lit it"
+            }
+          },
+          {
+            "id": "AS2",
+            "participant": "R2",
+            "quote": {
+              "end": 40,
+              "start": 0,
+              "text": "If the empty harbor means the boats fled"
+            }
+          }
+        ],
+        "disagreement": [],
+        "origin": {
+          "author": "P7 contract fixture (evaluation reference)",
+          "kind": "evaluation_reference"
+        },
+        "propositions": [
+          {
+            "id": "W",
+            "stances": [
+              "R1:asserts",
+              "R2:does_not_address"
+            ],
+            "statement": "The lamp signals that someone is keeping watch.",
+            "uncited": []
+          },
+          {
+            "id": "WARN",
+            "stances": [
+              "R1:does_not_address",
+              "R2:asserts"
+            ],
+            "statement": "The lamp signals a warning to stay away.",
+            "uncited": []
+          }
+        ],
+        "status": "proposed_unaccepted",
+        "unclassifiable": [],
+        "unresolved": []
+      },
+      "reference_problems": [],
+      "variants": []
+    },
+    {
+      "case_id": "C06_wording_only_difference",
+      "checks": {
+        "coverage_preserved": true,
+        "evidence_overlap": true,
+        "independent_rebuild_identical": true,
+        "minority_preserved": true,
+        "no_consensus_truth_or_claim_fields": true,
+        "order_invariant": true,
+        "participant_attribution": true,
+        "probes_refused_as_frozen": true,
+        "provenance_closed": true,
+        "reference_adequate_and_closed": true,
+        "relations": true,
+        "repeatable": true,
+        "schema_valid": true,
+        "semantic_abstention": true,
+        "storage_order_invariant": true,
+        "uncertainty": true,
+        "variants_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "coverage": {
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          },
+          "eligible_records": 2,
+          "extant_records": 2
+        },
+        "evidence": {
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical",
+          "shared_by_all": [
+            "A:1"
+          ],
+          "snapshot_varies": [],
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          }
+        },
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "context": [],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          },
+          "R2": {
+            "context": [],
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-b:1b",
+            "origin": "built_in",
+            "perspective": "skeptical-reader"
+          }
+        },
+        "question": "What does the lamp signal to the harbor?",
+        "relations": [
+          {
+            "evidence_focus": "identical",
+            "evidence_units": "identical",
+            "execution": "different_provider_model",
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          }
+        ],
+        "semantic": {
+          "fields": [
+            "claims",
+            "agreement",
+            "disagreement",
+            "evidence_reliance",
+            "assumptions",
+            "unresolved"
+          ],
+          "reason_code": "SEMANTIC_EXTRACTION_REQUIRED",
+          "statement": "Retained Perspective responses are free prose under perspective-run/v1. Claims, agreement, disagreement, the evidence a response relied on, assumptions and unresolved disagreement cannot be established from receipt structure without semantic extraction, which this deterministic policy does not perform.",
+          "status": "not_established"
+        },
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ]
+      },
+      "controls": "Very different wording, including a surface negation, for the same claim on the same evidence.",
+      "reference": {
+        "acceptance": "none",
+        "agreement": [
+          {
+            "evidence_relation": "identical",
+            "participants": [
+              "R1",
+              "R2"
+            ],
+            "proposition": "W",
+            "stance": "asserts"
+          }
+        ],
+        "assumptions": [],
+        "disagreement": [],
+        "origin": {
+          "author": "P7 contract fixture (evaluation reference)",
+          "kind": "evaluation_reference"
+        },
+        "propositions": [
+          {
+            "id": "W",
+            "stances": [
+              "R1:asserts",
+              "R2:asserts"
+            ],
+            "statement": "The lamp signals that someone is keeping watch.",
+            "uncited": []
+          },
+          {
+            "id": "BEACON",
+            "stances": [
+              "R1:does_not_address",
+              "R2:denies"
+            ],
+            "statement": "The lamp is a beacon for ships.",
+            "uncited": [
+              "R2"
+            ]
+          }
+        ],
+        "status": "proposed_unaccepted",
+        "unclassifiable": [],
+        "unresolved": []
+      },
+      "reference_problems": [],
+      "variants": []
+    },
+    {
+      "case_id": "C07_similar_wording_opposite_claims",
+      "checks": {
+        "coverage_preserved": true,
+        "evidence_overlap": true,
+        "independent_rebuild_identical": true,
+        "minority_preserved": true,
+        "no_consensus_truth_or_claim_fields": true,
+        "order_invariant": true,
+        "participant_attribution": true,
+        "probes_refused_as_frozen": true,
+        "provenance_closed": true,
+        "reference_adequate_and_closed": true,
+        "relations": true,
+        "repeatable": true,
+        "schema_valid": true,
+        "semantic_abstention": true,
+        "storage_order_invariant": true,
+        "uncertainty": true,
+        "variants_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "coverage": {
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          },
+          "eligible_records": 2,
+          "extant_records": 2
+        },
+        "evidence": {
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical",
+          "shared_by_all": [
+            "A:4"
+          ],
+          "snapshot_varies": [],
+          "units": {
+            "A:4": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          }
+        },
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "context": [],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:4"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          },
+          "R2": {
+            "context": [],
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:4"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "skeptical-reader"
+          }
+        },
+        "question": "What does the lamp signal to the harbor?",
+        "relations": [
+          {
+            "evidence_focus": "identical",
+            "evidence_units": "identical",
+            "execution": "same_provider_model",
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          }
+        ],
+        "semantic": {
+          "fields": [
+            "claims",
+            "agreement",
+            "disagreement",
+            "evidence_reliance",
+            "assumptions",
+            "unresolved"
+          ],
+          "reason_code": "SEMANTIC_EXTRACTION_REQUIRED",
+          "statement": "Retained Perspective responses are free prose under perspective-run/v1. Claims, agreement, disagreement, the evidence a response relied on, assumptions and unresolved disagreement cannot be established from receipt structure without semantic extraction, which this deterministic policy does not perform.",
+          "status": "not_established"
+        },
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ]
+      },
+      "controls": "Nearly identical wording that makes opposite claims on the same evidence.",
+      "reference": {
+        "acceptance": "none",
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [
+          {
+            "evidence_relation": "identical",
+            "groups": [
+              {
+                "participants": [
+                  "R1"
+                ],
+                "stance": "asserts"
+              },
+              {
+                "participants": [
+                  "R2"
+                ],
+                "stance": "denies"
+              }
+            ],
+            "proposition": "SAFE",
+            "resolution": "none_recorded",
+            "smaller_groups": []
+          }
+        ],
+        "origin": {
+          "author": "P7 contract fixture (evaluation reference)",
+          "kind": "evaluation_reference"
+        },
+        "propositions": [
+          {
+            "id": "SAFE",
+            "stances": [
+              "R1:asserts",
+              "R2:denies"
+            ],
+            "statement": "The lamp signals that the harbor is safe to enter.",
+            "uncited": []
+          }
+        ],
+        "status": "proposed_unaccepted",
+        "unclassifiable": [],
+        "unresolved": [
+          "SAFE"
+        ]
+      },
+      "reference_problems": [],
+      "variants": []
+    },
+    {
+      "case_id": "C08_two_to_one_minority",
+      "checks": {
+        "coverage_preserved": true,
+        "evidence_overlap": true,
+        "independent_rebuild_identical": true,
+        "minority_preserved": true,
+        "no_consensus_truth_or_claim_fields": true,
+        "order_invariant": true,
+        "participant_attribution": true,
+        "probes_refused_as_frozen": true,
+        "provenance_closed": true,
+        "reference_adequate_and_closed": true,
+        "relations": true,
+        "repeatable": true,
+        "schema_valid": true,
+        "semantic_abstention": true,
+        "storage_order_invariant": true,
+        "uncertainty": true,
+        "variants_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "coverage": {
+          "classified_records": {
+            "eligible": 3,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          },
+          "eligible_records": 3,
+          "extant_records": 3
+        },
+        "evidence": {
+          "only": {
+            "R1": [],
+            "R2": [],
+            "R3": []
+          },
+          "overall": "identical",
+          "shared_by_all": [
+            "A:1"
+          ],
+          "snapshot_varies": [],
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ],
+              "R3": [
+                "focus"
+              ]
+            }
+          }
+        },
+        "order": [
+          "R1",
+          "R2",
+          "R3"
+        ],
+        "participants": {
+          "R1": {
+            "context": [],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          },
+          "R2": {
+            "context": [],
+            "family": [
+              "built_in",
+              "contextual-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-b:1b",
+            "origin": "built_in",
+            "perspective": "contextual-reader"
+          },
+          "R3": {
+            "context": [],
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "skeptical-reader"
+          }
+        },
+        "question": "What does the lamp signal to the harbor?",
+        "relations": [
+          {
+            "evidence_focus": "identical",
+            "evidence_units": "identical",
+            "execution": "different_provider_model",
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          },
+          {
+            "evidence_focus": "identical",
+            "evidence_units": "identical",
+            "execution": "same_provider_model",
+            "pair": [
+              "R1",
+              "R3"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          },
+          {
+            "evidence_focus": "identical",
+            "evidence_units": "identical",
+            "execution": "different_provider_model",
+            "pair": [
+              "R2",
+              "R3"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          }
+        ],
+        "semantic": {
+          "fields": [
+            "claims",
+            "agreement",
+            "disagreement",
+            "evidence_reliance",
+            "assumptions",
+            "unresolved"
+          ],
+          "reason_code": "SEMANTIC_EXTRACTION_REQUIRED",
+          "statement": "Retained Perspective responses are free prose under perspective-run/v1. Claims, agreement, disagreement, the evidence a response relied on, assumptions and unresolved disagreement cannot be established from receipt structure without semantic extraction, which this deterministic policy does not perform.",
+          "status": "not_established"
+        },
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ]
+      },
+      "controls": "Three distinct Perspectives on one sentence: two assert the watch reading, one denies it and adds a hedged alternative.",
+      "reference": {
+        "acceptance": "none",
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [
+          {
+            "evidence_relation": "identical",
+            "groups": [
+              {
+                "participants": [
+                  "R1",
+                  "R2"
+                ],
+                "stance": "asserts"
+              },
+              {
+                "participants": [
+                  "R3"
+                ],
+                "stance": "denies"
+              }
+            ],
+            "proposition": "W",
+            "resolution": "none_recorded",
+            "smaller_groups": [
+              "R3"
+            ]
+          }
+        ],
+        "origin": {
+          "author": "P7 contract fixture (evaluation reference)",
+          "kind": "evaluation_reference"
+        },
+        "propositions": [
+          {
+            "id": "W",
+            "stances": [
+              "R1:asserts",
+              "R2:asserts",
+              "R3:denies"
+            ],
+            "statement": "The lamp signals that someone is keeping watch.",
+            "uncited": []
+          },
+          {
+            "id": "FORGOT",
+            "stances": [
+              "R1:does_not_address",
+              "R2:does_not_address",
+              "R3:unclassifiable"
+            ],
+            "statement": "The lamp may have been forgotten.",
+            "uncited": []
+          }
+        ],
+        "status": "proposed_unaccepted",
+        "unclassifiable": [
+          {
+            "participant": "R3",
+            "proposition": "FORGOT"
+          }
+        ],
+        "unresolved": [
+          "W"
+        ]
+      },
+      "reference_problems": [],
+      "variants": [
+        {
+          "expect": "substantive_unchanged",
+          "passed": true,
+          "variant_id": "model_swap"
+        }
+      ]
+    },
+    {
+      "case_id": "C09_unsupported_assertion",
+      "checks": {
+        "coverage_preserved": true,
+        "evidence_overlap": true,
+        "independent_rebuild_identical": true,
+        "minority_preserved": true,
+        "no_consensus_truth_or_claim_fields": true,
+        "order_invariant": true,
+        "participant_attribution": true,
+        "probes_refused_as_frozen": true,
+        "provenance_closed": true,
+        "reference_adequate_and_closed": true,
+        "relations": true,
+        "repeatable": true,
+        "schema_valid": true,
+        "semantic_abstention": true,
+        "storage_order_invariant": true,
+        "uncertainty": true,
+        "variants_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "coverage": {
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          },
+          "eligible_records": 2,
+          "extant_records": 2
+        },
+        "evidence": {
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical",
+          "shared_by_all": [
+            "A:1"
+          ],
+          "snapshot_varies": [],
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          }
+        },
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "context": [],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          },
+          "R2": {
+            "context": [],
+            "family": [
+              "canonical_saved",
+              "S1"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "canonical_saved",
+            "perspective": "S1"
+          }
+        },
+        "question": "What does the lamp signal to the harbor?",
+        "relations": [
+          {
+            "evidence_focus": "identical",
+            "evidence_units": "identical",
+            "execution": "same_provider_model",
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          }
+        ],
+        "semantic": {
+          "fields": [
+            "claims",
+            "agreement",
+            "disagreement",
+            "evidence_reliance",
+            "assumptions",
+            "unresolved"
+          ],
+          "reason_code": "SEMANTIC_EXTRACTION_REQUIRED",
+          "statement": "Retained Perspective responses are free prose under perspective-run/v1. Claims, agreement, disagreement, the evidence a response relied on, assumptions and unresolved disagreement cannot be established from receipt structure without semantic extraction, which this deterministic policy does not perform.",
+          "status": "not_established"
+        },
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ]
+      },
+      "controls": "A saved Perspective asserts a claim that nothing in its supplied Scope supports.",
+      "reference": {
+        "acceptance": "none",
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [],
+        "origin": {
+          "author": "P7 contract fixture (evaluation reference)",
+          "kind": "evaluation_reference"
+        },
+        "propositions": [
+          {
+            "id": "W",
+            "stances": [
+              "R1:asserts",
+              "R2:does_not_address"
+            ],
+            "statement": "The lamp signals that someone is keeping watch.",
+            "uncited": []
+          },
+          {
+            "id": "SMUGGLE",
+            "stances": [
+              "R1:does_not_address",
+              "R2:asserts"
+            ],
+            "statement": "The keeper was signalling smugglers.",
+            "uncited": [
+              "R2"
+            ]
+          }
+        ],
+        "status": "proposed_unaccepted",
+        "unclassifiable": [],
+        "unresolved": []
+      },
+      "reference_problems": [],
+      "variants": []
+    },
+    {
+      "case_id": "C10_incomplete_coverage_excluded_receipt",
+      "checks": {
+        "coverage_preserved": true,
+        "evidence_overlap": true,
+        "independent_rebuild_identical": true,
+        "minority_preserved": true,
+        "no_consensus_truth_or_claim_fields": true,
+        "order_invariant": true,
+        "participant_attribution": true,
+        "probes_refused_as_frozen": true,
+        "provenance_closed": true,
+        "reference_adequate_and_closed": true,
+        "relations": true,
+        "repeatable": true,
+        "schema_valid": true,
+        "semantic_abstention": true,
+        "storage_order_invariant": true,
+        "uncertainty": true,
+        "variants_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "coverage": {
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 1,
+            "invalid": 0,
+            "unsupported": 0
+          },
+          "eligible_records": 2,
+          "extant_records": 3
+        },
+        "evidence": {
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical",
+          "shared_by_all": [
+            "A:1"
+          ],
+          "snapshot_varies": [],
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          }
+        },
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "context": [],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          },
+          "R2": {
+            "context": [],
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "skeptical-reader"
+          }
+        },
+        "question": "What does the lamp signal to the harbor?",
+        "relations": [
+          {
+            "evidence_focus": "identical",
+            "evidence_units": "identical",
+            "execution": "same_provider_model",
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          }
+        ],
+        "semantic": {
+          "fields": [
+            "claims",
+            "agreement",
+            "disagreement",
+            "evidence_reliance",
+            "assumptions",
+            "unresolved"
+          ],
+          "reason_code": "SEMANTIC_EXTRACTION_REQUIRED",
+          "statement": "Retained Perspective responses are free prose under perspective-run/v1. Claims, agreement, disagreement, the evidence a response relied on, assumptions and unresolved disagreement cannot be established from receipt structure without semantic extraction, which this deterministic policy does not perform.",
+          "status": "not_established"
+        },
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION",
+          "RECEIPTS_NOT_ELIGIBLE"
+        ]
+      },
+      "controls": "Three retained runs; the third's source is then excluded from analysis, so its receipt is ineligible.",
+      "reference": {
+        "acceptance": "none",
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [
+          {
+            "evidence_relation": "identical",
+            "groups": [
+              {
+                "participants": [
+                  "R1"
+                ],
+                "stance": "asserts"
+              },
+              {
+                "participants": [
+                  "R2"
+                ],
+                "stance": "denies"
+              }
+            ],
+            "proposition": "W",
+            "resolution": "none_recorded",
+            "smaller_groups": []
+          }
+        ],
+        "origin": {
+          "author": "P7 contract fixture (evaluation reference)",
+          "kind": "evaluation_reference"
+        },
+        "propositions": [
+          {
+            "id": "W",
+            "stances": [
+              "R1:asserts",
+              "R2:denies"
+            ],
+            "statement": "The lamp signals that someone is keeping watch.",
+            "uncited": []
+          }
+        ],
+        "status": "proposed_unaccepted",
+        "unclassifiable": [],
+        "unresolved": [
+          "W"
+        ]
+      },
+      "reference_problems": [],
+      "variants": []
+    },
+    {
+      "case_id": "C11_legitimately_unclassifiable",
+      "checks": {
+        "coverage_preserved": true,
+        "evidence_overlap": true,
+        "independent_rebuild_identical": true,
+        "minority_preserved": true,
+        "no_consensus_truth_or_claim_fields": true,
+        "order_invariant": true,
+        "participant_attribution": true,
+        "probes_refused_as_frozen": true,
+        "provenance_closed": true,
+        "reference_adequate_and_closed": true,
+        "relations": true,
+        "repeatable": true,
+        "schema_valid": true,
+        "semantic_abstention": true,
+        "storage_order_invariant": true,
+        "uncertainty": true,
+        "variants_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "coverage": {
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          },
+          "eligible_records": 2,
+          "extant_records": 2
+        },
+        "evidence": {
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical",
+          "shared_by_all": [
+            "A:2"
+          ],
+          "snapshot_varies": [],
+          "units": {
+            "A:2": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          }
+        },
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "context": [],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:2"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          },
+          "R2": {
+            "context": [],
+            "family": [
+              "built_in",
+              "skeptical-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:2"
+            ],
+            "highlights": [],
+            "model_id": "model-b:1b",
+            "origin": "built_in",
+            "perspective": "skeptical-reader"
+          }
+        },
+        "question": "What does the lamp signal to the harbor?",
+        "relations": [
+          {
+            "evidence_focus": "identical",
+            "evidence_units": "identical",
+            "execution": "different_provider_model",
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          }
+        ],
+        "semantic": {
+          "fields": [
+            "claims",
+            "agreement",
+            "disagreement",
+            "evidence_reliance",
+            "assumptions",
+            "unresolved"
+          ],
+          "reason_code": "SEMANTIC_EXTRACTION_REQUIRED",
+          "statement": "Retained Perspective responses are free prose under perspective-run/v1. Claims, agreement, disagreement, the evidence a response relied on, assumptions and unresolved disagreement cannot be established from receipt structure without semantic extraction, which this deterministic policy does not perform.",
+          "status": "not_established"
+        },
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION"
+        ]
+      },
+      "controls": "Both responses decline to commit; their stance toward the watch reading is unclassifiable.",
+      "reference": {
+        "acceptance": "none",
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [],
+        "origin": {
+          "author": "P7 contract fixture (evaluation reference)",
+          "kind": "evaluation_reference"
+        },
+        "propositions": [
+          {
+            "id": "W",
+            "stances": [
+              "R1:unclassifiable",
+              "R2:unclassifiable"
+            ],
+            "statement": "The lamp signals that someone is keeping watch.",
+            "uncited": []
+          }
+        ],
+        "status": "proposed_unaccepted",
+        "unclassifiable": [
+          {
+            "participant": "R1",
+            "proposition": "W"
+          },
+          {
+            "participant": "R2",
+            "proposition": "W"
+          }
+        ],
+        "unresolved": []
+      },
+      "reference_problems": [],
+      "variants": []
+    },
+    {
+      "case_id": "C12_one_perspective_two_models_identical_text",
+      "checks": {
+        "coverage_preserved": true,
+        "evidence_overlap": true,
+        "independent_rebuild_identical": true,
+        "minority_preserved": true,
+        "no_consensus_truth_or_claim_fields": true,
+        "order_invariant": true,
+        "participant_attribution": true,
+        "probes_refused_as_frozen": true,
+        "provenance_closed": true,
+        "reference_adequate_and_closed": true,
+        "relations": true,
+        "repeatable": true,
+        "schema_valid": true,
+        "semantic_abstention": true,
+        "storage_order_invariant": true,
+        "uncertainty": true,
+        "variants_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "coverage": {
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          },
+          "eligible_records": 2,
+          "extant_records": 2
+        },
+        "evidence": {
+          "only": {
+            "R1": [],
+            "R2": []
+          },
+          "overall": "identical",
+          "shared_by_all": [
+            "A:1"
+          ],
+          "snapshot_varies": [],
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "focus"
+              ]
+            }
+          }
+        },
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "context": [],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          },
+          "R2": {
+            "context": [],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [],
+            "model_id": "model-b:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          }
+        },
+        "question": "What does the lamp signal to the harbor?",
+        "relations": [
+          {
+            "evidence_focus": "identical",
+            "evidence_units": "identical",
+            "execution": "different_provider_model",
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "same_family",
+            "response_text": "identical",
+            "same_source_document": true
+          }
+        ],
+        "semantic": {
+          "fields": [
+            "claims",
+            "agreement",
+            "disagreement",
+            "evidence_reliance",
+            "assumptions",
+            "unresolved"
+          ],
+          "reason_code": "SEMANTIC_EXTRACTION_REQUIRED",
+          "statement": "Retained Perspective responses are free prose under perspective-run/v1. Claims, agreement, disagreement, the evidence a response relied on, assumptions and unresolved disagreement cannot be established from receipt structure without semantic extraction, which this deterministic policy does not perform.",
+          "status": "not_established"
+        },
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION",
+          "MODEL_DIFFERENCE_NOT_PERSPECTIVE",
+          "IDENTICAL_TEXT_NOT_AGREEMENT"
+        ]
+      },
+      "controls": "The same built-in Perspective run by two models returns byte-identical text.",
+      "reference": {
+        "acceptance": "none",
+        "agreement": [
+          {
+            "evidence_relation": "identical",
+            "participants": [
+              "R1",
+              "R2"
+            ],
+            "proposition": "W",
+            "stance": "asserts"
+          }
+        ],
+        "assumptions": [],
+        "disagreement": [],
+        "origin": {
+          "author": "P7 contract fixture (evaluation reference)",
+          "kind": "evaluation_reference"
+        },
+        "propositions": [
+          {
+            "id": "W",
+            "stances": [
+              "R1:asserts",
+              "R2:asserts"
+            ],
+            "statement": "The lamp signals that someone is keeping watch.",
+            "uncited": []
+          }
+        ],
+        "status": "proposed_unaccepted",
+        "unclassifiable": [],
+        "unresolved": []
+      },
+      "reference_problems": [],
+      "variants": []
+    },
+    {
+      "case_id": "C13_overlapping_evidence_changed_highlight",
+      "checks": {
+        "coverage_preserved": true,
+        "evidence_overlap": true,
+        "independent_rebuild_identical": true,
+        "minority_preserved": true,
+        "no_consensus_truth_or_claim_fields": true,
+        "order_invariant": true,
+        "participant_attribution": true,
+        "probes_refused_as_frozen": true,
+        "provenance_closed": true,
+        "reference_adequate_and_closed": true,
+        "relations": true,
+        "repeatable": true,
+        "schema_valid": true,
+        "semantic_abstention": true,
+        "storage_order_invariant": true,
+        "uncertainty": true,
+        "variants_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "coverage": {
+          "classified_records": {
+            "eligible": 2,
+            "excluded": 0,
+            "invalid": 0,
+            "unsupported": 0
+          },
+          "eligible_records": 2,
+          "extant_records": 2
+        },
+        "evidence": {
+          "only": {
+            "R1": [],
+            "R2": [
+              "A:2",
+              "A:3",
+              "A:4",
+              "A:5",
+              "A:6"
+            ]
+          },
+          "overall": "overlapping",
+          "shared_by_all": [
+            "A:1",
+            "h1"
+          ],
+          "snapshot_varies": [
+            "h1"
+          ],
+          "units": {
+            "A:1": {
+              "R1": [
+                "focus"
+              ],
+              "R2": [
+                "context",
+                "focus"
+              ]
+            },
+            "A:2": {
+              "R2": [
+                "context",
+                "focus"
+              ]
+            },
+            "A:3": {
+              "R2": [
+                "context"
+              ]
+            },
+            "A:4": {
+              "R2": [
+                "context"
+              ]
+            },
+            "A:5": {
+              "R2": [
+                "context"
+              ]
+            },
+            "A:6": {
+              "R2": [
+                "context"
+              ]
+            },
+            "h1": {
+              "R1": [
+                "highlight"
+              ],
+              "R2": [
+                "highlight"
+              ]
+            }
+          }
+        },
+        "order": [
+          "R1",
+          "R2"
+        ],
+        "participants": {
+          "R1": {
+            "context": [],
+            "family": [
+              "built_in",
+              "close-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1"
+            ],
+            "highlights": [
+              "h1"
+            ],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "close-reader"
+          },
+          "R2": {
+            "context": [
+              "A:1",
+              "A:2",
+              "A:3",
+              "A:4",
+              "A:5",
+              "A:6"
+            ],
+            "family": [
+              "built_in",
+              "contextual-reader"
+            ],
+            "family_state": "supported",
+            "focus": [
+              "A:1",
+              "A:2"
+            ],
+            "highlights": [
+              "h1"
+            ],
+            "model_id": "model-a:1b",
+            "origin": "built_in",
+            "perspective": "contextual-reader"
+          }
+        },
+        "question": "What does the lamp signal to the harbor?",
+        "relations": [
+          {
+            "evidence_focus": "overlapping",
+            "evidence_units": "overlapping",
+            "execution": "same_provider_model",
+            "pair": [
+              "R1",
+              "R2"
+            ],
+            "perspective": "distinct_family_distinct_methodology",
+            "response_text": "different",
+            "same_source_document": true
+          }
+        ],
+        "semantic": {
+          "fields": [
+            "claims",
+            "agreement",
+            "disagreement",
+            "evidence_reliance",
+            "assumptions",
+            "unresolved"
+          ],
+          "reason_code": "SEMANTIC_EXTRACTION_REQUIRED",
+          "statement": "Retained Perspective responses are free prose under perspective-run/v1. Claims, agreement, disagreement, the evidence a response relied on, assumptions and unresolved disagreement cannot be established from receipt structure without semantic extraction, which this deterministic policy does not perform.",
+          "status": "not_established"
+        },
+        "uncertainty": [
+          "GOVERNING_QUESTION_NOT_BOUND",
+          "SUPPLIED_NOT_RELIED_ON",
+          "EXECUTION_SETTINGS_UNDISCLOSED",
+          "NO_ADJUDICATION",
+          "HIGHLIGHT_SNAPSHOT_VARIES"
+        ]
+      },
+      "controls": "Overlapping Scopes: a narrow focus plus a highlight versus a two-sentence focus with the current page and the same highlight, whose relevance is changed between runs.",
+      "reference": {
+        "acceptance": "none",
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [],
+        "origin": {
+          "author": "P7 contract fixture (evaluation reference)",
+          "kind": "evaluation_reference"
+        },
+        "propositions": [
+          {
+            "id": "W",
+            "stances": [
+              "R1:asserts",
+              "R2:does_not_address"
+            ],
+            "statement": "The lamp signals that someone is keeping watch.",
+            "uncited": []
+          },
+          {
+            "id": "UNASKED",
+            "stances": [
+              "R1:does_not_address",
+              "R2:asserts"
+            ],
+            "statement": "The lamp signals a question nobody asked.",
+            "uncited": []
+          },
+          {
+            "id": "LEDGER",
+            "stances": [
+              "R1:asserts",
+              "R2:does_not_address"
+            ],
+            "statement": "The ledger records only the oil.",
+            "uncited": []
+          }
+        ],
+        "status": "proposed_unaccepted",
+        "unclassifiable": [],
+        "unresolved": []
+      },
+      "reference_problems": [],
+      "variants": []
+    },
+    {
+      "case_id": "N1_question_mismatch",
+      "checks": {
+        "probes_refused_as_frozen": true,
+        "refused_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "refusal": "QUESTION_MISMATCH"
+      },
+      "controls": "Two retained runs answer different questions; comparing them is refused."
+    },
+    {
+      "case_id": "N2_legacy_without_receipt_table",
+      "checks": {
+        "probes_refused_as_frozen": true,
+        "refused_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "comparison": {
+        "refusal": "COVERAGE_UNSUPPORTED"
+      },
+      "controls": "A labeled legacy shape: the receipt table is absent, so receipt coverage is unsupported and comparison is refused."
+    }
+  ],
+  "corpus": "hermeneia.perspective-comparison-cases/v1",
+  "method": "each case materialized in a disposable synthetic workspace through production write boundaries; in-process fake adapters; no network, provider, credential store, real workspace or private text; production P4 adapter decides eligibility and the production comparator compares",
+  "policy_version": "1.0.0",
+  "schema": "hermeneia.perspective-comparison-lab-results/v1"
+}

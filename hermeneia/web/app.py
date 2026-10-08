@@ -9759,6 +9759,32 @@ Return ONLY valid JSON, no markdown, no explanation:
             conn.close()
         return _no_store(payload)
 
+    @app.route("/api/perspective/comparison")
+    def api_perspective_comparison():
+        """Deterministic comparison of eligible retained Perspectives (#215 P7); read-only, never saved."""
+        from ..perspective_achievement_evidence import read_perspective_achievement_evidence
+        from ..perspective_comparison import ComparisonRefused, compare_retained_perspectives
+        from ..study_lineage import serialize_projection
+
+        if set(request.args) - {"receipt_id"}:
+            return jsonify({"error": "Only repeated receipt_id parameters are supported", "code": "UNSUPPORTED_PARAMETER"}), 400
+        conn = _conn() if db_path.exists() else sqlite3.connect(":memory:")
+        try:
+            conn.execute("PRAGMA query_only=ON")
+            evidence = read_perspective_achievement_evidence(conn)
+            result = compare_retained_perspectives(evidence, request.args.getlist("receipt_id"))
+            payload = serialize_projection(result)
+        except ComparisonRefused as refusal:
+            status = 400 if refusal.code in ("DUPLICATE_PARTICIPANT", "TOO_FEW_PARTICIPANTS", "TOO_MANY_PARTICIPANTS") else 409
+            return jsonify({"error": "These receipts are not an admissible comparison; nothing was compared",
+                            "code": refusal.code}), status
+        except (sqlite3.Error, ValueError):
+            return jsonify({"error": "Perspective comparison could not evaluate this workspace; nothing was compared",
+                            "code": "EVALUATION_FAILED"}), 409
+        finally:
+            conn.close()
+        return _no_store(payload)
+
     def _award_json(payload, status=200):
         response = jsonify(payload)
         response.headers["Cache-Control"] = "no-store"
