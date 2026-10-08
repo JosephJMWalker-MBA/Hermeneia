@@ -1,0 +1,1423 @@
+{
+  "aggregate": {
+    "acceptance": {
+      "all_checks_passed": 9,
+      "items": 9
+    },
+    "adversarial": {
+      "all_checks_passed": 10,
+      "items": 10
+    },
+    "adversarial_outcomes": {
+      "ADV1_manufactured_assumption": {
+        "governance": "downgraded_to_unknown",
+        "score_deviates_from_reference": true
+      },
+      "ADV2_reliance_inferred_from_supply": {
+        "governance": "downgraded_to_unknown",
+        "score_deviates_from_reference": true
+      },
+      "ADV3_paraphrase_called_disagreement": {
+        "governance": "admitted",
+        "score_deviates_from_reference": true
+      },
+      "ADV4a_minority_erased_by_absence": {
+        "governance": "admitted",
+        "score_deviates_from_reference": true
+      },
+      "ADV4b_minority_erased_by_omission": {
+        "governance": "downgraded_to_unknown",
+        "score_deviates_from_reference": true
+      },
+      "ADV5a_majority_as_truth": {
+        "governance": "refused",
+        "score_deviates_from_reference": false
+      },
+      "ADV5b_truth_flag_nested": {
+        "governance": "refused",
+        "score_deviates_from_reference": false
+      },
+      "ADV6_wrong_participant_attribution": {
+        "governance": "downgraded_to_unknown",
+        "score_deviates_from_reference": true
+      },
+      "ADV7_unparseable_output": {
+        "governance": "refused",
+        "score_deviates_from_reference": false
+      },
+      "ADV8_invented_stance": {
+        "governance": "refused",
+        "score_deviates_from_reference": false
+      }
+    },
+    "adversarial_visible_only_in_score": [
+      "ADV3_paraphrase_called_disagreement",
+      "ADV4a_minority_erased_by_absence"
+    ],
+    "faithful": {
+      "all_checks_passed": 13,
+      "items": 13
+    },
+    "layer1_refusal": {
+      "all_checks_passed": 2,
+      "items": 2
+    }
+  },
+  "corpus": "hermeneia.perspective-comparison-candidate-cases/v1",
+  "method": "disposable synthetic workspaces through production write boundaries; the semantic model is an in-process fake returning scripted text (no network, no real model); scripted output measures the governed pipeline, not extraction quality",
+  "policy_version": "1.0.0",
+  "records": [
+    {
+      "case_id": "C01_same_conclusion_same_evidence",
+      "checks": {
+        "candidate_created": true,
+        "deterministic_given_output": true,
+        "extraction_score_perfect": true,
+        "generation_writes_nothing": true,
+        "no_authority_fields": true,
+        "nothing_untraceable": true,
+        "provenance_bound": true,
+        "relations_reproduce_reference": true
+      },
+      "kind": "faithful",
+      "minorities": [],
+      "relations": {
+        "agreement": 1,
+        "disagreement": 0,
+        "unknown_positions": 0,
+        "unresolved": 0
+      },
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 1
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 1,
+          "matched": 1,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 2
+        },
+        "stance": {
+          "agree": 2,
+          "total": 2
+        },
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "C02_same_conclusion_different_evidence",
+      "checks": {
+        "candidate_created": true,
+        "deterministic_given_output": true,
+        "extraction_score_perfect": true,
+        "generation_writes_nothing": true,
+        "no_authority_fields": true,
+        "nothing_untraceable": true,
+        "provenance_bound": true,
+        "relations_reproduce_reference": true
+      },
+      "kind": "faithful",
+      "minorities": [],
+      "relations": {
+        "agreement": 1,
+        "disagreement": 0,
+        "unknown_positions": 0,
+        "unresolved": 0
+      },
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 1
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 1,
+          "matched": 1,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 2
+        },
+        "stance": {
+          "agree": 2,
+          "total": 2
+        },
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "C03_different_conclusions_same_evidence",
+      "checks": {
+        "candidate_created": true,
+        "deterministic_given_output": true,
+        "extraction_score_perfect": true,
+        "generation_writes_nothing": true,
+        "no_authority_fields": true,
+        "nothing_untraceable": true,
+        "provenance_bound": true,
+        "relations_reproduce_reference": true
+      },
+      "kind": "faithful",
+      "minorities": [],
+      "relations": {
+        "agreement": 0,
+        "disagreement": 1,
+        "unknown_positions": 0,
+        "unresolved": 1
+      },
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 1
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 1,
+          "matched": 1,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 2
+        },
+        "stance": {
+          "agree": 2,
+          "total": 2
+        },
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "C04_different_conclusions_different_evidence",
+      "checks": {
+        "candidate_created": true,
+        "deterministic_given_output": true,
+        "extraction_score_perfect": true,
+        "generation_writes_nothing": true,
+        "no_authority_fields": true,
+        "nothing_untraceable": true,
+        "provenance_bound": true,
+        "relations_reproduce_reference": true
+      },
+      "kind": "faithful",
+      "minorities": [],
+      "relations": {
+        "agreement": 0,
+        "disagreement": 1,
+        "unknown_positions": 0,
+        "unresolved": 1
+      },
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 1
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 1,
+          "matched": 1,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 2
+        },
+        "stance": {
+          "agree": 2,
+          "total": 2
+        },
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "C05_assumption_difference",
+      "checks": {
+        "candidate_created": true,
+        "deterministic_given_output": true,
+        "extraction_score_perfect": true,
+        "generation_writes_nothing": true,
+        "no_authority_fields": true,
+        "nothing_untraceable": true,
+        "provenance_bound": true,
+        "relations_reproduce_reference": true
+      },
+      "kind": "faithful",
+      "minorities": [],
+      "relations": {
+        "agreement": 0,
+        "disagreement": 0,
+        "unknown_positions": 0,
+        "unresolved": 0
+      },
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 2
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 2,
+          "matched": 2,
+          "reference": 2
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 3
+        },
+        "stance": {
+          "agree": 4,
+          "total": 4
+        },
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "C06_wording_only_difference",
+      "checks": {
+        "candidate_created": true,
+        "deterministic_given_output": true,
+        "extraction_score_perfect": true,
+        "generation_writes_nothing": true,
+        "no_authority_fields": true,
+        "nothing_untraceable": true,
+        "provenance_bound": true,
+        "relations_reproduce_reference": true
+      },
+      "kind": "faithful",
+      "minorities": [],
+      "relations": {
+        "agreement": 1,
+        "disagreement": 0,
+        "unknown_positions": 0,
+        "unresolved": 0
+      },
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 1
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 2,
+          "matched": 2,
+          "reference": 2
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 2
+        },
+        "stance": {
+          "agree": 4,
+          "total": 4
+        },
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "C07_similar_wording_opposite_claims",
+      "checks": {
+        "candidate_created": true,
+        "deterministic_given_output": true,
+        "extraction_score_perfect": true,
+        "generation_writes_nothing": true,
+        "no_authority_fields": true,
+        "nothing_untraceable": true,
+        "provenance_bound": true,
+        "relations_reproduce_reference": true
+      },
+      "kind": "faithful",
+      "minorities": [],
+      "relations": {
+        "agreement": 0,
+        "disagreement": 1,
+        "unknown_positions": 0,
+        "unresolved": 1
+      },
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 1
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 1,
+          "matched": 1,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 2
+        },
+        "stance": {
+          "agree": 2,
+          "total": 2
+        },
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "C08_two_to_one_minority",
+      "checks": {
+        "candidate_created": true,
+        "deterministic_given_output": true,
+        "extraction_score_perfect": true,
+        "generation_writes_nothing": true,
+        "no_authority_fields": true,
+        "nothing_untraceable": true,
+        "provenance_bound": true,
+        "relations_reproduce_reference": true
+      },
+      "kind": "faithful",
+      "minorities": [
+        [
+          "R3"
+        ]
+      ],
+      "relations": {
+        "agreement": 0,
+        "disagreement": 1,
+        "unknown_positions": 1,
+        "unresolved": 1
+      },
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 1
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 2,
+          "matched": 2,
+          "reference": 2
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 3
+        },
+        "stance": {
+          "agree": 6,
+          "total": 6
+        },
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "C09_unsupported_assertion",
+      "checks": {
+        "candidate_created": true,
+        "deterministic_given_output": true,
+        "extraction_score_perfect": true,
+        "generation_writes_nothing": true,
+        "no_authority_fields": true,
+        "nothing_untraceable": true,
+        "provenance_bound": true,
+        "relations_reproduce_reference": true
+      },
+      "kind": "faithful",
+      "minorities": [],
+      "relations": {
+        "agreement": 0,
+        "disagreement": 0,
+        "unknown_positions": 0,
+        "unresolved": 0
+      },
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 2,
+          "matched": 2,
+          "reference": 2
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 1
+        },
+        "stance": {
+          "agree": 4,
+          "total": 4
+        },
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "C10_incomplete_coverage_excluded_receipt",
+      "checks": {
+        "candidate_created": true,
+        "deterministic_given_output": true,
+        "extraction_score_perfect": true,
+        "generation_writes_nothing": true,
+        "no_authority_fields": true,
+        "nothing_untraceable": true,
+        "provenance_bound": true,
+        "relations_reproduce_reference": true
+      },
+      "kind": "faithful",
+      "minorities": [],
+      "relations": {
+        "agreement": 0,
+        "disagreement": 1,
+        "unknown_positions": 0,
+        "unresolved": 1
+      },
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 1
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 1,
+          "matched": 1,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 2
+        },
+        "stance": {
+          "agree": 2,
+          "total": 2
+        },
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "C11_legitimately_unclassifiable",
+      "checks": {
+        "candidate_created": true,
+        "deterministic_given_output": true,
+        "extraction_score_perfect": true,
+        "generation_writes_nothing": true,
+        "no_authority_fields": true,
+        "nothing_untraceable": true,
+        "provenance_bound": true,
+        "relations_reproduce_reference": true
+      },
+      "kind": "faithful",
+      "minorities": [],
+      "relations": {
+        "agreement": 0,
+        "disagreement": 0,
+        "unknown_positions": 2,
+        "unresolved": 0
+      },
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 1,
+          "matched": 1,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 1
+        },
+        "stance": {
+          "agree": 2,
+          "total": 2
+        },
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "C12_one_perspective_two_models_identical_text",
+      "checks": {
+        "candidate_created": true,
+        "deterministic_given_output": true,
+        "extraction_score_perfect": true,
+        "generation_writes_nothing": true,
+        "no_authority_fields": true,
+        "nothing_untraceable": true,
+        "provenance_bound": true,
+        "relations_reproduce_reference": true
+      },
+      "kind": "faithful",
+      "minorities": [],
+      "relations": {
+        "agreement": 1,
+        "disagreement": 0,
+        "unknown_positions": 0,
+        "unresolved": 0
+      },
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 1
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 1,
+          "matched": 1,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 2
+        },
+        "stance": {
+          "agree": 2,
+          "total": 2
+        },
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "C13_overlapping_evidence_changed_highlight",
+      "checks": {
+        "candidate_created": true,
+        "deterministic_given_output": true,
+        "extraction_score_perfect": true,
+        "generation_writes_nothing": true,
+        "no_authority_fields": true,
+        "nothing_untraceable": true,
+        "provenance_bound": true,
+        "relations_reproduce_reference": true
+      },
+      "kind": "faithful",
+      "minorities": [],
+      "relations": {
+        "agreement": 0,
+        "disagreement": 0,
+        "unknown_positions": 0,
+        "unresolved": 0
+      },
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 3,
+          "matched": 3,
+          "reference": 3
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 4
+        },
+        "stance": {
+          "agree": 6,
+          "total": 6
+        },
+        "unknown_preserved": true,
+        "untraceable": {}
+      }
+    },
+    {
+      "case_id": "N1_question_mismatch",
+      "checks": {
+        "no_model_call": true,
+        "refused_as_layer1": true
+      },
+      "code": "QUESTION_MISMATCH",
+      "kind": "layer1_refusal"
+    },
+    {
+      "case_id": "N2_legacy_without_receipt_table",
+      "checks": {
+        "no_model_call": true,
+        "refused_as_layer1": true
+      },
+      "code": "INELIGIBLE_RECEIPT",
+      "kind": "layer1_refusal"
+    },
+    {
+      "base_case": "C01_same_conclusion_same_evidence",
+      "case_id": "ADV1_manufactured_assumption",
+      "checks": {
+        "candidate_created": true,
+        "generation_writes_nothing": true,
+        "governance_as_frozen": true,
+        "no_authority_fields": true,
+        "score_as_frozen": true
+      },
+      "kind": "adversarial",
+      "outcome": {
+        "score": {
+          "agreement": {
+            "fn": 0,
+            "fp": 0,
+            "tp": 1
+          },
+          "assumptions": {
+            "fn": 0,
+            "fp": 1,
+            "tp": 0
+          },
+          "disagreement": {
+            "fn": 0,
+            "fp": 0,
+            "tp": 0
+          },
+          "minority_preserved": true,
+          "propositions": {
+            "candidate": 1,
+            "matched": 1,
+            "reference": 1
+          },
+          "reliance": {
+            "fn": 0,
+            "fp": 0,
+            "tp": 2
+          },
+          "stance": {
+            "agree": 2,
+            "total": 2
+          },
+          "unknown_preserved": true,
+          "untraceable": {
+            "untraceable_assumption": 1
+          }
+        },
+        "untraceable": {
+          "untraceable_assumption": 1
+        }
+      },
+      "temptation": "manufacture an assumption"
+    },
+    {
+      "base_case": "C13_overlapping_evidence_changed_highlight",
+      "case_id": "ADV2_reliance_inferred_from_supply",
+      "checks": {
+        "candidate_created": true,
+        "generation_writes_nothing": true,
+        "governance_as_frozen": true,
+        "no_authority_fields": true,
+        "score_as_frozen": true
+      },
+      "kind": "adversarial",
+      "outcome": {
+        "score": {
+          "agreement": {
+            "fn": 0,
+            "fp": 0,
+            "tp": 0
+          },
+          "assumptions": {
+            "fn": 0,
+            "fp": 0,
+            "tp": 0
+          },
+          "disagreement": {
+            "fn": 0,
+            "fp": 0,
+            "tp": 0
+          },
+          "minority_preserved": true,
+          "propositions": {
+            "candidate": 3,
+            "matched": 3,
+            "reference": 3
+          },
+          "reliance": {
+            "fn": 0,
+            "fp": 5,
+            "tp": 4
+          },
+          "stance": {
+            "agree": 6,
+            "total": 6
+          },
+          "unknown_preserved": true,
+          "untraceable": {
+            "reliance_outside_supplied_scope": 1
+          }
+        },
+        "untraceable": {
+          "reliance_outside_supplied_scope": 1
+        }
+      },
+      "temptation": "infer reliance merely because evidence was supplied"
+    },
+    {
+      "base_case": "C06_wording_only_difference",
+      "case_id": "ADV3_paraphrase_called_disagreement",
+      "checks": {
+        "candidate_created": true,
+        "generation_writes_nothing": true,
+        "governance_as_frozen": true,
+        "no_authority_fields": true,
+        "score_as_frozen": true
+      },
+      "kind": "adversarial",
+      "outcome": {
+        "score": {
+          "agreement": {
+            "fn": 1,
+            "fp": 0,
+            "tp": 0
+          },
+          "assumptions": {
+            "fn": 0,
+            "fp": 0,
+            "tp": 0
+          },
+          "disagreement": {
+            "fn": 0,
+            "fp": 1,
+            "tp": 0
+          },
+          "minority_preserved": true,
+          "propositions": {
+            "candidate": 1,
+            "matched": 1,
+            "reference": 2
+          },
+          "reliance": {
+            "fn": 0,
+            "fp": 0,
+            "tp": 2
+          },
+          "stance": {
+            "agree": 1,
+            "total": 2
+          },
+          "unknown_preserved": true,
+          "untraceable": {}
+        },
+        "untraceable": {}
+      },
+      "temptation": "call a paraphrase (with a surface negation) a disagreement"
+    },
+    {
+      "base_case": "C08_two_to_one_minority",
+      "case_id": "ADV4a_minority_erased_by_absence",
+      "checks": {
+        "candidate_created": true,
+        "generation_writes_nothing": true,
+        "governance_as_frozen": true,
+        "no_authority_fields": true,
+        "score_as_frozen": true
+      },
+      "kind": "adversarial",
+      "outcome": {
+        "score": {
+          "agreement": {
+            "fn": 0,
+            "fp": 1,
+            "tp": 0
+          },
+          "assumptions": {
+            "fn": 0,
+            "fp": 0,
+            "tp": 0
+          },
+          "disagreement": {
+            "fn": 1,
+            "fp": 0,
+            "tp": 0
+          },
+          "minority_preserved": false,
+          "propositions": {
+            "candidate": 1,
+            "matched": 1,
+            "reference": 2
+          },
+          "reliance": {
+            "fn": 1,
+            "fp": 0,
+            "tp": 2
+          },
+          "stance": {
+            "agree": 2,
+            "total": 3
+          },
+          "unknown_preserved": false,
+          "untraceable": {}
+        },
+        "untraceable": {}
+      },
+      "temptation": "erase a 1-vs-2 minority by classifying the dissenter as silent"
+    },
+    {
+      "base_case": "C08_two_to_one_minority",
+      "case_id": "ADV4b_minority_erased_by_omission",
+      "checks": {
+        "candidate_created": true,
+        "generation_writes_nothing": true,
+        "governance_as_frozen": true,
+        "no_authority_fields": true,
+        "score_as_frozen": true
+      },
+      "kind": "adversarial",
+      "outcome": {
+        "score": {
+          "agreement": {
+            "fn": 0,
+            "fp": 1,
+            "tp": 0
+          },
+          "assumptions": {
+            "fn": 0,
+            "fp": 0,
+            "tp": 0
+          },
+          "disagreement": {
+            "fn": 1,
+            "fp": 0,
+            "tp": 0
+          },
+          "minority_preserved": false,
+          "propositions": {
+            "candidate": 2,
+            "matched": 2,
+            "reference": 2
+          },
+          "reliance": {
+            "fn": 1,
+            "fp": 0,
+            "tp": 2
+          },
+          "stance": {
+            "agree": 3,
+            "total": 6
+          },
+          "unknown_preserved": true,
+          "untraceable": {
+            "position_not_classified": 3
+          }
+        },
+        "untraceable": {
+          "position_not_classified": 3
+        }
+      },
+      "temptation": "erase a 1-vs-2 minority by omitting the dissenter"
+    },
+    {
+      "base_case": "C08_two_to_one_minority",
+      "case_id": "ADV5a_majority_as_truth",
+      "checks": {
+        "generation_writes_nothing": true,
+        "refused_as_frozen": true
+      },
+      "kind": "adversarial",
+      "outcome": {
+        "refused": "EXTRACTION_OUTPUT_AUTHORITY_FIELD"
+      },
+      "temptation": "turn the 2-to-1 majority into truth"
+    },
+    {
+      "base_case": "C08_two_to_one_minority",
+      "case_id": "ADV5b_truth_flag_nested",
+      "checks": {
+        "generation_writes_nothing": true,
+        "refused_as_frozen": true
+      },
+      "kind": "adversarial",
+      "outcome": {
+        "refused": "EXTRACTION_OUTPUT_AUTHORITY_FIELD"
+      },
+      "temptation": "mark the majority position as true inside a position"
+    },
+    {
+      "base_case": "C03_different_conclusions_same_evidence",
+      "case_id": "ADV6_wrong_participant_attribution",
+      "checks": {
+        "candidate_created": true,
+        "generation_writes_nothing": true,
+        "governance_as_frozen": true,
+        "no_authority_fields": true,
+        "score_as_frozen": true
+      },
+      "kind": "adversarial",
+      "outcome": {
+        "score": {
+          "agreement": {
+            "fn": 0,
+            "fp": 0,
+            "tp": 0
+          },
+          "assumptions": {
+            "fn": 0,
+            "fp": 0,
+            "tp": 0
+          },
+          "disagreement": {
+            "fn": 1,
+            "fp": 0,
+            "tp": 0
+          },
+          "minority_preserved": true,
+          "propositions": {
+            "candidate": 0,
+            "matched": 0,
+            "reference": 1
+          },
+          "reliance": {
+            "fn": 0,
+            "fp": 0,
+            "tp": 0
+          },
+          "stance": {
+            "agree": 0,
+            "total": 0
+          },
+          "unknown_preserved": true,
+          "untraceable": {
+            "untraceable_position": 2,
+            "untraceable_proposition": 1
+          }
+        },
+        "untraceable": {
+          "untraceable_position": 2,
+          "untraceable_proposition": 1
+        }
+      },
+      "temptation": "attribute each claim to the wrong participant"
+    },
+    {
+      "base_case": "C01_same_conclusion_same_evidence",
+      "case_id": "ADV7_unparseable_output",
+      "checks": {
+        "generation_writes_nothing": true,
+        "refused_as_frozen": true
+      },
+      "kind": "adversarial",
+      "outcome": {
+        "refused": "EXTRACTION_OUTPUT_UNPARSEABLE"
+      },
+      "temptation": "answer in prose instead of the contract"
+    },
+    {
+      "base_case": "C01_same_conclusion_same_evidence",
+      "case_id": "ADV8_invented_stance",
+      "checks": {
+        "generation_writes_nothing": true,
+        "refused_as_frozen": true
+      },
+      "kind": "adversarial",
+      "outcome": {
+        "refused": "EXTRACTION_OUTPUT_CONTRACT_VIOLATION"
+      },
+      "temptation": "invent a stance outside the contract"
+    },
+    {
+      "checks": {
+        "expected_accept": true,
+        "expected_accepted_equals_candidate": true,
+        "expected_lineage_authorship": true,
+        "expected_records": true,
+        "expected_repeat": true,
+        "expected_restored_bytes_identical": true,
+        "expected_verify": true,
+        "no_authority_fields": true,
+        "restored_verify_equals_source": true
+      },
+      "kind": "acceptance",
+      "observed": {
+        "accept": {
+          "status": 201
+        },
+        "accepted_equals_candidate": true,
+        "accepted_relations": {
+          "agreement": 0,
+          "disagreement": 1
+        },
+        "candidate_relations": {
+          "agreement": 0,
+          "disagreement": 1
+        },
+        "get_status": 200,
+        "governing_question_status": "absent",
+        "lineage_authorship": "accepted_model",
+        "lineage_visible": true,
+        "no_authority_fields": true,
+        "records": 1,
+        "repeat": {
+          "same_record": true,
+          "status": 200
+        },
+        "restored_bytes_identical": true,
+        "restored_verify": {
+          "candidate_replay": "verified",
+          "layer1_replay": "verified",
+          "model_output": "preserved_not_replayed",
+          "receipt_closure": "verified",
+          "record_integrity": "valid"
+        },
+        "verify": {
+          "candidate_replay": "verified",
+          "layer1_replay": "verified",
+          "model_output": "preserved_not_replayed",
+          "receipt_closure": "verified",
+          "record_integrity": "valid"
+        }
+      },
+      "scenario_id": "ACC1_accept_exact_then_export_restore"
+    },
+    {
+      "checks": {
+        "expected_accept": true,
+        "expected_accepted_relations": true,
+        "expected_candidate_relations": true,
+        "expected_lineage_authorship": true,
+        "expected_records": true,
+        "expected_verify": true,
+        "no_authority_fields": true
+      },
+      "kind": "acceptance",
+      "observed": {
+        "accept": {
+          "status": 201
+        },
+        "accepted_equals_candidate": false,
+        "accepted_relations": {
+          "agreement": 1,
+          "disagreement": 0
+        },
+        "candidate_relations": {
+          "agreement": 0,
+          "disagreement": 1
+        },
+        "get_status": 200,
+        "governing_question_status": "absent",
+        "lineage_authorship": "human",
+        "lineage_visible": true,
+        "no_authority_fields": true,
+        "records": 1,
+        "verify": {
+          "candidate_replay": "verified",
+          "layer1_replay": "verified",
+          "model_output": "preserved_not_replayed",
+          "receipt_closure": "verified",
+          "record_integrity": "valid"
+        }
+      },
+      "scenario_id": "ACC2_edit_repairs_paraphrase_disagreement"
+    },
+    {
+      "checks": {
+        "expected_accept": true,
+        "expected_discard": true,
+        "expected_records": true
+      },
+      "kind": "acceptance",
+      "observed": {
+        "accept": {
+          "code": "UNKNOWN_CANDIDATE",
+          "status": 404
+        },
+        "discard": {
+          "status": 200
+        },
+        "governing_question_status": "absent",
+        "records": 0
+      },
+      "scenario_id": "ACC3_discard_creates_nothing"
+    },
+    {
+      "checks": {
+        "expected_accept": true,
+        "expected_governing_question_status": true,
+        "expected_records": true
+      },
+      "kind": "acceptance",
+      "observed": {
+        "accept": {
+          "code": "STALE_CANDIDATE",
+          "status": 409
+        },
+        "governing_question_status": "captured",
+        "records": 0
+      },
+      "scenario_id": "ACC4_stale_governing_question"
+    },
+    {
+      "checks": {
+        "expected_accept": true,
+        "expected_governing_question_status": true,
+        "expected_records": true
+      },
+      "kind": "acceptance",
+      "observed": {
+        "accept": {
+          "code": "STALE_CANDIDATE",
+          "status": 409
+        },
+        "governing_question_status": "absent",
+        "records": 0
+      },
+      "scenario_id": "ACC5_stale_participant_excluded"
+    },
+    {
+      "checks": {
+        "expected_accept": true,
+        "expected_records": true
+      },
+      "kind": "acceptance",
+      "observed": {
+        "accept": {
+          "code": "CANDIDATE_MISMATCH",
+          "status": 409
+        },
+        "governing_question_status": "absent",
+        "records": 0
+      },
+      "scenario_id": "ACC6_candidate_mismatch"
+    },
+    {
+      "checks": {
+        "expected_accept": true,
+        "expected_records": true
+      },
+      "kind": "acceptance",
+      "observed": {
+        "accept": {
+          "code": "STRUCTURE_UNTRACEABLE",
+          "status": 422
+        },
+        "governing_question_status": "absent",
+        "records": 0
+      },
+      "scenario_id": "ACC7_untraceable_edit_refused"
+    },
+    {
+      "checks": {
+        "expected_accept": true,
+        "expected_records": true
+      },
+      "kind": "acceptance",
+      "observed": {
+        "accept": {
+          "code": "STRUCTURE_INVALID",
+          "status": 422
+        },
+        "governing_question_status": "absent",
+        "records": 0
+      },
+      "scenario_id": "ACC8_authority_field_in_edit_refused"
+    },
+    {
+      "checks": {
+        "expected_accept": true,
+        "expected_get_status": true,
+        "expected_lineage_visible": true,
+        "expected_records": true,
+        "expected_restored_bytes_identical": true,
+        "expected_verify": true,
+        "no_authority_fields": true,
+        "restored_verify_equals_source": true
+      },
+      "kind": "acceptance",
+      "observed": {
+        "accept": {
+          "status": 201
+        },
+        "accepted_equals_candidate": true,
+        "accepted_relations": {
+          "agreement": 1,
+          "disagreement": 0
+        },
+        "candidate_relations": {
+          "agreement": 1,
+          "disagreement": 0
+        },
+        "get_status": 404,
+        "governing_question_status": "absent",
+        "lineage_visible": false,
+        "no_authority_fields": true,
+        "records": 1,
+        "restored_bytes_identical": true,
+        "restored_verify": {
+          "candidate_replay": "verified",
+          "layer1_replay": "participants_not_eligible",
+          "model_output": "preserved_not_replayed",
+          "receipt_closure": "verified",
+          "record_integrity": "valid"
+        },
+        "verify": {
+          "candidate_replay": "verified",
+          "layer1_replay": "participants_not_eligible",
+          "model_output": "preserved_not_replayed",
+          "receipt_closure": "verified",
+          "record_integrity": "valid"
+        }
+      },
+      "scenario_id": "ACC9_excluded_after_acceptance"
+    }
+  ],
+  "schema": "hermeneia.perspective-comparison-candidate-lab-results/v1"
+}

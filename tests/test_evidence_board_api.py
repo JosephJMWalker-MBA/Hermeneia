@@ -315,4 +315,4 @@ def test_evidence_board_selected_highlights_feed_existing_scope_resolver(tmp_pat
         "Uncategorized marked passage.",
     ]
     assert _counts(db_path)["reader_highlights"] == 4
-    assert SCHEMA_VERSION == 19
+    assert SCHEMA_VERSION == 20

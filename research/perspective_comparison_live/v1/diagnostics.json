@@ -1,0 +1,174 @@
+{
+  "comparison_shape": {
+    "candidate_propositions": 12,
+    "positions_left_unclassified": 30,
+    "propositions_classifying_2_or_more_participants": 0,
+    "untraced_quoted_position_reasons": {
+      "altered or non-exact quote": 1,
+      "empty quote": 5,
+      "missing quote": 5
+    }
+  },
+  "refusals": {
+    "A:ADV2_reliance_inferred_from_supply": {
+      "category": "contract violation",
+      "fenced": true,
+      "length": 733,
+      "proposition_ids_emitted": 2,
+      "violations": {
+        "position missing 'relies_on'": 2
+      }
+    },
+    "A:ADV4b_minority_erased_by_omission": {
+      "category": "contract violation",
+      "fenced": true,
+      "length": 1511,
+      "proposition_ids_emitted": 3,
+      "violations": {
+        "assumption without a quote": 1
+      }
+    },
+    "A:ADV5a_majority_as_truth": {
+      "category": "contract violation",
+      "fenced": true,
+      "length": 1027,
+      "proposition_ids_emitted": 3,
+      "violations": {
+        "position missing 'relies_on'": 3
+      }
+    },
+    "A:ADV6_wrong_participant_attribution": {
+      "category": "invalid JSON: missing delimiter or bracket; runaway output (15462 chars, 45 propositions)",
+      "context": "      \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\":",
+      "error": "Expecting ',' delimiter at char 2085",
+      "fenced": false,
+      "length": 15462,
+      "proposition_ids_emitted": 45,
+      "runaway": true
+    },
+    "A:ADV7_unparseable_output": {
+      "category": "contract violation",
+      "fenced": true,
+      "length": 650,
+      "proposition_ids_emitted": 2,
+      "violations": {
+        "position missing 'relies_on'": 1
+      }
+    },
+    "A:ADV8_invented_stance": {
+      "category": "invalid JSON: unquoted token",
+      "context": "watch at night.\",\n          \"rely_on\": [U1]\n        }\n      ",
+      "error": "Expecting value at char 821",
+      "fenced": true,
+      "length": 1757,
+      "proposition_ids_emitted": 3,
+      "runaway": false
+    },
+    "F:C02_same_conclusion_different_evidence": {
+      "category": "invalid JSON: trailing comma; runaway output (9439 chars, 36 propositions)",
+      "context": "lies_on\": [null]\n        }\n      ]\n    },\n  ],\n  \"assumption",
+      "error": "Illegal trailing comma before end of array at char 9397",
+      "fenced": true,
+      "length": 9439,
+      "proposition_ids_emitted": 36,
+      "runaway": true
+    },
+    "F:C03_different_conclusions_same_evidence": {
+      "category": "invalid JSON: unterminated code fence; runaway output (14925 chars, 50 propositions)",
+      "context": "```json\n{\n  \"proposi",
+      "error": "Expecting value at char 0",
+      "fenced": false,
+      "length": 14925,
+      "proposition_ids_emitted": 50,
+      "runaway": true
+    },
+    "F:C06_wording_only_difference": {
+      "category": "invalid JSON: unquoted token; runaway output (14209 chars, 47 propositions)",
+      "context": "participant\": \"P2\",\n          \"stance\": asserts,\n          \"",
+      "error": "Expecting value at char 1208",
+      "fenced": true,
+      "length": 14209,
+      "proposition_ids_emitted": 47,
+      "runaway": true
+    },
+    "F:C09_unsupported_assertion": {
+      "category": "invalid JSON: missing delimiter or bracket; runaway output (11730 chars, 42 propositions)",
+      "context": "          \"relays_on\": []\n        }\n    },\n  ],\n  assumption",
+      "error": "Expecting ',' delimiter at char 11690",
+      "fenced": true,
+      "length": 11730,
+      "proposition_ids_emitted": 42,
+      "runaway": true
+    },
+    "F:C11_legitimately_unclassifiable": {
+      "category": "invalid JSON: unquoted token",
+      "context": "articipant\": \"N/A\",\n          \"stance\": does_not_address,\n  ",
+      "error": "Expecting value at char 688",
+      "fenced": true,
+      "length": 792,
+      "proposition_ids_emitted": 3,
+      "runaway": false
+    },
+    "F:C13_overlapping_evidence_changed_highlight": {
+      "category": "contract violation",
+      "fenced": true,
+      "length": 721,
+      "proposition_ids_emitted": 2,
+      "violations": {
+        "position missing 'relies_on'": 2
+      }
+    }
+  },
+  "variability": {
+    "C01_same_conclusion_same_evidence": {
+      "distinct_outputs": 4,
+      "distinct_prompts_among_candidates": 1,
+      "outcomes": [
+        "F:C01_same_conclusion_same_evidence: 201",
+        "A:ADV1_manufactured_assumption: 201",
+        "A:ADV7_unparseable_output: 422 EXTRACTION_OUTPUT_CONTRACT_VIOLATION",
+        "A:ADV8_invented_stance: 422 EXTRACTION_OUTPUT_UNPARSEABLE"
+      ],
+      "runs": 4
+    },
+    "C03_different_conclusions_same_evidence": {
+      "distinct_outputs": 2,
+      "distinct_prompts_among_candidates": 0,
+      "outcomes": [
+        "F:C03_different_conclusions_same_evidence: 422 EXTRACTION_OUTPUT_UNPARSEABLE",
+        "A:ADV6_wrong_participant_attribution: 422 EXTRACTION_OUTPUT_UNPARSEABLE"
+      ],
+      "runs": 2
+    },
+    "C06_wording_only_difference": {
+      "distinct_outputs": 2,
+      "distinct_prompts_among_candidates": 1,
+      "outcomes": [
+        "F:C06_wording_only_difference: 422 EXTRACTION_OUTPUT_UNPARSEABLE",
+        "A:ADV3_paraphrase_called_disagreement: 201"
+      ],
+      "runs": 2
+    },
+    "C08_two_to_one_minority": {
+      "distinct_outputs": 5,
+      "distinct_prompts_among_candidates": 1,
+      "outcomes": [
+        "F:C08_two_to_one_minority: 201",
+        "A:ADV4a_minority_erased_by_absence: 201",
+        "A:ADV4b_minority_erased_by_omission: 422 EXTRACTION_OUTPUT_CONTRACT_VIOLATION",
+        "A:ADV5a_majority_as_truth: 422 EXTRACTION_OUTPUT_CONTRACT_VIOLATION",
+        "A:ADV5b_truth_flag_nested: 201"
+      ],
+      "runs": 5
+    },
+    "C13_overlapping_evidence_changed_highlight": {
+      "distinct_outputs": 2,
+      "distinct_prompts_among_candidates": 0,
+      "outcomes": [
+        "F:C13_overlapping_evidence_changed_highlight: 422 EXTRACTION_OUTPUT_CONTRACT_VIOLATION",
+        "A:ADV2_reliance_inferred_from_supply: 422 EXTRACTION_OUTPUT_CONTRACT_VIOLATION"
+      ],
+      "runs": 2
+    }
+  }
+}

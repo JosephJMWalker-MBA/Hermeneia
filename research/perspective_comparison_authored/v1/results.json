@@ -1,0 +1,834 @@
+{
+  "aggregate": {
+    "authored_reference": {
+      "all_checks_passed": 13,
+      "items": 13
+    },
+    "demonstration": {
+      "all_checks_passed": 2,
+      "items": 2
+    },
+    "exclusion": {
+      "all_checks_passed": 1,
+      "items": 1
+    },
+    "gate": {
+      "all_checks_passed": 1,
+      "items": 1
+    },
+    "refusal": {
+      "all_checks_passed": 6,
+      "items": 6
+    }
+  },
+  "contract": "docs/design/perspective-comparison-p7-disposition.md §6",
+  "method": "disposable synthetic workspaces through production write boundaries; default app configuration (semantic extraction disabled); no model call; frozen references authored directly",
+  "records": [
+    {
+      "checks": {
+        "append_only": true,
+        "basis_read_only_no_store": true,
+        "export_restore_exact": true,
+        "independent_verification": true,
+        "lineage_human_steward_authored": true,
+        "no_authority_fields": true,
+        "p1_p2_p6_unchanged": true,
+        "recorded_as_steward_authored": true,
+        "relations_reproduce_frozen_reference": true,
+        "resubmission_returns_same_record": true,
+        "stored_bytes_canonical": true
+      },
+      "item": "C01_same_conclusion_same_evidence",
+      "kind": "authored_reference",
+      "relations": {
+        "agreement": [
+          [
+            "W",
+            "asserts",
+            [
+              "R1",
+              "R2"
+            ],
+            "identical"
+          ]
+        ],
+        "assumptions": [],
+        "disagreement": [],
+        "evidence_use": {
+          "R1": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          },
+          "R2": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          }
+        },
+        "unknown_positions": []
+      }
+    },
+    {
+      "checks": {
+        "append_only": true,
+        "basis_read_only_no_store": true,
+        "export_restore_exact": true,
+        "independent_verification": true,
+        "lineage_human_steward_authored": true,
+        "no_authority_fields": true,
+        "p1_p2_p6_unchanged": true,
+        "recorded_as_steward_authored": true,
+        "relations_reproduce_frozen_reference": true,
+        "resubmission_returns_same_record": true,
+        "stored_bytes_canonical": true
+      },
+      "item": "C02_same_conclusion_different_evidence",
+      "kind": "authored_reference",
+      "relations": {
+        "agreement": [
+          [
+            "W",
+            "asserts",
+            [
+              "R1",
+              "R2"
+            ],
+            "disjoint"
+          ]
+        ],
+        "assumptions": [],
+        "disagreement": [],
+        "evidence_use": {
+          "R1": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          },
+          "R2": {
+            "relied_on": [
+              "A:5"
+            ],
+            "supplied_not_relied_on": []
+          }
+        },
+        "unknown_positions": []
+      }
+    },
+    {
+      "checks": {
+        "append_only": true,
+        "basis_read_only_no_store": true,
+        "export_restore_exact": true,
+        "independent_verification": true,
+        "lineage_human_steward_authored": true,
+        "no_authority_fields": true,
+        "p1_p2_p6_unchanged": true,
+        "recorded_as_steward_authored": true,
+        "relations_reproduce_frozen_reference": true,
+        "resubmission_returns_same_record": true,
+        "stored_bytes_canonical": true
+      },
+      "item": "C03_different_conclusions_same_evidence",
+      "kind": "authored_reference",
+      "relations": {
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [
+          [
+            "W",
+            [
+              {
+                "participants": [
+                  "R1"
+                ],
+                "stance": "asserts"
+              },
+              {
+                "participants": [
+                  "R2"
+                ],
+                "stance": "denies"
+              }
+            ],
+            [],
+            "identical"
+          ]
+        ],
+        "evidence_use": {
+          "R1": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          },
+          "R2": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          }
+        },
+        "unknown_positions": []
+      }
+    },
+    {
+      "checks": {
+        "append_only": true,
+        "basis_read_only_no_store": true,
+        "export_restore_exact": true,
+        "independent_verification": true,
+        "lineage_human_steward_authored": true,
+        "no_authority_fields": true,
+        "p1_p2_p6_unchanged": true,
+        "recorded_as_steward_authored": true,
+        "relations_reproduce_frozen_reference": true,
+        "resubmission_returns_same_record": true,
+        "stored_bytes_canonical": true
+      },
+      "item": "C04_different_conclusions_different_evidence",
+      "kind": "authored_reference",
+      "relations": {
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [
+          [
+            "W",
+            [
+              {
+                "participants": [
+                  "R1"
+                ],
+                "stance": "asserts"
+              },
+              {
+                "participants": [
+                  "R2"
+                ],
+                "stance": "denies"
+              }
+            ],
+            [],
+            "disjoint"
+          ]
+        ],
+        "evidence_use": {
+          "R1": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          },
+          "R2": {
+            "relied_on": [
+              "A:6"
+            ],
+            "supplied_not_relied_on": []
+          }
+        },
+        "unknown_positions": []
+      }
+    },
+    {
+      "checks": {
+        "append_only": true,
+        "basis_read_only_no_store": true,
+        "export_restore_exact": true,
+        "independent_verification": true,
+        "lineage_human_steward_authored": true,
+        "no_authority_fields": true,
+        "p1_p2_p6_unchanged": true,
+        "recorded_as_steward_authored": true,
+        "relations_reproduce_frozen_reference": true,
+        "resubmission_returns_same_record": true,
+        "stored_bytes_canonical": true
+      },
+      "item": "C05_assumption_difference",
+      "kind": "authored_reference",
+      "relations": {
+        "agreement": [],
+        "assumptions": [
+          "R1",
+          "R2"
+        ],
+        "disagreement": [],
+        "evidence_use": {
+          "R1": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": [
+              "A:2",
+              "A:3",
+              "A:4",
+              "A:5",
+              "A:6"
+            ]
+          },
+          "R2": {
+            "relied_on": [
+              "A:1",
+              "A:4"
+            ],
+            "supplied_not_relied_on": [
+              "A:2",
+              "A:3",
+              "A:5",
+              "A:6"
+            ]
+          }
+        },
+        "unknown_positions": []
+      }
+    },
+    {
+      "checks": {
+        "append_only": true,
+        "basis_read_only_no_store": true,
+        "export_restore_exact": true,
+        "independent_verification": true,
+        "lineage_human_steward_authored": true,
+        "no_authority_fields": true,
+        "p1_p2_p6_unchanged": true,
+        "recorded_as_steward_authored": true,
+        "relations_reproduce_frozen_reference": true,
+        "resubmission_returns_same_record": true,
+        "stored_bytes_canonical": true
+      },
+      "item": "C06_wording_only_difference",
+      "kind": "authored_reference",
+      "relations": {
+        "agreement": [
+          [
+            "W",
+            "asserts",
+            [
+              "R1",
+              "R2"
+            ],
+            "identical"
+          ]
+        ],
+        "assumptions": [],
+        "disagreement": [],
+        "evidence_use": {
+          "R1": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          },
+          "R2": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          }
+        },
+        "unknown_positions": []
+      }
+    },
+    {
+      "checks": {
+        "append_only": true,
+        "basis_read_only_no_store": true,
+        "export_restore_exact": true,
+        "independent_verification": true,
+        "lineage_human_steward_authored": true,
+        "no_authority_fields": true,
+        "p1_p2_p6_unchanged": true,
+        "recorded_as_steward_authored": true,
+        "relations_reproduce_frozen_reference": true,
+        "resubmission_returns_same_record": true,
+        "stored_bytes_canonical": true
+      },
+      "item": "C07_similar_wording_opposite_claims",
+      "kind": "authored_reference",
+      "relations": {
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [
+          [
+            "SAFE",
+            [
+              {
+                "participants": [
+                  "R1"
+                ],
+                "stance": "asserts"
+              },
+              {
+                "participants": [
+                  "R2"
+                ],
+                "stance": "denies"
+              }
+            ],
+            [],
+            "identical"
+          ]
+        ],
+        "evidence_use": {
+          "R1": {
+            "relied_on": [
+              "A:4"
+            ],
+            "supplied_not_relied_on": []
+          },
+          "R2": {
+            "relied_on": [
+              "A:4"
+            ],
+            "supplied_not_relied_on": []
+          }
+        },
+        "unknown_positions": []
+      }
+    },
+    {
+      "checks": {
+        "append_only": true,
+        "basis_read_only_no_store": true,
+        "export_restore_exact": true,
+        "independent_verification": true,
+        "lineage_human_steward_authored": true,
+        "no_authority_fields": true,
+        "p1_p2_p6_unchanged": true,
+        "recorded_as_steward_authored": true,
+        "relations_reproduce_frozen_reference": true,
+        "resubmission_returns_same_record": true,
+        "stored_bytes_canonical": true
+      },
+      "item": "C08_two_to_one_minority",
+      "kind": "authored_reference",
+      "relations": {
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [
+          [
+            "W",
+            [
+              {
+                "participants": [
+                  "R1",
+                  "R2"
+                ],
+                "stance": "asserts"
+              },
+              {
+                "participants": [
+                  "R3"
+                ],
+                "stance": "denies"
+              }
+            ],
+            [
+              "R3"
+            ],
+            "identical"
+          ]
+        ],
+        "evidence_use": {
+          "R1": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          },
+          "R2": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          },
+          "R3": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          }
+        },
+        "unknown_positions": [
+          [
+            "FORGOT",
+            "R3",
+            "unclassifiable"
+          ]
+        ]
+      }
+    },
+    {
+      "checks": {
+        "append_only": true,
+        "basis_read_only_no_store": true,
+        "export_restore_exact": true,
+        "independent_verification": true,
+        "lineage_human_steward_authored": true,
+        "no_authority_fields": true,
+        "p1_p2_p6_unchanged": true,
+        "recorded_as_steward_authored": true,
+        "relations_reproduce_frozen_reference": true,
+        "resubmission_returns_same_record": true,
+        "stored_bytes_canonical": true
+      },
+      "item": "C09_unsupported_assertion",
+      "kind": "authored_reference",
+      "relations": {
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [],
+        "evidence_use": {
+          "R1": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          },
+          "R2": {
+            "relied_on": [],
+            "supplied_not_relied_on": [
+              "A:1"
+            ]
+          }
+        },
+        "unknown_positions": []
+      }
+    },
+    {
+      "checks": {
+        "append_only": true,
+        "basis_read_only_no_store": true,
+        "export_restore_exact": true,
+        "independent_verification": true,
+        "lineage_human_steward_authored": true,
+        "no_authority_fields": true,
+        "p1_p2_p6_unchanged": true,
+        "recorded_as_steward_authored": true,
+        "relations_reproduce_frozen_reference": true,
+        "resubmission_returns_same_record": true,
+        "stored_bytes_canonical": true
+      },
+      "item": "C10_incomplete_coverage_excluded_receipt",
+      "kind": "authored_reference",
+      "relations": {
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [
+          [
+            "W",
+            [
+              {
+                "participants": [
+                  "R1"
+                ],
+                "stance": "asserts"
+              },
+              {
+                "participants": [
+                  "R2"
+                ],
+                "stance": "denies"
+              }
+            ],
+            [],
+            "identical"
+          ]
+        ],
+        "evidence_use": {
+          "R1": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          },
+          "R2": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          }
+        },
+        "unknown_positions": []
+      }
+    },
+    {
+      "checks": {
+        "append_only": true,
+        "basis_read_only_no_store": true,
+        "export_restore_exact": true,
+        "independent_verification": true,
+        "lineage_human_steward_authored": true,
+        "no_authority_fields": true,
+        "p1_p2_p6_unchanged": true,
+        "recorded_as_steward_authored": true,
+        "relations_reproduce_frozen_reference": true,
+        "resubmission_returns_same_record": true,
+        "stored_bytes_canonical": true
+      },
+      "item": "C11_legitimately_unclassifiable",
+      "kind": "authored_reference",
+      "relations": {
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [],
+        "evidence_use": {
+          "R1": {
+            "relied_on": [
+              "A:2"
+            ],
+            "supplied_not_relied_on": []
+          },
+          "R2": {
+            "relied_on": [],
+            "supplied_not_relied_on": [
+              "A:2"
+            ]
+          }
+        },
+        "unknown_positions": [
+          [
+            "W",
+            "R1",
+            "unclassifiable"
+          ],
+          [
+            "W",
+            "R2",
+            "unclassifiable"
+          ]
+        ]
+      }
+    },
+    {
+      "checks": {
+        "append_only": true,
+        "basis_read_only_no_store": true,
+        "export_restore_exact": true,
+        "independent_verification": true,
+        "lineage_human_steward_authored": true,
+        "no_authority_fields": true,
+        "p1_p2_p6_unchanged": true,
+        "recorded_as_steward_authored": true,
+        "relations_reproduce_frozen_reference": true,
+        "resubmission_returns_same_record": true,
+        "stored_bytes_canonical": true
+      },
+      "item": "C12_one_perspective_two_models_identical_text",
+      "kind": "authored_reference",
+      "relations": {
+        "agreement": [
+          [
+            "W",
+            "asserts",
+            [
+              "R1",
+              "R2"
+            ],
+            "identical"
+          ]
+        ],
+        "assumptions": [],
+        "disagreement": [],
+        "evidence_use": {
+          "R1": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          },
+          "R2": {
+            "relied_on": [
+              "A:1"
+            ],
+            "supplied_not_relied_on": []
+          }
+        },
+        "unknown_positions": []
+      }
+    },
+    {
+      "checks": {
+        "append_only": true,
+        "basis_read_only_no_store": true,
+        "export_restore_exact": true,
+        "independent_verification": true,
+        "lineage_human_steward_authored": true,
+        "no_authority_fields": true,
+        "p1_p2_p6_unchanged": true,
+        "recorded_as_steward_authored": true,
+        "relations_reproduce_frozen_reference": true,
+        "resubmission_returns_same_record": true,
+        "stored_bytes_canonical": true
+      },
+      "item": "C13_overlapping_evidence_changed_highlight",
+      "kind": "authored_reference",
+      "relations": {
+        "agreement": [],
+        "assumptions": [],
+        "disagreement": [],
+        "evidence_use": {
+          "R1": {
+            "relied_on": [
+              "A:1",
+              "h1"
+            ],
+            "supplied_not_relied_on": []
+          },
+          "R2": {
+            "relied_on": [
+              "A:1",
+              "A:2"
+            ],
+            "supplied_not_relied_on": [
+              "A:3",
+              "A:4",
+              "A:5",
+              "A:6",
+              "h1"
+            ]
+          }
+        },
+        "unknown_positions": []
+      }
+    },
+    {
+      "checks": {
+        "explicit_unknown_kept_without_support": true,
+        "no_relation_manufactured": true,
+        "recorded": true
+      },
+      "item": "E1_explicit_unknown",
+      "kind": "demonstration",
+      "unknown_positions": [
+        [
+          "R1",
+          "unclassifiable"
+        ],
+        [
+          "R2",
+          "unknown"
+        ]
+      ]
+    },
+    {
+      "checks": {
+        "asserted_with_reliance_empty": true
+      },
+      "evidence_use_R2": {
+        "relied_on": [],
+        "supplied_not_relied_on": [
+          "A:1"
+        ]
+      },
+      "item": "E2_no_reliance_established",
+      "kind": "demonstration"
+    },
+    {
+      "checks": {
+        "nothing_recorded": true,
+        "refused_as_frozen": true
+      },
+      "item": "R1_governing_question_changed",
+      "kind": "refusal",
+      "observed": [
+        409,
+        "STALE_INPUT"
+      ]
+    },
+    {
+      "checks": {
+        "nothing_recorded": true,
+        "refused_as_frozen": true
+      },
+      "item": "R2_participant_excluded",
+      "kind": "refusal",
+      "observed": [
+        409,
+        "STALE_INPUT"
+      ]
+    },
+    {
+      "checks": {
+        "nothing_recorded": true,
+        "refused_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "item": "R3_layer1_digest_altered",
+      "kind": "refusal",
+      "observed": [
+        409,
+        "STALE_INPUT"
+      ]
+    },
+    {
+      "checks": {
+        "nothing_recorded": true,
+        "refused_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "item": "R4_untraceable_span",
+      "kind": "refusal",
+      "observed": [
+        422,
+        "STRUCTURE_UNTRACEABLE"
+      ]
+    },
+    {
+      "checks": {
+        "nothing_recorded": true,
+        "refused_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "item": "R5_authority_key",
+      "kind": "refusal",
+      "observed": [
+        422,
+        "STRUCTURE_INVALID"
+      ]
+    },
+    {
+      "checks": {
+        "nothing_recorded": true,
+        "refused_as_frozen": true,
+        "workspace_unchanged": true
+      },
+      "item": "R6_missing_position",
+      "kind": "refusal",
+      "observed": [
+        422,
+        "STRUCTURE_INVALID"
+      ]
+    },
+    {
+      "checks": {
+        "export_restore_exact": true,
+        "get_unavailable": true,
+        "lineage_omits": true,
+        "record_preserved": true,
+        "verification": true
+      },
+      "item": "X1_exclusion_after_authoring",
+      "kind": "exclusion",
+      "verification": {
+        "candidate_replay": "not_applicable",
+        "layer1_replay": "participants_not_eligible",
+        "model_output": "preserved_not_replayed",
+        "receipt_closure": "verified",
+        "record_integrity": "valid"
+      }
+    },
+    {
+      "checks": {
+        "no_model_call": true,
+        "refused": true,
+        "workspace_unchanged": true
+      },
+      "item": "G1_model_generation_disabled_by_default",
+      "kind": "gate"
+    }
+  ],
+  "schema": "hermeneia.perspective-comparison-authored-lab-results/v1"
+}

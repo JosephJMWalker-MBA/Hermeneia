@@ -232,7 +232,7 @@ def test_wbs_10_without_perspectives_restores_as_before(tmp_path: Path):
     store = SQLiteStore(dst)
     try:
         assert store.perspective_count() == 0
-        assert store._conn.execute("SELECT version FROM schema_version").fetchone()[0] == 19
+        assert store._conn.execute("SELECT version FROM schema_version").fetchone()[0] == 20
     finally:
         store.close()
 

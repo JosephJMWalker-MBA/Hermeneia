@@ -142,16 +142,20 @@ class _Fact:
         return len({_canonical(ref.get("record", ref)) for ref in self.refs})
 
 
+_TERMINAL_TABLES = frozenset({"achievement_awards", "accepted_perspective_comparisons"})
+
+
 def _fact_inputs(lineage: dict, current_state: dict) -> dict[str, _Fact]:
     """Extract bounded typed facts; Lineage alone owns eligibility/provenance."""
     coverage = lineage["coverage"]
-    # Award history is a terminal assertion, never P1/P2 prerequisite evidence.
-    # Its missing/invalid coverage must not change those history predicates.
-    missing_tables = [table for table in coverage["missing_tables"] if table != "achievement_awards"]
+    # Award history and accepted Perspective comparisons are terminal records,
+    # never P1/P2 prerequisite evidence. Their missing/invalid coverage must not
+    # change those history predicates.
+    missing_tables = [table for table in coverage["missing_tables"] if table not in _TERMINAL_TABLES]
     missing_columns = {table: value for table, value in coverage["missing_columns"].items()
-                       if table != "achievement_awards"}
+                       if table not in _TERMINAL_TABLES}
     omitted = {table: value for table, value in coverage["omitted"].items()
-               if table != "achievement_awards"}
+               if table not in _TERMINAL_TABLES}
     items = lineage["items"]
 
     def record_fact(tables, test=lambda item: True):
@@ -184,7 +188,7 @@ def _fact_inputs(lineage: dict, current_state: dict) -> dict[str, _Fact]:
         "interpretation": record_fact(("interpretations", "proposed_interpretations"), lambda i: nonblank(i, "text")),
         "blueprint": record_fact(("narrative_blueprints",)),
         "lineage": record_fact(tuple(sorted({item["record"]["table"] for item in items
-                                              if item["record"]["table"] != "achievement_awards"}))),
+                                              if item["record"]["table"] not in _TERMINAL_TABLES}))),
         "preserved_question": record_fact(("inquiry_notes",),
             lambda i: i["event"] == "recorded" and nonblank(i, "question_text")),
         "attributed_interpretation": record_fact(("interpretations",),

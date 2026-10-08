@@ -14,7 +14,7 @@ from ..perspective_identity import (
 )
 from .hashing import make_semantic_hash
 
-SCHEMA_VERSION = 19  # explicit append-only Perspective achievement awards
+SCHEMA_VERSION = 20  # explicit append-only accepted Perspective comparisons (P7 Layer 2)
 
 # Supersession triggers must be dropped and recreated whenever the canonical object
 # list grows. SQLite has no ALTER TRIGGER.
@@ -1201,6 +1201,8 @@ CREATE TABLE IF NOT EXISTS workspace_identity (
     ensure_perspective_execution_tables(conn)
     from ..achievement_awards import ensure_achievement_award_tables
     ensure_achievement_award_tables(conn)
+    from ..accepted_perspective_comparisons import ensure_accepted_comparison_tables
+    ensure_accepted_comparison_tables(conn)
     conn.commit()
 
 

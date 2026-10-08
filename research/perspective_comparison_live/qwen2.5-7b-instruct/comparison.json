@@ -1,0 +1,373 @@
+{
+  "phi4-mini \u00b7 v1": {
+    "decision_after_phi4_mini": "model_limited",
+    "governance_defects": [],
+    "metrics": {
+      "agreement": {
+        "fn": 4,
+        "fp": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "tp": 0
+      },
+      "assumptions": {
+        "fn": 2,
+        "fp": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "tp": 0
+      },
+      "claim_attribution_accuracy": 0.5217,
+      "cross_participant_invariant": {
+        "applicable": 18,
+        "holds": 0,
+        "rate": 0.0
+      },
+      "disagreement": {
+        "fn": 6,
+        "fp": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "tp": 0
+      },
+      "evidence_reliance": {
+        "fn": 7,
+        "fp": 2,
+        "precision": 0.75,
+        "recall": 0.4615,
+        "tp": 6
+      },
+      "live_runs": 23,
+      "minority_downgraded": 2,
+      "minority_lost": 1,
+      "minority_preservation": {
+        "preserved": 0,
+        "runs": 5
+      },
+      "misattributions": 0,
+      "multi_participant_proposition_rate": {
+        "multi_participant": 0,
+        "propositions": 12,
+        "rate": 0.0
+      },
+      "outcomes": {
+        "ADMITTED_BUT_WRONG_items": 7,
+        "DOWNGRADED_TO_UNKNOWN_items": 41,
+        "OMITTED_reference_propositions": 8,
+        "REFUSED_runs": 12,
+        "admitted_but_wrong_rate": 0.2917,
+        "admitted_semantic_items": 24,
+        "unmatched_candidate_claims": 4
+      },
+      "paraphrase_as_disagreement_errors": 0,
+      "provider_failures": 0,
+      "refusals_by_code": {
+        "EXTRACTION_OUTPUT_CONTRACT_VIOLATION": 5,
+        "EXTRACTION_OUTPUT_UNPARSEABLE": 7
+      },
+      "relation_recall_all_runs": {
+        "rate": 0.0,
+        "reference_relations": 18,
+        "tp": 0
+      },
+      "scored_candidates": 11,
+      "silent_minority_errors": 0,
+      "stance_accuracy": 0.3684,
+      "structural_refusal_rate": 0.5217,
+      "unknown_preservation": {
+        "preserved": 0,
+        "runs": 6
+      },
+      "untraceable_content_rate": 0.5694
+    },
+    "ready_conditions": {
+      "admitted_but_wrong_rate<=0.15": false,
+      "agreement_precision_recall>=0.80": false,
+      "claim_attribution_accuracy>=0.90": false,
+      "disagreement_precision_recall>=0.80": false,
+      "paraphrase_as_disagreement_errors==0": true,
+      "silent_minority_errors==0": true,
+      "stance_accuracy>=0.85": false,
+      "structural_refusal_rate<=0.10": false
+    },
+    "verdict": "P7 GOVERNANCE READY / EXTRACTION NOT READY"
+  },
+  "phi4-mini \u00b7 v1.1": {
+    "decision_after_phi4_mini": "model_limited",
+    "governance_defects": [],
+    "metrics": {
+      "agreement": {
+        "fn": 1,
+        "fp": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "tp": 0
+      },
+      "assumptions": {
+        "fn": 0,
+        "fp": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "tp": 0
+      },
+      "claim_attribution_accuracy": 0.2,
+      "cross_participant_invariant": {
+        "applicable": 18,
+        "holds": 1,
+        "rate": 0.0556
+      },
+      "disagreement": {
+        "fn": 0,
+        "fp": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "tp": 1
+      },
+      "evidence_reliance": {
+        "fn": 1,
+        "fp": 0,
+        "precision": 1.0,
+        "recall": 0.5,
+        "tp": 1
+      },
+      "live_runs": 23,
+      "minority_downgraded": 0,
+      "minority_lost": 0,
+      "minority_preservation": {
+        "preserved": 0,
+        "runs": 5
+      },
+      "misattributions": 0,
+      "multi_participant_proposition_rate": {
+        "multi_participant": 1,
+        "propositions": 1,
+        "rate": 1.0
+      },
+      "outcomes": {
+        "ADMITTED_BUT_WRONG_items": 0,
+        "DOWNGRADED_TO_UNKNOWN_items": 8,
+        "OMITTED_reference_propositions": 3,
+        "REFUSED_runs": 20,
+        "admitted_but_wrong_rate": 0.0,
+        "admitted_semantic_items": 3,
+        "unmatched_candidate_claims": 0
+      },
+      "paraphrase_as_disagreement_errors": 0,
+      "provider_failures": 0,
+      "refusals_by_code": {
+        "EXTRACTION_OUTPUT_CONTRACT_VIOLATION": 17,
+        "EXTRACTION_OUTPUT_UNPARSEABLE": 3
+      },
+      "relation_recall_all_runs": {
+        "rate": 0.0556,
+        "reference_relations": 18,
+        "tp": 1
+      },
+      "scored_candidates": 3,
+      "silent_minority_errors": 0,
+      "stance_accuracy": 1.0,
+      "structural_refusal_rate": 0.8696,
+      "unknown_preservation": {
+        "preserved": 0,
+        "runs": 6
+      },
+      "untraceable_content_rate": 0.5333
+    },
+    "ready_conditions": {
+      "admitted_but_wrong_rate<=0.15": true,
+      "agreement_precision_recall>=0.80": false,
+      "claim_attribution_accuracy>=0.90": false,
+      "disagreement_precision_recall>=0.80": true,
+      "paraphrase_as_disagreement_errors==0": true,
+      "silent_minority_errors==0": true,
+      "stance_accuracy>=0.85": true,
+      "structural_refusal_rate<=0.10": false
+    },
+    "verdict": "P7 GOVERNANCE READY / EXTRACTION NOT READY"
+  },
+  "qwen2.5-7b \u00b7 v1": {
+    "decision_after_phi4_mini": "model_limited",
+    "governance_defects": [],
+    "metrics": {
+      "agreement": {
+        "fn": 6,
+        "fp": 3,
+        "precision": 0.0,
+        "recall": 0.0,
+        "tp": 0
+      },
+      "assumptions": {
+        "fn": 1,
+        "fp": 14,
+        "precision": 0.0667,
+        "recall": 0.5,
+        "tp": 1
+      },
+      "claim_attribution_accuracy": 0.8125,
+      "cross_participant_invariant": {
+        "applicable": 18,
+        "holds": 5,
+        "rate": 0.2778
+      },
+      "disagreement": {
+        "fn": 5,
+        "fp": 2,
+        "precision": 0.0,
+        "recall": 0.0,
+        "tp": 0
+      },
+      "evidence_reliance": {
+        "fn": 10,
+        "fp": 9,
+        "precision": 0.7,
+        "recall": 0.6774,
+        "tp": 21
+      },
+      "live_runs": 23,
+      "minority_downgraded": 4,
+      "minority_lost": 0,
+      "minority_preservation": {
+        "preserved": 0,
+        "runs": 5
+      },
+      "misattributions": 0,
+      "multi_participant_proposition_rate": {
+        "multi_participant": 5,
+        "propositions": 21,
+        "rate": 0.2381
+      },
+      "outcomes": {
+        "ADMITTED_BUT_WRONG_items": 34,
+        "DOWNGRADED_TO_UNKNOWN_items": 25,
+        "OMITTED_reference_propositions": 10,
+        "REFUSED_runs": 7,
+        "admitted_but_wrong_rate": 0.4474,
+        "admitted_semantic_items": 76,
+        "unmatched_candidate_claims": 3
+      },
+      "paraphrase_as_disagreement_errors": 2,
+      "provider_failures": 0,
+      "refusals_by_code": {
+        "EXTRACTION_OUTPUT_CONTRACT_VIOLATION": 5,
+        "EXTRACTION_OUTPUT_UNPARSEABLE": 2
+      },
+      "relation_recall_all_runs": {
+        "rate": 0.0,
+        "reference_relations": 18,
+        "tp": 0
+      },
+      "scored_candidates": 16,
+      "silent_minority_errors": 0,
+      "stance_accuracy": 0.3953,
+      "structural_refusal_rate": 0.3043,
+      "unknown_preservation": {
+        "preserved": 0,
+        "runs": 6
+      },
+      "untraceable_content_rate": 0.2273
+    },
+    "ready_conditions": {
+      "admitted_but_wrong_rate<=0.15": false,
+      "agreement_precision_recall>=0.80": false,
+      "claim_attribution_accuracy>=0.90": false,
+      "disagreement_precision_recall>=0.80": false,
+      "paraphrase_as_disagreement_errors==0": false,
+      "silent_minority_errors==0": true,
+      "stance_accuracy>=0.85": false,
+      "structural_refusal_rate<=0.10": false
+    },
+    "verdict": "P7 GOVERNANCE READY / EXTRACTION NOT READY"
+  },
+  "qwen2.5-7b \u00b7 v1.1": {
+    "decision_after_phi4_mini": "model_limited",
+    "governance_defects": [],
+    "metrics": {
+      "agreement": {
+        "fn": 1,
+        "fp": 2,
+        "precision": 0.5,
+        "recall": 0.6667,
+        "tp": 2
+      },
+      "assumptions": {
+        "fn": 0,
+        "fp": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "tp": 0
+      },
+      "claim_attribution_accuracy": 1.0,
+      "cross_participant_invariant": {
+        "applicable": 18,
+        "holds": 3,
+        "rate": 0.1667
+      },
+      "disagreement": {
+        "fn": 0,
+        "fp": 3,
+        "precision": 0.0,
+        "recall": 0.0,
+        "tp": 0
+      },
+      "evidence_reliance": {
+        "fn": 0,
+        "fp": 19,
+        "precision": 0.3871,
+        "recall": 1.0,
+        "tp": 12
+      },
+      "live_runs": 23,
+      "minority_downgraded": 0,
+      "minority_lost": 0,
+      "minority_preservation": {
+        "preserved": 0,
+        "runs": 5
+      },
+      "misattributions": 0,
+      "multi_participant_proposition_rate": {
+        "multi_participant": 7,
+        "propositions": 8,
+        "rate": 0.875
+      },
+      "outcomes": {
+        "ADMITTED_BUT_WRONG_items": 25,
+        "DOWNGRADED_TO_UNKNOWN_items": 2,
+        "OMITTED_reference_propositions": 5,
+        "REFUSED_runs": 16,
+        "admitted_but_wrong_rate": 0.5435,
+        "admitted_semantic_items": 46,
+        "unmatched_candidate_claims": 0
+      },
+      "paraphrase_as_disagreement_errors": 1,
+      "provider_failures": 0,
+      "refusals_by_code": {
+        "EXTRACTION_OUTPUT_CONTRACT_VIOLATION": 16
+      },
+      "relation_recall_all_runs": {
+        "rate": 0.1111,
+        "reference_relations": 18,
+        "tp": 2
+      },
+      "scored_candidates": 7,
+      "silent_minority_errors": 0,
+      "stance_accuracy": 0.5625,
+      "structural_refusal_rate": 0.6957,
+      "unknown_preservation": {
+        "preserved": 0,
+        "runs": 6
+      },
+      "untraceable_content_rate": 0.0408
+    },
+    "ready_conditions": {
+      "admitted_but_wrong_rate<=0.15": false,
+      "agreement_precision_recall>=0.80": false,
+      "claim_attribution_accuracy>=0.90": true,
+      "disagreement_precision_recall>=0.80": false,
+      "paraphrase_as_disagreement_errors==0": false,
+      "silent_minority_errors==0": true,
+      "stance_accuracy>=0.85": false,
+      "structural_refusal_rate<=0.10": false
+    },
+    "verdict": "P7 GOVERNANCE READY / EXTRACTION NOT READY"
+  }
+}

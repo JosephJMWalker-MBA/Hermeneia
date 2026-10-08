@@ -51,17 +51,23 @@ _ACHIEVEMENT_AWARD_COLUMNS = frozenset({
     "id", "achievement_id", "rule_id", "rule_version", "receipt_json",
 })
 
+_ACCEPTED_COMPARISON_FILE = "study/accepted_perspective_comparisons.json"
+_ACCEPTED_COMPARISON_CAPABILITY = "accepted-perspective-comparison-v1"
+_ACCEPTED_COMPARISON_TABLE = "accepted_perspective_comparisons"
+_ACCEPTED_COMPARISON_COLUMNS = frozenset({"id", "candidate_id", "comparison_json"})
+
 # Required capabilities this restorer can reconstruct (see export.py).
 _PUBLICATION_CAPABILITY = "publication-authoring-v0"
 _PUBLICATION_PREFIX = "publication/"
 SUPPORTED_CAPABILITIES = frozenset({
     _PUBLICATION_CAPABILITY, _PERSPECTIVE_EXECUTION_CAPABILITY, _ACHIEVEMENT_AWARD_CAPABILITY,
+    _ACCEPTED_COMPARISON_CAPABILITY,
 })
 
 # Tables whose presence means the workspace is not empty.
 _OCCUPANCY_TABLES = [table for table, _ in _TABLE_FILES] + [
     "workspace_investigation", "publication_works", _PERSPECTIVE_EXECUTION_TABLE,
-    _ACHIEVEMENT_AWARD_TABLE,
+    _ACHIEVEMENT_AWARD_TABLE, _ACCEPTED_COMPARISON_TABLE,
 ]
 
 
@@ -139,6 +145,7 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
     perspective_supersessions = _load(_PERSPECTIVE_SUPERSESSION_FILE) or []
     perspective_executions, receipt_coverage = _read_perspective_executions(root, manifest)
     achievement_awards, award_coverage = _read_achievement_awards(root, manifest)
+    accepted_comparisons, comparison_coverage = _read_accepted_comparisons(root, manifest)
     publication = _read_publication_component(root, manifest)
     investigation = _load("investigation.json")
     uploads_dir = root / "corpus" / "uploads"
@@ -153,8 +160,10 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
         "perspective_supersessions": perspective_supersessions,
         "perspective_executions": perspective_executions,
         "achievement_awards": achievement_awards,
+        "accepted_comparisons": accepted_comparisons,
         "coverage": {_PERSPECTIVE_EXECUTION_TABLE: receipt_coverage,
-                     _ACHIEVEMENT_AWARD_TABLE: award_coverage},
+                     _ACHIEVEMENT_AWARD_TABLE: award_coverage,
+                     _ACCEPTED_COMPARISON_TABLE: comparison_coverage},
         "investigation": investigation,
         "uploads": uploads,
         "publication": publication,
@@ -263,6 +272,53 @@ def _read_achievement_awards(root: Path, manifest: dict) -> tuple[list[dict], di
         raise RestoreError(str(exc)) from exc
     return rows, {"status": "covered", "extant_records": len(rows),
                   "reason": "Extant award category covered; no complete historical award claim."}
+
+
+def _read_accepted_comparisons(root: Path, manifest: dict) -> tuple[list[dict], dict]:
+    """Validate the accepted-comparison component without accepting anything anew."""
+    declared = _ACCEPTED_COMPARISON_CAPABILITY in (manifest.get("required_capabilities") or [])
+    listed = [entry for entry in manifest.get("files") or []
+              if entry.get("path") == _ACCEPTED_COMPARISON_FILE]
+    path = root / _ACCEPTED_COMPARISON_FILE
+    if not declared and not listed and not path.exists():
+        return [], {"status": "unsupported",
+                    "reason": "Bundle does not cover accepted Perspective comparisons; their history is unknown."}
+    if not declared:
+        raise RestoreError("Accepted comparison component lacks its required capability declaration")
+    if len(listed) != 1 or listed[0].get("role") != "canonical" or not path.is_file():
+        raise RestoreError("Accepted comparison component must have one complete canonical manifest entry")
+    if root.resolve() not in path.resolve().parents:
+        raise RestoreError("Accepted comparison component escapes the bundle root")
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != listed[0].get("sha256"):
+        raise RestoreError("Accepted comparison component failed its hash check")
+    from ..accepted_perspective_comparisons import record_from_row
+
+    try:
+        rows = json.loads(data, object_pairs_hook=_unique_json_keys)
+        if not isinstance(rows, list):
+            raise ValueError("Accepted comparison component must contain a row list")
+        ids, candidates = set(), set()
+        for row in rows:
+            if not isinstance(row, dict) or set(row) != _ACCEPTED_COMPARISON_COLUMNS:
+                raise ValueError("malformed accepted comparison row")
+            record_from_row(row)
+            if row["id"] in ids or (row["candidate_id"] is not None and row["candidate_id"] in candidates):
+                raise ValueError("duplicate accepted comparison identity or candidate")
+            ids.add(row["id"])
+            candidates.add(row["candidate_id"])
+        if [row["id"] for row in rows] != sorted(ids):
+            raise ValueError("Accepted comparison component must use ASCII identity order")
+        counts = manifest.get("counts")
+        if not isinstance(counts, dict):
+            raise ValueError("Accepted comparison component requires explicit record counts")
+        count = counts.get(_ACCEPTED_COMPARISON_TABLE)
+        if type(count) is not int or count != len(rows):
+            raise ValueError("Accepted comparison count disagrees with component")
+    except (ValueError, TypeError, KeyError, UnicodeError) as exc:
+        raise RestoreError(str(exc)) from exc
+    return rows, {"status": "covered", "extant_records": len(rows),
+                  "reason": "Extant accepted-comparison category covered; no complete historical claim."}
 
 
 def _read_publication_component(root: Path, manifest: dict) -> dict[str, Any] | None:
@@ -413,6 +469,8 @@ def preview_restore(db_path: str | Path, bundle_dir: str | Path) -> dict[str, An
         counts[_PERSPECTIVE_EXECUTION_TABLE] = len(bundle["perspective_executions"])
     if bundle["coverage"][_ACHIEVEMENT_AWARD_TABLE]["status"] == "covered":
         counts[_ACHIEVEMENT_AWARD_TABLE] = len(bundle["achievement_awards"])
+    if bundle["coverage"][_ACCEPTED_COMPARISON_TABLE]["status"] == "covered":
+        counts[_ACCEPTED_COMPARISON_TABLE] = len(bundle["accepted_comparisons"])
     counts["uploads"] = len(bundle["uploads"])
     if bundle["publication"] is not None:
         for table, rows in bundle["publication"]["tables"].items():
@@ -521,6 +579,21 @@ def restore_workspace(
                     raise RestoreError("target cannot store the complete achievement award row")
                 restored[_ACHIEVEMENT_AWARD_TABLE] = _insert_rows(
                     conn, _ACHIEVEMENT_AWARD_TABLE, award_rows, set(_ACHIEVEMENT_AWARD_COLUMNS),
+                )
+
+            if bundle["coverage"][_ACCEPTED_COMPARISON_TABLE]["status"] == "covered":
+                from ..accepted_perspective_comparisons import record_from_row, validate_record_references
+
+                comparison_rows = bundle["accepted_comparisons"]
+                for comparison_row in comparison_rows:
+                    try:
+                        validate_record_references(conn, record_from_row(comparison_row))
+                    except (ValueError, KeyError, TypeError, sqlite3.Error) as exc:
+                        raise RestoreError(f"invalid accepted comparison references: {exc}") from exc
+                if not _ACCEPTED_COMPARISON_COLUMNS <= _table_columns(conn, _ACCEPTED_COMPARISON_TABLE):
+                    raise RestoreError("target cannot store the complete accepted comparison row")
+                restored[_ACCEPTED_COMPARISON_TABLE] = _insert_rows(
+                    conn, _ACCEPTED_COMPARISON_TABLE, comparison_rows, set(_ACCEPTED_COMPARISON_COLUMNS),
                 )
 
             investigation = bundle["investigation"]

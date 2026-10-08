@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermeneia.perspective-comparison-structure/v1",
+  "title": "Perspective comparison structure v1 (#215 P7 Layer 2) — one type for candidate, edited and authored comparisons",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "participants", "propositions", "assumptions", "untraceable", "relations"],
+  "properties": {
+    "schema": {"const": "hermeneia.perspective-comparison-structure/v1"},
+    "participants": {"type": "array", "minItems": 2, "maxItems": 8, "uniqueItems": true, "items": {"$ref": "#/$defs/receipt_id"}},
+    "propositions": {
+      "type": "array", "maxItems": 50,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "statement", "positions"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^p[1-9][0-9]*$"},
+          "statement": {"type": "string", "minLength": 1},
+          "positions": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/position"}}
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array", "maxItems": 50,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "participant", "span"],
+        "properties": {"id": {"type": "string", "pattern": "^a[1-9][0-9]*$"}, "participant": {"$ref": "#/$defs/receipt_id"}, "span": {"$ref": "#/$defs/span"}}
+      }
+    },
+    "untraceable": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["kind"],
+        "properties": {"kind": {"enum": ["untraceable_position", "contradictory_position", "position_not_classified",
+                                          "reliance_outside_supplied_scope", "untraceable_proposition", "untraceable_assumption"]}}
+      }
+    },
+    "relations": {
+      "type": "object", "additionalProperties": false,
+      "required": ["agreement", "disagreement", "unresolved", "unknown_positions", "evidence_use"],
+      "properties": {
+        "agreement": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["proposition", "stance", "participants", "not_established_for", "reliance", "same_reasoning"],
+            "properties": {
+              "proposition": {"type": "string"}, "stance": {"enum": ["asserts", "denies"]},
+              "participants": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/receipt_id"}},
+              "not_established_for": {"type": "array", "items": {"$ref": "#/$defs/receipt_id"}},
+              "reliance": {"$ref": "#/$defs/reliance_relation"},
+              "same_reasoning": {"const": "not_established"}
+            }
+          }
+        },
+        "disagreement": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["proposition", "groups", "minority_participants", "not_established_for", "reliance", "resolution"],
+            "properties": {
+              "proposition": {"type": "string"},
+              "groups": {"type": "array", "minItems": 2, "maxItems": 2,
+                         "items": {"type": "object", "additionalProperties": false, "required": ["stance", "participants"],
+                                   "properties": {"stance": {"enum": ["asserts", "denies"]}, "participants": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/receipt_id"}}}}},
+              "minority_participants": {"type": "array", "items": {"$ref": "#/$defs/receipt_id"}},
+              "not_established_for": {"type": "array", "items": {"$ref": "#/$defs/receipt_id"}},
+              "reliance": {"$ref": "#/$defs/reliance_relation"},
+              "resolution": {"const": "none_recorded"}
+            }
+          }
+        },
+        "unresolved": {"type": "array", "items": {"type": "string"}},
+        "unknown_positions": {
+          "type": "array",
+          "items": {"type": "object", "additionalProperties": false, "required": ["proposition", "participant", "stance"],
+                    "properties": {"proposition": {"type": "string"}, "participant": {"$ref": "#/$defs/receipt_id"}, "stance": {"enum": ["unknown", "unclassifiable"]}}}
+        },
+        "evidence_use": {
+          "type": "array",
+          "items": {"type": "object", "additionalProperties": false, "required": ["participant", "relied_on", "supplied_not_relied_on"],
+                    "properties": {"participant": {"$ref": "#/$defs/receipt_id"},
+                                   "relied_on": {"type": "array", "items": {"$ref": "#/$defs/ref"}},
+                                   "supplied_not_relied_on": {"type": "array", "items": {"$ref": "#/$defs/ref"}}}}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "receipt_id": {"type": "string", "pattern": "^perspective-execution-receipt:sha256:[0-9a-f]{64}$"},
+    "span": {"type": "object", "additionalProperties": false, "required": ["start", "end", "text"],
+             "properties": {"start": {"type": "integer", "minimum": 0}, "end": {"type": "integer", "minimum": 1}, "text": {"type": "string", "minLength": 1}}},
+    "ref": {"type": "object", "additionalProperties": false, "required": ["table", "key"],
+            "properties": {"table": {"enum": ["source_extractions", "reader_highlights"]},
+                           "key": {"type": "object", "additionalProperties": false, "required": ["id"], "properties": {"id": {"type": "string", "minLength": 1}}}}},
+    "reliance_relation": {"enum": ["identical", "overlapping", "disjoint", "some_uncited"]},
+    "position": {
+      "type": "object", "additionalProperties": false, "required": ["participant", "stance", "span", "reliance"],
+      "properties": {
+        "participant": {"$ref": "#/$defs/receipt_id"},
+        "stance": {"enum": ["asserts", "denies", "unclassifiable", "does_not_address", "unknown"]},
+        "span": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/span"}]},
+        "reliance": {"type": "array", "items": {"$ref": "#/$defs/ref"}}
+      }
+    }
+  }
+}

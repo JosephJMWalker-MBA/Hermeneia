@@ -1,0 +1,188 @@
+{
+  "A:ADV2_reliance_inferred_from_supply": {
+    "category": "invalid JSON",
+    "context": "dy asked.\\\"\", \"relies_on\": [\"U1\", \"U3\"]},\n          ]\n      ",
+    "error": "Illegal trailing comma before end of array at char 352",
+    "fenced": true,
+    "length": 1418,
+    "proposition_ids_emitted": 4
+  },
+  "A:ADV3_paraphrase_called_disagreement": {
+    "category": "contract violation",
+    "fenced": false,
+    "length": 466,
+    "proposition_ids_emitted": 1,
+    "violations": {
+      "classification missing 'relies_on'": 1
+    }
+  },
+  "A:ADV4a_minority_erased_by_absence": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 1669,
+    "proposition_ids_emitted": 3,
+    "violations": {
+      "assumption shape or quote": 1
+    }
+  },
+  "A:ADV4b_minority_erased_by_omission": {
+    "category": "invalid JSON",
+    "context": "{\"participant\": \"P1\", \"classification\": supports, \"quote\": \"",
+    "error": "Expecting value at char 615",
+    "fenced": true,
+    "length": 1215,
+    "proposition_ids_emitted": 3
+  },
+  "A:ADV5a_majority_as_truth": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 1679,
+    "proposition_ids_emitted": 3,
+    "violations": {
+      "assumption shape or quote": 1
+    }
+  },
+  "A:ADV5b_truth_flag_nested": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 841,
+    "proposition_ids_emitted": 2,
+    "violations": {
+      "classification missing 'quote'": 2,
+      "classification missing 'relies_on'": 2,
+      "participant label 'unknown'": 2
+    }
+  },
+  "A:ADV6_wrong_participant_attribution": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 580,
+    "proposition_ids_emitted": 1,
+    "violations": {
+      "assumption shape or quote": 2
+    }
+  },
+  "A:ADV7_unparseable_output": {
+    "category": "invalid JSON",
+    "context": "urning lamp shows a watch being kept.\"}], \n}],\nassumptions\":",
+    "error": "Illegal trailing comma before end of object at char 377",
+    "fenced": false,
+    "length": 402,
+    "proposition_ids_emitted": 1
+  },
+  "A:ADV8_invented_stance": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 445,
+    "proposition_ids_emitted": 1,
+    "violations": {
+      "assumption shape or quote": 1
+    }
+  },
+  "F:C01_same_conclusion_same_evidence": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 1604,
+    "proposition_ids_emitted": 4,
+    "violations": {
+      "classification missing 'relies_on'": 4
+    }
+  },
+  "F:C02_same_conclusion_different_evidence": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 433,
+    "proposition_ids_emitted": 1,
+    "violations": {
+      "assumption shape or quote": 1,
+      "classification missing 'relies_on'": 1
+    }
+  },
+  "F:C04_different_conclusions_different_evidence": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 859,
+    "proposition_ids_emitted": 2,
+    "violations": {
+      "assumption shape or quote": 1,
+      "classification missing 'relies_on'": 1
+    }
+  },
+  "F:C05_assumption_difference": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 976,
+    "proposition_ids_emitted": 2,
+    "violations": {
+      "assumption shape or quote": 2
+    }
+  },
+  "F:C06_wording_only_difference": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 524,
+    "proposition_ids_emitted": 1,
+    "violations": {
+      "classification value 'oposes'": 1
+    }
+  },
+  "F:C07_similar_wording_opposite_claims": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 509,
+    "proposition_ids_emitted": 1,
+    "violations": {
+      "assumption shape or quote": 1,
+      "classification value 'oposes'": 1
+    }
+  },
+  "F:C08_two_to_one_minority": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 847,
+    "proposition_ids_emitted": 2,
+    "violations": {
+      "classification missing 'quote'": 2,
+      "classification missing 'relies_on'": 2,
+      "participant label 'unknown'": 2
+    }
+  },
+  "F:C10_incomplete_coverage_excluded_receipt": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 399,
+    "proposition_ids_emitted": 1,
+    "violations": {
+      "assumption shape or quote": 1
+    }
+  },
+  "F:C11_legitimately_unclassifiable": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 458,
+    "proposition_ids_emitted": 1,
+    "violations": {
+      "assumption shape or quote": 1
+    }
+  },
+  "F:C12_one_perspective_two_models_identical_text": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 507,
+    "proposition_ids_emitted": 1,
+    "violations": {
+      "assumption shape or quote": 1
+    }
+  },
+  "F:C13_overlapping_evidence_changed_highlight": {
+    "category": "contract violation",
+    "fenced": true,
+    "length": 1725,
+    "proposition_ids_emitted": 4,
+    "violations": {
+      "classification missing 'quote'": 3,
+      "classification value ''": 3,
+      "participant label 'unknown'": 3
+    }
+  }
+}

@@ -112,8 +112,9 @@ def test_workspace_without_work_still_exports_wbs_1_1(tmp_path):
     manifest = export_workspace_bundle(db, tmp_path / "bundle", generated_at=NOW, workspace_id="w")
     assert manifest["wbs_version"] == "1.1"
     assert manifest["required_capabilities"] == [
-        "perspective-achievement-awards-v1", "perspective-retained-execution-v1",
+        "accepted-perspective-comparison-v1", "perspective-achievement-awards-v1", "perspective-retained-execution-v1",
     ]
+    assert manifest["counts"]["accepted_perspective_comparisons"] == 0
     assert manifest["counts"]["achievement_awards"] == 0
     assert manifest["counts"]["perspective_execution_receipts"] == 0
     assert not (tmp_path / "bundle" / "publication").exists()
