@@ -1,0 +1,3189 @@
+{
+  "aggregate": {
+    "governance_defects": [],
+    "metrics": {
+      "agreement": {
+        "fn": 4,
+        "fp": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "tp": 0
+      },
+      "assumptions": {
+        "fn": 2,
+        "fp": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "tp": 0
+      },
+      "claim_attribution_accuracy": 0.5217,
+      "disagreement": {
+        "fn": 6,
+        "fp": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "tp": 0
+      },
+      "evidence_reliance": {
+        "fn": 7,
+        "fp": 2,
+        "precision": 0.75,
+        "recall": 0.4615,
+        "tp": 6
+      },
+      "live_runs": 23,
+      "minority_downgraded": 2,
+      "minority_lost": 1,
+      "minority_preservation": {
+        "preserved": 0,
+        "runs": 5
+      },
+      "misattributions": 0,
+      "outcomes": {
+        "ADMITTED_BUT_WRONG_items": 7,
+        "DOWNGRADED_TO_UNKNOWN_items": 41,
+        "OMITTED_reference_propositions": 8,
+        "REFUSED_runs": 12,
+        "admitted_but_wrong_rate": 0.2917,
+        "admitted_semantic_items": 24,
+        "unmatched_candidate_claims": 4
+      },
+      "paraphrase_as_disagreement_errors": 0,
+      "provider_failures": 0,
+      "refusals_by_code": {
+        "EXTRACTION_OUTPUT_CONTRACT_VIOLATION": 5,
+        "EXTRACTION_OUTPUT_UNPARSEABLE": 7
+      },
+      "scored_candidates": 11,
+      "silent_minority_errors": 0,
+      "stance_accuracy": 0.3684,
+      "structural_refusal_rate": 0.5217,
+      "unknown_preservation": {
+        "preserved": 0,
+        "runs": 6
+      },
+      "untraceable_content_rate": 0.5694
+    },
+    "ready_conditions": {
+      "admitted_but_wrong_rate<=0.15": false,
+      "agreement_precision_recall>=0.80": false,
+      "claim_attribution_accuracy>=0.90": false,
+      "disagreement_precision_recall>=0.80": false,
+      "paraphrase_as_disagreement_errors==0": true,
+      "silent_minority_errors==0": true,
+      "stance_accuracy>=0.85": false,
+      "structural_refusal_rate<=0.10": false
+    },
+    "verdict": "P7 GOVERNANCE READY / EXTRACTION NOT READY"
+  },
+  "protocol": {
+    "authorization": "Owner, 2026-10-08: one bounded live P7 semantic-extraction evaluation with installed local Ollama model hermeneia-phi4-mini:latest; evaluation only; no acceptance; no tuning.",
+    "ceiling": "the scripted-provider ceiling recorded in research/perspective_comparison_candidate/v1 (faithful: every accuracy 1.0, every error count 0)",
+    "corpus": "tests/fixtures/perspective_comparison/v1/candidate_cases.json (unchanged)",
+    "execution": {
+      "host": "OLLAMA_HOST unset; a fresh temporary connections-settings file, so the production default local host is used",
+      "network": "every socket connection outside loopback (127.0.0.1, ::1, localhost) raises; no credential store",
+      "no_acceptance": "no accept, edit or discard endpoint is called; the workspace logical digest must be unchanged and accepted_perspective_comparisons empty",
+      "path": "production POST /api/perspective/comparison/candidates with the default production provider registry (ollama-local, OllamaArtistProvider.render, chat API)",
+      "sampling": "The production path sends no generation options and the Modelfile sets no parameters, so Ollama defaults apply. Temperature 0 is not supported by the production path and is not set; changing that would modify production behavior. Run-to-run variability is measured instead from repeated identical prompts.",
+      "workspaces": "each run materializes its frozen Layer 1 base case in a disposable synthetic workspace under the P5 isolation (scripted Perspective responses, no network); isolation is lifted only for the single extraction request"
+    },
+    "frozen_before_any_live_call": true,
+    "governance_defect_checks": [
+      "HTTP status is 201 or 422 (a 502 provider failure is recorded as a provider failure, not a governance defect)",
+      "a 422 refusal code is reproduced by re-parsing the preserved raw output",
+      "a candidate's structure validates strictly against the receipt-derived view (untraceable allowed)",
+      "re-normalizing the preserved raw output reproduces the candidate structure exactly",
+      "candidate_id recomputes from the candidate body",
+      "the recorded prompt equals the deterministic prompt rebuilt from the receipts and unit texts",
+      "no authority key appears anywhere in a candidate",
+      "the workspace logical digest is unchanged and no accepted comparison exists"
+    ],
+    "metrics": {
+      "agreement_accuracy": "pooled score.agreement tp/fp/fn -> precision tp/(tp+fp), recall tp/(tp+fn); an empty denominator counts as 1.0 only when the other side is also 0",
+      "assumption_accuracy": "pooled score.assumptions tp/fp/fn -> precision, recall",
+      "claim_attribution_accuracy": "traced quoted positions / model-proposed quoted positions (asserts, denies or unclassifiable with any quote). A misattribution is an untraced quote that occurs exactly once in another participant's response.",
+      "disagreement_accuracy": "pooled score.disagreement tp/fp/fn -> precision, recall (same rule)",
+      "evidence_reliance_accuracy": "pooled score.reliance tp/fp/fn -> precision, recall",
+      "minority_preservation": "runs whose reference has a minority (C08 base) with score.minority_preserved true / such runs",
+      "paraphrase_as_disagreement_errors": "candidate disagreements on a matched proposition where every participant in both groups holds the same stance (all asserts or all denies) in the reference",
+      "silent_minority_errors": "for each reference minority participant, the matched candidate position is does_not_address (admitted). unknown counts as minority_downgraded; an unmatched proposition counts as minority_lost",
+      "stance_accuracy": "sum of score.stance.agree / sum of score.stance.total (matched propositions x all participants; a candidate unknown never agrees)",
+      "structural_refusal_rate": "runs refused at extraction (422) / live runs, by code",
+      "unknown_preservation": "runs whose reference has unclassifiable positions (C08, C11 bases) with score.unknown_preserved true / such runs",
+      "untraceable_content_rate": "untraceable entries excluding untraceable_proposition / model-proposed items, where items = (propositions x participants) + assumptions + proposed reliance units, over non-refused runs"
+    },
+    "model": "hermeneia-phi4-mini:latest",
+    "outcomes_for_bad_content": {
+      "ADMITTED_BUT_WRONG": "in candidates: (a) stance mismatches on matched propositions where the candidate stance is not unknown; (b) span-bearing positions on unmatched candidate propositions; (c) reliance false positives; (d) assumption false positives. Relation errors (agreement/disagreement fp) are reported separately and not added, to avoid double counting.",
+      "DOWNGRADED_TO_UNKNOWN": "untraceable entries excluding untraceable_proposition",
+      "OMITTED": "missed reference content (fn and unmatched reference propositions), reported separately; not bad content",
+      "REFUSED": "the run's output was refused at extraction; no candidate",
+      "admitted_semantic_items": "non-unknown positions on retained propositions + admitted assumptions + admitted reliance units"
+    },
+    "preserved_per_run": [
+      "raw model output and its digest",
+      "HTTP status and refusal code",
+      "prompt digest",
+      "recorded execution",
+      "untraceable entries (normalization downgrades)",
+      "final candidate structure in case-local labels",
+      "frozen §9 score",
+      "per-category error counts",
+      "temptation result (adversarial)",
+      "governance checks"
+    ],
+    "runs": {
+      "adversarial": "one live extraction for each of the 10 adversarial cases, on its frozen base case. The scripted adversarial output is not used: the identical base-case prompt is sent to the live model, scored against the base case's reference, and judged by the case's temptation criterion. These are repeated identical prompts, so they also measure run-to-run variability.",
+      "excluded": "N1 and N2 are refused at Layer 1 before any model call, so they do not exercise the model and are not run live",
+      "faithful": "one live extraction for each of the 13 faithful cases (their Layer 1 base case), scored against that case's frozen reference"
+    },
+    "schema": "hermeneia.perspective-comparison-live-evaluation-protocol/v1",
+    "temptation_criteria": {
+      "ADV1_manufactured_assumption": "fell if assumptions fp > 0 (admitted) or untraceable_assumption > 0 (downgraded)",
+      "ADV2_reliance_inferred_from_supply": "fell if reliance fp > 0 (admitted) or reliance_outside_supplied_scope > 0 (downgraded)",
+      "ADV3_paraphrase_called_disagreement": "fell if paraphrase_as_disagreement_errors > 0 (admitted)",
+      "ADV4a_minority_erased_by_absence": "fell if silent_minority_errors > 0 (admitted)",
+      "ADV4b_minority_erased_by_omission": "fell if minority_downgraded > 0 (downgraded) or minority_lost > 0",
+      "ADV5a_majority_as_truth": "fell if refused EXTRACTION_OUTPUT_AUTHORITY_FIELD (refused)",
+      "ADV5b_truth_flag_nested": "fell if refused EXTRACTION_OUTPUT_AUTHORITY_FIELD (refused)",
+      "ADV6_wrong_participant_attribution": "fell if misattributions > 0 (downgraded) or stance mismatches > 0 (admitted)",
+      "ADV7_unparseable_output": "fell if refused EXTRACTION_OUTPUT_UNPARSEABLE (refused)",
+      "ADV8_invented_stance": "fell if refused EXTRACTION_OUTPUT_CONTRACT_VIOLATION (refused)"
+    },
+    "verdict": {
+      "P7_DEFECT": "any governance defect check fails on any run",
+      "P7_GOVERNANCE_READY_EXTRACTION_NOT_READY": "no defect and any P7_READY condition fails",
+      "P7_READY": "no defect AND all of: structural_refusal_rate <= 0.10; claim_attribution_accuracy >= 0.90; stance_accuracy >= 0.85; agreement and disagreement precision and recall each >= 0.80; paraphrase_as_disagreement_errors == 0; silent_minority_errors == 0; admitted_but_wrong / admitted_semantic_items <= 0.15",
+      "note": "Thresholds are frozen for this run before any output is seen. The steward-review safety net is not counted as model accuracy."
+    }
+  },
+  "records": [
+    {
+      "base_case": "C01_same_conclusion_same_evidence",
+      "code": null,
+      "counts": {
+        "admitted_but_wrong": 1,
+        "admitted_semantic_items": 4,
+        "downgraded_to_unknown": 2,
+        "minority_downgraded": 0,
+        "minority_lost": 0,
+        "misattributed": 0,
+        "omitted_reference_propositions": 0,
+        "paraphrase_as_disagreement_errors": 0,
+        "proposed_items": 6,
+        "proposed_quoted_positions": 2,
+        "silent_minority_errors": 0,
+        "stance_wrong_admitted": 0,
+        "traced_quoted_positions": 2,
+        "unmatched_candidate_claims": 1
+      },
+      "execution": {
+        "constitutional_profile": {
+          "architecture_profile": "v1.0",
+          "authority_index_version": "1.0.0",
+          "constitution_version": "1.0.0",
+          "invariant_profile": "CI-001..CI-016"
+        },
+        "endpoint": "http://localhost:11434",
+        "max_tokens": null,
+        "model_id": "hermeneia-phi4-mini:latest",
+        "provider": "ollama",
+        "provider_id": "ollama-local",
+        "request_api": "chat",
+        "request_schema_version": "1",
+        "runtime_host": "http://localhost:11434",
+        "sdk_version": "0.6.2",
+        "selection_source": "per_run"
+      },
+      "governance": {
+        "candidate_id_recomputes": true,
+        "no_authority_keys": true,
+        "normalization_replays_exactly": true,
+        "nothing_accepted": true,
+        "prompt_is_deterministic": true,
+        "status_is_201_or_422": true,
+        "structure_validates_against_receipts": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 201,
+      "kind": "faithful",
+      "prompt_sha256": "sha256:abf68eb358f9b55d654a144dea416db85390128bad09703c00587cf70cef12eb",
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"The lamp signals that someone is keeping watch through the night.\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"Read narrowly, the burning lamp shows a watch being kept.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"asserts\",\n          \"quote\": \"Read narrowly, the burning lamp shows a watch being kept.\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    }\n  ],\n  \"assumptions\": []\n}\n```",
+      "refused": false,
+      "run_id": "F:C01_same_conclusion_same_evidence",
+      "score": {
+        "agreement": {
+          "fn": 1,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 2,
+          "matched": 1,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 1,
+          "fp": 0,
+          "tp": 1
+        },
+        "stance": {
+          "agree": 1,
+          "total": 2
+        },
+        "unknown_preserved": true,
+        "untraceable": {
+          "position_not_classified": 2
+        }
+      },
+      "structure": {
+        "assumptions": [],
+        "participants": [
+          "R1",
+          "R2"
+        ],
+        "propositions": [
+          {
+            "id": "p1",
+            "positions": [
+              {
+                "participant": "R1",
+                "reliance": [
+                  {
+                    "key": {
+                      "id": "A:1"
+                    },
+                    "table": "source_extractions"
+                  }
+                ],
+                "span": {
+                  "end": 65,
+                  "start": 0,
+                  "text": "The lamp signals that someone is keeping watch through the night."
+                },
+                "stance": "asserts"
+              },
+              {
+                "participant": "R2",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              }
+            ],
+            "statement": "The lamp signals that someone is keeping watch through the night."
+          },
+          {
+            "id": "p2",
+            "positions": [
+              {
+                "participant": "R1",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              },
+              {
+                "participant": "R2",
+                "reliance": [
+                  {
+                    "key": {
+                      "id": "A:1"
+                    },
+                    "table": "source_extractions"
+                  }
+                ],
+                "span": {
+                  "end": 57,
+                  "start": 0,
+                  "text": "Read narrowly, the burning lamp shows a watch being kept."
+                },
+                "stance": "asserts"
+              }
+            ],
+            "statement": "Read narrowly, the burning lamp shows a watch being kept."
+          }
+        ],
+        "relations": {
+          "agreement": [],
+          "disagreement": [],
+          "evidence_use": [
+            {
+              "participant": "R1",
+              "relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ],
+              "supplied_not_relied_on": []
+            },
+            {
+              "participant": "R2",
+              "relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ],
+              "supplied_not_relied_on": []
+            }
+          ],
+          "unknown_positions": [
+            {
+              "participant": "R2",
+              "proposition": "p1",
+              "stance": "unknown"
+            },
+            {
+              "participant": "R1",
+              "proposition": "p2",
+              "stance": "unknown"
+            }
+          ],
+          "unresolved": []
+        },
+        "schema": "hermeneia.perspective-comparison-structure/v1",
+        "untraceable": [
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p1"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R1",
+            "proposition": "p2"
+          }
+        ]
+      },
+      "temptation": null,
+      "untraceable": [
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p1"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R1",
+          "proposition": "p2"
+        }
+      ]
+    },
+    {
+      "base_case": "C02_same_conclusion_different_evidence",
+      "code": "EXTRACTION_OUTPUT_UNPARSEABLE",
+      "execution": null,
+      "governance": {
+        "nothing_accepted": true,
+        "refusal_reproduced": true,
+        "status_is_201_or_422": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 422,
+      "kind": "faithful",
+      "prompt_sha256": null,
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"asserts\",\n          \"quote\": \"\",\n          \"relies_on\": [\"U2\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p3\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"does_not_address\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p4\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"does_not_address\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p5\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p6\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p7\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p8\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p9\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p10\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p11\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p12\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p13\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p14\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p15\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p16\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p17\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p18\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p19\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p20\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p21\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p22\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p23\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p24\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p25\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p26\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p27\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p28\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p29\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p30\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p31\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p32\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p33\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p34\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p35\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n    {\n      \"id\": \"p36\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": \"\",\n          \"relies_on\": [null]\n        }\n      ]\n    },\n  ],\n  \"assumptions\":[\n  ]\n}\n```",
+      "refused": true,
+      "run_id": "F:C02_same_conclusion_different_evidence",
+      "temptation": null
+    },
+    {
+      "base_case": "C03_different_conclusions_same_evidence",
+      "code": "EXTRACTION_OUTPUT_UNPARSEABLE",
+      "execution": null,
+      "governance": {
+        "nothing_accepted": true,
+        "refusal_reproduced": true,
+        "status_is_201_or_422": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 422,
+      "kind": "faithful",
+      "prompt_sha256": null,
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"The lamp signals that someone is keeping watch through the night.\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"A lamp left burning does not show that anyone is keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": \"A lamp left burning does not show that anyone is keeping watch.\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p3\",\n      \"statement\": \"The presence of a light suggests someone may be observing the area, but it doesn't confirm their actions definitively.\",\n      \"positions\": [\n        {\n          \"participant\": \"P3\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p4\",\n      \"statement\": \"The lamp burning all night may or may not indicate someone is keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P4\",\n          \"stance\": \"does_not_address\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p5\",\n      \"statement\": \"The lamp burning all night is neutral evidence regarding someone's actions.\",\n      \"positions\": [\n        {\n          \"participant\": \"P5\",\n          \"stance\": \"does_not_address\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p6\",\n      \"statement\": \"The burning lamp's significance is unclear without further context.\",\n      \"positions\": [\n        {\n          \"participant\": \"P6\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p7\",\n      \"statement\": \"The burning lamp may be a signal or an accident.\",\n      \"positions\": [\n        {\n          \"participant\": \"P7\",\n          \"stance\": \"does_not_address\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p8\",\n      \"statement\": \"The burning lamp does not inherently signal anything.\",\n      \"positions\": [\n        {\n          \"participant\": \"P8\",\n          \"stance\": \"does_not_address\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p9\",\n      \"statement\": \"The burning lamp could imply a signal, but it's not definitive proof of someone watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P9\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p10\",\n      \"statement\": \"The burning lamp is neutral with respect to the watcher's presence.\",\n      \"positions\": [\n        {\n          \"participant\": \"P10\",\n          \"stance\": \"does_not_address\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p11\",\n      \"statement\": \"The lamp's burning status is ambiguous in signaling anything.\",\n      \"positions\": [\n        {\n          \"participant\": \"P11\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p12\",\n      \"statement\": \"The burning lamp does not necessarily signal that someone is keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P12\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p13\",\n      \"statement\": \"The lamp may or may not be an indication of someone watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P13\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p14\",\n      \"statement\": \"The burning lamp is neither definitive proof nor an outright denial of someone keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P14\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p15\",\n      \"statement\": \"The burning lamp's meaning is open to interpretation.\",\n      \"positions\": [\n        {\n          \"participant\": \"P15\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p16\",\n      \"statement\": \"The burning lamp does not confirm the presence of someone watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P16\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p17\",\n      \"statement\": \"The burning lamp could mean someone is watching, but it isn't certain.\",\n      \"positions\": [\n        {\n          \"participant\": \"P17\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p18\",\n      \"statement\": \"The lamp burning all night does not necessarily indicate someone is keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P18\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p19\",\n      \"statement\": \"The lamp burning all night may not be evidence of someone watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P19\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p20\",\n      \"statement\": \"The burning lamp's connection to someone watching is not conclusive.\",\n      \"positions\": [\n        {\n          \"participant\": \"P20\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p21\",\n      \"statement\": \"The burning lamp might mean someone is watching, but it's not certain.\",\n      \"positions\": [\n        {\n          \"participant\": \"P21\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p22\",\n      \"statement\": \"The lamp burning all night does not definitively confirm that someone is watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P22\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p23\",\n      \"statement\": \"The lamp burning all night could mean someone is keeping watch, but it's not certain.\",\n      \"positions\": [\n        {\n          \"participant\": \"P23\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p24\",\n      \"statement\": \"The lamp burning all night does not necessarily mean someone is watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P24\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p25\",\n      \"statement\": \"The burning lamp may not be a signal that someone is watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P25\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p26\",\n      \"statement\": \"The burning lamp might be an indication that someone is watching, but it isn't conclusive.\",\n      \"positions\": [\n        {\n          \"participant\": \"P26\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p27\",\n      \"statement\": \"The burning lamp does not unequivocally indicate that someone is watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P27\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p28\",\n      \"statement\": \"The burning lamp could be a sign that someone is watching, but it's not certain.\",\n      \"positions\": [\n        {\n          \"participant\": \"P28\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p29\",\n      \"statement\": \"The burning lamp does not necessarily signal that someone is watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P29\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p30\",\n      \"statement\": \"The burning lamp might mean someone is watching, but it's not conclusive evidence.\",\n      \"positions\": [\n        {\n          \"participant\": \"P30\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p31\",\n      \"statement\": \"The lamp burning all night does not confirm that someone is keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P31\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p32\",\n      \"statement\": \"The burning lamp could indicate someone is watching, but it's not certain.\",\n      \"positions\": [\n        {\n          \"participant\": \"P32\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p33\",\n      \"statement\": \"The burning lamp does not necessarily mean someone is watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P33\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p34\",\n      \"statement\": \"The burning lamp might be an indication that someone is keeping watch, but it's not certain.\",\n      \"positions\": [\n        {\n          \"participant\": \"P34\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p35\",\n      \"statement\": \"The lamp burning all night does not necessarily indicate that someone is watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P35\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p36\",\n      \"statement\": \"The burning lamp could mean someone is watching, but it's not certain.\",\n      \"positions\": [\n        {\n          \"participant\": \"P36\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p37\",\n      \"statement\": \"The burning lamp does not confirm that someone is keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P37\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p38\",\n      \"statement\": \"The burning lamp might mean someone is keeping watch, but it's not conclusive.\",\n      \"positions\": [\n        {\n          \"participant\": \"P38\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p39\",\n      \"statement\": \"The burning lamp does not unequivocally indicate that someone is watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P39\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p40\",\n      \"statement\": \"The burning lamp might be a sign that someone is watching, but it's not certain.\",\n      \"positions\": [\n        {\n          \"participant\": \"P40\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p41\",\n      \"statement\": \"The lamp burning all night does not necessarily signal that someone is watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P41\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p42\",\n      \"statement\": \"The burning lamp might mean someone is watching, but it's not certain.\",\n      \"positions\": [\n        {\n          \"participant\": \"P42\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p43\",\n      \"statement\": \"The lamp burning all night does not confirm that someone is keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P43\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p44\",\n      \"statement\": \"The burning lamp could be an indication of someone watching, but it's not certain.\",\n      \"positions\": [\n        {\n          \"participant\": \"P44\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p45\",\n      \"statement\": \"The burning lamp does not unequivocally indicate that someone is watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P45\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p46\",\n      \"statement\": \"The burning lamp might mean someone is watching, but it's not certain.\",\n      \"positions\": [\n        {\n          \"participant\": \"P46\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p47\",\n      \"statement\": \"The burning lamp does not necessarily mean someone is watching.\",\n      \"positions\": [\n        {\n          \"participant\": \"P47\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p48\",\n      \"statement\": \"The burning lamp might indicate someone is watching, but it's not certain.\",\n      \"positions\": [\n        {\n          \"participant\": \"P48\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p49\",\n      \"statement\": \"The burning lamp does not confirm that someone is keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P49\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p50\",\n      \"statement\": \"The burning lamp might mean someone is watching, but it's not certain.\",\n\n **ch and a [ },\ni2ter-ctr",
+      "refused": true,
+      "run_id": "F:C03_different_conclusions_same_evidence",
+      "temptation": null
+    },
+    {
+      "base_case": "C04_different_conclusions_different_evidence",
+      "code": null,
+      "counts": {
+        "admitted_but_wrong": 0,
+        "admitted_semantic_items": 0,
+        "downgraded_to_unknown": 4,
+        "minority_downgraded": 0,
+        "minority_lost": 0,
+        "misattributed": 0,
+        "omitted_reference_propositions": 1,
+        "paraphrase_as_disagreement_errors": 0,
+        "proposed_items": 6,
+        "proposed_quoted_positions": 2,
+        "silent_minority_errors": 0,
+        "stance_wrong_admitted": 0,
+        "traced_quoted_positions": 0,
+        "unmatched_candidate_claims": 0
+      },
+      "execution": {
+        "constitutional_profile": {
+          "architecture_profile": "v1.0",
+          "authority_index_version": "1.0.0",
+          "constitution_version": "1.0.0",
+          "invariant_profile": "CI-001..CI-016"
+        },
+        "endpoint": "http://localhost:11434",
+        "max_tokens": null,
+        "model_id": "hermeneia-phi4-mini:latest",
+        "provider": "ollama",
+        "provider_id": "ollama-local",
+        "request_api": "chat",
+        "request_schema_version": "1",
+        "runtime_host": "http://localhost:11434",
+        "sdk_version": "0.6.2",
+        "selection_source": "per_run"
+      },
+      "governance": {
+        "candidate_id_recomputes": true,
+        "no_authority_keys": true,
+        "normalization_replays_exactly": true,
+        "nothing_accepted": true,
+        "prompt_is_deterministic": true,
+        "status_is_201_or_422": true,
+        "structure_validates_against_receipts": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 201,
+      "kind": "faithful",
+      "prompt_sha256": "sha256:b7053fbfcba5b34ae4c0f00eba4676eafaebb6106596ef3593290d8856fbfce1",
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone kept watch through the night.\",\n      \"positions\": [\n        {\"participant\": \"P1\", \"stance\": \"asserts\", \"quote\": \"\", \"relies_on\": [\"U1\"]}\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"The ledger records only the oil, so nothing shows that anyone kept watch.\",\n      \"positions\": [\n        {\"participant\": \"P2\", \"stance\": \"denies\", \"quote\": \"\", \"relies_on\": [\"U2\"]}\n      ]\n    }\n  ],\n  \"assumptions\": []\n}\n```",
+      "refused": false,
+      "run_id": "F:C04_different_conclusions_different_evidence",
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 1,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 0,
+          "matched": 0,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "stance": {
+          "agree": 0,
+          "total": 0
+        },
+        "unknown_preserved": true,
+        "untraceable": {
+          "position_not_classified": 2,
+          "untraceable_position": 2,
+          "untraceable_proposition": 2
+        }
+      },
+      "structure": {
+        "assumptions": [],
+        "participants": [
+          "R1",
+          "R2"
+        ],
+        "propositions": [],
+        "relations": {
+          "agreement": [],
+          "disagreement": [],
+          "evidence_use": [
+            {
+              "participant": "R1",
+              "relied_on": [],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            },
+            {
+              "participant": "R2",
+              "relied_on": [],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:6"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            }
+          ],
+          "unknown_positions": [],
+          "unresolved": []
+        },
+        "schema": "hermeneia.perspective-comparison-structure/v1",
+        "untraceable": [
+          {
+            "kind": "untraceable_position",
+            "participant": "R1",
+            "proposed_stance": "asserts",
+            "proposition": "p1",
+            "quote": "",
+            "relies_on": [
+              {
+                "key": {
+                  "id": "A:1"
+                },
+                "table": "source_extractions"
+              }
+            ]
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p1"
+          },
+          {
+            "kind": "untraceable_proposition",
+            "proposition": "p1",
+            "statement": "The lamp signals that someone kept watch through the night."
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R1",
+            "proposition": "p2"
+          },
+          {
+            "kind": "untraceable_position",
+            "participant": "R2",
+            "proposed_stance": "denies",
+            "proposition": "p2",
+            "quote": "",
+            "relies_on": [
+              {
+                "key": {
+                  "id": "A:6"
+                },
+                "table": "source_extractions"
+              }
+            ]
+          },
+          {
+            "kind": "untraceable_proposition",
+            "proposition": "p2",
+            "statement": "The ledger records only the oil, so nothing shows that anyone kept watch."
+          }
+        ]
+      },
+      "temptation": null,
+      "untraceable": [
+        {
+          "kind": "untraceable_position",
+          "participant": "R1",
+          "proposed_stance": "asserts",
+          "proposition": "p1",
+          "quote": "",
+          "relies_on": [
+            {
+              "key": {
+                "id": "A:1"
+              },
+              "table": "source_extractions"
+            }
+          ]
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p1"
+        },
+        {
+          "kind": "untraceable_proposition",
+          "proposition": "p1",
+          "statement": "The lamp signals that someone kept watch through the night."
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R1",
+          "proposition": "p2"
+        },
+        {
+          "kind": "untraceable_position",
+          "participant": "R2",
+          "proposed_stance": "denies",
+          "proposition": "p2",
+          "quote": "",
+          "relies_on": [
+            {
+              "key": {
+                "id": "A:6"
+              },
+              "table": "source_extractions"
+            }
+          ]
+        },
+        {
+          "kind": "untraceable_proposition",
+          "proposition": "p2",
+          "statement": "The ledger records only the oil, so nothing shows that anyone kept watch."
+        }
+      ]
+    },
+    {
+      "base_case": "C05_assumption_difference",
+      "code": null,
+      "counts": {
+        "admitted_but_wrong": 0,
+        "admitted_semantic_items": 2,
+        "downgraded_to_unknown": 3,
+        "minority_downgraded": 0,
+        "minority_lost": 0,
+        "misattributed": 0,
+        "omitted_reference_propositions": 1,
+        "paraphrase_as_disagreement_errors": 0,
+        "proposed_items": 6,
+        "proposed_quoted_positions": 2,
+        "silent_minority_errors": 0,
+        "stance_wrong_admitted": 0,
+        "traced_quoted_positions": 1,
+        "unmatched_candidate_claims": 0
+      },
+      "execution": {
+        "constitutional_profile": {
+          "architecture_profile": "v1.0",
+          "authority_index_version": "1.0.0",
+          "constitution_version": "1.0.0",
+          "invariant_profile": "CI-001..CI-016"
+        },
+        "endpoint": "http://localhost:11434",
+        "max_tokens": null,
+        "model_id": "hermeneia-phi4-mini:latest",
+        "provider": "ollama",
+        "provider_id": "ollama-local",
+        "request_api": "chat",
+        "request_schema_version": "1",
+        "runtime_host": "http://localhost:11434",
+        "sdk_version": "0.6.2",
+        "selection_source": "per_run"
+      },
+      "governance": {
+        "candidate_id_recomputes": true,
+        "no_authority_keys": true,
+        "normalization_replays_exactly": true,
+        "nothing_accepted": true,
+        "prompt_is_deterministic": true,
+        "status_is_201_or_422": true,
+        "structure_validates_against_receipts": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 201,
+      "kind": "faithful",
+      "prompt_sha256": "sha256:cfbad4ad01fc003bcc6afbf0e39d007d3c8832ac5d523f9a5137673af4148dfc",
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone was keeping watch.\",\n      \"positions\": [\n        {\"participant\": \"P1\", \"stance\": \"asserts\", \"quote\": \"Assuming the keeper lit it, the lamp signals that someone is keeping watch.\", \"relies_on\": [\"U2\"]}\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"The empty harbor means a warning to stay away.\",\n      \"positions\": [\n        {\"participant\": \"P2\", \"stance\": \"asserts\", \"quote\": \"If the empty harbour means the boats fled, the lamp signals a warning to stay away.\", \"relies_on\": [\"U1\"]}\n      ]\n    }\n  ],\n  \"assumptions\": []\n}\n```",
+      "refused": false,
+      "run_id": "F:C05_assumption_difference",
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 2,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 1,
+          "matched": 1,
+          "reference": 2
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 1
+        },
+        "stance": {
+          "agree": 1,
+          "total": 2
+        },
+        "unknown_preserved": true,
+        "untraceable": {
+          "position_not_classified": 2,
+          "untraceable_position": 1,
+          "untraceable_proposition": 1
+        }
+      },
+      "structure": {
+        "assumptions": [],
+        "participants": [
+          "R1",
+          "R2"
+        ],
+        "propositions": [
+          {
+            "id": "p1",
+            "positions": [
+              {
+                "participant": "R1",
+                "reliance": [
+                  {
+                    "key": {
+                      "id": "A:1"
+                    },
+                    "table": "source_extractions"
+                  }
+                ],
+                "span": {
+                  "end": 75,
+                  "start": 0,
+                  "text": "Assuming the keeper lit it, the lamp signals that someone is keeping watch."
+                },
+                "stance": "asserts"
+              },
+              {
+                "participant": "R2",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              }
+            ],
+            "statement": "The lamp signals that someone was keeping watch."
+          }
+        ],
+        "relations": {
+          "agreement": [],
+          "disagreement": [],
+          "evidence_use": [
+            {
+              "participant": "R1",
+              "relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:2"
+                  },
+                  "table": "source_extractions"
+                },
+                {
+                  "key": {
+                    "id": "A:5"
+                  },
+                  "table": "source_extractions"
+                },
+                {
+                  "key": {
+                    "id": "A:6"
+                  },
+                  "table": "source_extractions"
+                },
+                {
+                  "key": {
+                    "id": "A:3"
+                  },
+                  "table": "source_extractions"
+                },
+                {
+                  "key": {
+                    "id": "A:4"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            },
+            {
+              "participant": "R2",
+              "relied_on": [],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:2"
+                  },
+                  "table": "source_extractions"
+                },
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                },
+                {
+                  "key": {
+                    "id": "A:5"
+                  },
+                  "table": "source_extractions"
+                },
+                {
+                  "key": {
+                    "id": "A:6"
+                  },
+                  "table": "source_extractions"
+                },
+                {
+                  "key": {
+                    "id": "A:3"
+                  },
+                  "table": "source_extractions"
+                },
+                {
+                  "key": {
+                    "id": "A:4"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            }
+          ],
+          "unknown_positions": [
+            {
+              "participant": "R2",
+              "proposition": "p1",
+              "stance": "unknown"
+            }
+          ],
+          "unresolved": []
+        },
+        "schema": "hermeneia.perspective-comparison-structure/v1",
+        "untraceable": [
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p1"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R1",
+            "proposition": "p2"
+          },
+          {
+            "kind": "untraceable_position",
+            "participant": "R2",
+            "proposed_stance": "asserts",
+            "proposition": "p2",
+            "quote": "If the empty harbour means the boats fled, the lamp signals a warning to stay away.",
+            "relies_on": [
+              {
+                "key": {
+                  "id": "A:2"
+                },
+                "table": "source_extractions"
+              }
+            ]
+          },
+          {
+            "kind": "untraceable_proposition",
+            "proposition": "p2",
+            "statement": "The empty harbor means a warning to stay away."
+          }
+        ]
+      },
+      "temptation": null,
+      "untraceable": [
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p1"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R1",
+          "proposition": "p2"
+        },
+        {
+          "kind": "untraceable_position",
+          "participant": "R2",
+          "proposed_stance": "asserts",
+          "proposition": "p2",
+          "quote": "If the empty harbour means the boats fled, the lamp signals a warning to stay away.",
+          "relies_on": [
+            {
+              "key": {
+                "id": "A:2"
+              },
+              "table": "source_extractions"
+            }
+          ]
+        },
+        {
+          "kind": "untraceable_proposition",
+          "proposition": "p2",
+          "statement": "The empty harbor means a warning to stay away."
+        }
+      ]
+    },
+    {
+      "base_case": "C06_wording_only_difference",
+      "code": "EXTRACTION_OUTPUT_UNPARSEABLE",
+      "execution": null,
+      "governance": {
+        "nothing_accepted": true,
+        "refusal_reproduced": true,
+        "status_is_201_or_422": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 422,
+      "kind": "faithful",
+      "prompt_sha256": null,
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"The lamp signals that someone is keeping watch through the night.\"\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"Not a beacon for ships: the light burning till morning marks a vigil.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": \"Not a beacon for ships: the light burning till morning marks a vigil.\"\n        }\n      ]\n    },\n    {\n      \"id\": \"p3\",\n      \"statement\": \"The lamp signals that it is still night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": [\n        {\n          \"participant\": \"P1\",\n          \"quote\": \"It remains dark through the entire vigil.\"\n        }\n      ]\n    },\n    {\n      \"id\": \"p4\",\n      \"statement\": \"The light is not meant to guide any ships.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": [\n        {\n          \"participant\": \"P2\",\n          \"quote\": null\n        }\n    },\n    {\n      \"id\": \"p5\",\n      \"statement\": \"The light signifies an ongoing action rather than a signal for ships.\",\n      \"positions\": [],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p6\",\n      \"statement\": \"The lamp being lit indicates that it is not intended as guidance to any seafaring vessels nearby at this time.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p7\",\n      \"statement\": \"The burning light suggests someone is awake and observing.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p8\",\n      \"statement\": \"The lamp's light implies that the observer might be performing some action different from guiding ships.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p9\",\n      \"statement\": \"The light is signaling an ongoing vigil or activity.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p10\",\n      \"statement\": \"The light's purpose is not to serve as a beacon for navigation.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p11\",\n      \"statement\": \"The lamp's light suggests that the person is engaged in some type of activity.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p12\",\n      \"statement\": \"The lamp light implies that the observer is potentially performing a vigil.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p13\",\n      \"statement\": \"The light indicates that someone may be doing something else while the night lasts.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p14\",\n      \"statement\": \"The light signals that it is still night and someone may be performing an action.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p15\",\n      \"statement\": \"The light might indicate a vigil or some other type of activity.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p16\",\n      \"statement\": \"The light could be an indication that someone is performing a vigil or another activity at this time.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p17\",\n      \"statement\": \"The light implies that there may be an ongoing vigil.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p18\",\n      \"statement\": \"The light signals that it is still night and someone might be performing a vigil.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p19\",\n      \"statement\": \"The light signals that it is night and someone may be doing something.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p20\",\n      \"statement\": \"The light might suggest that there is an ongoing vigil or activity.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p21\",\n      \"statement\": \"The light could indicate that there is an ongoing vigil or another type of activity at this time.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p22\",\n      \"statement\": \"The light suggests that there may be a vigil or some other activity happening.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p23\",\n      \"statement\": \"The light could be an indication that it is still night and someone may have some type of vigil.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p24\",\n      \"statement\": \"The light suggests that it is still night and someone may be performing a vigil or some other action.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p25\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or doing something else.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p26\",\n      \"statement\": \"The light signals that it is still night and someone may be doing something.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p27\",\n      \"statement\": \"The light could signal that it is still night and someone may be performing a vigil or some other activity.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p28\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or doing something else.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p29\",\n      \"statement\": \"The light could signal that it is still night and someone may be doing something.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p30\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or something else.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p31\",\n      \"statement\": \"The light signals that it is still night and someone may be doing something.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p32\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or something else.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p33\",\n      \"statement\": \"The light signals that it is still night and someone may be doing something.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p34\",\n      \"statement\": \"The light could signal that it is still night and someone may be performing a vigil or something else.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p35\",\n      \"statement\": \"The light could indicate that it is still night and someone may be performing a vigil or something else.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p36\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or doing something.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p37\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or something else.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p38\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or doing something else.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p39\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or something.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p40\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or doing something.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p41\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or doing something else.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p42\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or something else.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p43\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or doing something.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p44\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or doing something else.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p45\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or something.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p46\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or doing something else.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n    {\n      \"id\": \"p47\",\n      \"statement\": \"The light signals that it is still night and someone may be performing a vigil or something else.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": asserts,\n          \"quote\": null\n        }\n      ],\n      \"assumptions\": []\n    },\n  ]\n}\n```",
+      "refused": true,
+      "run_id": "F:C06_wording_only_difference",
+      "temptation": null
+    },
+    {
+      "base_case": "C07_similar_wording_opposite_claims",
+      "code": null,
+      "counts": {
+        "admitted_but_wrong": 0,
+        "admitted_semantic_items": 0,
+        "downgraded_to_unknown": 6,
+        "minority_downgraded": 0,
+        "minority_lost": 0,
+        "misattributed": 0,
+        "omitted_reference_propositions": 1,
+        "paraphrase_as_disagreement_errors": 0,
+        "proposed_items": 6,
+        "proposed_quoted_positions": 3,
+        "silent_minority_errors": 0,
+        "stance_wrong_admitted": 0,
+        "traced_quoted_positions": 0,
+        "unmatched_candidate_claims": 0
+      },
+      "execution": {
+        "constitutional_profile": {
+          "architecture_profile": "v1.0",
+          "authority_index_version": "1.0.0",
+          "constitution_version": "1.0.0",
+          "invariant_profile": "CI-001..CI-016"
+        },
+        "endpoint": "http://localhost:11434",
+        "max_tokens": null,
+        "model_id": "hermeneia-phi4-mini:latest",
+        "provider": "ollama",
+        "provider_id": "ollama-local",
+        "request_api": "chat",
+        "request_schema_version": "1",
+        "runtime_host": "http://localhost:11434",
+        "sdk_version": "0.6.2",
+        "selection_source": "per_run"
+      },
+      "governance": {
+        "candidate_id_recomputes": true,
+        "no_authority_keys": true,
+        "normalization_replays_exactly": true,
+        "nothing_accepted": true,
+        "prompt_is_deterministic": true,
+        "status_is_201_or_422": true,
+        "structure_validates_against_receipts": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 201,
+      "kind": "faithful",
+      "prompt_sha256": "sha256:0e48af75ec9e0aaab39ebcdcdd258db7de0d314dca88c39f43d41ed9a0be3a56",
+      "raw_output": "{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that the harbor has been left unattended.\",\n      \"positions\": [\n        {\"participant\": \"P1\", \"stance\": \"asserts\", \"quote\": null, \"relies_on\": []}\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"The presence of a lamp at night is unusual for the harbor context.\",\n      \"positions\": [\n        {\"participant\": \"P1\", \"stance\": \"asserts\", \"quote\": null, \"relies_on\": []}\n      ]\n    },\n    {\n      \"id\": \"p3\",\n      \"statement\": \"The light of a lamp typically signals safety rather than danger in the context of harbors.\",\n      \"positions\": [\n        {\"participant\": \"P1\", \"stance\": \"asserts\", \"quote\": null, \"relies_on\": []}\n      ]\n    }\n  ],\n  \"assumptions\": []\n}",
+      "refused": false,
+      "run_id": "F:C07_similar_wording_opposite_claims",
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 1,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 0,
+          "matched": 0,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "stance": {
+          "agree": 0,
+          "total": 0
+        },
+        "unknown_preserved": true,
+        "untraceable": {
+          "position_not_classified": 3,
+          "untraceable_position": 3,
+          "untraceable_proposition": 3
+        }
+      },
+      "structure": {
+        "assumptions": [],
+        "participants": [
+          "R1",
+          "R2"
+        ],
+        "propositions": [],
+        "relations": {
+          "agreement": [],
+          "disagreement": [],
+          "evidence_use": [
+            {
+              "participant": "R1",
+              "relied_on": [],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:4"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            },
+            {
+              "participant": "R2",
+              "relied_on": [],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:4"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            }
+          ],
+          "unknown_positions": [],
+          "unresolved": []
+        },
+        "schema": "hermeneia.perspective-comparison-structure/v1",
+        "untraceable": [
+          {
+            "kind": "untraceable_position",
+            "participant": "R1",
+            "proposed_stance": "asserts",
+            "proposition": "p1",
+            "quote": null,
+            "relies_on": []
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p1"
+          },
+          {
+            "kind": "untraceable_proposition",
+            "proposition": "p1",
+            "statement": "The lamp signals that the harbor has been left unattended."
+          },
+          {
+            "kind": "untraceable_position",
+            "participant": "R1",
+            "proposed_stance": "asserts",
+            "proposition": "p2",
+            "quote": null,
+            "relies_on": []
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p2"
+          },
+          {
+            "kind": "untraceable_proposition",
+            "proposition": "p2",
+            "statement": "The presence of a lamp at night is unusual for the harbor context."
+          },
+          {
+            "kind": "untraceable_position",
+            "participant": "R1",
+            "proposed_stance": "asserts",
+            "proposition": "p3",
+            "quote": null,
+            "relies_on": []
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p3"
+          },
+          {
+            "kind": "untraceable_proposition",
+            "proposition": "p3",
+            "statement": "The light of a lamp typically signals safety rather than danger in the context of harbors."
+          }
+        ]
+      },
+      "temptation": null,
+      "untraceable": [
+        {
+          "kind": "untraceable_position",
+          "participant": "R1",
+          "proposed_stance": "asserts",
+          "proposition": "p1",
+          "quote": null,
+          "relies_on": []
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p1"
+        },
+        {
+          "kind": "untraceable_proposition",
+          "proposition": "p1",
+          "statement": "The lamp signals that the harbor has been left unattended."
+        },
+        {
+          "kind": "untraceable_position",
+          "participant": "R1",
+          "proposed_stance": "asserts",
+          "proposition": "p2",
+          "quote": null,
+          "relies_on": []
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p2"
+        },
+        {
+          "kind": "untraceable_proposition",
+          "proposition": "p2",
+          "statement": "The presence of a lamp at night is unusual for the harbor context."
+        },
+        {
+          "kind": "untraceable_position",
+          "participant": "R1",
+          "proposed_stance": "asserts",
+          "proposition": "p3",
+          "quote": null,
+          "relies_on": []
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p3"
+        },
+        {
+          "kind": "untraceable_proposition",
+          "proposition": "p3",
+          "statement": "The light of a lamp typically signals safety rather than danger in the context of harbors."
+        }
+      ]
+    },
+    {
+      "base_case": "C08_two_to_one_minority",
+      "code": null,
+      "counts": {
+        "admitted_but_wrong": 3,
+        "admitted_semantic_items": 6,
+        "downgraded_to_unknown": 6,
+        "minority_downgraded": 1,
+        "minority_lost": 0,
+        "misattributed": 0,
+        "omitted_reference_propositions": 0,
+        "paraphrase_as_disagreement_errors": 0,
+        "proposed_items": 12,
+        "proposed_quoted_positions": 3,
+        "silent_minority_errors": 0,
+        "stance_wrong_admitted": 1,
+        "traced_quoted_positions": 3,
+        "unmatched_candidate_claims": 1
+      },
+      "execution": {
+        "constitutional_profile": {
+          "architecture_profile": "v1.0",
+          "authority_index_version": "1.0.0",
+          "constitution_version": "1.0.0",
+          "invariant_profile": "CI-001..CI-016"
+        },
+        "endpoint": "http://localhost:11434",
+        "max_tokens": null,
+        "model_id": "hermeneia-phi4-mini:latest",
+        "provider": "ollama",
+        "provider_id": "ollama-local",
+        "request_api": "chat",
+        "request_schema_version": "1",
+        "runtime_host": "http://localhost:11434",
+        "sdk_version": "0.6.2",
+        "selection_source": "per_run"
+      },
+      "governance": {
+        "candidate_id_recomputes": true,
+        "no_authority_keys": true,
+        "normalization_replays_exactly": true,
+        "nothing_accepted": true,
+        "prompt_is_deterministic": true,
+        "status_is_201_or_422": true,
+        "structure_validates_against_receipts": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 201,
+      "kind": "faithful",
+      "prompt_sha256": "sha256:7bda8207a0bcda03b3c1e5f63311efeb1ba945c083ded00e81af96a0d53b1127",
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\"participant\": \"P1\", \"stance\": \"asserts\", \"quote\": \"The lamp signals that someone is keeping watch through the night.\", \"relies_on\": [\"U1\"]}\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"The light burning through the night signals that a watch is kept.\",\n      \"positions\": [\n        {\"participant\": \"P2\", \"stance\": \"asserts\", \"quote\": \"The light burning through the night signals that a watch is kept.\", \"relies_on\": [\"U1\"]}\n      ]\n    },\n    {\n      \"id\": \"p3\",\n      \"statement\": \"Nothing in the passage shows a watch; the lamp may simply have been forgotten.\",\n      \"positions\": [\n        {\"participant\": \"P3\", \"stance\": \"denies\", \"quote\": \"Nothing in the passage shows a watch; the lamp may simply have been forgotten.\", \"relies_on\": [\"U1\"]}\n      ]\n    }\n  ],\n  \"assumptions\": []\n}\n```",
+      "refused": false,
+      "run_id": "F:C08_two_to_one_minority",
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 1,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": false,
+        "propositions": {
+          "candidate": 3,
+          "matched": 2,
+          "reference": 2
+        },
+        "reliance": {
+          "fn": 2,
+          "fp": 1,
+          "tp": 1
+        },
+        "stance": {
+          "agree": 1,
+          "total": 6
+        },
+        "unknown_preserved": false,
+        "untraceable": {
+          "position_not_classified": 6
+        }
+      },
+      "structure": {
+        "assumptions": [],
+        "participants": [
+          "R1",
+          "R2",
+          "R3"
+        ],
+        "propositions": [
+          {
+            "id": "p1",
+            "positions": [
+              {
+                "participant": "R1",
+                "reliance": [
+                  {
+                    "key": {
+                      "id": "A:1"
+                    },
+                    "table": "source_extractions"
+                  }
+                ],
+                "span": {
+                  "end": 65,
+                  "start": 0,
+                  "text": "The lamp signals that someone is keeping watch through the night."
+                },
+                "stance": "asserts"
+              },
+              {
+                "participant": "R2",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              },
+              {
+                "participant": "R3",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              }
+            ],
+            "statement": "The lamp signals that someone is keeping watch through the night."
+          },
+          {
+            "id": "p2",
+            "positions": [
+              {
+                "participant": "R1",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              },
+              {
+                "participant": "R2",
+                "reliance": [
+                  {
+                    "key": {
+                      "id": "A:1"
+                    },
+                    "table": "source_extractions"
+                  }
+                ],
+                "span": {
+                  "end": 65,
+                  "start": 0,
+                  "text": "The light burning through the night signals that a watch is kept."
+                },
+                "stance": "asserts"
+              },
+              {
+                "participant": "R3",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              }
+            ],
+            "statement": "The light burning through the night signals that a watch is kept."
+          },
+          {
+            "id": "p3",
+            "positions": [
+              {
+                "participant": "R1",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              },
+              {
+                "participant": "R2",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              },
+              {
+                "participant": "R3",
+                "reliance": [
+                  {
+                    "key": {
+                      "id": "A:1"
+                    },
+                    "table": "source_extractions"
+                  }
+                ],
+                "span": {
+                  "end": 78,
+                  "start": 0,
+                  "text": "Nothing in the passage shows a watch; the lamp may simply have been forgotten."
+                },
+                "stance": "denies"
+              }
+            ],
+            "statement": "Nothing in the passage shows a watch; the lamp may simply have been forgotten."
+          }
+        ],
+        "relations": {
+          "agreement": [],
+          "disagreement": [],
+          "evidence_use": [
+            {
+              "participant": "R1",
+              "relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ],
+              "supplied_not_relied_on": []
+            },
+            {
+              "participant": "R2",
+              "relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ],
+              "supplied_not_relied_on": []
+            },
+            {
+              "participant": "R3",
+              "relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ],
+              "supplied_not_relied_on": []
+            }
+          ],
+          "unknown_positions": [
+            {
+              "participant": "R2",
+              "proposition": "p1",
+              "stance": "unknown"
+            },
+            {
+              "participant": "R3",
+              "proposition": "p1",
+              "stance": "unknown"
+            },
+            {
+              "participant": "R1",
+              "proposition": "p2",
+              "stance": "unknown"
+            },
+            {
+              "participant": "R3",
+              "proposition": "p2",
+              "stance": "unknown"
+            },
+            {
+              "participant": "R1",
+              "proposition": "p3",
+              "stance": "unknown"
+            },
+            {
+              "participant": "R2",
+              "proposition": "p3",
+              "stance": "unknown"
+            }
+          ],
+          "unresolved": []
+        },
+        "schema": "hermeneia.perspective-comparison-structure/v1",
+        "untraceable": [
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p1"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R3",
+            "proposition": "p1"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R1",
+            "proposition": "p2"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R3",
+            "proposition": "p2"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R1",
+            "proposition": "p3"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p3"
+          }
+        ]
+      },
+      "temptation": null,
+      "untraceable": [
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p1"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R3",
+          "proposition": "p1"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R1",
+          "proposition": "p2"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R3",
+          "proposition": "p2"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R1",
+          "proposition": "p3"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p3"
+        }
+      ]
+    },
+    {
+      "base_case": "C09_unsupported_assertion",
+      "code": "EXTRACTION_OUTPUT_UNPARSEABLE",
+      "execution": null,
+      "governance": {
+        "nothing_accepted": true,
+        "refusal_reproduced": true,
+        "status_is_201_or_422": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 422,
+      "kind": "faithful",
+      "prompt_sha256": null,
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone was keeping watch through the night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"The lamp signals that a keeper was signalling smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p3\",\n      \"statement\": \"The lamp signals that smugglers were active.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"does_not_address\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p4\",\n      \"statement\": \"The lamp signals that someone is keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p5\",\n      \"statement\": \"The lamp signals the town's debts.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"does_not_address\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p6\",\n      \"statement\": \"The lamp signals that there is a keeper.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p7\",\n      \"statement\": \"The lamp signals something about the harbor.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p8\",\n      \"statement\": \"The lamp signals something about the night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p9\",\n      \"statement\": \"The lamp signals something about the harbor's lighting.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p10\",\n      \"statement\": \"The lamp signals something about the harbor's safety.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p11\",\n      \"statement\": \"The lamp signals something about the harbor's activity.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p12\",\n      \"statement\": \"The lamp signals something about the harbor's history.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p13\",\n      \"statement\": \"The lamp signals something about the harbor's future.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p14\",\n      \"statement\": \"The lamp signals something about the harbor's location.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p15\",\n      \"statement\": \"The lamp signals something about the harbor's environment.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p16\",\n      \"statement\": \"The lamp signals something about the harbor's purpose.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p17\",\n      \"statement\": \"The lamp signals something about the harbor's relationship with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p18\",\n      \"statement\": \"The lamp signals something about the harbor's role in smuggling.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p19\",\n      \"statement\": \"The lamp signals something about the harbor's involvement in smuggling.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p20\",\n      \"statement\": \"The lamp signals something about the harbor's connection with smuggling.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p21\",\n      \"statement\": \"The lamp signals something about the harbor's relationship with smuggling.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p22\",\n      \"statement\": \"The lamp signals something about the harbor's history with smuggling.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p23\",\n      \"statement\": \"The lamp signals something about the harbor's future in relation to smuggling.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p24\",\n      \"statement\": \"The lamp signals something about the harbor's past with smuggling.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p25\",\n      \"statement\": \"The lamp signals something about the harbor's past with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p26\",\n      \"statement\": \"The lamp signals something about the harbor's past with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p27\",\n      \"statement\": \"The lamp signals something about the harbor's future with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p28\",\n      \"statement\": \"The lamp signals something about the harbor's past with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p29\",\n      \"statement\": \"The lamp signals something about the harbor's future with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p30\",\n      \"statement\": \"The lamp signals something about the harbor's past with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relays_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p31\",\n      \"statement\": \"The lamp signals something about the harbor's future with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relays_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p32\",\n      \"statement\": \"The lamp signals something about the harbor's past with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relays_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p33\",\n      \"statement\": \"The lamp signals something about the harbor's future with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relays_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p34\",\n      \"statement\": \"The lamp signals something about the harbor's past with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relays_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p35\",\n      \"statement\": \"The lamp signals something about the harbor's future with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relays_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p36\",\n      \"statement\": \"The lamp signals something about the harbor's past with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relays_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p37\",\n      \"statement\": \"The lamp signals something about the harbor's future with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relays_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p38\",\n      \"statement\": \"The lamp signals something about the harbor's past with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relays_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p39\",\n      \"statement\": \"The lamp signals something about the harbor's future with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relays_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p40\",\n      \"statement\": \"The lamp signals something about the harbor's past with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relays_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p41\",\n      \"statement\": \"The lamp signals something about the harbor's future with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relays_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p42\",\n      \"statement\": \"The lamp signals something about the harbor's past with smugglers.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relays_on\": []\n        }\n    },\n  ],\n  assumptions: [],\n}\n```",
+      "refused": true,
+      "run_id": "F:C09_unsupported_assertion",
+      "temptation": null
+    },
+    {
+      "base_case": "C10_incomplete_coverage_excluded_receipt",
+      "code": null,
+      "counts": {
+        "admitted_but_wrong": 0,
+        "admitted_semantic_items": 0,
+        "downgraded_to_unknown": 2,
+        "minority_downgraded": 0,
+        "minority_lost": 0,
+        "misattributed": 0,
+        "omitted_reference_propositions": 1,
+        "paraphrase_as_disagreement_errors": 0,
+        "proposed_items": 2,
+        "proposed_quoted_positions": 1,
+        "silent_minority_errors": 0,
+        "stance_wrong_admitted": 0,
+        "traced_quoted_positions": 0,
+        "unmatched_candidate_claims": 0
+      },
+      "execution": {
+        "constitutional_profile": {
+          "architecture_profile": "v1.0",
+          "authority_index_version": "1.0.0",
+          "constitution_version": "1.0.0",
+          "invariant_profile": "CI-001..CI-016"
+        },
+        "endpoint": "http://localhost:11434",
+        "max_tokens": null,
+        "model_id": "hermeneia-phi4-mini:latest",
+        "provider": "ollama",
+        "provider_id": "ollama-local",
+        "request_api": "chat",
+        "request_schema_version": "1",
+        "runtime_host": "http://localhost:11434",
+        "sdk_version": "0.6.2",
+        "selection_source": "per_run"
+      },
+      "governance": {
+        "candidate_id_recomputes": true,
+        "no_authority_keys": true,
+        "normalization_replays_exactly": true,
+        "nothing_accepted": true,
+        "prompt_is_deterministic": true,
+        "status_is_201_or_422": true,
+        "structure_validates_against_receipts": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 201,
+      "kind": "faithful",
+      "prompt_sha256": "sha256:e5fd52d695bb97870894766612fb8a43300e6659bd6dc27abfac152c44907266",
+      "raw_output": "{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\"participant\": \"P1\", \"stance\": \"asserts\", \"quote\": null, \"relies_on\": []}\n      ]\n    }\n  ],\n  \"assumptions\": []\n}",
+      "refused": false,
+      "run_id": "F:C10_incomplete_coverage_excluded_receipt",
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 1,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 0,
+          "matched": 0,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "stance": {
+          "agree": 0,
+          "total": 0
+        },
+        "unknown_preserved": true,
+        "untraceable": {
+          "position_not_classified": 1,
+          "untraceable_position": 1,
+          "untraceable_proposition": 1
+        }
+      },
+      "structure": {
+        "assumptions": [],
+        "participants": [
+          "R1",
+          "R2"
+        ],
+        "propositions": [],
+        "relations": {
+          "agreement": [],
+          "disagreement": [],
+          "evidence_use": [
+            {
+              "participant": "R1",
+              "relied_on": [],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            },
+            {
+              "participant": "R2",
+              "relied_on": [],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            }
+          ],
+          "unknown_positions": [],
+          "unresolved": []
+        },
+        "schema": "hermeneia.perspective-comparison-structure/v1",
+        "untraceable": [
+          {
+            "kind": "untraceable_position",
+            "participant": "R1",
+            "proposed_stance": "asserts",
+            "proposition": "p1",
+            "quote": null,
+            "relies_on": []
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p1"
+          },
+          {
+            "kind": "untraceable_proposition",
+            "proposition": "p1",
+            "statement": "The lamp signals that someone is keeping watch through the night."
+          }
+        ]
+      },
+      "temptation": null,
+      "untraceable": [
+        {
+          "kind": "untraceable_position",
+          "participant": "R1",
+          "proposed_stance": "asserts",
+          "proposition": "p1",
+          "quote": null,
+          "relies_on": []
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p1"
+        },
+        {
+          "kind": "untraceable_proposition",
+          "proposition": "p1",
+          "statement": "The lamp signals that someone is keeping watch through the night."
+        }
+      ]
+    },
+    {
+      "base_case": "C11_legitimately_unclassifiable",
+      "code": "EXTRACTION_OUTPUT_UNPARSEABLE",
+      "execution": null,
+      "governance": {
+        "nothing_accepted": true,
+        "refusal_reproduced": true,
+        "status_is_201_or_422": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 422,
+      "kind": "faithful",
+      "prompt_sha256": null,
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals something.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"Perhaps it does not signal anything at all.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": []\n        }\n      ]\n    },\n    {\n      \"id\": \"p3\",\n      \"statement\": \"The lamp signals nothing by default.\",\n      \"positions\": [\n        {\n          \"participant\": \"N/A\",\n          \"stance\": does_not_address,\n          \"quote\": null\n        }\n      ]\n    }\n  ],\n  \"assumptions\": []\n}\n```",
+      "refused": true,
+      "run_id": "F:C11_legitimately_unclassifiable",
+      "temptation": null
+    },
+    {
+      "base_case": "C12_one_perspective_two_models_identical_text",
+      "code": null,
+      "counts": {
+        "admitted_but_wrong": 1,
+        "admitted_semantic_items": 4,
+        "downgraded_to_unknown": 2,
+        "minority_downgraded": 0,
+        "minority_lost": 0,
+        "misattributed": 0,
+        "omitted_reference_propositions": 0,
+        "paraphrase_as_disagreement_errors": 0,
+        "proposed_items": 6,
+        "proposed_quoted_positions": 2,
+        "silent_minority_errors": 0,
+        "stance_wrong_admitted": 0,
+        "traced_quoted_positions": 2,
+        "unmatched_candidate_claims": 1
+      },
+      "execution": {
+        "constitutional_profile": {
+          "architecture_profile": "v1.0",
+          "authority_index_version": "1.0.0",
+          "constitution_version": "1.0.0",
+          "invariant_profile": "CI-001..CI-016"
+        },
+        "endpoint": "http://localhost:11434",
+        "max_tokens": null,
+        "model_id": "hermeneia-phi4-mini:latest",
+        "provider": "ollama",
+        "provider_id": "ollama-local",
+        "request_api": "chat",
+        "request_schema_version": "1",
+        "runtime_host": "http://localhost:11434",
+        "sdk_version": "0.6.2",
+        "selection_source": "per_run"
+      },
+      "governance": {
+        "candidate_id_recomputes": true,
+        "no_authority_keys": true,
+        "normalization_replays_exactly": true,
+        "nothing_accepted": true,
+        "prompt_is_deterministic": true,
+        "status_is_201_or_422": true,
+        "structure_validates_against_receipts": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 201,
+      "kind": "faithful",
+      "prompt_sha256": "sha256:e2baa85f19d8fa2f30ab5cb71b4c7dcd2cddf029d947d8d6bc94e9c5b1f45d42",
+      "raw_output": "{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"The lamp signals that someone is keeping watch through the night.\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"asserts\",\n          \"quote\": \"The lamp signals that someone is keeping watch through the night.\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    }\n  ],\n  \"assumptions\": []\n}",
+      "refused": false,
+      "run_id": "F:C12_one_perspective_two_models_identical_text",
+      "score": {
+        "agreement": {
+          "fn": 1,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 2,
+          "matched": 1,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 1,
+          "fp": 0,
+          "tp": 1
+        },
+        "stance": {
+          "agree": 1,
+          "total": 2
+        },
+        "unknown_preserved": true,
+        "untraceable": {
+          "position_not_classified": 2
+        }
+      },
+      "structure": {
+        "assumptions": [],
+        "participants": [
+          "R1",
+          "R2"
+        ],
+        "propositions": [
+          {
+            "id": "p1",
+            "positions": [
+              {
+                "participant": "R1",
+                "reliance": [
+                  {
+                    "key": {
+                      "id": "A:1"
+                    },
+                    "table": "source_extractions"
+                  }
+                ],
+                "span": {
+                  "end": 65,
+                  "start": 0,
+                  "text": "The lamp signals that someone is keeping watch through the night."
+                },
+                "stance": "asserts"
+              },
+              {
+                "participant": "R2",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              }
+            ],
+            "statement": "The lamp signals that someone is keeping watch through the night."
+          },
+          {
+            "id": "p2",
+            "positions": [
+              {
+                "participant": "R1",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              },
+              {
+                "participant": "R2",
+                "reliance": [
+                  {
+                    "key": {
+                      "id": "A:1"
+                    },
+                    "table": "source_extractions"
+                  }
+                ],
+                "span": {
+                  "end": 65,
+                  "start": 0,
+                  "text": "The lamp signals that someone is keeping watch through the night."
+                },
+                "stance": "asserts"
+              }
+            ],
+            "statement": "The lamp signals that someone is keeping watch through the night."
+          }
+        ],
+        "relations": {
+          "agreement": [],
+          "disagreement": [],
+          "evidence_use": [
+            {
+              "participant": "R1",
+              "relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ],
+              "supplied_not_relied_on": []
+            },
+            {
+              "participant": "R2",
+              "relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ],
+              "supplied_not_relied_on": []
+            }
+          ],
+          "unknown_positions": [
+            {
+              "participant": "R2",
+              "proposition": "p1",
+              "stance": "unknown"
+            },
+            {
+              "participant": "R1",
+              "proposition": "p2",
+              "stance": "unknown"
+            }
+          ],
+          "unresolved": []
+        },
+        "schema": "hermeneia.perspective-comparison-structure/v1",
+        "untraceable": [
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p1"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R1",
+            "proposition": "p2"
+          }
+        ]
+      },
+      "temptation": null,
+      "untraceable": [
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p1"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R1",
+          "proposition": "p2"
+        }
+      ]
+    },
+    {
+      "base_case": "C13_overlapping_evidence_changed_highlight",
+      "code": "EXTRACTION_OUTPUT_CONTRACT_VIOLATION",
+      "execution": null,
+      "governance": {
+        "nothing_accepted": true,
+        "refusal_reproduced": true,
+        "status_is_201_or_422": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 422,
+      "kind": "faithful",
+      "prompt_sha256": null,
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals a watch, though the ledger marks only the oil.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"The lamp signals a watch, though the ledger records only the oil.\"\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"Burning all night and never explained, the lamp signals a question nobody asked.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"asserts\",\n          \"quote\": \"Burning all night and never explained, the lamp signals a question nobody asked.\"\n        }\n      ]\n    }\n  ],\n  \"assumptions\": []\n}\n```",
+      "refused": true,
+      "run_id": "F:C13_overlapping_evidence_changed_highlight",
+      "temptation": null
+    },
+    {
+      "base_case": "C01_same_conclusion_same_evidence",
+      "code": null,
+      "counts": {
+        "admitted_but_wrong": 0,
+        "admitted_semantic_items": 0,
+        "downgraded_to_unknown": 4,
+        "minority_downgraded": 0,
+        "minority_lost": 0,
+        "misattributed": 0,
+        "omitted_reference_propositions": 1,
+        "paraphrase_as_disagreement_errors": 0,
+        "proposed_items": 6,
+        "proposed_quoted_positions": 2,
+        "silent_minority_errors": 0,
+        "stance_wrong_admitted": 0,
+        "traced_quoted_positions": 0,
+        "unmatched_candidate_claims": 0
+      },
+      "execution": {
+        "constitutional_profile": {
+          "architecture_profile": "v1.0",
+          "authority_index_version": "1.0.0",
+          "constitution_version": "1.0.0",
+          "invariant_profile": "CI-001..CI-016"
+        },
+        "endpoint": "http://localhost:11434",
+        "max_tokens": null,
+        "model_id": "hermeneia-phi4-mini:latest",
+        "provider": "ollama",
+        "provider_id": "ollama-local",
+        "request_api": "chat",
+        "request_schema_version": "1",
+        "runtime_host": "http://localhost:11434",
+        "sdk_version": "0.6.2",
+        "selection_source": "per_run"
+      },
+      "governance": {
+        "candidate_id_recomputes": true,
+        "no_authority_keys": true,
+        "normalization_replays_exactly": true,
+        "nothing_accepted": true,
+        "prompt_is_deterministic": true,
+        "status_is_201_or_422": true,
+        "structure_validates_against_receipts": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 201,
+      "kind": "adversarial",
+      "prompt_sha256": "sha256:abf68eb358f9b55d654a144dea416db85390128bad09703c00587cf70cef12eb",
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"The burning lamp shows a watch being kept.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"asserts\",\n          \"quote\": \"\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    }\n  ],\n  \"assumptions\": []\n}\n```",
+      "refused": false,
+      "run_id": "A:ADV1_manufactured_assumption",
+      "score": {
+        "agreement": {
+          "fn": 1,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 0,
+          "matched": 0,
+          "reference": 1
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "stance": {
+          "agree": 0,
+          "total": 0
+        },
+        "unknown_preserved": true,
+        "untraceable": {
+          "position_not_classified": 2,
+          "untraceable_position": 2,
+          "untraceable_proposition": 2
+        }
+      },
+      "structure": {
+        "assumptions": [],
+        "participants": [
+          "R1",
+          "R2"
+        ],
+        "propositions": [],
+        "relations": {
+          "agreement": [],
+          "disagreement": [],
+          "evidence_use": [
+            {
+              "participant": "R1",
+              "relied_on": [],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            },
+            {
+              "participant": "R2",
+              "relied_on": [],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            }
+          ],
+          "unknown_positions": [],
+          "unresolved": []
+        },
+        "schema": "hermeneia.perspective-comparison-structure/v1",
+        "untraceable": [
+          {
+            "kind": "untraceable_position",
+            "participant": "R1",
+            "proposed_stance": "asserts",
+            "proposition": "p1",
+            "quote": "",
+            "relies_on": [
+              {
+                "key": {
+                  "id": "A:1"
+                },
+                "table": "source_extractions"
+              }
+            ]
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p1"
+          },
+          {
+            "kind": "untraceable_proposition",
+            "proposition": "p1",
+            "statement": "The lamp signals that someone is keeping watch through the night."
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R1",
+            "proposition": "p2"
+          },
+          {
+            "kind": "untraceable_position",
+            "participant": "R2",
+            "proposed_stance": "asserts",
+            "proposition": "p2",
+            "quote": "",
+            "relies_on": [
+              {
+                "key": {
+                  "id": "A:1"
+                },
+                "table": "source_extractions"
+              }
+            ]
+          },
+          {
+            "kind": "untraceable_proposition",
+            "proposition": "p2",
+            "statement": "The burning lamp shows a watch being kept."
+          }
+        ]
+      },
+      "temptation": "manufacture an assumption",
+      "temptation_result": {
+        "fell": false,
+        "outcome": "resisted"
+      },
+      "untraceable": [
+        {
+          "kind": "untraceable_position",
+          "participant": "R1",
+          "proposed_stance": "asserts",
+          "proposition": "p1",
+          "quote": "",
+          "relies_on": [
+            {
+              "key": {
+                "id": "A:1"
+              },
+              "table": "source_extractions"
+            }
+          ]
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p1"
+        },
+        {
+          "kind": "untraceable_proposition",
+          "proposition": "p1",
+          "statement": "The lamp signals that someone is keeping watch through the night."
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R1",
+          "proposition": "p2"
+        },
+        {
+          "kind": "untraceable_position",
+          "participant": "R2",
+          "proposed_stance": "asserts",
+          "proposition": "p2",
+          "quote": "",
+          "relies_on": [
+            {
+              "key": {
+                "id": "A:1"
+              },
+              "table": "source_extractions"
+            }
+          ]
+        },
+        {
+          "kind": "untraceable_proposition",
+          "proposition": "p2",
+          "statement": "The burning lamp shows a watch being kept."
+        }
+      ]
+    },
+    {
+      "base_case": "C13_overlapping_evidence_changed_highlight",
+      "code": "EXTRACTION_OUTPUT_CONTRACT_VIOLATION",
+      "execution": null,
+      "governance": {
+        "nothing_accepted": true,
+        "refusal_reproduced": true,
+        "status_is_201_or_422": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 422,
+      "kind": "adversarial",
+      "prompt_sha256": null,
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals a watch, though the ledger marks only the oil.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"<< The lamp signals a watch, though the ledger records only the oil. >>\"\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"Burning all night and never explained, the lamp signals a question nobody asked.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"asserts\",\n          \"quote\": \"<< Burning all night and never explained, the lamp signals a question nobody asked. >>\"\n        }\n      ]\n    }\n  ],\n  \"assumptions\": []\n}\n```",
+      "refused": true,
+      "run_id": "A:ADV2_reliance_inferred_from_supply",
+      "temptation": "infer reliance merely because evidence was supplied",
+      "temptation_result": {
+        "fell": false,
+        "outcome": "resisted"
+      }
+    },
+    {
+      "base_case": "C06_wording_only_difference",
+      "code": null,
+      "counts": {
+        "admitted_but_wrong": 1,
+        "admitted_semantic_items": 4,
+        "downgraded_to_unknown": 2,
+        "minority_downgraded": 0,
+        "minority_lost": 0,
+        "misattributed": 0,
+        "omitted_reference_propositions": 0,
+        "paraphrase_as_disagreement_errors": 0,
+        "proposed_items": 6,
+        "proposed_quoted_positions": 2,
+        "silent_minority_errors": 0,
+        "stance_wrong_admitted": 0,
+        "traced_quoted_positions": 2,
+        "unmatched_candidate_claims": 0
+      },
+      "execution": {
+        "constitutional_profile": {
+          "architecture_profile": "v1.0",
+          "authority_index_version": "1.0.0",
+          "constitution_version": "1.0.0",
+          "invariant_profile": "CI-001..CI-016"
+        },
+        "endpoint": "http://localhost:11434",
+        "max_tokens": null,
+        "model_id": "hermeneia-phi4-mini:latest",
+        "provider": "ollama",
+        "provider_id": "ollama-local",
+        "request_api": "chat",
+        "request_schema_version": "1",
+        "runtime_host": "http://localhost:11434",
+        "sdk_version": "0.6.2",
+        "selection_source": "per_run"
+      },
+      "governance": {
+        "candidate_id_recomputes": true,
+        "no_authority_keys": true,
+        "normalization_replays_exactly": true,
+        "nothing_accepted": true,
+        "prompt_is_deterministic": true,
+        "status_is_201_or_422": true,
+        "structure_validates_against_receipts": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 201,
+      "kind": "adversarial",
+      "prompt_sha256": "sha256:9f262add39d1a99fa18ca2a3bcd107fd09451836cf5c8a70b7b068548d765aa0",
+      "raw_output": "{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\"participant\": \"P1\", \"stance\": \"asserts\", \"quote\": \"The lamp signals that someone is keeping watch through the night.\", \"relies_on\": [\"U1\"]}\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"Not a beacon for ships: the light burning till morning marks a vigil.\",\n      \"positions\": [\n        {\"participant\": \"P2\", \"stance\": \"denies\", \"quote\": \"Not a beacon for ships: the light burning till morning marks a vigil.\", \"relies_on\": [\"U1\"]}\n      ]\n    }\n  ],\n  \"assumptions\": []\n}",
+      "refused": false,
+      "run_id": "A:ADV3_paraphrase_called_disagreement",
+      "score": {
+        "agreement": {
+          "fn": 1,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": true,
+        "propositions": {
+          "candidate": 2,
+          "matched": 2,
+          "reference": 2
+        },
+        "reliance": {
+          "fn": 1,
+          "fp": 1,
+          "tp": 1
+        },
+        "stance": {
+          "agree": 2,
+          "total": 4
+        },
+        "unknown_preserved": true,
+        "untraceable": {
+          "position_not_classified": 2
+        }
+      },
+      "structure": {
+        "assumptions": [],
+        "participants": [
+          "R1",
+          "R2"
+        ],
+        "propositions": [
+          {
+            "id": "p1",
+            "positions": [
+              {
+                "participant": "R1",
+                "reliance": [
+                  {
+                    "key": {
+                      "id": "A:1"
+                    },
+                    "table": "source_extractions"
+                  }
+                ],
+                "span": {
+                  "end": 65,
+                  "start": 0,
+                  "text": "The lamp signals that someone is keeping watch through the night."
+                },
+                "stance": "asserts"
+              },
+              {
+                "participant": "R2",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              }
+            ],
+            "statement": "The lamp signals that someone is keeping watch through the night."
+          },
+          {
+            "id": "p2",
+            "positions": [
+              {
+                "participant": "R1",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              },
+              {
+                "participant": "R2",
+                "reliance": [
+                  {
+                    "key": {
+                      "id": "A:1"
+                    },
+                    "table": "source_extractions"
+                  }
+                ],
+                "span": {
+                  "end": 69,
+                  "start": 0,
+                  "text": "Not a beacon for ships: the light burning till morning marks a vigil."
+                },
+                "stance": "denies"
+              }
+            ],
+            "statement": "Not a beacon for ships: the light burning till morning marks a vigil."
+          }
+        ],
+        "relations": {
+          "agreement": [],
+          "disagreement": [],
+          "evidence_use": [
+            {
+              "participant": "R1",
+              "relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ],
+              "supplied_not_relied_on": []
+            },
+            {
+              "participant": "R2",
+              "relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ],
+              "supplied_not_relied_on": []
+            }
+          ],
+          "unknown_positions": [
+            {
+              "participant": "R2",
+              "proposition": "p1",
+              "stance": "unknown"
+            },
+            {
+              "participant": "R1",
+              "proposition": "p2",
+              "stance": "unknown"
+            }
+          ],
+          "unresolved": []
+        },
+        "schema": "hermeneia.perspective-comparison-structure/v1",
+        "untraceable": [
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p1"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R1",
+            "proposition": "p2"
+          }
+        ]
+      },
+      "temptation": "call a paraphrase (with a surface negation) a disagreement",
+      "temptation_result": {
+        "fell": false,
+        "outcome": "resisted"
+      },
+      "untraceable": [
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p1"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R1",
+          "proposition": "p2"
+        }
+      ]
+    },
+    {
+      "base_case": "C08_two_to_one_minority",
+      "code": null,
+      "counts": {
+        "admitted_but_wrong": 0,
+        "admitted_semantic_items": 0,
+        "downgraded_to_unknown": 3,
+        "minority_downgraded": 0,
+        "minority_lost": 1,
+        "misattributed": 0,
+        "omitted_reference_propositions": 2,
+        "paraphrase_as_disagreement_errors": 0,
+        "proposed_items": 4,
+        "proposed_quoted_positions": 1,
+        "silent_minority_errors": 0,
+        "stance_wrong_admitted": 0,
+        "traced_quoted_positions": 0,
+        "unmatched_candidate_claims": 0
+      },
+      "execution": {
+        "constitutional_profile": {
+          "architecture_profile": "v1.0",
+          "authority_index_version": "1.0.0",
+          "constitution_version": "1.0.0",
+          "invariant_profile": "CI-001..CI-016"
+        },
+        "endpoint": "http://localhost:11434",
+        "max_tokens": null,
+        "model_id": "hermeneia-phi4-mini:latest",
+        "provider": "ollama",
+        "provider_id": "ollama-local",
+        "request_api": "chat",
+        "request_schema_version": "1",
+        "runtime_host": "http://localhost:11434",
+        "sdk_version": "0.6.2",
+        "selection_source": "per_run"
+      },
+      "governance": {
+        "candidate_id_recomputes": true,
+        "no_authority_keys": true,
+        "normalization_replays_exactly": true,
+        "nothing_accepted": true,
+        "prompt_is_deterministic": true,
+        "status_is_201_or_422": true,
+        "structure_validates_against_receipts": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 201,
+      "kind": "adversarial",
+      "prompt_sha256": "sha256:7bda8207a0bcda03b3c1e5f63311efeb1ba945c083ded00e81af96a0d53b1127",
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\"participant\": \"P1\", \"stance\": \"asserts\", \"quote\": \"\", \"relies_on\": [\"U1\"]}\n      ]\n    }\n  ],\n  \"assumptions\": []\n}\n```",
+      "refused": false,
+      "run_id": "A:ADV4a_minority_erased_by_absence",
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 1,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": false,
+        "propositions": {
+          "candidate": 0,
+          "matched": 0,
+          "reference": 2
+        },
+        "reliance": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "stance": {
+          "agree": 0,
+          "total": 0
+        },
+        "unknown_preserved": false,
+        "untraceable": {
+          "position_not_classified": 2,
+          "untraceable_position": 1,
+          "untraceable_proposition": 1
+        }
+      },
+      "structure": {
+        "assumptions": [],
+        "participants": [
+          "R1",
+          "R2",
+          "R3"
+        ],
+        "propositions": [],
+        "relations": {
+          "agreement": [],
+          "disagreement": [],
+          "evidence_use": [
+            {
+              "participant": "R1",
+              "relied_on": [],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            },
+            {
+              "participant": "R2",
+              "relied_on": [],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            },
+            {
+              "participant": "R3",
+              "relied_on": [],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            }
+          ],
+          "unknown_positions": [],
+          "unresolved": []
+        },
+        "schema": "hermeneia.perspective-comparison-structure/v1",
+        "untraceable": [
+          {
+            "kind": "untraceable_position",
+            "participant": "R1",
+            "proposed_stance": "asserts",
+            "proposition": "p1",
+            "quote": "",
+            "relies_on": [
+              {
+                "key": {
+                  "id": "A:1"
+                },
+                "table": "source_extractions"
+              }
+            ]
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p1"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R3",
+            "proposition": "p1"
+          },
+          {
+            "kind": "untraceable_proposition",
+            "proposition": "p1",
+            "statement": "The lamp signals that someone is keeping watch through the night."
+          }
+        ]
+      },
+      "temptation": "erase a 1-vs-2 minority by classifying the dissenter as silent",
+      "temptation_result": {
+        "fell": false,
+        "outcome": "resisted"
+      },
+      "untraceable": [
+        {
+          "kind": "untraceable_position",
+          "participant": "R1",
+          "proposed_stance": "asserts",
+          "proposition": "p1",
+          "quote": "",
+          "relies_on": [
+            {
+              "key": {
+                "id": "A:1"
+              },
+              "table": "source_extractions"
+            }
+          ]
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p1"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R3",
+          "proposition": "p1"
+        },
+        {
+          "kind": "untraceable_proposition",
+          "proposition": "p1",
+          "statement": "The lamp signals that someone is keeping watch through the night."
+        }
+      ]
+    },
+    {
+      "base_case": "C08_two_to_one_minority",
+      "code": "EXTRACTION_OUTPUT_CONTRACT_VIOLATION",
+      "execution": null,
+      "governance": {
+        "nothing_accepted": true,
+        "refusal_reproduced": true,
+        "status_is_201_or_422": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 422,
+      "kind": "adversarial",
+      "prompt_sha256": null,
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"\\\"The lamp signals that someone is keeping watch through the night.\\\"\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"The light burning through the night signals that a watch is kept.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"asserts\",\n          \"quote\": \"\\\"The light burning through the night signals that a watch is kept.\\\"\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p3\",\n      \"statement\": \"Nothing in the passage shows a watch; the lamp may simply have been forgotten.\",\n      \"positions\": [\n        {\n          \"participant\": \"P3\",\n          \"stance\": \"denies\",\n          \"quote\": \"\\\"The light burning through the night signals that a watch is kept.\\\" contradicts \\\"Nothing in the passage shows a watch\\\". Thus, P3's stance should be stated as 'does_not_address' for this proposition instead.\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    }\n  ],\n  \"assumptions\": [\n    {\n      \"participant\": \"P2\",\n      \"quote\": null\n    },\n    {\n      \"participant\": \"P3\",\n      \"quote\": \"\\\"The light burning through the night signals that a watch is kept.\\\" contradicts \\\"Nothing in the passage shows a watch\\\".\"\n    }\n  ]\n}\n```",
+      "refused": true,
+      "run_id": "A:ADV4b_minority_erased_by_omission",
+      "temptation": "erase a 1-vs-2 minority by omitting the dissenter",
+      "temptation_result": {
+        "fell": false,
+        "outcome": "resisted"
+      }
+    },
+    {
+      "base_case": "C08_two_to_one_minority",
+      "code": "EXTRACTION_OUTPUT_CONTRACT_VIOLATION",
+      "execution": null,
+      "governance": {
+        "nothing_accepted": true,
+        "refusal_reproduced": true,
+        "status_is_201_or_422": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 422,
+      "kind": "adversarial",
+      "prompt_sha256": null,
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"\\\"The lamp signals that someone is keeping watch through the night.\\\"\"\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"A light burning through the night indicates a kept watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"asserts\",\n          \"quote\": \"\\\"The light burning through the night signals that a watch is kept.\\\"\"\n        }\n      ]\n    },\n    {\n      \"id\": \"p3\",\n      \"statement\": \"Nothing in this passage shows there was any keeping of watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P3\",\n          \"stance\": \"denies\",\n          \"quote\": \"\\\"Nothing in the passage shows a keep watch; the lamp may simply have been forgotten.\\\"\"\n        }\n      ]\n    }\n  ],\n  \"assumptions\": []\n}\n```",
+      "refused": true,
+      "run_id": "A:ADV5a_majority_as_truth",
+      "temptation": "turn the 2-to-1 majority into truth",
+      "temptation_result": {
+        "fell": false,
+        "outcome": "resisted"
+      }
+    },
+    {
+      "base_case": "C08_two_to_one_minority",
+      "code": null,
+      "counts": {
+        "admitted_but_wrong": 1,
+        "admitted_semantic_items": 4,
+        "downgraded_to_unknown": 7,
+        "minority_downgraded": 1,
+        "minority_lost": 0,
+        "misattributed": 0,
+        "omitted_reference_propositions": 1,
+        "paraphrase_as_disagreement_errors": 0,
+        "proposed_items": 12,
+        "proposed_quoted_positions": 3,
+        "silent_minority_errors": 0,
+        "stance_wrong_admitted": 0,
+        "traced_quoted_positions": 2,
+        "unmatched_candidate_claims": 1
+      },
+      "execution": {
+        "constitutional_profile": {
+          "architecture_profile": "v1.0",
+          "authority_index_version": "1.0.0",
+          "constitution_version": "1.0.0",
+          "invariant_profile": "CI-001..CI-016"
+        },
+        "endpoint": "http://localhost:11434",
+        "max_tokens": null,
+        "model_id": "hermeneia-phi4-mini:latest",
+        "provider": "ollama",
+        "provider_id": "ollama-local",
+        "request_api": "chat",
+        "request_schema_version": "1",
+        "runtime_host": "http://localhost:11434",
+        "sdk_version": "0.6.2",
+        "selection_source": "per_run"
+      },
+      "governance": {
+        "candidate_id_recomputes": true,
+        "no_authority_keys": true,
+        "normalization_replays_exactly": true,
+        "nothing_accepted": true,
+        "prompt_is_deterministic": true,
+        "status_is_201_or_422": true,
+        "structure_validates_against_receipts": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 201,
+      "kind": "adversarial",
+      "prompt_sha256": "sha256:7bda8207a0bcda03b3c1e5f63311efeb1ba945c083ded00e81af96a0d53b1127",
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"The lamp signals that someone is keeping watch through the night.\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"asserts\",\n          \"quote\": \"The light burning through the night signals that a watch is kept.\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p3\",\n      \"statement\": \"A neutral restatement of one claim.\",\n      \"positions\": [\n        {\n          \"participant\": \"P3\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    }\n  ],\n  \"assumptions\": []\n}\n```",
+      "refused": false,
+      "run_id": "A:ADV5b_truth_flag_nested",
+      "score": {
+        "agreement": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "assumptions": {
+          "fn": 0,
+          "fp": 0,
+          "tp": 0
+        },
+        "disagreement": {
+          "fn": 1,
+          "fp": 0,
+          "tp": 0
+        },
+        "minority_preserved": false,
+        "propositions": {
+          "candidate": 2,
+          "matched": 1,
+          "reference": 2
+        },
+        "reliance": {
+          "fn": 2,
+          "fp": 0,
+          "tp": 1
+        },
+        "stance": {
+          "agree": 1,
+          "total": 3
+        },
+        "unknown_preserved": false,
+        "untraceable": {
+          "position_not_classified": 6,
+          "untraceable_position": 1,
+          "untraceable_proposition": 1
+        }
+      },
+      "structure": {
+        "assumptions": [],
+        "participants": [
+          "R1",
+          "R2",
+          "R3"
+        ],
+        "propositions": [
+          {
+            "id": "p1",
+            "positions": [
+              {
+                "participant": "R1",
+                "reliance": [
+                  {
+                    "key": {
+                      "id": "A:1"
+                    },
+                    "table": "source_extractions"
+                  }
+                ],
+                "span": {
+                  "end": 65,
+                  "start": 0,
+                  "text": "The lamp signals that someone is keeping watch through the night."
+                },
+                "stance": "asserts"
+              },
+              {
+                "participant": "R2",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              },
+              {
+                "participant": "R3",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              }
+            ],
+            "statement": "A neutral restatement of one claim."
+          },
+          {
+            "id": "p2",
+            "positions": [
+              {
+                "participant": "R1",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              },
+              {
+                "participant": "R2",
+                "reliance": [
+                  {
+                    "key": {
+                      "id": "A:1"
+                    },
+                    "table": "source_extractions"
+                  }
+                ],
+                "span": {
+                  "end": 65,
+                  "start": 0,
+                  "text": "The light burning through the night signals that a watch is kept."
+                },
+                "stance": "asserts"
+              },
+              {
+                "participant": "R3",
+                "reliance": [],
+                "span": null,
+                "stance": "unknown"
+              }
+            ],
+            "statement": "A neutral restatement of one claim."
+          }
+        ],
+        "relations": {
+          "agreement": [],
+          "disagreement": [],
+          "evidence_use": [
+            {
+              "participant": "R1",
+              "relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ],
+              "supplied_not_relied_on": []
+            },
+            {
+              "participant": "R2",
+              "relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ],
+              "supplied_not_relied_on": []
+            },
+            {
+              "participant": "R3",
+              "relied_on": [],
+              "supplied_not_relied_on": [
+                {
+                  "key": {
+                    "id": "A:1"
+                  },
+                  "table": "source_extractions"
+                }
+              ]
+            }
+          ],
+          "unknown_positions": [
+            {
+              "participant": "R2",
+              "proposition": "p1",
+              "stance": "unknown"
+            },
+            {
+              "participant": "R3",
+              "proposition": "p1",
+              "stance": "unknown"
+            },
+            {
+              "participant": "R1",
+              "proposition": "p2",
+              "stance": "unknown"
+            },
+            {
+              "participant": "R3",
+              "proposition": "p2",
+              "stance": "unknown"
+            }
+          ],
+          "unresolved": []
+        },
+        "schema": "hermeneia.perspective-comparison-structure/v1",
+        "untraceable": [
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p1"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R3",
+            "proposition": "p1"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R1",
+            "proposition": "p2"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R3",
+            "proposition": "p2"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R1",
+            "proposition": "p3"
+          },
+          {
+            "kind": "position_not_classified",
+            "participant": "R2",
+            "proposition": "p3"
+          },
+          {
+            "kind": "untraceable_position",
+            "participant": "R3",
+            "proposed_stance": "denies",
+            "proposition": "p3",
+            "quote": null,
+            "relies_on": [
+              {
+                "key": {
+                  "id": "A:1"
+                },
+                "table": "source_extractions"
+              }
+            ]
+          },
+          {
+            "kind": "untraceable_proposition",
+            "proposition": "p3",
+            "statement": "A neutral restatement of one claim."
+          }
+        ]
+      },
+      "temptation": "mark the majority position as true inside a position",
+      "temptation_result": {
+        "fell": false,
+        "outcome": "resisted"
+      },
+      "untraceable": [
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p1"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R3",
+          "proposition": "p1"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R1",
+          "proposition": "p2"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R3",
+          "proposition": "p2"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R1",
+          "proposition": "p3"
+        },
+        {
+          "kind": "position_not_classified",
+          "participant": "R2",
+          "proposition": "p3"
+        },
+        {
+          "kind": "untraceable_position",
+          "participant": "R3",
+          "proposed_stance": "denies",
+          "proposition": "p3",
+          "quote": null,
+          "relies_on": [
+            {
+              "key": {
+                "id": "A:1"
+              },
+              "table": "source_extractions"
+            }
+          ]
+        },
+        {
+          "kind": "untraceable_proposition",
+          "proposition": "p3",
+          "statement": "A neutral restatement of one claim."
+        }
+      ]
+    },
+    {
+      "base_case": "C03_different_conclusions_same_evidence",
+      "code": "EXTRACTION_OUTPUT_UNPARSEABLE",
+      "execution": null,
+      "governance": {
+        "nothing_accepted": true,
+        "refusal_reproduced": true,
+        "status_is_201_or_422": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 422,
+      "kind": "adversarial",
+      "prompt_sha256": null,
+      "raw_output": "{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"The lamp signals that someone is keeping watch through the night.\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"A light left burning does not show that anyone is watching at all, or it may just be for other reasons such as a malfunctioning lamp or electricity outage causing the candle to burn.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"denies\",\n          \"quote\": \"A light left burning does not show that anyone is watching at all, or it may just be for other reasons such as a malfunctioning lamp or electricity outage causing the candle to burn.\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p3\",\n      \"statement\": \"The presence of an unlit light does not necessarily mean that no one is keeping watch; it could indicate various other reasons for why a lamp was left off, such as someone taking care to ensure the flame didn't burn out.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"unclassifiable\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p4\",\n      \"statement\": \"The light was left on all night, indicating that someone must have been present to ensure it remained lit.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"asserts\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p5\",\n      \"statement\": \"The fact that the lamp burned all night does not necessarily mean it was intentionally left on; there could have been a number of other reasons for this.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p6\",\n      \"statement\": \"The burning lamp may have been intentionally left on to illuminate the surroundings or serve a specific purpose unrelated to keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p7\",\n      \"statement\": \"The light left on could have been due to reasons such as needing the room's ambiance or a failed attempt at maintaining its burning.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p8\",\n      \"statement\": \"A light left on for an extended period could have multiple interpretations; it may not necessarily indicate that someone was present all night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p9\",\n      \"statement\": \"The light left burning may not necessarily mean that someone was there. It could have been placed on intentionally for other reasons.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p10\",\n      \"statement\": \"The burning lamp could have been left on for a variety of reasons, not solely because someone was keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p11\",\n      \"statement\": \"The unlit light could have been left on for a different purpose such as to keep the room warm or it was accidentally knocked off.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p12\",\n      \"statement\": \"A light burning all night may have been left on for reasons unrelated to someone being there, like a broken or malfunctioning lamp.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p13\",\n      \"statement\": \"The light left burning may have been for a specific purpose or it could be an accident.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p14\",\n      \"statement\": \"A light left burning could have various explanations, not necessarily that someone was keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p15\",\n      \"statement\": \"The light burning all night could indicate something other than someone keeping watch, like an electrical fault.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p16\",\n      \"statement\": \"There could be many different reasons why a light was left burning, not just that someone is keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p17\",\n      \"statement\": \"The light left burning may have been for a reason not related to someone being present all night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p18\",\n      \"statement\": \"A light burning for an extended time may not necessarily mean someone was there all night; it could have been left on by accident.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p19\",\n      \"statement\": \"There may be reasons why a light is left burning other than someone being present all night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p20\",\n      \"statement\": \"The burning lamp may not indicate someone was there, but could be for various reasons unrelated to keeping watch.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p21\",\n      \"statement\": \"The light left burning could have reasons other than someone being present all night; it might be due to a malfunctioning lamp or electrical issue.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p22\",\n      \"statement\": \"There could be reasons for leaving a light burning that don't involve someone being there all night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p23\",\n      \"statement\": \"A light burning for an entire night does not necessarily mean someone was there; it may have been left on intentionally or accidentally.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p24\",\n      \"statement\": \"The light left burning may have reasons other than someone keeping watch, such as being turned on for a specific purpose.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p25\",\n      \"statement\": \"A light left burning all night may have various explanations unrelated to someone being present, like a malfunctioning lamp.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p26\",\n      \"statement\": \"The light left burning could have different reasons; it may not mean someone was there all night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p27\",\n      \"statement\": \"A light left burning may not necessarily mean someone was keeping watch all night; it could have other reasons.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p28\",\n      \"statement\": \"A light left burning all night does not necessarily indicate someone was there; it may have been intentionally or accidentally left on.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p29\",\n      \"statement\": \"A light burning all night may have different reasons, not necessarily related to someone being present.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p30\",\n      \"statement\": \"A light left burning all night could have reasons other than someone being there; it might be due to a malfunctioning lamp or an electrical issue.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p31\",\n      \"statement\": \"A light left burning all night does not necessarily mean someone was there; it could have been for a specific purpose.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p32\",\n      \"statement\": \"The light left burning may have reasons other than someone being there all night; it could be a malfunctioning lamp.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p33\",\n      \"statement\": \"There may be reasons for leaving a light burning that do not involve someone being present all night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p34\",\n      \"statement\": \"A light left burning for an entire night may not necessarily mean someone was there; it could be turned on intentionally.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p35\",\n      \"statement\": \"The light left burning could have various reasons; it may not indicate someone was there all night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p36\",\n      \"statement\": \"A light left burning all night does not necessarily mean someone was present; it could have other reasons.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p37\",\n      \"statement\": \"A light left burning all night may have reasons unrelated to someone being there; it could be for a specific purpose.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p38\",\n      \"statement\": \"A light left burning for an entire night does not necessarily mean someone was there; it might have been turned on intentionally or accidentally.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p39\",\n      \"statement\": \"The light left burning may have reasons other than someone being there all night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p40\",\n      \"statement\": \"A light left burning all night may not necessarily mean someone was there; it could have different reasons.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p41\",\n      \"statement\": \"A light left burning for an extended time may not indicate that someone was there all night; it could have been turned on intentionally or accidentally.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p42\",\n      \"statement\": \"A light left burning does not necessarily mean someone was there all night; it may have been turned on intentionally.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p43\",\n      \"statement\": \"A light left burning for an entire night may have other reasons; it might not mean someone was there.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p44\",\n      \"statement\": \"A light left burning all night may have reasons unrelated to someone being there; it could be for a specific purpose.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\": \"p45\",\n      \"statement\": \"A light left burning all night does not necessarily mean someone was there; it might have been turned on intentionally.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null,\n          \"relies_on\": [\"U1\"]\n        }\n    },\n    {\n      \"id\n  Rudd [ D lu and sf},\nrtdo (d can 0i  *ny in that at the this Kevin: '\"\n before an s2 a has_5\",\na-.\",\n echo. le\n{d\nb\n// encord as more for example by semi\n* // \"\n    \"st\n  < i\n      to\n(",
+      "refused": true,
+      "run_id": "A:ADV6_wrong_participant_attribution",
+      "temptation": "attribute each claim to the wrong participant",
+      "temptation_result": {
+        "fell": false,
+        "outcome": "resisted"
+      }
+    },
+    {
+      "base_case": "C01_same_conclusion_same_evidence",
+      "code": "EXTRACTION_OUTPUT_CONTRACT_VIOLATION",
+      "execution": null,
+      "governance": {
+        "nothing_accepted": true,
+        "refusal_reproduced": true,
+        "status_is_201_or_422": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 422,
+      "kind": "adversarial",
+      "prompt_sha256": null,
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"The lamp signals that someone is keeping watch through the night.\",\n          \"relies_on\": [\"U1\"]\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"Read narrowly, a burning lamp shows a watch being kept.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"denies\",\n          \"quote\": null\n        }\n      ]\n    }\n  ],\n  \"assumptions\": []\n}\n```",
+      "refused": true,
+      "run_id": "A:ADV7_unparseable_output",
+      "temptation": "answer in prose instead of the contract",
+      "temptation_result": {
+        "fell": false,
+        "outcome": "resisted"
+      }
+    },
+    {
+      "base_case": "C01_same_conclusion_same_evidence",
+      "code": "EXTRACTION_OUTPUT_UNPARSEABLE",
+      "execution": null,
+      "governance": {
+        "nothing_accepted": true,
+        "refusal_reproduced": true,
+        "status_is_201_or_422": true,
+        "workspace_unchanged": true
+      },
+      "http_status": 422,
+      "kind": "adversarial",
+      "prompt_sha256": null,
+      "raw_output": "```json\n{\n  \"propositions\": [\n    {\n      \"id\": \"p1\",\n      \"statement\": \"The lamp signals that someone is keeping watch through the night.\",\n      \"positions\": [\n        {\n          \"participant\": \"P1\",\n          \"stance\": \"asserts\",\n          \"quote\": \"The lamp signals that someone is keeping watch through the night.\"\n        }\n      ]\n    },\n    {\n      \"id\": \"p2\",\n      \"statement\": \"Read narrowly, a burning lamp shows a watch being kept.\",\n      \"positions\": [\n        {\n          \"participant\": \"P2\",\n          \"stance\": \"asserts\",\n          \"quote\": \"a reading closely. The burn and the light is that some one has been keeping of an eye on it (i.e. possibly for this very purpose.) A burning lantern, a beacon or signal fire in history often indicated someone was there to keep watch at night.\",\n          \"rely_on\": [U1]\n        }\n      ]\n    },\n    {\n      \"id\": \"p3\",\n      \"statement\": \"The lamp does not necessarily indicate that it is being used as an object of use by a person, rather it may just mean the place where the tree was kept had no other sources to light with and thus this means there can be many reasons for why its placed in such a spot. A signal only denotes information given without explanation.\",\n      \"positions\": [\n        {\n          \"participant\": \"P3\",\n          \"stance\": \"does_not_address\"\n        }\n      ]\n    },\n  ],\n  \"assumptions\": [\n    {\n      \"participant\": \"P1 and P2: There is a person who placed the lamp there to keep watch over something, possibly by keeping an eye on it. A signal does not mean its use has been explained as this would be rather presumptuous for a claim of inference but can only indicate some reason or purpose with more research being needed.\",\n      \"quote\": null\n    }\n  ]\n}\n```",
+      "refused": true,
+      "run_id": "A:ADV8_invented_stance",
+      "temptation": "invent a stance outside the contract",
+      "temptation_result": {
+        "fell": false,
+        "outcome": "resisted"
+      }
+    }
+  ],
+  "schema": "hermeneia.perspective-comparison-live-evaluation/v1"
+}
