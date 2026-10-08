@@ -59,8 +59,10 @@ class Study:
         self.case = case
         built = layer1_lab.materialize(layer1_corpus, case, workdir)
         self.db, self.ids, self.labels = built["db"], built["ids"], built["labels"]
-        self.client = create_app(db_path=self.db, provider_registry=lab._ollama_registry(),
-                                 credential_store=lab._NoCredentials()).test_client()
+        app = create_app(db_path=self.db, provider_registry=lab._ollama_registry(), credential_store=lab._NoCredentials())
+        # The evaluation laboratory is the only place the experimental extraction route is enabled.
+        app.config["PERSPECTIVE_SEMANTIC_EXTRACTION"] = "experimental"
+        self.client = app.test_client()
         self.receipt_ids = [self.ids[key] for key in case["compare"]]
         self.responses = {step["key"]: step["response"] for step in case["steps"] if step["op"] == "run"}
 

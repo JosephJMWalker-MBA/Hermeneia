@@ -9787,6 +9787,10 @@ Return ONLY valid JSON, no markdown, no explanation:
 
     # P7 Layer 2: transient model-proposed comparison candidates. Disposable
     # server state with no history authority; only a steward decision writes.
+    # Provider-backed extraction is experimental and disabled by default
+    # (docs/design/perspective-comparison-p7-disposition.md §5).
+    app.config.setdefault("PERSPECTIVE_SEMANTIC_EXTRACTION",
+                          "experimental" if os.environ.get("HERMENEIA_SEMANTIC_EXTRACTION") == "experimental" else "disabled")
     perspective_comparison_candidates: dict[str, dict] = {}
     perspective_comparison_candidates_lock = threading.RLock()
     _SHAPE_REFUSALS = ("DUPLICATE_PARTICIPANT", "TOO_FEW_PARTICIPANTS", "TOO_MANY_PARTICIPANTS")
@@ -9800,6 +9804,10 @@ Return ONLY valid JSON, no markdown, no explanation:
             EXTRACTION_POLICY_VERSION, POLICIES, ExtractionRefused, build_candidate, candidate_inputs, prompt_for, text_digest,
         )
 
+        if app.config.get("PERSPECTIVE_SEMANTIC_EXTRACTION") != "experimental":
+            return jsonify({"error": "Automatic semantic extraction is experimental and disabled; author the comparison "
+                                     "directly through /api/perspective/comparison/authored",
+                            "code": "SEMANTIC_EXTRACTION_DISABLED"}), 403
         payload = request.get_json(silent=True)
         if (not isinstance(payload, dict) or not {"receipt_ids", "model"} <= set(payload) <= {"receipt_ids", "model", "policy_version"}
                 or not isinstance(payload["receipt_ids"], list) or not all(isinstance(i, str) for i in payload["receipt_ids"])
@@ -9932,6 +9940,86 @@ Return ONLY valid JSON, no markdown, no explanation:
                 return jsonify({"error": "An accepted comparison cannot be discarded", "code": "ALREADY_ACCEPTED"}), 409
             del perspective_comparison_candidates[candidate_id]
         return jsonify({"candidate_id": candidate_id, "state": "discarded", "canonical_status": "not_persisted"})
+
+    @app.route("/api/perspective/comparison/authoring-basis")
+    def api_perspective_comparison_authoring_basis():
+        """Read-only basis for a steward-authored comparison: the exact binding and the deterministic Layer 1."""
+        from ..perspective_achievement_evidence import read_perspective_achievement_evidence
+        from ..perspective_comparison import ComparisonRefused
+        from ..perspective_comparison_candidates import candidate_inputs
+        from ..study_lineage import serialize_projection
+
+        if set(request.args) - {"receipt_id"}:
+            return jsonify({"error": "Only repeated receipt_id parameters are supported", "code": "UNSUPPORTED_PARAMETER"}), 400
+        conn = _conn() if db_path.exists() else sqlite3.connect(":memory:")
+        try:
+            conn.execute("PRAGMA query_only=ON")
+            conn.execute("BEGIN")
+            inputs = candidate_inputs(conn, read_perspective_achievement_evidence(conn), request.args.getlist("receipt_id"))
+            payload = serialize_projection({"binding": inputs["binding"], "layer1": inputs["layer1"]})
+        except ComparisonRefused as refusal:
+            return jsonify({"error": "These receipts are not an admissible comparison", "code": refusal.code}), (
+                400 if refusal.code in _SHAPE_REFUSALS else 409)
+        except (sqlite3.Error, ValueError):
+            return jsonify({"error": "Comparison inputs could not be read", "code": "EVALUATION_FAILED"}), 409
+        finally:
+            conn.close()
+        return _no_store(payload)
+
+    @app.route("/api/perspective/comparison/authored", methods=["POST"])
+    def api_author_perspective_comparison():
+        """A steward-authored comparison: strict validation, then the same append-only record; no model is called."""
+        from ..accepted_perspective_comparisons import (
+            TABLE as ACCEPTED_TABLE, make_steward_authored_record, record_from_row, store_accepted_comparison,
+        )
+        from ..perspective_achievement_evidence import read_perspective_achievement_evidence
+        from ..perspective_comparison import ComparisonRefused
+        from ..perspective_comparison_candidates import StructureRefused, candidate_inputs, structure_from_edit
+        from ..perspective_execution_receipts import canonical_bytes
+        from ..study_lineage import project_study_lineage
+
+        payload = request.get_json(silent=True)
+        if (not isinstance(payload, dict) or set(payload) != {"binding", "structure"} or not isinstance(payload["binding"], dict)
+                or not isinstance(payload["binding"].get("receipts"), list)
+                or not all(isinstance(r, dict) and isinstance(r.get("receipt_id"), str) for r in payload["binding"]["receipts"])):
+            return jsonify({"error": "Exactly binding (as returned by the authoring basis) and structure are required",
+                            "code": "INVALID_REQUEST"}), 400
+        if not db_path.exists():
+            return jsonify({"error": "database not found", "code": "NOT_RECORDED"}), 404
+        with perspective_comparison_candidates_lock:
+            conn = _conn_rw()
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    inputs = candidate_inputs(conn, read_perspective_achievement_evidence(conn),
+                                              [binding["receipt_id"] for binding in payload["binding"]["receipts"]])
+                except ComparisonRefused:
+                    inputs = None
+                if inputs is None or inputs["binding"] != payload["binding"]:
+                    conn.rollback()
+                    return jsonify({"error": "The bound receipts, Layer 1 comparison or governing question changed since the "
+                                             "basis was read; nothing was recorded", "code": "STALE_INPUT"}), 409
+                structure = structure_from_edit(payload["structure"], inputs["view"])
+                for row in conn.execute(f"SELECT id, candidate_id, comparison_json FROM {ACCEPTED_TABLE} WHERE candidate_id IS NULL"):
+                    existing = record_from_row(dict(row))
+                    if existing["binding"] == inputs["binding"] and canonical_bytes(existing["structure"]) == canonical_bytes(structure):
+                        conn.rollback()
+                        return jsonify(existing), 200
+                record = store_accepted_comparison(conn, make_steward_authored_record(
+                    inputs["binding"], structure, accepted_at=utc_now_iso()))
+                if not any(item["record"] == {"table": ACCEPTED_TABLE, "key": {"id": record["id"]}}
+                           for item in project_study_lineage(conn)["items"]):
+                    raise ValueError("authored comparison is not eligible under the study's exclusions")
+                conn.commit()
+            except StructureRefused as exc:
+                conn.rollback()
+                return jsonify({"error": str(exc), "code": exc.code}), 422
+            except (ValueError, sqlite3.DatabaseError) as exc:
+                conn.rollback()
+                return jsonify({"error": str(exc), "code": "NOT_RECORDED"}), 409
+            finally:
+                conn.close()
+        return jsonify(record), 201
 
     @app.route("/api/perspective/comparison/accepted/<path:comparison_id>")
     def api_accepted_perspective_comparison(comparison_id):

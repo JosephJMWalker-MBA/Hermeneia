@@ -32,6 +32,9 @@ _DOMAIN = b"hermeneia.accepted-perspective-comparison/v1\0"
 _ID_PREFIX = "accepted-perspective-comparison:sha256:"
 _FIELDS = {"schema", "id", "origin", "binding", "candidate", "structure", "acceptance"}
 _ACCEPTANCE_FIELDS = {"decision", "actor", "actor_identity", "accepted_at", "reviewed_candidate_id", "structure_sha256", "meaning"}
+# One origin field, three kinds, one schema (docs/design/perspective-comparison-p7-disposition.md §3).
+MODEL_ORIGINS = {"accept": "model_proposed_steward_accepted", "edit_and_accept": "model_proposed_steward_edited"}
+STEWARD_AUTHORED = "steward_authored"
 
 
 class InvalidAcceptedComparison(ValueError):
@@ -60,7 +63,7 @@ def _finish(record: dict) -> dict:
 def make_accepted_record(candidate: dict, *, decision: str, structure: dict, accepted_at: str) -> dict:
     """The record of a steward decision on one exact model candidate (accept or edit_and_accept)."""
     return _finish({
-        "schema": SCHEMA, "origin": {"kind": "model_candidate"}, "binding": candidate["binding"],
+        "schema": SCHEMA, "origin": {"kind": MODEL_ORIGINS[decision]}, "binding": candidate["binding"],
         "candidate": {"candidate_id": candidate["candidate_id"], "extraction": candidate["extraction"],
                       "structure": candidate["structure"]},
         "structure": structure,
@@ -73,7 +76,7 @@ def make_accepted_record(candidate: dict, *, decision: str, structure: dict, acc
 def make_steward_authored_record(binding: dict, structure: dict, *, accepted_at: str) -> dict:
     """Option (b): the same canonical type, authored directly by a steward (no route in P7)."""
     return _finish({
-        "schema": SCHEMA, "origin": {"kind": "steward_authored"}, "binding": binding, "candidate": None,
+        "schema": SCHEMA, "origin": {"kind": STEWARD_AUTHORED}, "binding": binding, "candidate": None,
         "structure": structure,
         "acceptance": {"decision": "author", "actor": "local_steward", "actor_identity": "unknown",
                        "accepted_at": accepted_at, "reviewed_candidate_id": None,
@@ -107,7 +110,7 @@ def validate_record(record) -> dict:
     _require(isinstance(structure, dict) and structure.get("schema") == STRUCTURE_SCHEMA
              and structure.get("participants") == [r["receipt_id"] for r in receipts], "structure participants")
     _require(acceptance["structure_sha256"] == _digest(canonical_bytes(structure)), "accepted structure digest")
-    if origin == {"kind": "model_candidate"}:
+    if isinstance(origin, dict) and set(origin) == {"kind"} and origin["kind"] in MODEL_ORIGINS.values():
         candidate = record["candidate"]
         _require(isinstance(candidate, dict) and set(candidate) == {"candidate_id", "extraction", "structure"}, "candidate fields")
         extraction = candidate["extraction"]
@@ -118,13 +121,13 @@ def validate_record(record) -> dict:
         recomputed = candidate_id({"schema": CANDIDATE_SCHEMA, "binding": binding, "extraction": extraction,
                                    "structure": candidate["structure"]})
         _require(candidate["candidate_id"] == recomputed == acceptance["reviewed_candidate_id"], "candidate binding")
-        _require(acceptance["decision"] in ("accept", "edit_and_accept"), "decision for a model candidate")
+        _require(MODEL_ORIGINS.get(acceptance["decision"]) == origin["kind"], "origin kind must match the decision")
         if acceptance["decision"] == "accept":
             _require(structure == candidate["structure"], "exact acceptance must keep the candidate structure")
         else:
             _require(structure["untraceable"] == [], "an edited structure is never downgraded")
     else:
-        _require(origin == {"kind": "steward_authored"} and record["candidate"] is None
+        _require(origin == {"kind": STEWARD_AUTHORED} and record["candidate"] is None
                  and acceptance["decision"] == "author" and acceptance["reviewed_candidate_id"] is None
                  and structure["untraceable"] == [], "steward-authored record")
     return record
