@@ -8,6 +8,7 @@ explicitly. Synthetic workspaces only; in-process fakes; no network.
 """
 from __future__ import annotations
 
+import inspect
 import json
 from pathlib import Path
 import shutil
@@ -21,6 +22,7 @@ from hermeneia import blueprint_proposals as bp
 from hermeneia.capabilities import evaluate_capabilities
 from hermeneia.study_lineage import project_study_lineage
 from hermeneia.web.app import create_app
+from hermeneia.workspace import export_workspace_bundle, preview_restore, read_bundle
 from test_e10_vertical_slice_api import _FakeOllamaClient
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -141,3 +143,31 @@ def test_generation_is_disabled_unless_explicitly_enabled(tmp_path, monkeypatch)
     assert create_app(db_path=tmp_path / "a" / "w.db").config["BLUEPRINT_PROPOSAL_GENERATION"] == "disabled"
     monkeypatch.setenv("HERMENEIA_BLUEPRINT_PROPOSALS", "experimental")
     assert create_app(db_path=tmp_path / "b" / "w.db").config["BLUEPRINT_PROPOSAL_GENERATION"] == "experimental"
+
+
+def test_p8_routes_never_route_through_legacy_model_write_paths(tmp_path):
+    # R-P8-LEGACY-1 (docs/design/blueprint-proposal-p8-disposition.md): the legacy routes stay, but P8 never
+    # reaches their model-to-canonical persistence; it commits only through the canonical seams.
+    views = create_app(db_path=tmp_path / "w.db").view_functions
+    sources = {name: inspect.getsource(views[name]) for name in (
+        "api_blueprint_proposal", "api_accept_blueprint_proposal", "api_discard_blueprint_proposal")}
+    for source in sources.values():
+        for legacy in ("api_architect_generate", "/api/architect/generate", "ai-generated", "extract_blueprint_from_text",
+                       "_call_provider", "/api/pipeline/extract-blueprint", '"extracted"', "INSERT OR IGNORE INTO narrative_blueprints"):
+            assert legacy not in source
+    accept = sources["api_accept_blueprint_proposal"]
+    assert "_persist_exact_blueprint_and_compile" in accept and "_revise_blueprint_in_transaction" in accept
+    assert "BEGIN IMMEDIATE" in accept
+
+
+def test_export_and_restore_preview_declare_acceptance_history_unsupported(accepted, tmp_path):
+    # Owner portability gate (2026-10-10): never imply that WBS preserves Blueprint proposal acceptance history.
+    ws, _receipt = accepted
+    bundle = tmp_path / "bundle"
+    manifest = export_workspace_bundle(ws.db, bundle, generated_at="2026-10-10T00:00:00+00:00", workspace_id="synthetic-p8")
+    assert not any(token in f["path"] for f in manifest["files"] for token in ("blueprint", "architect", "interpretation"))
+    target = tmp_path / "restored" / "workspace.db"
+    target.parent.mkdir()
+    for coverage in (read_bundle(bundle)["coverage"], preview_restore(target, bundle)["coverage"]):
+        assert coverage[bp.TABLE] == {"status": "unsupported", "reason": bp.PORTABILITY_REASON}
+        assert "P10" in coverage[bp.TABLE]["reason"]

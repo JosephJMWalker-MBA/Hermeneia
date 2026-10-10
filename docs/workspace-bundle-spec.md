@@ -243,6 +243,28 @@ Both files have manifest role `authored`: they are human intellectual judgment
 and must be restored verbatim. They are not `canonical` source evidence and are
 not derived projections.
 
+### 6.2 Declared unsupported: the Blueprint dependency chain (2026-10-10, #215 P8)
+
+The §6 table maps `interpretations` to `reports/interpretations.json`. The
+WBS 1.x exporter does **not** implement that row. It also exports none of
+these:
+
+- `narrative_blueprints` and their links;
+- `architect_plans`;
+- Blueprint `supersession_relations`;
+- `blueprint_proposal_acceptances` (P8 acceptance receipts).
+
+Restore therefore reports, in both `read_bundle` and `preview_restore`
+coverage, `blueprint_proposal_acceptances` as `unsupported` with its reason.
+It never creates a receipt.
+
+No WBS 1.x bundle preserves Blueprint proposal acceptance history, or the
+Blueprints, plans, supersessions and Interpretations that history closes over.
+Local durability in `workspace.db` is not portable recoverability. The owner
+deferred the complete chain to #215 P10. P8 generation stays disabled by
+default until that portability gate passes
+(`docs/design/blueprint-proposal-p8-disposition.md`).
+
 ---
 
 ## 7. Storage is an abstraction; Git is the first provider
