@@ -1,13 +1,54 @@
 # P8 disposition — portability, legacy risk, live diagnostic
 
-**Status:** owner decisions of 2026-10-10 on draft PR #250 (#215 P8). P8 is
-**not complete**. This record governs how P8 may be exposed. It amends neither
-the frozen contract (`docs/design/blueprint-proposal-v1.md`) nor its corpus.
+**Status:** owner decisions of 2026-10-10 on PR #250 (#215 P8). This record
+governs how P8 may be exposed. It amends neither the frozen contract
+(`docs/design/blueprint-proposal-v1.md`) nor its corpus.
+
+## 0. Closeout disposition (owner, 2026-10-10)
+
+```text
+GOVERNANCE_COMPLETE / GENERATION_NOT_READY / RELEASE_GATED
+```
+
+**Demonstrated:**
+- exact proposal binding;
+- steward acceptance;
+- revision provenance;
+- local durability;
+- fail-closed behavior.
+
+**Not demonstrated:** trustworthy natural-language Blueprint generation.
+
+PR #250 merges as **gated implementation infrastructure**, not as a released
+natural-language Blueprint assistant. Generation remains disabled by default.
+
+**Key finding.** In the 18-call live evaluation, which is preserved unchanged,
+structurally valid citations did not establish semantic support:
+- pooled reference precision was 1.0;
+- only 2 of 16 graded claims were supported;
+- every admitted proposal flattened an open matter.
+
+**Release blockers.** All must clear before generation is enabled for
+ordinary use:
+
+| Blocker | State |
+| --- | --- |
+| Model competence | Not demonstrated (§3) |
+| P10 portability | Deferred (§1) |
+| Reader review UI | Absent |
+| Legacy direct-write remediation | Open: R-P8-LEGACY-1, #251 (§2) |
+| Steward authorization to enable | Not given |
+
+**Prompt v1.1 is not run.** The observed copying of `I1`/`I2` from the prompt
+example is a specific design hypothesis. Removing that example would not
+establish semantic competence. Any future experiment needs:
+- a separately frozen policy;
+- an appropriately independent evaluation set, not the six cases used here.
 
 ## 1. Portability: deferred to P10, gated before normal exposure
 
 **Decision.** The complete Blueprint dependency chain is deferred to P10, as
-planned in #215. The chain is:
+planned in #215, and the obligation is recorded on #215. The chain is:
 
 - Interpretations;
 - Blueprints;
@@ -39,10 +80,25 @@ those receipts close over. So a receipt proves provenance only inside the
 database that recorded it. Backing up or moving a study through WBS **loses**
 that provenance.
 
+**Preserved spec discrepancy.** The WBS spec's §6 table maps `interpretations`
+to `reports/interpretations.json`, but the WBS 1.x exporter never wrote them.
+This predates P8. It is recorded in WBS spec §6.2 and stays part of the P10
+obligation until export coverage matches the spec, or the spec is corrected by
+decision.
+
 ## 2. Legacy model-direct write paths: a separate compatibility and governance risk
 
-**Decision.** This packet changes neither `/api/architect/generate` nor the
-existing Reader UI. Their behavior is recorded here as risk **R-P8-LEGACY-1**.
+**Decision.** This packet changes neither legacy route nor the existing Reader
+UI. Their behavior is recorded as risk **R-P8-LEGACY-1**, tracked in **#251**.
+#251 has:
+- callers and line references;
+- a reproduction on synthetic workspaces;
+- authority violations;
+- compatibility implications;
+- migration options;
+- closure criteria.
+
+Recording the risk does not resolve it.
 
 Hermeneia **is not free of model-direct canonical writes** while these routes
 stay accessible. #215's P8 gate ("No provider/model path can directly mutate
@@ -50,7 +106,8 @@ canonical Blueprint state") holds for the **P8 routes only**.
 
 ### `/api/architect/generate`
 
-Called by the committed Reader UI (`index.html`, the `fetch('/api/architect/generate'…)` call).
+Called by the Reader Architect panel's "Generate Blueprint →" button
+(`e10GenerateBlueprint()` in `index.html`).
 
 - **Model-to-canonical write.** It inserts the model's Blueprint directly
   (`source="ai-generated"`), with links and an ArchitectPlan, and no steward
@@ -63,19 +120,34 @@ Called by the committed Reader UI (`index.html`, the `fetch('/api/architect/gene
 
   Interpretation references are matched by an 8-character ID prefix and
   otherwise dropped.
+- **Unshown records can be bound.** An in-range number the model was never
+  shown binds a real Observation. `OBS-n` is positional across all documents,
+  and the prompt samples at most 40 Observations.
 - **Not atomic.** The Blueprint and links commit before the plan is compiled.
-  A compile failure leaves a Blueprint without a plan.
+  A compile failure leaves a Blueprint without a plan (reproduced: HTTP 500,
+  Blueprint kept, no plan).
 - **Evidence selection** filters `excluded_from_analysis` directly rather than
   using the Lineage eligibility projection that P8 uses.
 
 ### `/api/pipeline/extract-blueprint` with `save:true`
 
-The Reader UI calls this route with a caller-controlled `save` flag.
+The Reader calls this route in two steps:
+- "Extract Intent Hypothesis" calls `obExtractBlueprint(false)`, a preview;
+- "Ratify & Save Blueprint →" calls `obExtractBlueprint(true)`.
 
-- It persists the model's extraction as `source="extracted"` without review,
-  through the canonical `_persist_exact_blueprint_and_compile` helper.
-- `extract_blueprint_from_text` falls back silently to a canned Blueprint when
-  the provider fails.
+- **`save:true` re-runs the extraction.** It persists that new output as
+  `source="extracted"` through `_persist_exact_blueprint_and_compile`, so the
+  steward's ratification commits a model output the steward never saw
+  (reproduced).
+- **A canned Blueprint can be committed with no model run.**
+  `extract_blueprint_from_text` returns it for the `null` provider (the UI
+  default) and for any client interface it does not recognize, with no signal
+  that no model ran.
+
+  *Correction:* earlier P8 records, including this one before 2026-10-10,
+  described this as a fallback "when the provider fails". That wording was
+  inaccurate and is corrected here; the historical records are left as
+  written.
 
 ### Boundary with P8
 
@@ -93,7 +165,8 @@ The Reader UI calls this route with a caller-controlled `save` flag.
    calls with P8 propose-and-review, once a P8 Reader surface exists.
 2. Then default-disable both legacy write modes for the product flow.
 
-Until then, R-P8-LEGACY-1 stays open.
+Until then, R-P8-LEGACY-1 (#251) stays open. Its migration options and
+closure criteria are in the issue.
 
 ## 3. Live diagnostic
 
