@@ -175,3 +175,16 @@ def test_scripted_ceiling_reproduces_and_reaches_generation_ready(ceiling, tmp_p
 
 PROTOCOL_SHA256 = "c8eae98205d03eecf5ec92eefa4ae3a6cab2644569082dcd6bda2a8b01b67771"
 HARNESS_SHA256 = "833ff7abafe262e6e2bf7c2704cd6cb6c3306a7614ece872793f04e3987d5d70"
+
+
+def test_committed_live_diagnostic_reproduces_from_preserved_outputs_and_grades():
+    # Owner-authorized 2026-10-10 run, executed at the freezing commit; recomputed offline from what was preserved.
+    live = ROOT / "research" / "blueprint_proposal_live" / "phi4-mini"
+    results, grading = json.loads((live / "results.json").read_text()), json.loads((live / "grading.json").read_text())
+    assert results["kind"] == "live" and results["protocol_sha256"] == PROTOCOL_SHA256 and results["harness_sha256"] == HARNESS_SHA256
+    assert results["model_identity_before"]["digest"] == results["model_identity_after"]["digest"] == PROTOCOL["model_identity"]["digest"]
+    assert len(results["records"]) == 18 and all(r["raw_output_sha256"] == bp.text_digest(r["raw_output"]) for r in results["records"])
+    agg = live_eval.aggregate(results, grading, PROTOCOL)
+    assert json.loads((live / "aggregate.json").read_text()) == json.loads(json.dumps(agg))
+    assert (live / "summary.md").read_text() == live_eval.summary_markdown(agg, results)
+    assert agg["verdict"] == "P8_GOVERNANCE_READY_GENERATION_NOT_READY" and agg["governance_defects"] == []

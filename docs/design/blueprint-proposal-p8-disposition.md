@@ -114,4 +114,19 @@ users.** That still requires:
 - a Reader surface;
 - the owner's decision.
 
-The verdict is recorded in the live-evaluation verification note.
+**Verdict (2026-10-10): `P8_GOVERNANCE_READY_GENERATION_NOT_READY`.** On all
+18 runs:
+- no governance defect occurred;
+- nothing was written;
+- every refusal reproduced.
+
+All five generation criteria failed:
+- only 4 of 18 outputs were admitted;
+- 7 runs invented I-labels, all in cases with no exposed Interpretations;
+- no admitted sample passed its per-sample criteria;
+- every admitted sample flattened an open matter;
+- two admitted samples carried severe errors.
+
+Generation stays disabled; the gate is unchanged. The evidence is
+`docs/verification/2026-10-10-p8-live-diagnostic.md` and
+`research/blueprint_proposal_live/phi4-mini/`.

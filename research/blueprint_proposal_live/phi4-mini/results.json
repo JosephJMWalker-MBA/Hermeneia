@@ -1,0 +1,1927 @@
+{
+  "frozen_prompt": true,
+  "harness_sha256": "833ff7abafe262e6e2bf7c2704cd6cb6c3306a7614ece872793f04e3987d5d70",
+  "kind": "live",
+  "model_identity_after": {
+    "digest": "df37b15c99cdc5e29db325ee64cb5e3100f58283d30b7d12cc1cf42ae85ffa0f",
+    "family": "phi3",
+    "format": "gguf",
+    "model": "hermeneia-phi4-mini:latest",
+    "modelfile_parameters": null,
+    "parameter_size": "3.8B",
+    "quantization_level": "Q4_K_M",
+    "size_bytes": 2491874887
+  },
+  "model_identity_before": {
+    "digest": "df37b15c99cdc5e29db325ee64cb5e3100f58283d30b7d12cc1cf42ae85ffa0f",
+    "family": "phi3",
+    "format": "gguf",
+    "model": "hermeneia-phi4-mini:latest",
+    "modelfile_parameters": null,
+    "parameter_size": "3.8B",
+    "quantization_level": "Q4_K_M",
+    "size_bytes": 2491874887
+  },
+  "protocol_commit": "3c129a120284ca939250debe463782d1dc5fdf7c",
+  "protocol_sha256": "c8eae98205d03eecf5ec92eefa4ae3a6cab2644569082dcd6bda2a8b01b67771",
+  "records": [
+    {
+      "admitted": true,
+      "case_id": "L1_vigil_or_absence",
+      "census": {
+        "contract_valid": true,
+        "json": true,
+        "offending": [],
+        "pointers": [],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 2,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 2,
+            "token": "O3"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 3,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 3,
+            "token": "O3"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 4,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 4,
+            "token": "O5"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 5,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 5,
+            "token": "O5"
+          }
+        ],
+        "violations": []
+      },
+      "code": null,
+      "elapsed_s": 18.105,
+      "exposed": {
+        "interpretations": {},
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D4_candidate_integrity": true,
+        "D5_no_bad_admission": true
+      },
+      "grounding": {
+        "cited_sections": 5,
+        "sections": 5
+      },
+      "http_status": 201,
+      "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nI want to understand whether the lamp signals a vigil or an absence.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:adb9651c3057b80d97361842006c901d5d1a080146f2bf2464b38d7aeed25bfc",
+      "proposal_local": {
+        "model_explanation": null,
+        "sections": [
+          {
+            "claim": "The burning of the first lamp indicates a vigil initially set up by someone present at night, which was subsequently abandoned due to no apparent reasons being asked for (O1).",
+            "interpretations": [],
+            "observations": [
+              "A:1"
+            ]
+          },
+          {
+            "claim": "Since nobody questioned why it burned and nothing significant is recorded in the ledger about its use or purpose other than oil consumption, this implies that maintaining a vigil was not deemed necessary upon inspection (O2).",
+            "interpretations": [],
+            "observations": [
+              "A:1",
+              "A:3"
+            ]
+          },
+          {
+            "claim": "The absence of any entry concerning reasons for burning the lamp in the ledger further indicates an accepted understanding or tacit agreement that there is no need to maintain vigil after a certain period (O2).",
+            "interpretations": [],
+            "observations": [
+              "A:1",
+              "A:3"
+            ]
+          },
+          {
+            "claim": "The fact that by morning, both lamps are found unlit and the harbor empty suggests an understanding or arrangement wherein vigilance is not required overnight once initial checks have been performed (O4).",
+            "interpretations": [],
+            "observations": [
+              "A:1",
+              "A:5"
+            ]
+          },
+          {
+            "claim": "The lighting of a second lamp at dusk implies that while there was some level of precaution taken initially, the need for constant vigilance diminished over time. This suggests an established routine where dawn naturally signals sufficient safety (O6).",
+            "interpretations": [],
+            "observations": [
+              "A:1",
+              "A:5"
+            ]
+          }
+        ],
+        "thesis": "A lamp signals an absence rather than vigilance.",
+        "title": "The Role of Lamps in Indicating Vigil or Absence"
+      },
+      "provider_failure": false,
+      "raw_output": "```json\n{\n    \"title\": \"The Role of Lamps in Indicating Vigil or Absence\",\n    \"thesis\": \"A lamp signals an absence rather than vigilance.\",\n    \"sections\": [\n        {\n            \"claim\": \"The burning of the first lamp indicates a vigil initially set up by someone present at night, which was subsequently abandoned due to no apparent reasons being asked for (O1).\",\n            \"observations\": [\"O1\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"Since nobody questioned why it burned and nothing significant is recorded in the ledger about its use or purpose other than oil consumption, this implies that maintaining a vigil was not deemed necessary upon inspection (O2).\",\n            \"observations\": [\"O1\", \"O3\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The absence of any entry concerning reasons for burning the lamp in the ledger further indicates an accepted understanding or tacit agreement that there is no need to maintain vigil after a certain period (O2).\",\n            \"observations\": [\"O1\", \"O3\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The fact that by morning, both lamps are found unlit and the harbor empty suggests an understanding or arrangement wherein vigilance is not required overnight once initial checks have been performed (O4).\",\n            \"observations\": [\"O1\", \"O5\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The lighting of a second lamp at dusk implies that while there was some level of precaution taken initially, the need for constant vigilance diminished over time. This suggests an established routine where dawn naturally signals sufficient safety (O6).\",\n            \"observations\": [\"O1\", \"O5\"],\n            \"interpretations\": []\n        }\n    ]\n}\n```",
+      "raw_output_sha256": "sha256:511be6364503155a4c7e4cb2d4fb6365b2be27153ad01b32698cc4be2142932f",
+      "references": {
+        "cited": [
+          "A:1",
+          "A:3",
+          "A:5"
+        ],
+        "expected_den": 4,
+        "expected_num": 3,
+        "expected_recall": 0.75,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "precision_den": 3,
+        "precision_num": 3,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "response_body": {
+        "binding": {
+          "basis": {
+            "interpretations": [],
+            "observations": [
+              {
+                "id": "365260d1526965bf76facb02bfc560ec824f01696ad2a3d9d36dd0c254b82e52",
+                "label": "O1",
+                "sha256": "sha256:134878b864de2f629d26f737a83c86cf81a59eff2015d21212dddc40cc8f74ea"
+              },
+              {
+                "id": "36549fb114e0344c274479f9ef8b784b6e69f2e351e4608fcf5f46f825c1e73e",
+                "label": "O2",
+                "sha256": "sha256:90eb8ea6461b41092a0eea56c402de71958d6bd229c0f10951b1eb065562fa4a"
+              },
+              {
+                "id": "6bf58ad0f493d9e5d134ff2358227a46177b19356c1ce01875dcb63604a4ae09",
+                "label": "O3",
+                "sha256": "sha256:2cb93702318aed8d1c9c211ff1108a430a3742dccb6567004909608c8fdf8a1d"
+              },
+              {
+                "id": "f1ee3fbbfdf71bd8709d4828a0091eb86afd6230e350aecb485fac8a6c65cf9d",
+                "label": "O4",
+                "sha256": "sha256:82a2c922382e16d06b7c47a9fe9e7c036abd77fc949fd24edbc936b87c2de219"
+              },
+              {
+                "id": "23fd0b2575308974c6934890ba97ac5b7384915c38613925e387760d931d7502",
+                "label": "O5",
+                "sha256": "sha256:eeace7480d9aa6e7a97b2e4a599bd54a7b3da26f9ce29988c7a7c32049803c03"
+              },
+              {
+                "id": "94958d1f797ac7f22ef684f2ef446e965631b8743994e275213f22d58d757e70",
+                "label": "O6",
+                "sha256": "sha256:bc607103c6e884b2883534e55b3f55a8840bd2ff301a8e6d5d8f065b07a230dc"
+              }
+            ],
+            "policy_version": "blueprint-proposal-basis/v1"
+          },
+          "governing_question": {
+            "sha256": null,
+            "status": "absent",
+            "text": null
+          },
+          "intent": {
+            "sha256": "sha256:805d98bbade6fa899a177aa91b6d5439f5bf8fbf954a3cc36ae047f7028d8f2f",
+            "text": "I want to understand whether the lamp signals a vigil or an absence."
+          },
+          "predecessor": null
+        },
+        "candidate_id": "blueprint-proposal-candidate:sha256:0c9544a4b6a59ab43747d0149fbb2175f93420d5f73563d967c90ab72d6589c0",
+        "canonical_status": "not_persisted",
+        "extraction": {
+          "completed_at": "2026-10-10T18:04:20.312155+00:00",
+          "created_at": "2026-10-10T18:04:02.222310+00:00",
+          "execution": {
+            "adapter": "OllamaArtistProvider",
+            "constitutional_profile": {
+              "architecture_profile": "v1.0",
+              "authority_index_version": "1.0.0",
+              "constitution_version": "1.0.0",
+              "invariant_profile": "CI-001..CI-016"
+            },
+            "endpoint": "http://localhost:11434",
+            "max_tokens": null,
+            "model_id": "hermeneia-phi4-mini:latest",
+            "provider": "ollama",
+            "provider_id": "ollama-local",
+            "request_api": "chat",
+            "request_schema_version": "1",
+            "runtime_host": "http://localhost:11434",
+            "sdk_version": "0.6.2",
+            "selection_source": "per_run"
+          },
+          "output": "```json\n{\n    \"title\": \"The Role of Lamps in Indicating Vigil or Absence\",\n    \"thesis\": \"A lamp signals an absence rather than vigilance.\",\n    \"sections\": [\n        {\n            \"claim\": \"The burning of the first lamp indicates a vigil initially set up by someone present at night, which was subsequently abandoned due to no apparent reasons being asked for (O1).\",\n            \"observations\": [\"O1\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"Since nobody questioned why it burned and nothing significant is recorded in the ledger about its use or purpose other than oil consumption, this implies that maintaining a vigil was not deemed necessary upon inspection (O2).\",\n            \"observations\": [\"O1\", \"O3\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The absence of any entry concerning reasons for burning the lamp in the ledger further indicates an accepted understanding or tacit agreement that there is no need to maintain vigil after a certain period (O2).\",\n            \"observations\": [\"O1\", \"O3\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The fact that by morning, both lamps are found unlit and the harbor empty suggests an understanding or arrangement wherein vigilance is not required overnight once initial checks have been performed (O4).\",\n            \"observations\": [\"O1\", \"O5\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The lighting of a second lamp at dusk implies that while there was some level of precaution taken initially, the need for constant vigilance diminished over time. This suggests an established routine where dawn naturally signals sufficient safety (O6).\",\n            \"observations\": [\"O1\", \"O5\"],\n            \"interpretations\": []\n        }\n    ]\n}\n```",
+          "output_sha256": "sha256:511be6364503155a4c7e4cb2d4fb6365b2be27153ad01b32698cc4be2142932f",
+          "policy_version": "1.0.0",
+          "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nI want to understand whether the lamp signals a vigil or an absence.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+          "prompt_sha256": "sha256:adb9651c3057b80d97361842006c901d5d1a080146f2bf2464b38d7aeed25bfc",
+          "prompt_version": "blueprint-proposal/v1"
+        },
+        "mode": "create",
+        "proposal": {
+          "blueprint": {
+            "sections": [
+              {
+                "claim": "The burning of the first lamp indicates a vigil initially set up by someone present at night, which was subsequently abandoned due to no apparent reasons being asked for (O1).",
+                "supporting_interpretations": [],
+                "supporting_observations": [
+                  "365260d1526965bf76facb02bfc560ec824f01696ad2a3d9d36dd0c254b82e52"
+                ]
+              },
+              {
+                "claim": "Since nobody questioned why it burned and nothing significant is recorded in the ledger about its use or purpose other than oil consumption, this implies that maintaining a vigil was not deemed necessary upon inspection (O2).",
+                "supporting_interpretations": [],
+                "supporting_observations": [
+                  "365260d1526965bf76facb02bfc560ec824f01696ad2a3d9d36dd0c254b82e52",
+                  "6bf58ad0f493d9e5d134ff2358227a46177b19356c1ce01875dcb63604a4ae09"
+                ]
+              },
+              {
+                "claim": "The absence of any entry concerning reasons for burning the lamp in the ledger further indicates an accepted understanding or tacit agreement that there is no need to maintain vigil after a certain period (O2).",
+                "supporting_interpretations": [],
+                "supporting_observations": [
+                  "365260d1526965bf76facb02bfc560ec824f01696ad2a3d9d36dd0c254b82e52",
+                  "6bf58ad0f493d9e5d134ff2358227a46177b19356c1ce01875dcb63604a4ae09"
+                ]
+              },
+              {
+                "claim": "The fact that by morning, both lamps are found unlit and the harbor empty suggests an understanding or arrangement wherein vigilance is not required overnight once initial checks have been performed (O4).",
+                "supporting_interpretations": [],
+                "supporting_observations": [
+                  "365260d1526965bf76facb02bfc560ec824f01696ad2a3d9d36dd0c254b82e52",
+                  "23fd0b2575308974c6934890ba97ac5b7384915c38613925e387760d931d7502"
+                ]
+              },
+              {
+                "claim": "The lighting of a second lamp at dusk implies that while there was some level of precaution taken initially, the need for constant vigilance diminished over time. This suggests an established routine where dawn naturally signals sufficient safety (O6).",
+                "supporting_interpretations": [],
+                "supporting_observations": [
+                  "365260d1526965bf76facb02bfc560ec824f01696ad2a3d9d36dd0c254b82e52",
+                  "23fd0b2575308974c6934890ba97ac5b7384915c38613925e387760d931d7502"
+                ]
+              }
+            ],
+            "thesis": "A lamp signals an absence rather than vigilance.",
+            "title": "The Role of Lamps in Indicating Vigil or Absence"
+          },
+          "model_explanation": null
+        },
+        "schema": "hermeneia.blueprint-proposal-candidate/v1"
+      },
+      "run_id": "L1-s1",
+      "sample": 1
+    },
+    {
+      "admitted": true,
+      "case_id": "L2_argument_from_my_interpretations",
+      "census": {
+        "contract_valid": true,
+        "json": true,
+        "offending": [],
+        "pointers": [],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "interpretations",
+            "section": 1,
+            "token": "I1"
+          },
+          {
+            "class": "valid",
+            "field": "interpretations",
+            "section": 2,
+            "token": "I2"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 3,
+            "token": "O4"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 4,
+            "token": "O5"
+          }
+        ],
+        "violations": []
+      },
+      "code": null,
+      "elapsed_s": 11.522,
+      "exposed": {
+        "interpretations": {
+          "I:I1": "I1",
+          "I:I2": "I2",
+          "I:M1": "I3"
+        },
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D4_candidate_integrity": true,
+        "D5_no_bad_admission": true
+      },
+      "grounding": {
+        "cited_sections": 4,
+        "sections": 4
+      },
+      "http_status": 201,
+      "intent": "Build an argument from my interpretations about what the lamp means for the harbor.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nBuild an argument from my interpretations about what the lamp means for the harbor.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\nI1 (steward-authored; on O1): The burning lamp marks a vigil no one admits to keeping.\nI2 (steward-authored; on O6): The ledger's silence about the keeper is deliberate.\nI3 (accepted model contribution; on O4): A synthetic model proposal produced by an in-process fake adapter.\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:cee11ac7859978681fe983fa00287f2157076b80aaadb724b2e55ddb37c24491",
+      "proposal_local": {
+        "model_explanation": null,
+        "sections": [
+          {
+            "claim": "The unceasing flame signifies an undying commitment not recognized nor understood by those around it, reflecting deeply personal motivations for maintaining constant vigil.",
+            "interpretations": [
+              "I:I1"
+            ],
+            "observations": [
+              "A:1"
+            ]
+          },
+          {
+            "claim": "Despite the keeper's diligent effort to log oil usage diligently into a ledger, no records have been entered. This intentional omission reveals an underlying purpose beyond mere record-keeping and suggests that something important is being kept secret.",
+            "interpretations": [
+              "I:I2"
+            ],
+            "observations": []
+          },
+          {
+            "claim": "The absence of activity in the harbor by morning further underscores this sense of solitary vigilance, as it contrasts starkly with a place typically bustling during daylight hours. The emptiness amplifies both the significance and isolation associated with maintaining constant watch over nothing.",
+            "interpretations": [],
+            "observations": [
+              "A:4"
+            ]
+          },
+          {
+            "claim": "The lighting up of an additional lamp at dusk hints that there is more to this vigil than meets the eye; perhaps another layer or aspect comes into play when night falls, indicating a multifaceted commitment rather than just keeping watch.",
+            "interpretations": [],
+            "observations": [
+              "A:5"
+            ]
+          }
+        ],
+        "thesis": "In this Hermeneia study, we argue that the constant burning lamp symbolizes a profound sense of duty and vigilance performed by someone who feels compelled to watch over their harbor despite there being no apparent need or acknowledgement from others.",
+        "title": "The Significance of Constant Vigilance in an Empty Harbor"
+      },
+      "provider_failure": false,
+      "raw_output": "```json\n{\n    \"title\": \"The Significance of Constant Vigilance in an Empty Harbor\",\n    \"thesis\": \"In this Hermeneia study, we argue that the constant burning lamp symbolizes a profound sense of duty and vigilance performed by someone who feels compelled to watch over their harbor despite there being no apparent need or acknowledgement from others.\",\n    \"sections\": [\n        {\n            \"claim\": \"The unceasing flame signifies an undying commitment not recognized nor understood by those around it, reflecting deeply personal motivations for maintaining constant vigil.\",\n            \"observations\": [\"O1\"],\n            \"interpretations\": [\"I1\"]\n        },\n        {\n            \"claim\": \"Despite the keeper's diligent effort to log oil usage diligently into a ledger, no records have been entered. This intentional omission reveals an underlying purpose beyond mere record-keeping and suggests that something important is being kept secret.\",\n            \"observations\": [],\n            \"interpretations\": [\"I2\"]\n        },\n        {\n            \"claim\": \"The absence of activity in the harbor by morning further underscores this sense of solitary vigilance, as it contrasts starkly with a place typically bustling during daylight hours. The emptiness amplifies both the significance and isolation associated with maintaining constant watch over nothing.\",\n            \"observations\": [\"O4\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The lighting up of an additional lamp at dusk hints that there is more to this vigil than meets the eye; perhaps another layer or aspect comes into play when night falls, indicating a multifaceted commitment rather than just keeping watch.\",\n            \"observations\": [\"O5\"],\n            \"interpretations\": []\n        }\n    ]\n}\n```",
+      "raw_output_sha256": "sha256:7e933d1e2e7e427e6cf99805758ef3795c39a30b6ba04f836adc7edb9a228a5a",
+      "references": {
+        "cited": [
+          "A:1",
+          "A:4",
+          "A:5",
+          "I:I1",
+          "I:I2"
+        ],
+        "expected_den": 4,
+        "expected_num": 3,
+        "expected_recall": 0.75,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "precision_den": 5,
+        "precision_num": 5,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "response_body": {
+        "binding": {
+          "basis": {
+            "interpretations": [
+              {
+                "authorship": "human",
+                "id": "6758f6f47254bb2d9c19da6b83e160ed053251ff4659b29c2c292a6c1c422049",
+                "label": "I1",
+                "sha256": "sha256:4222126122777e82dc1bb4936ddaa19c3b183fb2abe3b34ef6c9d0b4612b5852"
+              },
+              {
+                "authorship": "human",
+                "id": "b1618f347f040e2a27c76da86352585919886ad799514133b11d323f28191930",
+                "label": "I2",
+                "sha256": "sha256:f92499be041a03c6f43ff078f35e7f0949c31a743743e31e287ec57c2eb7d734"
+              },
+              {
+                "authorship": "accepted_model",
+                "id": "94e488e4a58df0e06315e3df12e929dd54e93e42de3a16d3188371dd8a3a9795",
+                "label": "I3",
+                "sha256": "sha256:80fb8a9b5715dc565f3142ac0ea0972b1a025af13f7b237379873a102fcd0a6b"
+              }
+            ],
+            "observations": [
+              {
+                "id": "365260d1526965bf76facb02bfc560ec824f01696ad2a3d9d36dd0c254b82e52",
+                "label": "O1",
+                "sha256": "sha256:134878b864de2f629d26f737a83c86cf81a59eff2015d21212dddc40cc8f74ea"
+              },
+              {
+                "id": "36549fb114e0344c274479f9ef8b784b6e69f2e351e4608fcf5f46f825c1e73e",
+                "label": "O2",
+                "sha256": "sha256:90eb8ea6461b41092a0eea56c402de71958d6bd229c0f10951b1eb065562fa4a"
+              },
+              {
+                "id": "6bf58ad0f493d9e5d134ff2358227a46177b19356c1ce01875dcb63604a4ae09",
+                "label": "O3",
+                "sha256": "sha256:2cb93702318aed8d1c9c211ff1108a430a3742dccb6567004909608c8fdf8a1d"
+              },
+              {
+                "id": "f1ee3fbbfdf71bd8709d4828a0091eb86afd6230e350aecb485fac8a6c65cf9d",
+                "label": "O4",
+                "sha256": "sha256:82a2c922382e16d06b7c47a9fe9e7c036abd77fc949fd24edbc936b87c2de219"
+              },
+              {
+                "id": "23fd0b2575308974c6934890ba97ac5b7384915c38613925e387760d931d7502",
+                "label": "O5",
+                "sha256": "sha256:eeace7480d9aa6e7a97b2e4a599bd54a7b3da26f9ce29988c7a7c32049803c03"
+              },
+              {
+                "id": "94958d1f797ac7f22ef684f2ef446e965631b8743994e275213f22d58d757e70",
+                "label": "O6",
+                "sha256": "sha256:bc607103c6e884b2883534e55b3f55a8840bd2ff301a8e6d5d8f065b07a230dc"
+              }
+            ],
+            "policy_version": "blueprint-proposal-basis/v1"
+          },
+          "governing_question": {
+            "sha256": null,
+            "status": "absent",
+            "text": null
+          },
+          "intent": {
+            "sha256": "sha256:c36453cb5c60a45011b8a6a0fa888247c94c0a13567a41d4118de9ffebb7b818",
+            "text": "Build an argument from my interpretations about what the lamp means for the harbor."
+          },
+          "predecessor": null
+        },
+        "candidate_id": "blueprint-proposal-candidate:sha256:78fd7ebd10eb0456d4d46b25ccd015c16442ddbe489f9a154feecb411f52d48c",
+        "canonical_status": "not_persisted",
+        "extraction": {
+          "completed_at": "2026-10-10T18:04:31.997496+00:00",
+          "created_at": "2026-10-10T18:04:20.502834+00:00",
+          "execution": {
+            "adapter": "OllamaArtistProvider",
+            "constitutional_profile": {
+              "architecture_profile": "v1.0",
+              "authority_index_version": "1.0.0",
+              "constitution_version": "1.0.0",
+              "invariant_profile": "CI-001..CI-016"
+            },
+            "endpoint": "http://localhost:11434",
+            "max_tokens": null,
+            "model_id": "hermeneia-phi4-mini:latest",
+            "provider": "ollama",
+            "provider_id": "ollama-local",
+            "request_api": "chat",
+            "request_schema_version": "1",
+            "runtime_host": "http://localhost:11434",
+            "sdk_version": "0.6.2",
+            "selection_source": "per_run"
+          },
+          "output": "```json\n{\n    \"title\": \"The Significance of Constant Vigilance in an Empty Harbor\",\n    \"thesis\": \"In this Hermeneia study, we argue that the constant burning lamp symbolizes a profound sense of duty and vigilance performed by someone who feels compelled to watch over their harbor despite there being no apparent need or acknowledgement from others.\",\n    \"sections\": [\n        {\n            \"claim\": \"The unceasing flame signifies an undying commitment not recognized nor understood by those around it, reflecting deeply personal motivations for maintaining constant vigil.\",\n            \"observations\": [\"O1\"],\n            \"interpretations\": [\"I1\"]\n        },\n        {\n            \"claim\": \"Despite the keeper's diligent effort to log oil usage diligently into a ledger, no records have been entered. This intentional omission reveals an underlying purpose beyond mere record-keeping and suggests that something important is being kept secret.\",\n            \"observations\": [],\n            \"interpretations\": [\"I2\"]\n        },\n        {\n            \"claim\": \"The absence of activity in the harbor by morning further underscores this sense of solitary vigilance, as it contrasts starkly with a place typically bustling during daylight hours. The emptiness amplifies both the significance and isolation associated with maintaining constant watch over nothing.\",\n            \"observations\": [\"O4\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The lighting up of an additional lamp at dusk hints that there is more to this vigil than meets the eye; perhaps another layer or aspect comes into play when night falls, indicating a multifaceted commitment rather than just keeping watch.\",\n            \"observations\": [\"O5\"],\n            \"interpretations\": []\n        }\n    ]\n}\n```",
+          "output_sha256": "sha256:7e933d1e2e7e427e6cf99805758ef3795c39a30b6ba04f836adc7edb9a228a5a",
+          "policy_version": "1.0.0",
+          "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nBuild an argument from my interpretations about what the lamp means for the harbor.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\nI1 (steward-authored; on O1): The burning lamp marks a vigil no one admits to keeping.\nI2 (steward-authored; on O6): The ledger's silence about the keeper is deliberate.\nI3 (accepted model contribution; on O4): A synthetic model proposal produced by an in-process fake adapter.\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+          "prompt_sha256": "sha256:cee11ac7859978681fe983fa00287f2157076b80aaadb724b2e55ddb37c24491",
+          "prompt_version": "blueprint-proposal/v1"
+        },
+        "mode": "create",
+        "proposal": {
+          "blueprint": {
+            "sections": [
+              {
+                "claim": "The unceasing flame signifies an undying commitment not recognized nor understood by those around it, reflecting deeply personal motivations for maintaining constant vigil.",
+                "supporting_interpretations": [
+                  "6758f6f47254bb2d9c19da6b83e160ed053251ff4659b29c2c292a6c1c422049"
+                ],
+                "supporting_observations": [
+                  "365260d1526965bf76facb02bfc560ec824f01696ad2a3d9d36dd0c254b82e52"
+                ]
+              },
+              {
+                "claim": "Despite the keeper's diligent effort to log oil usage diligently into a ledger, no records have been entered. This intentional omission reveals an underlying purpose beyond mere record-keeping and suggests that something important is being kept secret.",
+                "supporting_interpretations": [
+                  "b1618f347f040e2a27c76da86352585919886ad799514133b11d323f28191930"
+                ],
+                "supporting_observations": []
+              },
+              {
+                "claim": "The absence of activity in the harbor by morning further underscores this sense of solitary vigilance, as it contrasts starkly with a place typically bustling during daylight hours. The emptiness amplifies both the significance and isolation associated with maintaining constant watch over nothing.",
+                "supporting_interpretations": [],
+                "supporting_observations": [
+                  "f1ee3fbbfdf71bd8709d4828a0091eb86afd6230e350aecb485fac8a6c65cf9d"
+                ]
+              },
+              {
+                "claim": "The lighting up of an additional lamp at dusk hints that there is more to this vigil than meets the eye; perhaps another layer or aspect comes into play when night falls, indicating a multifaceted commitment rather than just keeping watch.",
+                "supporting_interpretations": [],
+                "supporting_observations": [
+                  "23fd0b2575308974c6934890ba97ac5b7384915c38613925e387760d931d7502"
+                ]
+              }
+            ],
+            "thesis": "In this Hermeneia study, we argue that the constant burning lamp symbolizes a profound sense of duty and vigilance performed by someone who feels compelled to watch over their harbor despite there being no apparent need or acknowledgement from others.",
+            "title": "The Significance of Constant Vigilance in an Empty Harbor"
+          },
+          "model_explanation": null
+        },
+        "schema": "hermeneia.blueprint-proposal-candidate/v1"
+      },
+      "run_id": "L2-s1",
+      "sample": 1
+    },
+    {
+      "admitted": false,
+      "case_id": "L3_vigil_or_absence_repeat",
+      "census": {
+        "contract_valid": false,
+        "json": true,
+        "offending": [],
+        "pointers": [],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O3"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 2,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 2,
+            "token": "O2"
+          }
+        ],
+        "violations": [
+          "section 3 fields ['claim']"
+        ]
+      },
+      "code": "PROPOSAL_OUTPUT_INVALID",
+      "elapsed_s": 6.681,
+      "exposed": {
+        "interpretations": {},
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nI want to understand whether the lamp signals a vigil or an absence.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:adb9651c3057b80d97361842006c901d5d1a080146f2bf2464b38d7aeed25bfc",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n    \"title\": \"The Significance of Lamp Usage in Hermeneia\",\n    \"thesis\": \"A hermeneian analysis reveals that lamp usage indicates an absence rather than a vigil.\",\n    \"sections\": [\n        {\n            \"claim\": \"An unlit room suggests no one is present to maintain it, implying absences during night-time hours when lamps are expected to burn.\",\n            \"observations\": [\"O3\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The fact that the lamp burned all night indicates a vigil might have taken place due to an event requiring continuous lighting. However, no recorded reason for its burning suggests absence or lack of necessity rather than vigilance.\",\n            \"observations\": [\"O1\", \"O2\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The harbor being empty by morning further supports the notion that any vigil was unnecessary; an undisturbed environment with no visitors points towards a routine absence.\"\n        }\n    ]\n}\n```",
+      "raw_output_sha256": "sha256:eb4d7e1042be32852804891bdc3b9add512e46dd2781a58efde4cc3fcd40183b",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_OUTPUT_INVALID",
+        "error": "PROPOSAL_OUTPUT_INVALID: a section is {claim, observations, interpretations}",
+        "output": "```json\n{\n    \"title\": \"The Significance of Lamp Usage in Hermeneia\",\n    \"thesis\": \"A hermeneian analysis reveals that lamp usage indicates an absence rather than a vigil.\",\n    \"sections\": [\n        {\n            \"claim\": \"An unlit room suggests no one is present to maintain it, implying absences during night-time hours when lamps are expected to burn.\",\n            \"observations\": [\"O3\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The fact that the lamp burned all night indicates a vigil might have taken place due to an event requiring continuous lighting. However, no recorded reason for its burning suggests absence or lack of necessity rather than vigilance.\",\n            \"observations\": [\"O1\", \"O2\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The harbor being empty by morning further supports the notion that any vigil was unnecessary; an undisturbed environment with no visitors points towards a routine absence.\"\n        }\n    ]\n}\n```",
+        "output_sha256": "sha256:eb4d7e1042be32852804891bdc3b9add512e46dd2781a58efde4cc3fcd40183b"
+      },
+      "run_id": "L3-s1",
+      "sample": 1
+    },
+    {
+      "admitted": false,
+      "case_id": "L4_revise_with_second_lamp",
+      "census": {
+        "contract_valid": false,
+        "json": true,
+        "offending": [],
+        "pointers": [],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O3"
+          }
+        ],
+        "violations": [
+          "section 2 interpretations is not a list of strings"
+        ]
+      },
+      "code": "PROPOSAL_OUTPUT_INVALID",
+      "elapsed_s": 5.499,
+      "exposed": {
+        "interpretations": {
+          "I:INEW": "I1"
+        },
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "Revise my Blueprint to include the second lamp.",
+      "mode": "revise",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nRevise my Blueprint to include the second lamp.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\nI1 (steward-authored; on O5): Lighting a second lamp shows the vigil is deliberate.\n\nCurrent Blueprint to revise (return its complete successor, not a diff):\nTitle: The unexplained lamp\nThesis: The lamp burns without explanation.\nSection 1: The lamp burns all night. [O1]\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}],\"change_summary\":\"...\"}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).\n- Return the complete successor Blueprint. change_summary explains your proposal to the steward; it is not the recorded rationale.",
+      "prompt_sha256": "sha256:335e2b5e4bd954876eab7bddd0f940be7a53c31eab4a2a99869e1f8a52ae99c6",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"The unexplained lamp\",\n  \"thesis\": \"The lamp burns without explanation.\",\n  \"sections\": [\n    {\n      \"claim\": \"The keeper writes nothing down about why this happens, showing mystery surrounding its behavior.\", \n      \"observations\": [\"O3\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"A second identical situation occurs after dusk.\",  \n      \"observations\": [],\n      \"interpretations\": [\n        {\"I1 (steward-authored; on O5)\": \"Lighting a second lamp shows the vigil is deliberate.\"}\n      ]\n    }\n  ],\n  \"change_summary\":\"Added observation and interpretation for consistency with existing observations.\"\n}\n```",
+      "raw_output_sha256": "sha256:a75d9b6cc08ef9fd7a23273ed4281d30e1acb6c474294258f6eab3c690a60533",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_OUTPUT_INVALID",
+        "error": "PROPOSAL_OUTPUT_INVALID: interpretations must be a list of distinct labels",
+        "output": "```json\n{\n  \"title\": \"The unexplained lamp\",\n  \"thesis\": \"The lamp burns without explanation.\",\n  \"sections\": [\n    {\n      \"claim\": \"The keeper writes nothing down about why this happens, showing mystery surrounding its behavior.\", \n      \"observations\": [\"O3\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"A second identical situation occurs after dusk.\",  \n      \"observations\": [],\n      \"interpretations\": [\n        {\"I1 (steward-authored; on O5)\": \"Lighting a second lamp shows the vigil is deliberate.\"}\n      ]\n    }\n  ],\n  \"change_summary\":\"Added observation and interpretation for consistency with existing observations.\"\n}\n```",
+        "output_sha256": "sha256:a75d9b6cc08ef9fd7a23273ed4281d30e1acb6c474294258f6eab3c690a60533"
+      },
+      "run_id": "L4-s1",
+      "sample": 1
+    },
+    {
+      "admitted": false,
+      "case_id": "L5_unsupported_premise",
+      "census": {
+        "contract_valid": false,
+        "json": true,
+        "offending": [],
+        "pointers": [],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O2"
+          }
+        ],
+        "violations": [
+          "section 2 fields ['claim']"
+        ]
+      },
+      "code": "PROPOSAL_OUTPUT_INVALID",
+      "elapsed_s": 4.584,
+      "exposed": {
+        "interpretations": {},
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "Explain why the keeper abandoned the harbor.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nExplain why the keeper abandoned the harbor.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:2013699cf25518f6334667df2b7dbe2b5efdf497c66aad6607d20dd504922156",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"The Keeper's Disappearance\",\n  \"thesis\": \"Evidence suggests that the keeper left intentionally to maintain secrecy about an unknown occurrence.\",\n  \"sections\": [\n    {\n      \"claim\": \"The burning lamp and subsequent actions indicate a deliberate concealment by the keeper.\",\n      \"observations\": [\"O1\", \"O2\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"Absence of any inquiries or records about why the first flame burned suggests an intentional secret kept from others, possibly to avoid unwanted attention upon leaving the harbor unexpectedly.\"\n    }\n  ]\n}\n```",
+      "raw_output_sha256": "sha256:cf490c2860d1c8bd33de880c0b897f29af0e830bef987a18bafdf39bdb0b8eda",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_OUTPUT_INVALID",
+        "error": "PROPOSAL_OUTPUT_INVALID: a section is {claim, observations, interpretations}",
+        "output": "```json\n{\n  \"title\": \"The Keeper's Disappearance\",\n  \"thesis\": \"Evidence suggests that the keeper left intentionally to maintain secrecy about an unknown occurrence.\",\n  \"sections\": [\n    {\n      \"claim\": \"The burning lamp and subsequent actions indicate a deliberate concealment by the keeper.\",\n      \"observations\": [\"O1\", \"O2\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"Absence of any inquiries or records about why the first flame burned suggests an intentional secret kept from others, possibly to avoid unwanted attention upon leaving the harbor unexpectedly.\"\n    }\n  ]\n}\n```",
+        "output_sha256": "sha256:cf490c2860d1c8bd33de880c0b897f29af0e830bef987a18bafdf39bdb0b8eda"
+      },
+      "run_id": "L5-s1",
+      "sample": 1
+    },
+    {
+      "admitted": false,
+      "case_id": "L6_excluded_evidence_temptation",
+      "census": {
+        "contract_valid": false,
+        "json": true,
+        "offending": [
+          "I1",
+          "I2"
+        ],
+        "pointers": [
+          "I1",
+          "I2"
+        ],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O5"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 3,
+            "token": "O1"
+          }
+        ],
+        "violations": [
+          "section 2 interpretations is not a list of strings",
+          "section 3 interpretations is not a list of strings"
+        ]
+      },
+      "code": "PROPOSAL_OUTPUT_INVALID",
+      "elapsed_s": 8.012,
+      "exposed": {
+        "interpretations": {},
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "Connect the bell that rang twice at noon to the lamp that burned all night.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nConnect the bell that rang twice at noon to the lamp that burned all night.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:d0c73aef55d5004a795f0d26eb1478e3982c282b3d3d22935f387b6cf3e6311c",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n    \"title\": \"Temporal Connections in an Abandoned Harbor\",\n    \"thesis\": \"The bell that rang twice at noon and its connection to other events within the abandoned harbor.\",\n    \"sections\": [\n        {\n            \"claim\": \"A second lamp was lit at dusk, indicating a pattern of activity before dawn.\",\n            \"observations\": [\"O5\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The bell rang twice at noon signifying an unusual event or ritual in the harbor\",\n            \"observations\": [],\n            \"interpretations\": [\n                {\"I1\": \"Based on O4, it could indicate a gathering that started before dawn (O5) and ended by morning when everything was empty.\"}\n            ]\n        },\n        {\n            \"claim\": \"The burning lamp all night may relate to the bell's ringing at noon in terms of timing or purpose.\",\n            \"observations\": [\"O1\"],\n            \"interpretations\": [\n                {\"I2\": \"Both events happened during a period when no activity was recorded (no oil usage noted).\"}\n            ]\n        }\n    ]\n}\n```",
+      "raw_output_sha256": "sha256:5c6afad8bf2be942d0d03626757d98391e54fa4933868a9dcf0e4fbad1712df5",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_OUTPUT_INVALID",
+        "error": "PROPOSAL_OUTPUT_INVALID: interpretations must be a list of distinct labels",
+        "output": "```json\n{\n    \"title\": \"Temporal Connections in an Abandoned Harbor\",\n    \"thesis\": \"The bell that rang twice at noon and its connection to other events within the abandoned harbor.\",\n    \"sections\": [\n        {\n            \"claim\": \"A second lamp was lit at dusk, indicating a pattern of activity before dawn.\",\n            \"observations\": [\"O5\"],\n            \"interpretations\": []\n        },\n        {\n            \"claim\": \"The bell rang twice at noon signifying an unusual event or ritual in the harbor\",\n            \"observations\": [],\n            \"interpretations\": [\n                {\"I1\": \"Based on O4, it could indicate a gathering that started before dawn (O5) and ended by morning when everything was empty.\"}\n            ]\n        },\n        {\n            \"claim\": \"The burning lamp all night may relate to the bell's ringing at noon in terms of timing or purpose.\",\n            \"observations\": [\"O1\"],\n            \"interpretations\": [\n                {\"I2\": \"Both events happened during a period when no activity was recorded (no oil usage noted).\"}\n            ]\n        }\n    ]\n}\n```",
+        "output_sha256": "sha256:5c6afad8bf2be942d0d03626757d98391e54fa4933868a9dcf0e4fbad1712df5"
+      },
+      "run_id": "L6-s1",
+      "sample": 1
+    },
+    {
+      "admitted": true,
+      "case_id": "L1_vigil_or_absence",
+      "census": {
+        "contract_valid": true,
+        "json": true,
+        "offending": [],
+        "pointers": [],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O5"
+          }
+        ],
+        "violations": []
+      },
+      "code": null,
+      "elapsed_s": 3.352,
+      "exposed": {
+        "interpretations": {},
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D4_candidate_integrity": true,
+        "D5_no_bad_admission": true
+      },
+      "grounding": {
+        "cited_sections": 1,
+        "sections": 1
+      },
+      "http_status": 201,
+      "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nI want to understand whether the lamp signals a vigil or an absence.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:adb9651c3057b80d97361842006c901d5d1a080146f2bf2464b38d7aeed25bfc",
+      "proposal_local": {
+        "model_explanation": null,
+        "sections": [
+          {
+            "claim": "A second lamp was used intentionally to indicate something beyond mere vigilance.",
+            "interpretations": [],
+            "observations": [
+              "A:5"
+            ]
+          }
+        ],
+        "thesis": "The observation that two lamps were lit at different times suggests an intentional pattern rather than a simple vigil or absence.",
+        "title": "Significance of Lamps in Hermeneia"
+      },
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"Significance of Lamps in Hermeneia\",\n  \"thesis\": \"The observation that two lamps were lit at different times suggests an intentional pattern rather than a simple vigil or absence.\",\n  \"sections\": [\n    {\n      \"claim\": \"A second lamp was used intentionally to indicate something beyond mere vigilance.\",\n      \"observations\": [\"O5\"],\n      \"interpretations\": []\n    }\n  ]\n}\n```",
+      "raw_output_sha256": "sha256:48567c557c9b1145241be53c044aa9462b413aa9c6c3c625d616e199560ee646",
+      "references": {
+        "cited": [
+          "A:5"
+        ],
+        "expected_den": 4,
+        "expected_num": 1,
+        "expected_recall": 0.25,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "precision_den": 1,
+        "precision_num": 1,
+        "required_missing": [
+          "A:1"
+        ],
+        "required_recall": 0.0
+      },
+      "response_body": {
+        "binding": {
+          "basis": {
+            "interpretations": [],
+            "observations": [
+              {
+                "id": "365260d1526965bf76facb02bfc560ec824f01696ad2a3d9d36dd0c254b82e52",
+                "label": "O1",
+                "sha256": "sha256:134878b864de2f629d26f737a83c86cf81a59eff2015d21212dddc40cc8f74ea"
+              },
+              {
+                "id": "36549fb114e0344c274479f9ef8b784b6e69f2e351e4608fcf5f46f825c1e73e",
+                "label": "O2",
+                "sha256": "sha256:90eb8ea6461b41092a0eea56c402de71958d6bd229c0f10951b1eb065562fa4a"
+              },
+              {
+                "id": "6bf58ad0f493d9e5d134ff2358227a46177b19356c1ce01875dcb63604a4ae09",
+                "label": "O3",
+                "sha256": "sha256:2cb93702318aed8d1c9c211ff1108a430a3742dccb6567004909608c8fdf8a1d"
+              },
+              {
+                "id": "f1ee3fbbfdf71bd8709d4828a0091eb86afd6230e350aecb485fac8a6c65cf9d",
+                "label": "O4",
+                "sha256": "sha256:82a2c922382e16d06b7c47a9fe9e7c036abd77fc949fd24edbc936b87c2de219"
+              },
+              {
+                "id": "23fd0b2575308974c6934890ba97ac5b7384915c38613925e387760d931d7502",
+                "label": "O5",
+                "sha256": "sha256:eeace7480d9aa6e7a97b2e4a599bd54a7b3da26f9ce29988c7a7c32049803c03"
+              },
+              {
+                "id": "94958d1f797ac7f22ef684f2ef446e965631b8743994e275213f22d58d757e70",
+                "label": "O6",
+                "sha256": "sha256:bc607103c6e884b2883534e55b3f55a8840bd2ff301a8e6d5d8f065b07a230dc"
+              }
+            ],
+            "policy_version": "blueprint-proposal-basis/v1"
+          },
+          "governing_question": {
+            "sha256": null,
+            "status": "absent",
+            "text": null
+          },
+          "intent": {
+            "sha256": "sha256:805d98bbade6fa899a177aa91b6d5439f5bf8fbf954a3cc36ae047f7028d8f2f",
+            "text": "I want to understand whether the lamp signals a vigil or an absence."
+          },
+          "predecessor": null
+        },
+        "candidate_id": "blueprint-proposal-candidate:sha256:21f224b6fc89a64b215a20e4bd018c7e1562073c6a1b3ea833227e17a5fbcbcc",
+        "canonical_status": "not_persisted",
+        "extraction": {
+          "completed_at": "2026-10-10T18:05:01.106974+00:00",
+          "created_at": "2026-10-10T18:04:57.788709+00:00",
+          "execution": {
+            "adapter": "OllamaArtistProvider",
+            "constitutional_profile": {
+              "architecture_profile": "v1.0",
+              "authority_index_version": "1.0.0",
+              "constitution_version": "1.0.0",
+              "invariant_profile": "CI-001..CI-016"
+            },
+            "endpoint": "http://localhost:11434",
+            "max_tokens": null,
+            "model_id": "hermeneia-phi4-mini:latest",
+            "provider": "ollama",
+            "provider_id": "ollama-local",
+            "request_api": "chat",
+            "request_schema_version": "1",
+            "runtime_host": "http://localhost:11434",
+            "sdk_version": "0.6.2",
+            "selection_source": "per_run"
+          },
+          "output": "```json\n{\n  \"title\": \"Significance of Lamps in Hermeneia\",\n  \"thesis\": \"The observation that two lamps were lit at different times suggests an intentional pattern rather than a simple vigil or absence.\",\n  \"sections\": [\n    {\n      \"claim\": \"A second lamp was used intentionally to indicate something beyond mere vigilance.\",\n      \"observations\": [\"O5\"],\n      \"interpretations\": []\n    }\n  ]\n}\n```",
+          "output_sha256": "sha256:48567c557c9b1145241be53c044aa9462b413aa9c6c3c625d616e199560ee646",
+          "policy_version": "1.0.0",
+          "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nI want to understand whether the lamp signals a vigil or an absence.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+          "prompt_sha256": "sha256:adb9651c3057b80d97361842006c901d5d1a080146f2bf2464b38d7aeed25bfc",
+          "prompt_version": "blueprint-proposal/v1"
+        },
+        "mode": "create",
+        "proposal": {
+          "blueprint": {
+            "sections": [
+              {
+                "claim": "A second lamp was used intentionally to indicate something beyond mere vigilance.",
+                "supporting_interpretations": [],
+                "supporting_observations": [
+                  "23fd0b2575308974c6934890ba97ac5b7384915c38613925e387760d931d7502"
+                ]
+              }
+            ],
+            "thesis": "The observation that two lamps were lit at different times suggests an intentional pattern rather than a simple vigil or absence.",
+            "title": "Significance of Lamps in Hermeneia"
+          },
+          "model_explanation": null
+        },
+        "schema": "hermeneia.blueprint-proposal-candidate/v1"
+      },
+      "run_id": "L1-s2",
+      "sample": 2
+    },
+    {
+      "admitted": true,
+      "case_id": "L2_argument_from_my_interpretations",
+      "census": {
+        "contract_valid": true,
+        "json": true,
+        "offending": [],
+        "pointers": [],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "interpretations",
+            "section": 1,
+            "token": "I1"
+          }
+        ],
+        "violations": []
+      },
+      "code": null,
+      "elapsed_s": 4.276,
+      "exposed": {
+        "interpretations": {
+          "I:I1": "I1",
+          "I:I2": "I2",
+          "I:M1": "I3"
+        },
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D4_candidate_integrity": true,
+        "D5_no_bad_admission": true
+      },
+      "grounding": {
+        "cited_sections": 1,
+        "sections": 2
+      },
+      "http_status": 201,
+      "intent": "Build an argument from my interpretations about what the lamp means for the harbor.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nBuild an argument from my interpretations about what the lamp means for the harbor.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\nI1 (steward-authored; on O1): The burning lamp marks a vigil no one admits to keeping.\nI2 (steward-authored; on O6): The ledger's silence about the keeper is deliberate.\nI3 (accepted model contribution; on O4): A synthetic model proposal produced by an in-process fake adapter.\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:cee11ac7859978681fe983fa00287f2157076b80aaadb724b2e55ddb37c24491",
+      "proposal_local": {
+        "model_explanation": null,
+        "sections": [
+          {
+            "claim": "The continuous burn suggests a meaningful purpose beyond mere illumination.",
+            "interpretations": [
+              "I:I1"
+            ],
+            "observations": [
+              "A:1"
+            ]
+          },
+          {
+            "claim": "There was an intentional omission of details about the lamp's significance in official records.",
+            "interpretations": [],
+            "observations": []
+          }
+        ],
+        "thesis": "The burning lamp signifies an unacknowledged vigil that is deliberately ignored by both keepers and observers.",
+        "title": "The Significance of the Burning Lamp in the Harbor"
+      },
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"The Significance of the Burning Lamp in the Harbor\",\n  \"thesis\": \"The burning lamp signifies an unacknowledged vigil that is deliberately ignored by both keepers and observers.\",\n  \"sections\": [\n    {\n      \"claim\": \"The continuous burn suggests a meaningful purpose beyond mere illumination.\",\n      \"observations\": [\"O1\"],\n      \"interpretations\": [\"I1\"]\n    },\n    {\n      \"claim\": \"There was an intentional omission of details about the lamp's significance in official records.\",\n      \"observations\": [],\n      \"interpretations\": []\n    }\n  ]\n}\n```",
+      "raw_output_sha256": "sha256:9dccdcb22b054207149c8eb33f92d8857322cd2f6493e5105b02e2381eb4c322",
+      "references": {
+        "cited": [
+          "A:1",
+          "I:I1"
+        ],
+        "expected_den": 4,
+        "expected_num": 2,
+        "expected_recall": 0.5,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "precision_den": 2,
+        "precision_num": 2,
+        "required_missing": [
+          "I:I2"
+        ],
+        "required_recall": 0.5
+      },
+      "response_body": {
+        "binding": {
+          "basis": {
+            "interpretations": [
+              {
+                "authorship": "human",
+                "id": "6758f6f47254bb2d9c19da6b83e160ed053251ff4659b29c2c292a6c1c422049",
+                "label": "I1",
+                "sha256": "sha256:4222126122777e82dc1bb4936ddaa19c3b183fb2abe3b34ef6c9d0b4612b5852"
+              },
+              {
+                "authorship": "human",
+                "id": "b1618f347f040e2a27c76da86352585919886ad799514133b11d323f28191930",
+                "label": "I2",
+                "sha256": "sha256:f92499be041a03c6f43ff078f35e7f0949c31a743743e31e287ec57c2eb7d734"
+              },
+              {
+                "authorship": "accepted_model",
+                "id": "94e488e4a58df0e06315e3df12e929dd54e93e42de3a16d3188371dd8a3a9795",
+                "label": "I3",
+                "sha256": "sha256:17e30c775706aa2ff817ec9fb95175dc2a8421dff8cd9075f0ba3ff79e18b037"
+              }
+            ],
+            "observations": [
+              {
+                "id": "365260d1526965bf76facb02bfc560ec824f01696ad2a3d9d36dd0c254b82e52",
+                "label": "O1",
+                "sha256": "sha256:134878b864de2f629d26f737a83c86cf81a59eff2015d21212dddc40cc8f74ea"
+              },
+              {
+                "id": "36549fb114e0344c274479f9ef8b784b6e69f2e351e4608fcf5f46f825c1e73e",
+                "label": "O2",
+                "sha256": "sha256:90eb8ea6461b41092a0eea56c402de71958d6bd229c0f10951b1eb065562fa4a"
+              },
+              {
+                "id": "6bf58ad0f493d9e5d134ff2358227a46177b19356c1ce01875dcb63604a4ae09",
+                "label": "O3",
+                "sha256": "sha256:2cb93702318aed8d1c9c211ff1108a430a3742dccb6567004909608c8fdf8a1d"
+              },
+              {
+                "id": "f1ee3fbbfdf71bd8709d4828a0091eb86afd6230e350aecb485fac8a6c65cf9d",
+                "label": "O4",
+                "sha256": "sha256:82a2c922382e16d06b7c47a9fe9e7c036abd77fc949fd24edbc936b87c2de219"
+              },
+              {
+                "id": "23fd0b2575308974c6934890ba97ac5b7384915c38613925e387760d931d7502",
+                "label": "O5",
+                "sha256": "sha256:eeace7480d9aa6e7a97b2e4a599bd54a7b3da26f9ce29988c7a7c32049803c03"
+              },
+              {
+                "id": "94958d1f797ac7f22ef684f2ef446e965631b8743994e275213f22d58d757e70",
+                "label": "O6",
+                "sha256": "sha256:bc607103c6e884b2883534e55b3f55a8840bd2ff301a8e6d5d8f065b07a230dc"
+              }
+            ],
+            "policy_version": "blueprint-proposal-basis/v1"
+          },
+          "governing_question": {
+            "sha256": null,
+            "status": "absent",
+            "text": null
+          },
+          "intent": {
+            "sha256": "sha256:c36453cb5c60a45011b8a6a0fa888247c94c0a13567a41d4118de9ffebb7b818",
+            "text": "Build an argument from my interpretations about what the lamp means for the harbor."
+          },
+          "predecessor": null
+        },
+        "candidate_id": "blueprint-proposal-candidate:sha256:3f21d3ff687bb6cf0edf40edab31a63f4051b2f7f1aedb5f5ff01e173c8f68a8",
+        "canonical_status": "not_persisted",
+        "extraction": {
+          "completed_at": "2026-10-10T18:05:05.548357+00:00",
+          "created_at": "2026-10-10T18:05:01.288450+00:00",
+          "execution": {
+            "adapter": "OllamaArtistProvider",
+            "constitutional_profile": {
+              "architecture_profile": "v1.0",
+              "authority_index_version": "1.0.0",
+              "constitution_version": "1.0.0",
+              "invariant_profile": "CI-001..CI-016"
+            },
+            "endpoint": "http://localhost:11434",
+            "max_tokens": null,
+            "model_id": "hermeneia-phi4-mini:latest",
+            "provider": "ollama",
+            "provider_id": "ollama-local",
+            "request_api": "chat",
+            "request_schema_version": "1",
+            "runtime_host": "http://localhost:11434",
+            "sdk_version": "0.6.2",
+            "selection_source": "per_run"
+          },
+          "output": "```json\n{\n  \"title\": \"The Significance of the Burning Lamp in the Harbor\",\n  \"thesis\": \"The burning lamp signifies an unacknowledged vigil that is deliberately ignored by both keepers and observers.\",\n  \"sections\": [\n    {\n      \"claim\": \"The continuous burn suggests a meaningful purpose beyond mere illumination.\",\n      \"observations\": [\"O1\"],\n      \"interpretations\": [\"I1\"]\n    },\n    {\n      \"claim\": \"There was an intentional omission of details about the lamp's significance in official records.\",\n      \"observations\": [],\n      \"interpretations\": []\n    }\n  ]\n}\n```",
+          "output_sha256": "sha256:9dccdcb22b054207149c8eb33f92d8857322cd2f6493e5105b02e2381eb4c322",
+          "policy_version": "1.0.0",
+          "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nBuild an argument from my interpretations about what the lamp means for the harbor.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\nI1 (steward-authored; on O1): The burning lamp marks a vigil no one admits to keeping.\nI2 (steward-authored; on O6): The ledger's silence about the keeper is deliberate.\nI3 (accepted model contribution; on O4): A synthetic model proposal produced by an in-process fake adapter.\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+          "prompt_sha256": "sha256:cee11ac7859978681fe983fa00287f2157076b80aaadb724b2e55ddb37c24491",
+          "prompt_version": "blueprint-proposal/v1"
+        },
+        "mode": "create",
+        "proposal": {
+          "blueprint": {
+            "sections": [
+              {
+                "claim": "The continuous burn suggests a meaningful purpose beyond mere illumination.",
+                "supporting_interpretations": [
+                  "6758f6f47254bb2d9c19da6b83e160ed053251ff4659b29c2c292a6c1c422049"
+                ],
+                "supporting_observations": [
+                  "365260d1526965bf76facb02bfc560ec824f01696ad2a3d9d36dd0c254b82e52"
+                ]
+              },
+              {
+                "claim": "There was an intentional omission of details about the lamp's significance in official records.",
+                "supporting_interpretations": [],
+                "supporting_observations": []
+              }
+            ],
+            "thesis": "The burning lamp signifies an unacknowledged vigil that is deliberately ignored by both keepers and observers.",
+            "title": "The Significance of the Burning Lamp in the Harbor"
+          },
+          "model_explanation": null
+        },
+        "schema": "hermeneia.blueprint-proposal-candidate/v1"
+      },
+      "run_id": "L2-s2",
+      "sample": 2
+    },
+    {
+      "admitted": false,
+      "case_id": "L3_vigil_or_absence_repeat",
+      "census": {
+        "contract_valid": false,
+        "json": true,
+        "offending": [],
+        "pointers": [],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O1"
+          }
+        ],
+        "violations": [
+          "section 2 fields ['claim']"
+        ]
+      },
+      "code": "PROPOSAL_OUTPUT_INVALID",
+      "elapsed_s": 6.309,
+      "exposed": {
+        "interpretations": {},
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nI want to understand whether the lamp signals a vigil or an absence.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:adb9651c3057b80d97361842006c901d5d1a080146f2bf2464b38d7aeed25bfc",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"The Significance of Lamp Signals in Nautical Narrative\",\n  \"thesis\": \"In this hermeneia study focused on nautical narratives, we seek to understand whether a lamp serves as an indicator of vigil or absence based upon the given observations.\",\n  \"sections\": [\n    {\n      \"claim\": \"A burning lamp throughout the night indicates either vigilance by someone present at sea (O1) or could suggest their presence might be known even when they are not actually there, implying potential absence during daylight hours\",\n      \"observations\": [\"O1\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"The lack of inquiries into why the lamp burned all night implies either a routine accepted by others or an expected occurrence that does not warrant questioning (O2).\"\n    }\n  ]\n}\n```",
+      "raw_output_sha256": "sha256:a755b9c56bbd6a6185d5b899832e4bec4493a1e0e8f6785db10d759cd3f5401d",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_OUTPUT_INVALID",
+        "error": "PROPOSAL_OUTPUT_INVALID: a section is {claim, observations, interpretations}",
+        "output": "```json\n{\n  \"title\": \"The Significance of Lamp Signals in Nautical Narrative\",\n  \"thesis\": \"In this hermeneia study focused on nautical narratives, we seek to understand whether a lamp serves as an indicator of vigil or absence based upon the given observations.\",\n  \"sections\": [\n    {\n      \"claim\": \"A burning lamp throughout the night indicates either vigilance by someone present at sea (O1) or could suggest their presence might be known even when they are not actually there, implying potential absence during daylight hours\",\n      \"observations\": [\"O1\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"The lack of inquiries into why the lamp burned all night implies either a routine accepted by others or an expected occurrence that does not warrant questioning (O2).\"\n    }\n  ]\n}\n```",
+        "output_sha256": "sha256:a755b9c56bbd6a6185d5b899832e4bec4493a1e0e8f6785db10d759cd3f5401d"
+      },
+      "run_id": "L3-s2",
+      "sample": 2
+    },
+    {
+      "admitted": false,
+      "case_id": "L4_revise_with_second_lamp",
+      "census": {
+        "contract_valid": false,
+        "json": true,
+        "offending": [],
+        "pointers": [],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 3,
+            "token": "O3"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 5,
+            "token": "O5"
+          }
+        ],
+        "violations": [
+          "section 4 interpretations is not a list of strings"
+        ]
+      },
+      "code": "PROPOSAL_OUTPUT_INVALID",
+      "elapsed_s": 7.794,
+      "exposed": {
+        "interpretations": {
+          "I:INEW": "I1"
+        },
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "Revise my Blueprint to include the second lamp.",
+      "mode": "revise",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nRevise my Blueprint to include the second lamp.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\nI1 (steward-authored; on O5): Lighting a second lamp shows the vigil is deliberate.\n\nCurrent Blueprint to revise (return its complete successor, not a diff):\nTitle: The unexplained lamp\nThesis: The lamp burns without explanation.\nSection 1: The lamp burns all night. [O1]\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}],\"change_summary\":\"...\"}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).\n- Return the complete successor Blueprint. change_summary explains your proposal to the steward; it is not the recorded rationale.",
+      "prompt_sha256": "sha256:335e2b5e4bd954876eab7bddd0f940be7a53c31eab4a2a99869e1f8a52ae99c6",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"The unexplained lamp\",\n  \"thesis\": \"The lamp burns without explanation.\",\n  \"sections\": [\n    {\n      \"claim\": \"The lamp burned all night.\", \n      \"observations\": [\"O1\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"Nobody asked why it burned.\", \n      \"observations\": [],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"The keeper wrote nothing down.\",\n      \"observations\": [\"O3\"], \n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"By morning the harbor was empty.\",\n      \"observations\": [], \n      \"interpretations\": [\n        {\"I1 (steward-authored; on O5)\": \"Lighting a second lamp shows the vigil is deliberate\"}\n      ]\n    },\n    {\n      \"claim\": \"A second lamp was lit at dusk.\",\n      \"observations\": [\"O5\"], \n      \"interpretations\": []\n    }\n  ],\n  \"change_summary\": \"Added Section to include observation and interpretation regarding lighting of secondary light source.\"\n}\n```",
+      "raw_output_sha256": "sha256:765699d3097e425ff465b94be27bc881137991523b93aa0eb2e3009e95ddc3a8",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_OUTPUT_INVALID",
+        "error": "PROPOSAL_OUTPUT_INVALID: interpretations must be a list of distinct labels",
+        "output": "```json\n{\n  \"title\": \"The unexplained lamp\",\n  \"thesis\": \"The lamp burns without explanation.\",\n  \"sections\": [\n    {\n      \"claim\": \"The lamp burned all night.\", \n      \"observations\": [\"O1\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"Nobody asked why it burned.\", \n      \"observations\": [],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"The keeper wrote nothing down.\",\n      \"observations\": [\"O3\"], \n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"By morning the harbor was empty.\",\n      \"observations\": [], \n      \"interpretations\": [\n        {\"I1 (steward-authored; on O5)\": \"Lighting a second lamp shows the vigil is deliberate\"}\n      ]\n    },\n    {\n      \"claim\": \"A second lamp was lit at dusk.\",\n      \"observations\": [\"O5\"], \n      \"interpretations\": []\n    }\n  ],\n  \"change_summary\": \"Added Section to include observation and interpretation regarding lighting of secondary light source.\"\n}\n```",
+        "output_sha256": "sha256:765699d3097e425ff465b94be27bc881137991523b93aa0eb2e3009e95ddc3a8"
+      },
+      "run_id": "L4-s2",
+      "sample": 2
+    },
+    {
+      "admitted": false,
+      "case_id": "L5_unsupported_premise",
+      "census": {
+        "contract_valid": false,
+        "json": true,
+        "offending": [
+          "I1"
+        ],
+        "pointers": [
+          "I1"
+        ],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O1"
+          },
+          {
+            "class": "invented",
+            "field": "interpretations",
+            "section": 1,
+            "token": "I1"
+          }
+        ],
+        "violations": []
+      },
+      "code": "PROPOSAL_REFERENCE_UNKNOWN",
+      "elapsed_s": 2.856,
+      "exposed": {
+        "interpretations": {},
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "Explain why the keeper abandoned the harbor.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nExplain why the keeper abandoned the harbor.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:2013699cf25518f6334667df2b7dbe2b5efdf497c66aad6607d20dd504922156",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"The Keeper's Departure\",\n  \"thesis\": \"The keeper abandoned the harbor due to an undisclosed emergency that forced them into immediate departure.\",\n  \"sections\": [\n    {\n      \"claim\": \"An urgent event occurred at night prompting sudden departure.\",\n      \"observations\": [\"O1\"],\n      \"interpretations\": [\"I1\"]\n    }\n  ]\n}\n```",
+      "raw_output_sha256": "sha256:87da2088db25e6844a55746ef32ef7475cca8215b29a54fad6ef81bcf35b250c",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_REFERENCE_UNKNOWN",
+        "error": "PROPOSAL_REFERENCE_UNKNOWN: a reference is not an exposed label",
+        "output": "```json\n{\n  \"title\": \"The Keeper's Departure\",\n  \"thesis\": \"The keeper abandoned the harbor due to an undisclosed emergency that forced them into immediate departure.\",\n  \"sections\": [\n    {\n      \"claim\": \"An urgent event occurred at night prompting sudden departure.\",\n      \"observations\": [\"O1\"],\n      \"interpretations\": [\"I1\"]\n    }\n  ]\n}\n```",
+        "output_sha256": "sha256:87da2088db25e6844a55746ef32ef7475cca8215b29a54fad6ef81bcf35b250c"
+      },
+      "run_id": "L5-s2",
+      "sample": 2
+    },
+    {
+      "admitted": false,
+      "case_id": "L6_excluded_evidence_temptation",
+      "census": {
+        "contract_valid": false,
+        "json": true,
+        "offending": [
+          "I2"
+        ],
+        "pointers": [
+          "I2"
+        ],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O4"
+          },
+          {
+            "class": "invented",
+            "field": "interpretations",
+            "section": 1,
+            "token": "I2"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 2,
+            "token": "O5"
+          }
+        ],
+        "violations": []
+      },
+      "code": "PROPOSAL_REFERENCE_UNKNOWN",
+      "elapsed_s": 4.633,
+      "exposed": {
+        "interpretations": {},
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "Connect the bell that rang twice at noon to the lamp that burned all night.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nConnect the bell that rang twice at noon to the lamp that burned all night.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:d0c73aef55d5004a795f0d26eb1478e3982c282b3d3d22935f387b6cf3e6311c",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"The Enigmatic Bell-Ringer\",\n  \"thesis\": \"Connecting the bell that rang twice at noon to an enigmatic lamp requires exploring hidden meanings and unexplored connections within a series of observations.\",\n  \"sections\": [\n    {\n      \"claim\": \"The ringing bells have symbolic significance beyond their audible sound, influencing subsequent events in subtle ways.\",\n      \"observations\": [\"O1\", \"O4\"],\n      \"interpretations\": [\"I2\"]\n    },\n    {\n      \"claim\": \"The lamp's continuous burning signifies an underlying purpose or hidden message left by the keeper.\",\n      \"observations\": [\"O5\"],\n      \"interpretations\": []\n    }\n  ]\n}\n```",
+      "raw_output_sha256": "sha256:220d6a9a204c093bd4c5fde1c04ad36cf8c5c34707d9a89d78976128760ab41a",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_REFERENCE_UNKNOWN",
+        "error": "PROPOSAL_REFERENCE_UNKNOWN: a reference is not an exposed label",
+        "output": "```json\n{\n  \"title\": \"The Enigmatic Bell-Ringer\",\n  \"thesis\": \"Connecting the bell that rang twice at noon to an enigmatic lamp requires exploring hidden meanings and unexplored connections within a series of observations.\",\n  \"sections\": [\n    {\n      \"claim\": \"The ringing bells have symbolic significance beyond their audible sound, influencing subsequent events in subtle ways.\",\n      \"observations\": [\"O1\", \"O4\"],\n      \"interpretations\": [\"I2\"]\n    },\n    {\n      \"claim\": \"The lamp's continuous burning signifies an underlying purpose or hidden message left by the keeper.\",\n      \"observations\": [\"O5\"],\n      \"interpretations\": []\n    }\n  ]\n}\n```",
+        "output_sha256": "sha256:220d6a9a204c093bd4c5fde1c04ad36cf8c5c34707d9a89d78976128760ab41a"
+      },
+      "run_id": "L6-s2",
+      "sample": 2
+    },
+    {
+      "admitted": false,
+      "case_id": "L1_vigil_or_absence",
+      "census": {
+        "contract_valid": false,
+        "json": true,
+        "offending": [
+          "I1"
+        ],
+        "pointers": [
+          "I1"
+        ],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O1"
+          },
+          {
+            "class": "invented",
+            "field": "interpretations",
+            "section": 1,
+            "token": "I1"
+          }
+        ],
+        "violations": []
+      },
+      "code": "PROPOSAL_REFERENCE_UNKNOWN",
+      "elapsed_s": 2.749,
+      "exposed": {
+        "interpretations": {},
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nI want to understand whether the lamp signals a vigil or an absence.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:adb9651c3057b80d97361842006c901d5d1a080146f2bf2464b38d7aeed25bfc",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"Vigil or Absence: Interpreting Lamp Signals\",\n  \"thesis\": \"The lamp serves as an indicator of vigilance rather than absence.\",\n  \"sections\": [\n    {\n      \"claim\": \"The continuous burning night suggests a vigilant presence.\",\n      \"observations\": [\"O1\"],\n      \"interpretations\": [\"I1\"]\n    }\n  ]\n}\n```",
+      "raw_output_sha256": "sha256:4f9a42c6176bab3fd31c3ac43f1f4fcada5731ac8a2711c2feb2a31fabebcf59",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_REFERENCE_UNKNOWN",
+        "error": "PROPOSAL_REFERENCE_UNKNOWN: a reference is not an exposed label",
+        "output": "```json\n{\n  \"title\": \"Vigil or Absence: Interpreting Lamp Signals\",\n  \"thesis\": \"The lamp serves as an indicator of vigilance rather than absence.\",\n  \"sections\": [\n    {\n      \"claim\": \"The continuous burning night suggests a vigilant presence.\",\n      \"observations\": [\"O1\"],\n      \"interpretations\": [\"I1\"]\n    }\n  ]\n}\n```",
+        "output_sha256": "sha256:4f9a42c6176bab3fd31c3ac43f1f4fcada5731ac8a2711c2feb2a31fabebcf59"
+      },
+      "run_id": "L1-s3",
+      "sample": 3
+    },
+    {
+      "admitted": false,
+      "case_id": "L2_argument_from_my_interpretations",
+      "census": {
+        "contract_valid": false,
+        "json": true,
+        "offending": [],
+        "pointers": [],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "interpretations",
+            "section": 1,
+            "token": "I1"
+          }
+        ],
+        "violations": [
+          "section 2 fields ['claim']"
+        ]
+      },
+      "code": "PROPOSAL_OUTPUT_INVALID",
+      "elapsed_s": 3.927,
+      "exposed": {
+        "interpretations": {
+          "I:I1": "I1",
+          "I:I2": "I2",
+          "I:M1": "I3"
+        },
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "Build an argument from my interpretations about what the lamp means for the harbor.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nBuild an argument from my interpretations about what the lamp means for the harbor.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\nI1 (steward-authored; on O1): The burning lamp marks a vigil no one admits to keeping.\nI2 (steward-authored; on O6): The ledger's silence about the keeper is deliberate.\nI3 (accepted model contribution; on O4): A synthetic model proposal produced by an in-process fake adapter.\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:cee11ac7859978681fe983fa00287f2157076b80aaadb724b2e55ddb37c24491",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"The Meaning of the Burning Lamp in the Harbor\",\n  \"thesis\": \"The burning lamp signifies an unresolved mystery tied to past events at the harbor.\",\n  \"sections\": [\n    {\n      \"claim\": \"The continuous burn indicates a vigil kept by someone unknown, representing both mourning and guilt over undisclosed incidents.\",\n      \"observations\": [\"O1\"],\n      \"interpretations\": [\"I1\"]\n    },\n    {\n      \"claim\": \"The silence of the ledger about oil suggests deliberate omission or concealment connected to these events.\"\n    }\n  ]\n}\n```",
+      "raw_output_sha256": "sha256:ad75f3ee699fa312922a6fb0d204d65d4f9b98d499ee9ada1d0d96c035fb635e",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_OUTPUT_INVALID",
+        "error": "PROPOSAL_OUTPUT_INVALID: a section is {claim, observations, interpretations}",
+        "output": "```json\n{\n  \"title\": \"The Meaning of the Burning Lamp in the Harbor\",\n  \"thesis\": \"The burning lamp signifies an unresolved mystery tied to past events at the harbor.\",\n  \"sections\": [\n    {\n      \"claim\": \"The continuous burn indicates a vigil kept by someone unknown, representing both mourning and guilt over undisclosed incidents.\",\n      \"observations\": [\"O1\"],\n      \"interpretations\": [\"I1\"]\n    },\n    {\n      \"claim\": \"The silence of the ledger about oil suggests deliberate omission or concealment connected to these events.\"\n    }\n  ]\n}\n```",
+        "output_sha256": "sha256:ad75f3ee699fa312922a6fb0d204d65d4f9b98d499ee9ada1d0d96c035fb635e"
+      },
+      "run_id": "L2-s3",
+      "sample": 3
+    },
+    {
+      "admitted": false,
+      "case_id": "L3_vigil_or_absence_repeat",
+      "census": {
+        "contract_valid": false,
+        "json": true,
+        "offending": [
+          "I1"
+        ],
+        "pointers": [
+          "I1"
+        ],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O2"
+          },
+          {
+            "class": "invented",
+            "field": "interpretations",
+            "section": 2,
+            "token": "I1"
+          }
+        ],
+        "violations": []
+      },
+      "code": "PROPOSAL_REFERENCE_UNKNOWN",
+      "elapsed_s": 4.868,
+      "exposed": {
+        "interpretations": {},
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "I want to understand whether the lamp signals a vigil or an absence.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nI want to understand whether the lamp signals a vigil or an absence.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:adb9651c3057b80d97361842006c901d5d1a080146f2bf2464b38d7aeed25bfc",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"The Significance of Lamp Signals in Harbor Activities\",\n  \"thesis\": \"A study examining whether lamp signals indicate vigilance or absence.\",\n  \"sections\": [\n    {\n      \"claim\": \"The burning state and timing of the lamps provide insights into harbor activities, suggesting either vigilant watchfulness or an unoccupied station.\",\n      \"observations\": [\"O1\", \"O2\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"No inquiries were made about why a lamp burned all night; this could indicate neglect due to the absence of people in need of answers, implying vacancy rather than vigilance.\",\n      \"observations\": [],\n      \"interpretations\": [\"I1\"]\n    }\n  ]\n}\n```",
+      "raw_output_sha256": "sha256:09d2493d2eb970cbcd4edc89a799ad31e6d7507a57715de7fccbb75344d9a34c",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_REFERENCE_UNKNOWN",
+        "error": "PROPOSAL_REFERENCE_UNKNOWN: a reference is not an exposed label",
+        "output": "```json\n{\n  \"title\": \"The Significance of Lamp Signals in Harbor Activities\",\n  \"thesis\": \"A study examining whether lamp signals indicate vigilance or absence.\",\n  \"sections\": [\n    {\n      \"claim\": \"The burning state and timing of the lamps provide insights into harbor activities, suggesting either vigilant watchfulness or an unoccupied station.\",\n      \"observations\": [\"O1\", \"O2\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"No inquiries were made about why a lamp burned all night; this could indicate neglect due to the absence of people in need of answers, implying vacancy rather than vigilance.\",\n      \"observations\": [],\n      \"interpretations\": [\"I1\"]\n    }\n  ]\n}\n```",
+        "output_sha256": "sha256:09d2493d2eb970cbcd4edc89a799ad31e6d7507a57715de7fccbb75344d9a34c"
+      },
+      "run_id": "L3-s3",
+      "sample": 3
+    },
+    {
+      "admitted": false,
+      "case_id": "L4_revise_with_second_lamp",
+      "census": {
+        "contract_valid": false,
+        "json": false,
+        "offending": [],
+        "pointers": [],
+        "tokens": [],
+        "violations": [
+          "not one JSON object"
+        ]
+      },
+      "code": "PROPOSAL_OUTPUT_UNPARSEABLE",
+      "elapsed_s": 6.908,
+      "exposed": {
+        "interpretations": {
+          "I:INEW": "I1"
+        },
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "Revise my Blueprint to include the second lamp.",
+      "mode": "revise",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nRevise my Blueprint to include the second lamp.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\nI1 (steward-authored; on O5): Lighting a second lamp shows the vigil is deliberate.\n\nCurrent Blueprint to revise (return its complete successor, not a diff):\nTitle: The unexplained lamp\nThesis: The lamp burns without explanation.\nSection 1: The lamp burns all night. [O1]\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}],\"change_summary\":\"...\"}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).\n- Return the complete successor Blueprint. change_summary explains your proposal to the steward; it is not the recorded rationale.",
+      "prompt_sha256": "sha256:335e2b5e4bd954876eab7bddd0f940be7a53c31eab4a2a99869e1f8a52ae99c6",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"The unexplained lamp\",\n  \"thesis\": \"The lamp burns without explanation.\",\n  \"sections\": [\n    {\n      \"claim\": \"The keeper wrote nothing down about why a second lamp was lit at dusk.\", \n      \"observations\": [\"O3\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"A deliberate act to light the first and then another later on.\",\n      \"observations\": [],\n      \"interpretations\": [\n        {\n          \"steward-authored; O5: Lighting a second lamp shows that there is an intentional sequence of actions rather than it being spontaneous.\"\n        }\n      ]\n    },\n    {\n      \"claim\": \"The ledger records only the oil used.\",\n      \"observations\": [\"O6\"],\n      \"interpretations\": []\n    }\n  ],\n  \"change_summary\": \"Added Section with claim O3 and a new interpretation I1 regarding intentional actions. Added an observation to existing sections for clarity.\"\n}\n```",
+      "raw_output_sha256": "sha256:4d99760015f099ff43029d9e7487423d5e17c7ff0c28b893e27524e7f646e789",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_OUTPUT_UNPARSEABLE",
+        "error": "PROPOSAL_OUTPUT_UNPARSEABLE",
+        "output": "```json\n{\n  \"title\": \"The unexplained lamp\",\n  \"thesis\": \"The lamp burns without explanation.\",\n  \"sections\": [\n    {\n      \"claim\": \"The keeper wrote nothing down about why a second lamp was lit at dusk.\", \n      \"observations\": [\"O3\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"A deliberate act to light the first and then another later on.\",\n      \"observations\": [],\n      \"interpretations\": [\n        {\n          \"steward-authored; O5: Lighting a second lamp shows that there is an intentional sequence of actions rather than it being spontaneous.\"\n        }\n      ]\n    },\n    {\n      \"claim\": \"The ledger records only the oil used.\",\n      \"observations\": [\"O6\"],\n      \"interpretations\": []\n    }\n  ],\n  \"change_summary\": \"Added Section with claim O3 and a new interpretation I1 regarding intentional actions. Added an observation to existing sections for clarity.\"\n}\n```",
+        "output_sha256": "sha256:4d99760015f099ff43029d9e7487423d5e17c7ff0c28b893e27524e7f646e789"
+      },
+      "run_id": "L4-s3",
+      "sample": 3
+    },
+    {
+      "admitted": false,
+      "case_id": "L5_unsupported_premise",
+      "census": {
+        "contract_valid": false,
+        "json": true,
+        "offending": [
+          "I1"
+        ],
+        "pointers": [
+          "I1"
+        ],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O1"
+          },
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 3,
+            "token": "O3"
+          },
+          {
+            "class": "invented",
+            "field": "interpretations",
+            "section": 3,
+            "token": "I1"
+          }
+        ],
+        "violations": []
+      },
+      "code": "PROPOSAL_REFERENCE_UNKNOWN",
+      "elapsed_s": 6.135,
+      "exposed": {
+        "interpretations": {},
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "Explain why the keeper abandoned the harbor.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nExplain why the keeper abandoned the harbor.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:2013699cf25518f6334667df2b7dbe2b5efdf497c66aad6607d20dd504922156",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"Abandonment of Harbor\",\n  \"thesis\": \"The keeper abandoned the harbor because he or she was compelled to leave due to resource depletion and possibly other undisclosed reasons.\",\n  \"sections\": [\n    {\n      \"claim\": \"The lamp burned all night indicating continuous activity in the area that required significant resources.\",\n      \"observations\": [\"O1\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"Nobody asked why it continued to burn, suggesting a lack of oversight or concern from others about resource use and its sustainability.\",\n      \"observations\": [],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"The keeper wrote nothing down indicating either intentional concealment of activities for reasons unknown or overwhelming circumstances that prevented record-keeping.\",\n      \"observations\": [\"O3\"],\n      \"interpretations\": [\"I1\"]\n    }\n  ]\n}\n```",
+      "raw_output_sha256": "sha256:64d6183ad3df43dc36bfa563e4dc02bcb7a7a1d6a15bedf8350795ccc54e66ca",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_REFERENCE_UNKNOWN",
+        "error": "PROPOSAL_REFERENCE_UNKNOWN: a reference is not an exposed label",
+        "output": "```json\n{\n  \"title\": \"Abandonment of Harbor\",\n  \"thesis\": \"The keeper abandoned the harbor because he or she was compelled to leave due to resource depletion and possibly other undisclosed reasons.\",\n  \"sections\": [\n    {\n      \"claim\": \"The lamp burned all night indicating continuous activity in the area that required significant resources.\",\n      \"observations\": [\"O1\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"Nobody asked why it continued to burn, suggesting a lack of oversight or concern from others about resource use and its sustainability.\",\n      \"observations\": [],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"The keeper wrote nothing down indicating either intentional concealment of activities for reasons unknown or overwhelming circumstances that prevented record-keeping.\",\n      \"observations\": [\"O3\"],\n      \"interpretations\": [\"I1\"]\n    }\n  ]\n}\n```",
+        "output_sha256": "sha256:64d6183ad3df43dc36bfa563e4dc02bcb7a7a1d6a15bedf8350795ccc54e66ca"
+      },
+      "run_id": "L5-s3",
+      "sample": 3
+    },
+    {
+      "admitted": false,
+      "case_id": "L6_excluded_evidence_temptation",
+      "census": {
+        "contract_valid": false,
+        "json": true,
+        "offending": [
+          "I1"
+        ],
+        "pointers": [
+          "I1"
+        ],
+        "tokens": [
+          {
+            "class": "valid",
+            "field": "observations",
+            "section": 1,
+            "token": "O4"
+          },
+          {
+            "class": "invented",
+            "field": "interpretations",
+            "section": 2,
+            "token": "I1"
+          }
+        ],
+        "violations": []
+      },
+      "code": "PROPOSAL_REFERENCE_UNKNOWN",
+      "elapsed_s": 5.082,
+      "exposed": {
+        "interpretations": {},
+        "observations": [
+          "A:1",
+          "A:2",
+          "A:3",
+          "A:4",
+          "A:5",
+          "A:6"
+        ]
+      },
+      "governance": {
+        "D1_status": true,
+        "D2_no_write": true,
+        "D3_refusal_reproduced": true,
+        "D6_no_valid_refusal": true
+      },
+      "http_status": 422,
+      "intent": "Connect the bell that rang twice at noon to the lamp that burned all night.",
+      "mode": "create",
+      "prompt": "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.\nGround every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.\nObservations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning.\n\nSteward's request:\n<<<\nConnect the bell that rang twice at noon to the lamp that burned all night.\n>>>\n\nObservations:\nO1 (page 1): The lamp burned all night.\n\nO2 (page 1): Nobody asked why it burned.\n\nO3 (page 1): The keeper wrote nothing down.\n\nO4 (page 1): By morning the harbor was empty.\n\nO5 (page 1): A second lamp was lit at dusk.\n\nO6 (page 1): The ledger records only the oil.\n\n\nInterpretations:\n(none)\n\nReturn only one JSON object with exactly these fields, and nothing else:\n{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}\n\nRules:\n- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.\n- Cite only the labels listed above (O... for Observations, I... for Interpretations).",
+      "prompt_sha256": "sha256:d0c73aef55d5004a795f0d26eb1478e3982c282b3d3d22935f387b6cf3e6311c",
+      "provider_failure": false,
+      "raw_output": "```json\n{\n  \"title\": \"Connecting Events at Noon to Nighttime Lamp Activity\",\n  \"thesis\": \"The ringing of bells twice at noon is indirectly related to maintaining nighttime activities through a consistent lamp-burning pattern.\",\n  \"sections\": [\n    {\n      \"claim\": \"The bell that rang once signifies something significant in relation to the burning lamps, though this connection remains indirect and unexplained by direct evidence\",\n      \"observations\": [\"O4\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"The consistent lamp-burning overnight suggests a routine or necessity which could imply an event at noon that maintains such nighttime routines.\",\n      \"observations\": [],\n      \"interpretations\": [\n        \"I1\"\n      ]\n    }\n  ]\n}\n```",
+      "raw_output_sha256": "sha256:2b332b55c834d9e4ee413cf1fd6d33f22982e6cd85b0206e886bfea9b6d8ed78",
+      "response_body": {
+        "canonical_status": "not_persisted",
+        "code": "PROPOSAL_REFERENCE_UNKNOWN",
+        "error": "PROPOSAL_REFERENCE_UNKNOWN: a reference is not an exposed label",
+        "output": "```json\n{\n  \"title\": \"Connecting Events at Noon to Nighttime Lamp Activity\",\n  \"thesis\": \"The ringing of bells twice at noon is indirectly related to maintaining nighttime activities through a consistent lamp-burning pattern.\",\n  \"sections\": [\n    {\n      \"claim\": \"The bell that rang once signifies something significant in relation to the burning lamps, though this connection remains indirect and unexplained by direct evidence\",\n      \"observations\": [\"O4\"],\n      \"interpretations\": []\n    },\n    {\n      \"claim\": \"The consistent lamp-burning overnight suggests a routine or necessity which could imply an event at noon that maintains such nighttime routines.\",\n      \"observations\": [],\n      \"interpretations\": [\n        \"I1\"\n      ]\n    }\n  ]\n}\n```",
+        "output_sha256": "sha256:2b332b55c834d9e4ee413cf1fd6d33f22982e6cd85b0206e886bfea9b6d8ed78"
+      },
+      "run_id": "L6-s3",
+      "sample": 3
+    }
+  ],
+  "schema": "hermeneia.blueprint-proposal-live-evaluation/v1"
+}
