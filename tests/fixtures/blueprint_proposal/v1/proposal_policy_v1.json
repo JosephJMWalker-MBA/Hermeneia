@@ -1,0 +1,47 @@
+{
+  "schema": "hermeneia.blueprint-proposal-policy/v1",
+  "policy_version": "1.0.0",
+  "prompt_version": "blueprint-proposal/v1",
+  "basis_policy": "blueprint-proposal-basis/v1",
+  "basis_limits": {
+    "observations": 200,
+    "interpretations": 100
+  },
+  "section_limits": {
+    "min": 1,
+    "max": 12
+  },
+  "header": [
+    "You are proposing a NarrativeBlueprint for a Hermeneia study. A steward will review it; nothing you write is saved or decided by you.",
+    "Ground every section in the evidence listed below and cite evidence only by its label. Do not invent evidence. A section may cite nothing when no listed evidence supports it.",
+    "Observations are source evidence. Interpretations are recorded readings with stated authorship; an accepted model contribution is not the steward's own reasoning."
+  ],
+  "intent_intro": "Steward's request:",
+  "governing_intro": "Governing question (the steward's current question; context, not evidence):",
+  "observations_intro": "Observations:",
+  "interpretations_intro": "Interpretations:",
+  "none_line": "(none)",
+  "observation_line": "O{n} (page {page}): {raw_text}",
+  "interpretation_line": "I{n} ({authorship}; on {observation_label}): {text}",
+  "authorship_labels": {
+    "human": "steward-authored",
+    "accepted_model": "accepted model contribution",
+    "unknown": "authorship not recorded"
+  },
+  "predecessor_intro": "Current Blueprint to revise (return its complete successor, not a diff):",
+  "predecessor_lines": [
+    "Title: {title}",
+    "Thesis: {thesis}",
+    "Section {k}: {claim} [{labels}]"
+  ],
+  "return_intro": "Return only one JSON object with exactly these fields, and nothing else:",
+  "create_shape": "{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}]}",
+  "revise_shape": "{\"title\":\"...\",\"thesis\":\"...\",\"sections\":[{\"claim\":\"...\",\"observations\":[\"O1\"],\"interpretations\":[\"I1\"]}],\"change_summary\":\"...\"}",
+  "rules_intro": "Rules:",
+  "rules": [
+    "- Between 1 and 12 sections. Every field is required; use [] when a section cites nothing.",
+    "- Cite only the labels listed above (O... for Observations, I... for Interpretations)."
+  ],
+  "revise_rule": "- Return the complete successor Blueprint. change_summary explains your proposal to the steward; it is not the recorded rationale.",
+  "assembly": "header; blank; intent_intro; '<<<'; intent; '>>>'; [blank; governing_intro; question] when captured; blank; observations_intro; observation lines or none_line; blank; interpretations_intro; interpretation lines or none_line; [blank; predecessor_intro; predecessor lines] for revise; blank; return_intro; shape; blank; rules_intro; rules; [revise_rule] for revise; joined with a newline"
+}

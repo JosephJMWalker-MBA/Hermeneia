@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermeneia.blueprint-proposal-acceptance/v1",
+  "title": "Blueprint proposal acceptance receipt v1 (#215 P8): append-only; the steward accepted this Blueprint from this exact model proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "mode", "origin", "candidate", "result", "acceptance"],
+  "properties": {
+    "schema": {"const": "hermeneia.blueprint-proposal-acceptance/v1"},
+    "id": {"type": "string", "pattern": "^blueprint-proposal-acceptance:sha256:[0-9a-f]{64}$"},
+    "mode": {"enum": ["create", "revise"]},
+    "origin": {"type": "object", "additionalProperties": false, "required": ["kind"],
+               "properties": {"kind": {"enum": ["model_proposed_steward_accepted", "model_proposed_steward_edited"]}}},
+    "candidate": {"$ref": "candidate.schema.json"},
+    "result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["resulting_blueprint_id", "plan_id", "blueprint_preexisted", "predecessor_id", "supersession"],
+      "properties": {
+        "resulting_blueprint_id": {"type": "string"}, "plan_id": {"type": "string"}, "blueprint_preexisted": {"type": "boolean"},
+        "predecessor_id": {"type": ["string", "null"]},
+        "supersession": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false,
+                          "required": ["old_id", "new_id", "reason", "ratified_at"],
+                          "properties": {"old_id": {"type": "string"}, "new_id": {"type": "string"},
+                                         "reason": {"type": "string", "minLength": 1}, "ratified_at": {"type": "string"}}}]}
+      }
+    },
+    "acceptance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decision", "actor", "actor_identity", "accepted_at", "reviewed_candidate_id", "accepted_blueprint", "edited", "rationale", "meaning"],
+      "properties": {
+        "decision": {"enum": ["accept", "edit_and_accept"]},
+        "actor": {"const": "local_steward"}, "actor_identity": {"const": "unknown"},
+        "accepted_at": {"type": "string"}, "reviewed_candidate_id": {"type": "string"},
+        "accepted_blueprint": {"$ref": "candidate.schema.json#/$defs/blueprint"},
+        "edited": {"type": "boolean"}, "rationale": {"type": ["string", "null"]},
+        "meaning": {"const": "The steward accepted this Blueprint (as proposed, or as edited) from this exact model proposal. It does not establish that the Blueprint's claims are true or that the model's explanation is the steward's rationale."}
+      }
+    }
+  }
+}

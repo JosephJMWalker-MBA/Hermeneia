@@ -1,0 +1,165 @@
+{
+  "graded_at": "2026-10-10",
+  "grader": "Claude Opus 5.5 (evaluating agent), after the live run and before any aggregate; automatic statuses were visible",
+  "grades": [
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "No Interpretations are exposed; nothing is attributed to an Interpretation or to the steward."
+      },
+      "claims": [
+        {
+          "class": "plausible_unsupported",
+          "rationale": "Of the cited records only A:3 (the keeper wrote nothing) bears on absence; A:1 and A:5 bear toward a vigil, so the cited evidence gives no reason for 'absence rather than vigilance'.",
+          "unit": "thesis"
+        },
+        {
+          "class": "plausible_unsupported",
+          "rationale": "A:1 states only that the lamp burned all night; a vigil 'set up by someone present at night' and 'subsequently abandoned' goes beyond it. The inline '(O1)' also tags A:2's content (no one asked).",
+          "unit": "section 1"
+        },
+        {
+          "class": "plausible_unsupported",
+          "rationale": "Its facts are true of A:2 and A:6, but it cites A:1 and A:3; 'not deemed necessary upon inspection' invents an inspection.",
+          "unit": "section 2"
+        },
+        {
+          "class": "plausible_unsupported",
+          "rationale": "The ledger's silence is A:6 content, tagged inline '(O2)' and cited as A:1 and A:3; a 'tacit agreement that there is no need to maintain vigil after a certain period' goes beyond every record.",
+          "unit": "section 3"
+        },
+        {
+          "class": "misrepresents_record",
+          "rationale": "States 'The fact that by morning, both lamps are found unlit' and tags it '(O4)'; A:4 records only the empty harbor, and no record says any lamp was found unlit.",
+          "unit": "section 4"
+        },
+        {
+          "class": "plausible_unsupported",
+          "rationale": "A:5 states the second lamp; 'the need for constant vigilance diminished over time' and 'an established routine' go beyond it, and the inline '(O6)' tags the ledger record, which does not bear on it.",
+          "unit": "section 5"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes a position (absence rather than vigilance) on the asked question and offers reasons, mostly inferential.",
+        "score": 2
+      },
+      "run_id": "L1-s1",
+      "uncertainty": {
+        "class": "flattened",
+        "quote": "The fact that by morning, both lamps are found unlit and the harbor empty",
+        "rationale": "Asserted as established fact; it presupposes that the second lamp burned through the same night before that morning, asserting the open sequence of the second lamp. Section 1 also narrates a vigil set up by someone present at night and later abandoned."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Readings drawn from I1 and I2 are argued, not attributed to the source; I3, the accepted model contribution, is not used; 'we argue' is the proposal's own voice, not a claim of steward decision."
+      },
+      "claims": [
+        {
+          "class": "plausible_unsupported",
+          "rationale": "I1 and A:1 support an unacknowledged vigil, but 'a profound sense of duty' and 'someone who feels compelled' attribute motives that no cited record or Interpretation gives.",
+          "unit": "thesis"
+        },
+        {
+          "class": "plausible_unsupported",
+          "rationale": "Partly adopts I1 ('not recognized'), but 'deeply personal motivations' goes beyond I1 and A:1.",
+          "unit": "section 1"
+        },
+        {
+          "class": "contradicted",
+          "rationale": "'no records have been entered' contradicts A:6, which records that the ledger records the oil; the keeper's 'diligent effort to log oil usage' is asserted without any record.",
+          "unit": "section 2"
+        },
+        {
+          "class": "plausible_unsupported",
+          "rationale": "A:4 states the empty harbor; 'a place typically bustling during daylight hours' is invented background, and 'constant watch over nothing' goes beyond A:4.",
+          "unit": "section 3"
+        },
+        {
+          "class": "supported",
+          "rationale": "A hedged reading ('hints', 'perhaps') for which A:5, an additional lamp lit at dusk, gives a specific basis.",
+          "unit": "section 4"
+        }
+      ],
+      "intent": {
+        "rationale": "Builds an argument about what the lamp means for the harbor and draws on the steward's I1 and I2.",
+        "score": 2
+      },
+      "run_id": "L2-s1",
+      "uncertainty": {
+        "class": "flattened",
+        "quote": "Despite the keeper's diligent effort to log oil usage diligently into a ledger, no records have been entered.",
+        "rationale": "Asserts as established the keeper's effort and intent, an open matter (whether the keeper intended anything; why the keeper or the ledger recorded nothing beyond the oil)."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "No Interpretations are exposed; nothing is attributed to an Interpretation or to the steward."
+      },
+      "claims": [
+        {
+          "class": "plausible_unsupported",
+          "rationale": "A:5 supports deliberate lighting and, by 'second', different lighting times; it gives no reason to set aside both a vigil and an absence.",
+          "unit": "thesis"
+        },
+        {
+          "class": "plausible_unsupported",
+          "rationale": "A:5 states that a second lamp was lit; 'used intentionally to indicate something beyond mere vigilance' asserts a purpose that no record gives.",
+          "unit": "section 1"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes up the question by rejecting both alternatives in favour of 'an intentional pattern', with one section of reasons.",
+        "score": 2
+      },
+      "run_id": "L1-s2",
+      "uncertainty": {
+        "class": "flattened",
+        "quote": "A second lamp was used intentionally to indicate something beyond mere vigilance.",
+        "rationale": "Asserts the lamp's purpose as established (open matter: why the lamp burned, or for whom)."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Nothing is attributed to the source or to the steward; the uncited restatement of I2 is graded under support and uncertainty. I3 is not used."
+      },
+      "claims": [
+        {
+          "class": "plausible_unsupported",
+          "rationale": "I1 supports an unacknowledged vigil; 'deliberately ignored by both keepers and observers' is given no reason by A:1 or I1.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A hedged reading ('suggests') for which A:1 and I1 give a specific reason: a purpose beyond illumination.",
+          "unit": "section 1"
+        },
+        {
+          "class": "plausible_unsupported",
+          "rationale": "Asserts an intentional omission in 'official records' while citing nothing; it restates I2's reading as fact without citing I2.",
+          "unit": "section 2"
+        }
+      ],
+      "intent": {
+        "rationale": "Argues what the lamp signifies and draws on I1, but the harbor is absent from the thesis and sections, and I2's reading appears only uncited.",
+        "score": 1
+      },
+      "run_id": "L2-s2",
+      "uncertainty": {
+        "class": "flattened",
+        "quote": "There was an intentional omission of details about the lamp's significance in official records.",
+        "rationale": "Asserts as an established event why the record is silent (open matter: why the keeper or the ledger recorded nothing beyond the oil)."
+      }
+    }
+  ],
+  "results_binding": "47132673aeb20ce763443507f90d1324905de5fc54608d3455997a73e14f3486",
+  "rubric_version": "blueprint-proposal-live-rubric/v1",
+  "schema": "hermeneia.blueprint-proposal-live-grading/v1"
+}

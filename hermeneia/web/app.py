@@ -985,16 +985,9 @@ def create_app(
     def _blueprint_supersession_row(row: sqlite3.Row | None) -> dict | None:
         return dict(row) if row else None
 
-    def _persist_blueprint_revision_and_compile(
-        conn: sqlite3.Connection,
-        *,
-        predecessor_id: str,
-        candidate: dict,
-        reason: str,
-    ) -> dict:
-        from ..compiler.architect import compile_architect_plan
+    def _revision_preflight(conn: sqlite3.Connection, *, predecessor_id: str, candidate: dict, reason: str) -> tuple[str, str]:
+        """Validate the steward reason and references; return the reason and the content-derived successor ID."""
         from ..storage.hashing import make_blueprint_id
-        from ..storage.sqlite import ensure_architect_tables
 
         reason = str(reason or "").strip()
         if not reason:
@@ -1008,97 +1001,45 @@ def create_app(
         successor_id = make_blueprint_id(candidate["title"], candidate["thesis"], sections)
         if predecessor_id == successor_id:
             raise ValueError("Blueprint cannot supersede itself")
+        return reason, successor_id
 
-        ensure_architect_tables(conn)
-        conn.commit()
-        conn.execute("BEGIN IMMEDIATE")
-        try:
-            predecessor = conn.execute(
-                "SELECT * FROM narrative_blueprints WHERE id = ?",
-                (predecessor_id,),
-            ).fetchone()
-            if predecessor is None:
-                raise KeyError("unknown predecessor Blueprint")
+    def _revise_blueprint_in_transaction(
+        conn: sqlite3.Connection,
+        *,
+        predecessor_id: str,
+        successor_id: str,
+        candidate: dict,
+        reason: str,
+        source: str,
+    ) -> dict:
+        """The append-only revision writes inside a caller-owned write transaction (no commit)."""
+        from ..compiler.architect import compile_architect_plan
 
-            existing_edge = conn.execute(
-                """
-                SELECT * FROM supersession_relations
-                WHERE old_id = ? AND new_id = ? AND reason = ?
-                ORDER BY ratified_at
-                LIMIT 1
-                """,
-                (predecessor_id, successor_id, reason),
-            ).fetchone()
-            existing_successor = conn.execute(
-                "SELECT * FROM narrative_blueprints WHERE id = ?",
-                (successor_id,),
-            ).fetchone()
-            if existing_successor is not None and not _blueprint_row_matches_candidate(existing_successor, candidate):
-                raise ValueError("Blueprint ID already exists with different immutable content.")
+        sections = candidate["sections"]
+        predecessor = conn.execute(
+            "SELECT * FROM narrative_blueprints WHERE id = ?",
+            (predecessor_id,),
+        ).fetchone()
+        if predecessor is None:
+            raise KeyError("unknown predecessor Blueprint")
 
-            if existing_edge is not None and existing_successor is not None:
-                plan = compile_architect_plan(successor_id, conn)
-                pr = plan["plan_row"]
-                conn.execute(
-                    """INSERT OR IGNORE INTO architect_plans
-                       (id, blueprint_id, blueprint_hash, title, source, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (pr["id"], pr["blueprint_id"], pr["blueprint_hash"],
-                     pr["title"], pr["source"], pr["created_at"]),
-                )
-                for para in plan["paragraph_rows"]:
-                    conn.execute(
-                        """INSERT OR IGNORE INTO architect_plan_paragraphs
-                           (plan_id, order_idx, purpose, blueprint_section,
-                            required_observations, required_interpretations,
-                            required_terms, forbidden_claims, notes)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (para["plan_id"], para["order_idx"], para["purpose"],
-                         para["blueprint_section"], para["required_observations"],
-                         para["required_interpretations"], para["required_terms"],
-                         para["forbidden_claims"], para["notes"]),
-                    )
-                conn.commit()
-                return {
-                    "blueprint_id": successor_id,
-                    "plan_id": pr["id"],
-                    "committed_blueprint": candidate,
-                    "predecessor_id": predecessor_id,
-                    "supersession": _blueprint_supersession_row(existing_edge),
-                    "status": "already_revised",
-                }
+        existing_edge = conn.execute(
+            """
+            SELECT * FROM supersession_relations
+            WHERE old_id = ? AND new_id = ? AND reason = ?
+            ORDER BY ratified_at
+            LIMIT 1
+            """,
+            (predecessor_id, successor_id, reason),
+        ).fetchone()
+        existing_successor = conn.execute(
+            "SELECT * FROM narrative_blueprints WHERE id = ?",
+            (successor_id,),
+        ).fetchone()
+        if existing_successor is not None and not _blueprint_row_matches_candidate(existing_successor, candidate):
+            raise ValueError("Blueprint ID already exists with different immutable content.")
 
-            if _blueprint_path_exists(conn, successor_id, predecessor_id):
-                raise ValueError("Blueprint supersession cycle rejected.")
-
-            now = datetime.now(timezone.utc).isoformat()
-            if existing_successor is None:
-                conn.execute(
-                    """
-                    INSERT INTO narrative_blueprints
-                        (id, title, thesis, sections, source, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        successor_id,
-                        candidate["title"],
-                        candidate["thesis"],
-                        json.dumps(sections),
-                        "steward-authored",
-                        now,
-                    ),
-                )
-            for oid in {oid for sec in sections for oid in sec.get("supporting_observations", [])}:
-                conn.execute(
-                    "INSERT OR IGNORE INTO blueprint_observation_links (blueprint_id, observation_id) VALUES (?, ?)",
-                    (successor_id, oid),
-                )
-            for iid in {iid for sec in sections for iid in sec.get("supporting_interpretations", [])}:
-                conn.execute(
-                    "INSERT OR IGNORE INTO blueprint_interpretation_links (blueprint_id, interpretation_id) VALUES (?, ?)",
-                    (successor_id, iid),
-                )
-
+        if existing_edge is not None and existing_successor is not None:
             plan = compile_architect_plan(successor_id, conn)
             pr = plan["plan_row"]
             conn.execute(
@@ -1120,31 +1061,112 @@ def create_app(
                      para["required_interpretations"], para["required_terms"],
                      para["forbidden_claims"], para["notes"]),
                 )
-            ratified_at = datetime.now(timezone.utc).isoformat()
-            conn.execute(
-                """
-                INSERT INTO supersession_relations
-                    (old_id, new_id, reason, ratified_at)
-                VALUES (?, ?, ?, ?)
-                """,
-                (predecessor_id, successor_id, reason, ratified_at),
-            )
-            edge = conn.execute(
-                """
-                SELECT * FROM supersession_relations
-                WHERE old_id = ? AND new_id = ? AND reason = ? AND ratified_at = ?
-                """,
-                (predecessor_id, successor_id, reason, ratified_at),
-            ).fetchone()
-            conn.commit()
             return {
                 "blueprint_id": successor_id,
                 "plan_id": pr["id"],
                 "committed_blueprint": candidate,
                 "predecessor_id": predecessor_id,
-                "supersession": _blueprint_supersession_row(edge),
-                "status": "revised",
+                "supersession": _blueprint_supersession_row(existing_edge),
+                "status": "already_revised",
             }
+
+        if _blueprint_path_exists(conn, successor_id, predecessor_id):
+            raise ValueError("Blueprint supersession cycle rejected.")
+
+        now = datetime.now(timezone.utc).isoformat()
+        if existing_successor is None:
+            conn.execute(
+                """
+                INSERT INTO narrative_blueprints
+                    (id, title, thesis, sections, source, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    successor_id,
+                    candidate["title"],
+                    candidate["thesis"],
+                    json.dumps(sections),
+                    source,
+                    now,
+                ),
+            )
+        for oid in {oid for sec in sections for oid in sec.get("supporting_observations", [])}:
+            conn.execute(
+                "INSERT OR IGNORE INTO blueprint_observation_links (blueprint_id, observation_id) VALUES (?, ?)",
+                (successor_id, oid),
+            )
+        for iid in {iid for sec in sections for iid in sec.get("supporting_interpretations", [])}:
+            conn.execute(
+                "INSERT OR IGNORE INTO blueprint_interpretation_links (blueprint_id, interpretation_id) VALUES (?, ?)",
+                (successor_id, iid),
+            )
+
+        plan = compile_architect_plan(successor_id, conn)
+        pr = plan["plan_row"]
+        conn.execute(
+            """INSERT OR IGNORE INTO architect_plans
+               (id, blueprint_id, blueprint_hash, title, source, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (pr["id"], pr["blueprint_id"], pr["blueprint_hash"],
+             pr["title"], pr["source"], pr["created_at"]),
+        )
+        for para in plan["paragraph_rows"]:
+            conn.execute(
+                """INSERT OR IGNORE INTO architect_plan_paragraphs
+                   (plan_id, order_idx, purpose, blueprint_section,
+                    required_observations, required_interpretations,
+                    required_terms, forbidden_claims, notes)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (para["plan_id"], para["order_idx"], para["purpose"],
+                 para["blueprint_section"], para["required_observations"],
+                 para["required_interpretations"], para["required_terms"],
+                 para["forbidden_claims"], para["notes"]),
+            )
+        ratified_at = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            """
+            INSERT INTO supersession_relations
+                (old_id, new_id, reason, ratified_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (predecessor_id, successor_id, reason, ratified_at),
+        )
+        edge = conn.execute(
+            """
+            SELECT * FROM supersession_relations
+            WHERE old_id = ? AND new_id = ? AND reason = ? AND ratified_at = ?
+            """,
+            (predecessor_id, successor_id, reason, ratified_at),
+        ).fetchone()
+        return {
+            "blueprint_id": successor_id,
+            "plan_id": pr["id"],
+            "committed_blueprint": candidate,
+            "predecessor_id": predecessor_id,
+            "supersession": _blueprint_supersession_row(edge),
+            "status": "revised",
+        }
+
+    def _persist_blueprint_revision_and_compile(
+        conn: sqlite3.Connection,
+        *,
+        predecessor_id: str,
+        candidate: dict,
+        reason: str,
+    ) -> dict:
+        from ..storage.sqlite import ensure_architect_tables
+
+        reason, successor_id = _revision_preflight(conn, predecessor_id=predecessor_id, candidate=candidate, reason=reason)
+        ensure_architect_tables(conn)
+        conn.commit()
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            result = _revise_blueprint_in_transaction(
+                conn, predecessor_id=predecessor_id, successor_id=successor_id,
+                candidate=candidate, reason=reason, source="steward-authored",
+            )
+            conn.commit()
+            return result
         except Exception:
             conn.rollback()
             raise
@@ -10020,6 +10042,195 @@ Return ONLY valid JSON, no markdown, no explanation:
             finally:
                 conn.close()
         return jsonify(record), 201
+
+    # P8: natural-language Blueprint proposals (docs/design/blueprint-proposal-v1.md).
+    # Candidates are transient server state; only a steward decision writes, through the
+    # existing Blueprint persistence seams plus an append-only acceptance receipt.
+    app.config.setdefault("BLUEPRINT_PROPOSAL_GENERATION",
+                          "experimental" if os.environ.get("HERMENEIA_BLUEPRINT_PROPOSALS") == "experimental" else "disabled")
+    blueprint_proposal_candidates: dict[str, dict] = {}
+    blueprint_proposal_lock = threading.RLock()
+
+    @app.route("/api/blueprint/proposals", methods=["POST"])
+    def api_blueprint_proposal():
+        """Draft a Blueprint or successor from natural-language intent; nothing canonical is written."""
+        from ..blueprint_proposals import ProposalRefused, build_candidate, build_prompt, proposal_basis, text_digest
+
+        if app.config.get("BLUEPRINT_PROPOSAL_GENERATION") != "experimental":
+            return jsonify({"error": "Natural-language Blueprint proposal generation is disabled",
+                            "code": "BLUEPRINT_PROPOSAL_DISABLED"}), 403
+        payload = request.get_json(silent=True)
+        mode = payload.get("mode") if isinstance(payload, dict) else None
+        allowed = {"create": {"mode", "intent", "model"}, "revise": {"mode", "intent", "model", "predecessor_id"}}.get(mode)
+        if (allowed is None or set(payload) != allowed or not isinstance(payload["intent"], str) or not payload["intent"].strip()
+                or not isinstance(payload["model"], str) or (mode == "revise" and not isinstance(payload["predecessor_id"], str))):
+            return jsonify({"error": "mode, a non-blank intent, model and (for revise) predecessor_id are required",
+                            "code": "INVALID_REQUEST"}), 400
+        if not db_path.exists():
+            return jsonify({"error": "database not found", "code": "NOT_AVAILABLE"}), 404
+        conn = _conn()
+        try:
+            conn.execute("PRAGMA query_only=ON")
+            conn.execute("BEGIN")
+            basis = proposal_basis(conn, mode, payload.get("predecessor_id"))
+        except ProposalRefused as refusal:
+            return jsonify({"error": str(refusal), "code": refusal.code}), refusal.status
+        except sqlite3.Error:
+            return jsonify({"error": "The proposal basis could not be read", "code": "EVALUATION_FAILED"}), 409
+        finally:
+            conn.close()
+        context, error = _local_perspective_execution_context(payload["model"].strip())
+        if error is not None:
+            body, status = error
+            return jsonify({**body, "canonical_status": "not_persisted"}), status
+        prompt = build_prompt(basis, payload["intent"])
+        created_at = utc_now_iso()
+        try:
+            adapter = active_provider_registry.create(context["provider_id"], model=context["model_id"], host=context["runtime_host"])
+            output = adapter.render(prompt)
+            execution = adapter.execution_config()
+        except Exception:
+            return jsonify({"error": "Local Blueprint proposal generation failed. Check the runtime and selected model.",
+                            "code": "PROVIDER_FAILED", "provider_id": context["provider_id"], "model_id": context["model_id"]}), 502
+        if not isinstance(output, str) or not isinstance(execution, dict):
+            return jsonify({"error": "The provider returned no text", "code": "PROVIDER_FAILED"}), 502
+        execution.update({"provider_id": context["provider_id"], "model_id": context["model_id"],
+                          "runtime_host": context["runtime_host"], "adapter": type(adapter).__name__, "selection_source": "per_run"})
+        try:
+            candidate = build_candidate(basis, intent=payload["intent"], prompt=prompt, execution=execution, output=output,
+                                        created_at=created_at, completed_at=utc_now_iso())
+        except ProposalRefused as refusal:
+            return jsonify({"error": str(refusal), "code": refusal.code, "output": output, "output_sha256": text_digest(output),
+                            "canonical_status": "not_persisted"}), refusal.status
+        with blueprint_proposal_lock:
+            while len(blueprint_proposal_candidates) >= 100:
+                del blueprint_proposal_candidates[next(iter(blueprint_proposal_candidates))]
+            blueprint_proposal_candidates[candidate["candidate_id"]] = {"candidate": candidate, "receipt": None}
+        return jsonify({**candidate, "canonical_status": "not_persisted"}), 201
+
+    def _held_blueprint_proposal(candidate_id: str, payload, fields: set):
+        if not isinstance(payload, dict) or not fields <= set(payload) <= fields | {"reason"}:
+            return None, (jsonify({"error": "Exact decision fields are required; the proposal is server-owned",
+                                   "code": "INVALID_REQUEST"}), 400)
+        held = blueprint_proposal_candidates.get(candidate_id)
+        if held is None:
+            return None, (jsonify({"error": "Unknown, discarded or expired candidate; propose again",
+                                   "code": "UNKNOWN_CANDIDATE"}), 404)
+        if payload["candidate_id"] != candidate_id or held["candidate"]["candidate_id"] != candidate_id:
+            return None, (jsonify({"error": "The reviewed candidate is not the held candidate", "code": "CANDIDATE_MISMATCH"}), 409)
+        return held, None
+
+    @app.route("/api/blueprint/proposals/<path:candidate_id>/accept", methods=["POST"])
+    def api_accept_blueprint_proposal(candidate_id):
+        """Commit the exact held proposal, or the steward's edit of it, with an append-only acceptance receipt."""
+        from ..blueprint_proposals import SOURCES, TABLE as RECEIPT_TABLE, make_receipt, stale_reasons, store_receipt
+        from ..storage.hashing import make_blueprint_id
+        from ..storage.sqlite import ensure_architect_tables
+        from ..study_lineage import project_study_lineage
+
+        payload = request.get_json(silent=True)
+        decision = payload.get("decision") if isinstance(payload, dict) else None
+        fields = {"accept": {"decision", "candidate_id"}, "edit_and_accept": {"decision", "candidate_id", "blueprint"}}.get(decision)
+        with blueprint_proposal_lock:
+            held, refusal = _held_blueprint_proposal(candidate_id, payload if fields else None, fields or {"decision"})
+            if refusal is not None:
+                return refusal
+            if held["receipt"] is not None:
+                return jsonify(held["receipt"]), 200
+            candidate = held["candidate"]
+            rationale = _optional_text(payload, "reason")
+            if candidate["mode"] == "revise" and rationale is None:
+                return jsonify({"error": "A revision needs the steward's rationale (reason)", "code": "REASON_REQUIRED"}), 422
+            if candidate["mode"] == "create" and "reason" in payload:
+                return jsonify({"error": "A new Blueprint takes no revision reason", "code": "INVALID_REQUEST"}), 400
+            if decision == "accept":
+                blueprint = candidate["proposal"]["blueprint"]
+            else:
+                blueprint, error = _normalize_blueprint_candidate(payload["blueprint"])
+                if error:
+                    return jsonify({"error": error, "code": "PROPOSAL_EDIT_INVALID"}), 422
+            if not db_path.exists():
+                return jsonify({"error": "database not found", "code": "NOT_RECORDED"}), 404
+            conn = _conn_rw()
+            try:
+                ensure_architect_tables(conn)
+                conn.commit()
+                conn.execute("BEGIN IMMEDIATE")
+                reasons = stale_reasons(conn, candidate)
+                if reasons:
+                    conn.rollback()
+                    return jsonify({"error": "The candidate's bound inputs changed; nothing was accepted", "code": "STALE_CANDIDATE",
+                                    "reasons": reasons}), 409
+                bp_id = make_blueprint_id(blueprint["title"], blueprint["thesis"], blueprint["sections"])
+                preexisted = conn.execute("SELECT 1 FROM narrative_blueprints WHERE id = ?", (bp_id,)).fetchone() is not None
+                if candidate["mode"] == "create":
+                    outcome = _persist_exact_blueprint_and_compile(conn, blueprint, source=SOURCES[decision])
+                    result = {"resulting_blueprint_id": outcome["blueprint_id"], "plan_id": outcome["plan_id"],
+                              "blueprint_preexisted": preexisted, "predecessor_id": None, "supersession": None}
+                else:
+                    predecessor_id = candidate["binding"]["predecessor"]["id"]
+                    rationale, successor_id = _revision_preflight(conn, predecessor_id=predecessor_id, candidate=blueprint, reason=rationale)
+                    outcome = _revise_blueprint_in_transaction(conn, predecessor_id=predecessor_id, successor_id=successor_id,
+                                                               candidate=blueprint, reason=rationale, source=SOURCES[decision])
+                    edge = outcome["supersession"]
+                    result = {"resulting_blueprint_id": outcome["blueprint_id"], "plan_id": outcome["plan_id"],
+                              "blueprint_preexisted": preexisted, "predecessor_id": predecessor_id,
+                              "supersession": {key: edge[key] for key in ("old_id", "new_id", "reason", "ratified_at")}}
+                receipt = store_receipt(conn, make_receipt(candidate, decision=decision, accepted_blueprint=blueprint, result=result,
+                                                           rationale=rationale if candidate["mode"] == "revise" else None,
+                                                           accepted_at=utc_now_iso()))
+                if not any(item["record"] == {"table": RECEIPT_TABLE, "key": {"id": receipt["id"]}}
+                           for item in project_study_lineage(conn)["items"]):
+                    raise ValueError("the acceptance receipt is not eligible under the study's exclusions")
+                conn.commit()
+            except _ScopeAccessError as exc:
+                conn.rollback()
+                return _scope_error_response(exc)
+            except (ValueError, KeyError, sqlite3.DatabaseError) as exc:
+                conn.rollback()
+                return jsonify({"error": str(exc).strip("'"), "code": "NOT_RECORDED"}), 409
+            finally:
+                conn.close()
+            held["receipt"] = receipt
+        return jsonify(receipt), 201
+
+    @app.route("/api/blueprint/proposals/<path:candidate_id>/discard", methods=["POST"])
+    def api_discard_blueprint_proposal(candidate_id):
+        """Discard a transient proposal; no canonical negative-history event exists."""
+        payload = request.get_json(silent=True)
+        with blueprint_proposal_lock:
+            held, refusal = _held_blueprint_proposal(
+                candidate_id, payload if isinstance(payload, dict) and payload.get("decision") == "discard" and "reason" not in payload else None,
+                {"decision", "candidate_id"})
+            if refusal is not None:
+                return refusal
+            if held["receipt"] is not None:
+                return jsonify({"error": "An accepted proposal cannot be discarded", "code": "ALREADY_ACCEPTED"}), 409
+            del blueprint_proposal_candidates[candidate_id]
+        return jsonify({"candidate_id": candidate_id, "state": "discarded", "canonical_status": "not_persisted"})
+
+    @app.route("/api/blueprint/proposals/acceptances/<path:receipt_id>")
+    def api_blueprint_proposal_acceptance(receipt_id):
+        """Read one acceptance receipt; an ineligible receipt is indistinguishable from an unknown one."""
+        from ..blueprint_proposals import TABLE as RECEIPT_TABLE, load_receipt
+        from ..study_lineage import project_study_lineage, serialize_projection
+
+        receipt = None
+        if db_path.exists():
+            conn = _conn()
+            try:
+                conn.execute("PRAGMA query_only=ON")
+                conn.execute("BEGIN")
+                if any(item["record"] == {"table": RECEIPT_TABLE, "key": {"id": receipt_id}}
+                       for item in project_study_lineage(conn)["items"]):
+                    receipt = load_receipt(conn, receipt_id)
+            except (sqlite3.Error, ValueError):
+                receipt = None
+            finally:
+                conn.close()
+        if receipt is None:
+            return jsonify({"error": "Unknown or unavailable acceptance receipt", "code": "NOT_AVAILABLE"}), 404
+        return _no_store(serialize_projection(receipt))
 
     @app.route("/api/perspective/comparison/accepted/<path:comparison_id>")
     def api_accepted_perspective_comparison(comparison_id):
