@@ -128,7 +128,7 @@ def _chat_replies(*replies):
     return SimpleNamespace(_model="fake", _client=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))), calls
 
 
-@pytest.mark.parametrize("mode", [exposed("legacy", R1UnresolvedReferenceDropped)])
+@pytest.mark.parametrize("mode", [exposed("legacy", R1UnresolvedReferenceDropped), "governed", "disabled"])
 def test_r1_unresolved_references_are_refused_not_dropped(isolated, mode):
     study = Study(isolated, mode, [DOC])
     response, _ = study.generate({"title": "T", "thesis": "Th", "sections": [
@@ -142,7 +142,7 @@ def test_r1_unresolved_references_are_refused_not_dropped(isolated, mode):
         assert {(r["ref"], r["reason"]) for r in body["invalid_references"]} == {("OBS-99", "unshown"), ("INTERP-deadbeef", "unknown")}
 
 
-@pytest.mark.parametrize("mode", [exposed("legacy", R2aWrongTypeBound)])
+@pytest.mark.parametrize("mode", [exposed("legacy", R2aWrongTypeBound), "governed", "disabled"])
 def test_r2a_a_label_of_another_kind_never_binds_an_observation(isolated, mode):
     study = Study(isolated, mode, [DOC])
     response, _ = study.generate({"title": "T", "thesis": "Th", "sections": [
@@ -156,7 +156,7 @@ def test_r2a_a_label_of_another_kind_never_binds_an_observation(isolated, mode):
         assert [(r["ref"], r["reason"]) for r in body["invalid_references"]] == [("I3", "unresolved")]
 
 
-@pytest.mark.parametrize("mode", [exposed("legacy", R2bUnshownRecordBound)])
+@pytest.mark.parametrize("mode", [exposed("legacy", R2bUnshownRecordBound), "governed", "disabled"])
 def test_r2b_a_reference_the_model_was_never_shown_never_binds(isolated, mode):
     documents = [[f"Document {d}, line {n}." for n in range(1, 31)] for d in ("one", "two", "three")]
     study = Study(isolated, mode, documents)
@@ -175,7 +175,7 @@ def test_r2b_a_reference_the_model_was_never_shown_never_binds(isolated, mode):
         assert [(r["ref"], r["reason"]) for r in body["invalid_references"]] == [("OBS-2", "unshown")]
 
 
-@pytest.mark.parametrize("mode", ["legacy"])
+@pytest.mark.parametrize("mode", ["legacy", "governed", "disabled"])
 def test_r3_blueprint_links_and_plan_commit_together_or_not_at_all(isolated, mode):
     study = Study(isolated, mode, [DOC])
     with mock.patch("hermeneia.compiler.architect.compile_architect_plan", side_effect=RuntimeError("compile failed")):
@@ -186,7 +186,7 @@ def test_r3_blueprint_links_and_plan_commit_together_or_not_at_all(isolated, mod
     assert study.rows("SELECT COUNT(*) FROM blueprint_observation_links")[0][0] == 0
 
 
-@pytest.mark.parametrize("mode", [exposed("legacy", R4ModelDirectWrite)])
+@pytest.mark.parametrize("mode", [exposed("legacy", R4ModelDirectWrite), exposed("governed", R4ModelDirectWrite), "disabled"])
 def test_r4_a_generation_request_never_writes_model_output_to_canonical_state(isolated, mode):
     study = Study(isolated, mode, [DOC])
     response, prompts = study.generate({"title": "T", "thesis": "Th", "sections": [{"claim": "C", "obs_refs": ["OBS-1"], "interp_refs": []}]})
@@ -203,7 +203,7 @@ def test_r4_a_generation_request_never_writes_model_output_to_canonical_state(is
     assert prompts == []
 
 
-@pytest.mark.parametrize("mode", [exposed("legacy", R5UnreviewedResample)])
+@pytest.mark.parametrize("mode", [exposed("legacy", R5UnreviewedResample), "governed", "disabled"])
 def test_r5_ratify_and_save_never_commits_an_unreviewed_model_result(isolated, mode):
     study = Study(isolated, mode, [DOC])
     provider, calls = _chat_replies(PREVIEWED, RESAMPLED)
@@ -218,7 +218,7 @@ def test_r5_ratify_and_save_never_commits_an_unreviewed_model_result(isolated, m
     assert len(calls) == 1
 
 
-@pytest.mark.parametrize("mode", [exposed("legacy", R6PlaceholderCommitted)])
+@pytest.mark.parametrize("mode", [exposed("legacy", R6PlaceholderCommitted), "governed", "disabled"])
 def test_r6_no_placeholder_blueprint_is_committed_when_no_model_ran(isolated, mode):
     study = Study(isolated, mode, [DOC])
     saved = study.client.post("/api/pipeline/extract-blueprint", json={"text": "Any source text at all.", "provider": "null", "save": True})
