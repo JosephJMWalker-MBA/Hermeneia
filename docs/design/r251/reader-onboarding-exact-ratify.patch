@@ -1,0 +1,214 @@
+diff --git a/hermeneia/web/static/index.html b/hermeneia/web/static/index.html
+index 4fbbbb6..274e491 100644
+--- a/hermeneia/web/static/index.html
++++ b/hermeneia/web/static/index.html
+@@ -6254,6 +6254,43 @@ function _obPopulateProviders() {
+   });
+ }
+ 
++let _obPreviewedBlueprint = null;  // the exact proposal under review; ratification commits it, never a new extraction (#251 R5)
++
++function _obExtractProposalHtml(bp, state) {
++  const sections = (bp.sections || []).map((s, i) =>
++    `<div class="ob-extract-section"><span style="color:var(--dim2);font-size:11px;margin-right:6px">${i+1}.</span>${x(s.claim)}</div>`
++  ).join('');
++  const savedBadge = state === 'saved'
++    ? `<span style="background:#2d6a4f;color:#b7e4c7;font-size:10px;padding:2px 7px;border-radius:4px;margin-left:8px">saved</span>` : '';
++  const actions = state === 'saved' ? `
++        <div class="ob-extract-actions">
++          <button class="btn-primary" onclick="e10Go('architect')">View in Architect →</button>
++          <button class="btn-trace" onclick="obToggleExtract()">Done</button>
++        </div>` : state === 'placeholder' ? `
++        <div class="ob-extract-note" style="color:#f87171">
++          No model ran — the selected provider returned a placeholder, not an extraction. Connect a provider and run again.
++        </div>
++        <div class="ob-extract-actions">
++          <button class="btn-trace" onclick="obToggleExtract()">Discard</button>
++        </div>` : `
++        <div class="ob-extract-actions">
++          <button class="btn-primary" onclick="obRatifyPreviewed()">Ratify &amp; Save Blueprint →</button>
++          <button class="btn-trace" onclick="obToggleExtract()">Discard</button>
++        </div>`;
++  return `
++      <div class="ob-extract-proposal">
++        <div class="ob-extract-proposal-title">${x(bp.title)}${savedBadge}</div>
++        <div class="ob-extract-proposal-thesis">"${x(bp.thesis)}"</div>
++        <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2);margin-bottom:6px">Supporting Claims</div>
++        ${sections}
++        <div class="ob-extract-note">
++          A wrong Blueprint is not a planning failure — it is a reading failure.
++          If this reconstruction is inaccurate, edit the section claims below or run again with a different provider.
++        </div>
++        ${actions}
++      </div>`;
++}
++
+ async function obExtractBlueprint(save) {
+   const text     = document.getElementById('ob-extract-text')?.value?.trim();
+   const provider = document.getElementById('ob-extract-provider')?.value || 'null';
+@@ -6265,6 +6302,7 @@ async function obExtractBlueprint(save) {
+   btn.disabled = true;
+   btn.textContent = 'Extracting…';
+   propEl.style.display = 'none';
++  _obPreviewedBlueprint = null;
+ 
+   try {
+     const resp = await fetch('/api/pipeline/extract-blueprint', {
+@@ -6279,32 +6317,11 @@ async function obExtractBlueprint(save) {
+       return;
+     }
+     const bp = data.proposed_blueprint;
+-    const sections = (bp.sections || []).map((s, i) =>
+-      `<div class="ob-extract-section"><span style="color:var(--dim2);font-size:11px;margin-right:6px">${i+1}.</span>${x(s.claim)}</div>`
+-    ).join('');
+-    const savedBadge = data.blueprint_id
+-      ? `<span style="background:#2d6a4f;color:#b7e4c7;font-size:10px;padding:2px 7px;border-radius:4px;margin-left:8px">saved</span>` : '';
++    const placeholder = !!(data.execution && data.execution.model_executed === false);
++    const state = data.blueprint_id ? 'saved' : placeholder ? 'placeholder' : 'preview';
++    _obPreviewedBlueprint = state === 'preview' ? bp : null;
+     propEl.style.display = 'block';
+-    propEl.innerHTML = `
+-      <div class="ob-extract-proposal">
+-        <div class="ob-extract-proposal-title">${x(bp.title)}${savedBadge}</div>
+-        <div class="ob-extract-proposal-thesis">"${x(bp.thesis)}"</div>
+-        <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2);margin-bottom:6px">Supporting Claims</div>
+-        ${sections}
+-        <div class="ob-extract-note">
+-          A wrong Blueprint is not a planning failure — it is a reading failure.
+-          If this reconstruction is inaccurate, edit the section claims below or run again with a different provider.
+-        </div>
+-        ${data.blueprint_id ? `
+-        <div class="ob-extract-actions">
+-          <button class="btn-primary" onclick="e10Go('architect')">View in Architect →</button>
+-          <button class="btn-trace" onclick="obToggleExtract()">Done</button>
+-        </div>` : `
+-        <div class="ob-extract-actions">
+-          <button class="btn-primary" onclick="obExtractBlueprint(true)">Ratify &amp; Save Blueprint →</button>
+-          <button class="btn-trace" onclick="obToggleExtract()">Discard</button>
+-        </div>`}
+-      </div>`;
++    propEl.innerHTML = _obExtractProposalHtml(bp, state);
+   } catch (err) {
+     propEl.style.display = 'block';
+     propEl.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${err.message}</div>`;
+@@ -6314,6 +6331,31 @@ async function obExtractBlueprint(save) {
+   }
+ }
+ 
++// Ratify & Save commits the exact previewed Blueprint through the human approval boundary (#251 R5).
++async function obRatifyPreviewed() {
++  const propEl = document.getElementById('ob-extract-proposal');
++  const reviewed = _obPreviewedBlueprint;
++  if (!propEl || !reviewed) return;
++  try {
++    const resp = await fetch('/api/pipeline/ratify-blueprint', {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify({ proposed_blueprint: reviewed }),
++    });
++    const data = await resp.json();
++    if (!resp.ok) {
++      propEl.innerHTML = _obExtractProposalHtml(reviewed, 'preview')
++        + `<div style="color:#f87171;font-size:13px">✗ ${x(data.error || 'Ratification failed')}</div>`;
++      return;
++    }
++    _obPreviewedBlueprint = null;
++    propEl.innerHTML = _obExtractProposalHtml(data.committed_blueprint || reviewed, 'saved');
++  } catch (err) {
++    propEl.innerHTML = _obExtractProposalHtml(reviewed, 'preview')
++      + `<div style="color:#f87171;font-size:13px">✗ ${x(err.message)}</div>`;
++  }
++}
++
+ // ── Supporting corpus upload ────────────────────────────
+ async function obDocMute(docId, currentlyMuted) {
+   try {
+diff --git a/tests/test_reader_onboarding_exact_ratify.py b/tests/test_reader_onboarding_exact_ratify.py
+new file mode 100644
+index 0000000..dc5a187
+--- /dev/null
++++ b/tests/test_reader_onboarding_exact_ratify.py
+@@ -0,0 +1,83 @@
++"""#251 R5/R6: onboarding "Ratify & Save" commits the exact previewed Blueprint, never a new extraction.
++
++The onboarding preview keeps the proposal it displayed. Ratification posts
++exactly that object to the human approval boundary
++(/api/pipeline/ratify-blueprint, no provider call) instead of re-running
++extract-blueprint with save:true. A placeholder (no model ran) is shown as
++such and cannot be ratified from this panel. The real functions run under
++Node with a fake DOM and fetch.
++"""
++from __future__ import annotations
++
++import json
++from pathlib import Path
++import shutil
++import subprocess
++
++import pytest
++
++from test_evidence_board_ui import _extract_function
++
++INDEX = Path(__file__).parent.parent / "hermeneia" / "web" / "static" / "index.html"
++PREVIEW = {"title": "Previewed proposal", "thesis": "What the steward reviewed.", "sections": [{"claim": "Reviewed claim."}]}
++
++
++def _run(responses: list[dict], steps: str) -> dict:
++    node = shutil.which("node")
++    if not node:
++        pytest.skip("node not available for the onboarding ratify test")
++    source = INDEX.read_text()
++    functions = "\n".join(_extract_function(source, sig) for sig in (
++        "function _obExtractProposalHtml(", "async function obExtractBlueprint(", "async function obRatifyPreviewed("))
++    script = r"""
++const els = {'ob-extract-text': {value: 'A source text.'}, 'ob-extract-provider': {value: 'fake'},
++             'ob-extract-proposal': {style: {}, innerHTML: ''}, 'ob-extract-btn': {disabled: false, textContent: ''}};
++const document = {getElementById: id => els[id] || null};
++const x = s => String(s ?? '');
++const alert = () => {};
++const responses = RESPONSES;
++const calls = [];
++const fetch = async (url, init) => { calls.push({url, body: JSON.parse(init.body)}); const r = responses.shift();
++  return {ok: r.ok, json: async () => r.json}; };
++let _obPreviewedBlueprint = null;
++""" + functions + r"""
++(async () => { STEPS
++  console.log(JSON.stringify({calls, html: els['ob-extract-proposal'].innerHTML, held: _obPreviewedBlueprint}));
++})();
++"""
++    script = script.replace("RESPONSES", json.dumps(responses)).replace("STEPS", steps)
++    result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=30)
++    assert result.returncode == 0, result.stderr
++    return json.loads(result.stdout)
++
++
++def test_ratify_and_save_posts_the_exact_preview_to_the_approval_boundary():
++    executed = {"provider": "fake", "interface": "openai", "model_executed": True, "placeholder": False}
++    out = _run([{"ok": True, "json": {"proposed_blueprint": PREVIEW, "execution": executed}},
++                {"ok": True, "json": {"blueprint_id": "b", "plan_id": "p", "committed_blueprint": PREVIEW}}],
++               "await obExtractBlueprint(false); await obRatifyPreviewed();")
++    assert [c["url"] for c in out["calls"]] == ["/api/pipeline/extract-blueprint", "/api/pipeline/ratify-blueprint"]
++    assert out["calls"][0]["body"] == {"text": "A source text.", "provider": "fake", "save": False}
++    assert out["calls"][1]["body"] == {"proposed_blueprint": PREVIEW}
++    assert "saved" in out["html"] and "Previewed proposal" in out["html"] and out["held"] is None
++
++
++def test_a_placeholder_is_shown_as_such_and_cannot_be_ratified_here():
++    placeholder = {"provider": "null", "interface": "placeholder", "model_executed": False, "placeholder": True}
++    canned = {"title": "Extracted Blueprint", "thesis": "The document establishes a central claim.", "sections": []}
++    out = _run([{"ok": True, "json": {"proposed_blueprint": canned, "execution": placeholder}}],
++               "await obExtractBlueprint(false); await obRatifyPreviewed();")
++    assert [c["url"] for c in out["calls"]] == ["/api/pipeline/extract-blueprint"]
++    assert "No model ran" in out["html"] and "obRatifyPreviewed()" not in out["html"] and out["held"] is None
++
++
++def test_a_refused_ratification_keeps_the_reviewed_preview():
++    executed = {"provider": "fake", "interface": "openai", "model_executed": True, "placeholder": False}
++    out = _run([{"ok": True, "json": {"proposed_blueprint": PREVIEW, "execution": executed}},
++                {"ok": False, "json": {"error": "Scope refused"}}],
++               "await obExtractBlueprint(false); await obRatifyPreviewed();")
++    assert "Scope refused" in out["html"] and "obRatifyPreviewed()" in out["html"] and out["held"] == PREVIEW
++
++
++def test_onboarding_never_saves_by_re_running_extraction():
++    assert "obExtractBlueprint(true)" not in INDEX.read_text()
