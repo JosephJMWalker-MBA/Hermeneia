@@ -227,3 +227,46 @@ def test_r6_no_placeholder_blueprint_is_committed_when_no_model_ran(isolated, mo
             and committed[0]["source"] == "extracted"):
         raise R6PlaceholderCommitted("the canned 'Extracted Blueprint' was committed as extracted though no model ran")
     _refused_without_rows(study, saved, {"EXACT_RATIFICATION_REQUIRED", "NO_MODEL_EXECUTED"})
+
+
+# Found while repairing R3 (2026-10-10): the shared exact-persistence helper ran
+# ensure_architect_tables() mid-transaction, whose executescript() commits, so
+# steward ratification and P8 acceptance were not atomic either. The required
+# provenance (#251 area 3) includes the P8 acceptance receipt.
+
+class R3PartialAcceptance(AssertionError):
+    """A P8 acceptance failed but its Blueprint stayed committed without plan or receipt."""
+
+
+@pytest.mark.xfail(strict=True, raises=R3OrphanBlueprint, reason="R3OrphanBlueprint in ratify-blueprint (#251)")
+def test_r3_steward_ratification_commits_blueprint_and_plan_together(isolated):
+    study = Study(isolated, "legacy", [DOC])
+    candidate = {"title": "Steward Blueprint", "thesis": "Th.",
+                 "sections": [{"claim": "C", "supporting_observations": [study.obs[0]], "supporting_interpretations": []}]}
+    with mock.patch("hermeneia.compiler.architect.compile_architect_plan", side_effect=RuntimeError("compile failed")):
+        response = study.client.post("/api/pipeline/ratify-blueprint", json={"proposed_blueprint": candidate})
+    if response.status_code == 500 and len(study.blueprints()) == 1 and study.plans() == 0:
+        raise R3OrphanBlueprint("ratification failed at plan compilation but the Blueprint stayed committed")
+    assert response.status_code == 500 and not study.blueprints() and study.plans() == 0
+
+
+@pytest.mark.parametrize("failing", ["hermeneia.blueprint_proposals.store_receipt", "hermeneia.compiler.architect.compile_architect_plan"])
+@pytest.mark.xfail(strict=True, raises=R3PartialAcceptance, reason="R3PartialAcceptance in P8 accept (#251)")
+def test_r3_p8_acceptance_commits_blueprint_plan_and_receipt_together(isolated, failing):
+    import blueprint_proposal_lab as proposal_lab
+    from test_e10_vertical_slice_api import _FakeOllamaClient
+
+    corpus = proposal_lab.load()
+    _FakeOllamaClient.models = [corpus["extraction_model"]]
+    case = next(c for c in corpus["cases"] if c["case_id"] == "P05_exact_accept")
+    ws = proposal_lab.Workspace(corpus, isolated)
+    for op in case["setup"]:
+        ws.apply(op)
+    candidate = proposal_lab.propose(ws, case["generate"], case["generate"]["script"], corpus["extraction_model"])[0].get_json()
+    with mock.patch(failing, side_effect=RuntimeError("injected failure")):
+        response = proposal_lab.decide(ws, candidate, {"decision": "accept"})
+    counts = {t: ws.count(t) for t in ("narrative_blueprints", "blueprint_observation_links", "architect_plans",
+                                       "blueprint_proposal_acceptances")}
+    if response.status_code >= 500 and counts["narrative_blueprints"] == 1 and counts["blueprint_proposal_acceptances"] == 0:
+        raise R3PartialAcceptance(f"acceptance failed ({failing.rsplit('.', 1)[1]}) but left {counts}")
+    assert response.status_code >= 500 and set(counts.values()) == {0}
