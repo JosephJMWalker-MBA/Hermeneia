@@ -175,7 +175,7 @@ def test_r2b_a_reference_the_model_was_never_shown_never_binds(isolated, mode):
         assert [(r["ref"], r["reason"]) for r in body["invalid_references"]] == [("OBS-2", "unshown")]
 
 
-@pytest.mark.parametrize("mode", [exposed("legacy", R3OrphanBlueprint)])
+@pytest.mark.parametrize("mode", ["legacy"])
 def test_r3_blueprint_links_and_plan_commit_together_or_not_at_all(isolated, mode):
     study = Study(isolated, mode, [DOC])
     with mock.patch("hermeneia.compiler.architect.compile_architect_plan", side_effect=RuntimeError("compile failed")):
@@ -238,7 +238,6 @@ class R3PartialAcceptance(AssertionError):
     """A P8 acceptance failed but its Blueprint stayed committed without plan or receipt."""
 
 
-@pytest.mark.xfail(strict=True, raises=R3OrphanBlueprint, reason="R3OrphanBlueprint in ratify-blueprint (#251)")
 def test_r3_steward_ratification_commits_blueprint_and_plan_together(isolated):
     study = Study(isolated, "legacy", [DOC])
     candidate = {"title": "Steward Blueprint", "thesis": "Th.",
@@ -251,7 +250,6 @@ def test_r3_steward_ratification_commits_blueprint_and_plan_together(isolated):
 
 
 @pytest.mark.parametrize("failing", ["hermeneia.blueprint_proposals.store_receipt", "hermeneia.compiler.architect.compile_architect_plan"])
-@pytest.mark.xfail(strict=True, raises=R3PartialAcceptance, reason="R3PartialAcceptance in P8 accept (#251)")
 def test_r3_p8_acceptance_commits_blueprint_plan_and_receipt_together(isolated, failing):
     import blueprint_proposal_lab as proposal_lab
     from test_e10_vertical_slice_api import _FakeOllamaClient

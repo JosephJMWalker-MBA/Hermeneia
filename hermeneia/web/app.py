@@ -888,6 +888,11 @@ def create_app(
         from ..storage.hashing import make_blueprint_id
         from ..storage.sqlite import ensure_architect_tables
 
+        # ensure_architect_tables() commits (executescript). It runs only before any write and never inside
+        # a caller-owned transaction (P8 acceptance ensures first), so the Blueprint, links, plan and any
+        # caller provenance commit together or not at all (#251 R3).
+        if not conn.in_transaction:
+            ensure_architect_tables(conn)
         sections = candidate["sections"]
         ref_error = _validate_blueprint_references(conn, sections)
         if ref_error:
@@ -915,7 +920,6 @@ def create_app(
                 (bp_id, iid),
             )
 
-        ensure_architect_tables(conn)
         plan = compile_architect_plan(bp_id, conn)
         pr = plan["plan_row"]
         conn.execute(
@@ -6781,6 +6785,11 @@ Return ONLY valid JSON, no markdown, no explanation:
             now = _dt.datetime.now(_dt.timezone.utc).isoformat()
             bp_id = make_blueprint_id(title, thesis, sections_data)
 
+            # ensure_architect_tables() commits (executescript), so it runs before the first write:
+            # the Blueprint, its links and its plan then commit together or not at all (#251 R3).
+            from ..storage.sqlite import ensure_architect_tables
+            ensure_architect_tables(conn)
+
             conn.execute(
                 """INSERT OR IGNORE INTO narrative_blueprints
                    (id, title, thesis, sections, source, created_at)
@@ -6798,12 +6807,8 @@ Return ONLY valid JSON, no markdown, no explanation:
                         "INSERT OR IGNORE INTO blueprint_interpretation_links (blueprint_id, interpretation_id) VALUES (?, ?)",
                         (bp_id, iid),
                     )
-            conn.commit()
 
             # ── Compile ArchitectPlan ──────────────────────────────────────
-            from ..storage.sqlite import ensure_architect_tables
-            ensure_architect_tables(conn)
-
             plan = compile_architect_plan(bp_id, conn)
             pr   = plan["plan_row"]
             plan_id = pr["id"]
@@ -6838,6 +6843,7 @@ Return ONLY valid JSON, no markdown, no explanation:
             }), 201
 
         except Exception as exc:
+            conn.rollback()
             return jsonify({
                 "error": str(exc),
                 "error_type": type(exc).__name__,
