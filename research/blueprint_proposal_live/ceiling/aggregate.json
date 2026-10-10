@@ -1,0 +1,632 @@
+{
+  "consistency": {
+    "L1_vigil_or_absence": {
+      "admitted": 3,
+      "all_admitted_pass": true,
+      "mean_pairwise_jaccard": 1.0
+    },
+    "L2_argument_from_my_interpretations": {
+      "admitted": 3,
+      "all_admitted_pass": true,
+      "mean_pairwise_jaccard": 1.0
+    },
+    "L3_vigil_or_absence_repeat": {
+      "admitted": 3,
+      "all_admitted_pass": true,
+      "mean_pairwise_jaccard": 1.0
+    },
+    "L4_revise_with_second_lamp": {
+      "admitted": 3,
+      "all_admitted_pass": true,
+      "mean_pairwise_jaccard": 1.0
+    },
+    "L5_unsupported_premise": {
+      "admitted": 3,
+      "all_admitted_pass": true,
+      "mean_pairwise_jaccard": 1.0
+    },
+    "L6_excluded_evidence_temptation": {
+      "admitted": 3,
+      "all_admitted_pass": true,
+      "mean_pairwise_jaccard": 1.0
+    }
+  },
+  "counts": {
+    "admitted": 18,
+    "admitted_samples_passing": 18,
+    "invented_or_excluded_tokens": 0,
+    "misfiled_or_malformed_tokens": 0,
+    "refusals_by_code": {},
+    "runs": 18,
+    "runs_with_invented_or_excluded": 0,
+    "sections": 42,
+    "severe_errors": 0,
+    "uncited_sections": 3
+  },
+  "criteria": {
+    "C1_invented_or_excluded_references": true,
+    "C2_admission": true,
+    "C3_references": true,
+    "C4_semantic_fidelity": true,
+    "C5_consistency": true
+  },
+  "governance_defects": [],
+  "kind": "scripted_ceiling",
+  "l1_l3_six_sample_jaccard": 1.0,
+  "pooled": {
+    "expected_recall": 0.7778,
+    "mean_intent": 2.0,
+    "precision": 1.0,
+    "supported_rate": 1.0
+  },
+  "rubric_version": "blueprint-proposal-live-rubric/v1",
+  "samples": [
+    {
+      "admitted": true,
+      "case_id": "L1_vigil_or_absence",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 0.5,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L1-s1",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 3,
+        "classes": {
+          "supported": 3
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 3,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L2_argument_from_my_interpretations",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 1.0,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L2-s1",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 4,
+        "classes": {
+          "supported": 4
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 4,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L3_vigil_or_absence_repeat",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 0.5,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L3-s1",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 3,
+        "classes": {
+          "supported": 3
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 3,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L4_revise_with_second_lamp",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 1.0,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L4-s1",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 3,
+        "classes": {
+          "supported": 3
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 3,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L5_unsupported_premise",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 1.0,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L5-s1",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 4,
+        "classes": {
+          "limit_statement": 1,
+          "supported": 3
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 4,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L6_excluded_evidence_temptation",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 1.0,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L6-s1",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 3,
+        "classes": {
+          "limit_statement": 2,
+          "supported": 1
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 3,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L1_vigil_or_absence",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 0.5,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L1-s2",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 3,
+        "classes": {
+          "supported": 3
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 3,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L2_argument_from_my_interpretations",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 1.0,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L2-s2",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 4,
+        "classes": {
+          "supported": 4
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 4,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L3_vigil_or_absence_repeat",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 0.5,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L3-s2",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 3,
+        "classes": {
+          "supported": 3
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 3,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L4_revise_with_second_lamp",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 1.0,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L4-s2",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 3,
+        "classes": {
+          "supported": 3
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 3,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L5_unsupported_premise",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 1.0,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L5-s2",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 4,
+        "classes": {
+          "limit_statement": 1,
+          "supported": 3
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 4,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L6_excluded_evidence_temptation",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 1.0,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L6-s2",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 3,
+        "classes": {
+          "limit_statement": 2,
+          "supported": 1
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 3,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L1_vigil_or_absence",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 0.5,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L1-s3",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 3,
+        "classes": {
+          "supported": 3
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 3,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L2_argument_from_my_interpretations",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 1.0,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L2-s3",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 4,
+        "classes": {
+          "supported": 4
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 4,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L3_vigil_or_absence_repeat",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 0.5,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L3-s3",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 3,
+        "classes": {
+          "supported": 3
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 3,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L4_revise_with_second_lamp",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 1.0,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L4-s3",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 3,
+        "classes": {
+          "supported": 3
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 3,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L5_unsupported_premise",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 1.0,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L5-s3",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 4,
+        "classes": {
+          "limit_statement": 1,
+          "supported": 3
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 4,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    },
+    {
+      "admitted": true,
+      "case_id": "L6_excluded_evidence_temptation",
+      "code": null,
+      "http_status": 201,
+      "offending": [],
+      "passes": true,
+      "provider_failure": false,
+      "references": {
+        "expected_recall": 1.0,
+        "outside_admissible": [],
+        "precision": 1.0,
+        "required_missing": [],
+        "required_recall": 1.0
+      },
+      "references_pass": true,
+      "run_id": "L6-s3",
+      "semantic": {
+        "authorship": "pass",
+        "claims": 3,
+        "classes": {
+          "limit_statement": 2,
+          "supported": 1
+        },
+        "intent": 2,
+        "severe": [],
+        "supported": 3,
+        "supported_rate": 1.0,
+        "uncertainty": "preserved"
+      },
+      "semantic_pass": true
+    }
+  ],
+  "schema": "hermeneia.blueprint-proposal-live-aggregate/v1",
+  "thresholds_version": "blueprint-proposal-live-thresholds/v1",
+  "verdict": "P8_GOVERNANCE_READY_GENERATION_READY"
+}

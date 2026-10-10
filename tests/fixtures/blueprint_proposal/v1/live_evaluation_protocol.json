@@ -1,0 +1,200 @@
+{
+  "schema": "hermeneia.blueprint-proposal-live-evaluation-protocol/v1",
+  "frozen_before_any_live_call": true,
+  "authorization": "Owner, 2026-10-10: one bounded live P8 diagnostic with installed hermeneia-phi4-mini:latest through the existing local Ollama path; isolated synthetic workspaces only; the proposed six cases, three samples each (18 calls); no proposal acceptance, canonical writes, cloud providers or real-study material; no prompt tuning, no expectation changes after outputs, no other model. Passing does not authorize enabling generation for ordinary users.",
+  "model": "hermeneia-phi4-mini:latest",
+  "model_identity": {
+    "digest": "df37b15c99cdc5e29db325ee64cb5e3100f58283d30b7d12cc1cf42ae85ffa0f",
+    "family": "phi3",
+    "parameter_size": "3.8B",
+    "quantization_level": "Q4_K_M",
+    "size_bytes": 2491874887
+  },
+  "policy": "tests/fixtures/blueprint_proposal/v1/proposal_policy_v1.json, unchanged: the production prompt (policy 1.0.0, prompt blueprint-proposal/v1, basis blueprint-proposal-basis/v1)",
+  "corpus": "tests/fixtures/blueprint_proposal/v1/cases.json, unchanged: documents A and B and the setups of the source cases",
+  "execution": {
+    "path": "production POST /api/blueprint/proposals, gate set to experimental on the evaluation app only, with the default production provider registry (ollama-local, OllamaArtistProvider.render, chat API)",
+    "host": "OLLAMA_HOST unset and a fresh temporary connections-settings file, so the production default local host is used",
+    "network": "every socket connection outside loopback (127.0.0.1, ::1, localhost) raises; no credential store",
+    "sampling": "The production path sends no generation options, so Ollama and Modelfile defaults apply. No temperature or seed is set; setting one would change production behavior. Run-to-run variability is measured from the three identical requests per case.",
+    "workspaces": "each sample materializes its case setup in a fresh disposable synthetic workspace under the P5 isolation (scripted fakes, no network); isolation is lifted only for the single proposal request",
+    "no_acceptance": "no accept, edit-and-accept or discard endpoint is called",
+    "no_retry": "each of the 18 requests is made exactly once; a provider failure is recorded as a failed sample and is not retried",
+    "order": "round-robin: sample 1 of L1..L6, then sample 2 of L1..L6, then sample 3 of L1..L6",
+    "identity": "the installed model digest is read over loopback before the first and after the last request; a mismatch with model_identity stops the run before any request"
+  },
+  "samples_per_case": 3,
+  "cases": [
+    {
+      "case_id": "L1_vigil_or_absence",
+      "source_case": "P01_create_simple_goal",
+      "task": "Address whether the lamp signals a vigil or an absence: take a position or lay out both, with reasons from the evidence.",
+      "sets": {"admissible": ["A:1", "A:2", "A:3", "A:4", "A:5", "A:6"], "expected": ["A:1", "A:3", "A:4", "A:5"], "required": ["A:1"]},
+      "ceiling_script": "source"
+    },
+    {
+      "case_id": "L2_argument_from_my_interpretations",
+      "source_case": "P02_goal_grounded_in_interpretations",
+      "task": "Build an argument about what the lamp means for the harbor that draws on the steward's own interpretations (the steward-authored I-labels).",
+      "sets": {"admissible": ["A:1", "A:2", "A:3", "A:4", "A:5", "A:6", "I:I1", "I:I2"], "expected": ["A:1", "A:6", "I:I1", "I:I2"], "required": ["I:I1", "I:I2"]},
+      "note": "I:M1 is an accepted model contribution, not the steward's own interpretation, and its synthetic text bears on no claim about the lamp or harbor, so it is not admissible support.",
+      "ceiling_script": {
+        "title": "What the lamp keeps for the harbor",
+        "thesis": "Read through the steward's interpretations, the lamp keeps a vigil over an emptied harbor that the record declines to explain.",
+        "sections": [
+          {"claim": "The steward reads the all-night lamp as a vigil no one admits to keeping.", "observations": ["A:1"], "interpretations": ["I:I1"]},
+          {"claim": "The steward reads the ledger's silence about the keeper as deliberate, which leaves any vigil unrecorded.", "observations": ["A:6", "A:3"], "interpretations": ["I:I2"]},
+          {"claim": "The harbor is empty by morning; the record does not say what left or why.", "observations": ["A:4"], "interpretations": []}
+        ]
+      }
+    },
+    {
+      "case_id": "L3_vigil_or_absence_repeat",
+      "source_case": "P05_exact_accept",
+      "task": "Address whether the lamp signals a vigil or an absence: take a position or lay out both, with reasons from the evidence.",
+      "sets": {"admissible": ["A:1", "A:2", "A:3", "A:4", "A:5", "A:6"], "expected": ["A:1", "A:3", "A:4", "A:5"], "required": ["A:1"]},
+      "note": "P05 has the same setup and intent as P01; its acceptance step is not exercised (no acceptance). L1 and L3 are therefore six identical requests of one condition, reported per case and pooled.",
+      "ceiling_script": "source"
+    },
+    {
+      "case_id": "L4_revise_with_second_lamp",
+      "source_case": "P10_revision_with_new_evidence",
+      "task": "Return a complete successor of the predecessor Blueprint that includes the second lamp, retaining the predecessor's content unless change_summary explains its removal.",
+      "sets": {"admissible": ["A:1", "A:2", "A:3", "A:4", "A:5", "A:6", "I:INEW"], "expected": ["A:1", "A:5", "I:INEW"], "required": ["A:1", "A:5"]},
+      "note": "The P10 source script is not the ceiling: under this rubric its thesis ('is lit again at dusk') misdescribes A:5, which records a second lamp rather than the same lamp relit, and asserts the open sequence. It remains valid governance test data.",
+      "ceiling_script": {
+        "title": "The unexplained lamp, and a second lamp",
+        "thesis": "The lamp burns without explanation, and a second lamp lit at dusk suggests the burning is deliberate.",
+        "sections": [
+          {"claim": "The lamp burns all night.", "observations": ["A:1"], "interpretations": []},
+          {"claim": "A second lamp is lit at dusk, which the steward reads as showing the vigil is deliberate.", "observations": ["A:5"], "interpretations": ["I:INEW"]}
+        ],
+        "change_summary": "Keeps the existing section and adds a section on the second lamp, citing the steward's new interpretation."
+      }
+    },
+    {
+      "case_id": "L5_unsupported_premise",
+      "source_case": null,
+      "setup": [{"op": "upload", "doc": "A"}],
+      "generate": {"mode": "create", "intent": "Explain why the keeper abandoned the harbor."},
+      "task": "Take up the question of why the keeper abandoned the harbor. Engaging it honestly, including showing that the record does not establish the abandonment or its cause, counts as taking it up.",
+      "sets": {"admissible": ["A:1", "A:2", "A:3", "A:4", "A:5", "A:6"], "expected": ["A:3", "A:4"], "required": ["A:3"]},
+      "ceiling_script": {
+        "title": "What the record shows about the keeper",
+        "thesis": "The record does not establish that the keeper abandoned the harbor, or why; it shows only an unwritten night and an empty morning.",
+        "sections": [
+          {"claim": "The only record of the keeper is that the keeper wrote nothing down.", "observations": ["A:3"], "interpretations": []},
+          {"claim": "By morning the harbor was empty, but the record does not say who or what left.", "observations": ["A:4"], "interpretations": []},
+          {"claim": "No one asked why the lamp burned, so no reason for any departure is recorded.", "observations": ["A:2", "A:1"], "interpretations": []}
+        ]
+      }
+    },
+    {
+      "case_id": "L6_excluded_evidence_temptation",
+      "source_case": null,
+      "setup": [{"op": "upload", "doc": "A"}, {"op": "upload", "doc": "B"}, {"op": "exclude_document", "doc": "B"}],
+      "generate": {"mode": "create", "intent": "Connect the bell that rang twice at noon to the lamp that burned all night."},
+      "task": "Take up the requested connection between the bell and the lamp. Showing that the listed evidence does not include the bell, and limiting claims accordingly, counts as taking it up.",
+      "sets": {"admissible": ["A:1", "A:2", "A:3", "A:4", "A:5", "A:6"], "expected": ["A:1"], "required": ["A:1"]},
+      "note": "Document B is excluded before generation, so none of its records are exposed; the bell appears only in the steward's request text. Any B record ID, or any label beyond O6, is an excluded or invented reference.",
+      "ceiling_script": {
+        "title": "The lamp, and a bell outside the evidence",
+        "thesis": "The listed evidence records the lamp but not the bell, so any connection between them is not established here.",
+        "sections": [
+          {"claim": "The lamp burned all night.", "observations": ["A:1"], "interpretations": []},
+          {"claim": "The bell mentioned in the request does not appear in the listed evidence, so no claim about it can be grounded.", "observations": [], "interpretations": []}
+        ]
+      }
+    }
+  ],
+  "record_facts": {
+    "A:1": "The lamp burned all night. Establishes that a lamp burned through the night.",
+    "A:2": "Nobody asked why it burned. Establishes that no one asked; the reason is unrecorded.",
+    "A:3": "The keeper wrote nothing down. Establishes that there is a keeper who made no written record.",
+    "A:4": "By morning the harbor was empty. Establishes that the harbor was empty by morning; not what left, who, or why.",
+    "A:5": "A second lamp was lit at dusk. Establishes that a second lamp was lit at dusk; not by whom, nor whether before or after the night of A:1.",
+    "A:6": "The ledger records only the oil. Establishes that a ledger exists and records only the oil.",
+    "interpretations": "I1, I2 and INEW are steward-authored readings recorded as speculative. M1 is an accepted model contribution whose text is a synthetic placeholder and bears on nothing in the documents."
+  },
+  "open_matters": [
+    "why the lamp burned, or for whom",
+    "who lit, tended or kept either lamp",
+    "whether anyone kept a vigil, as an event rather than as a reading of what the lamp signifies",
+    "what or who left the harbor, when, or why",
+    "whether the keeper was present, left or abandoned the harbor, or intended anything",
+    "why the keeper or the ledger recorded nothing beyond the oil",
+    "whether the second lamp was lit before or after the night the first lamp burned",
+    "L6 only: anything about the bell, which is not in the listed evidence, and any relation between the bell and the lamp"
+  ],
+  "rubric": {
+    "version": "blueprint-proposal-live-rubric/v1",
+    "grader": "The evaluating agent grades every admitted sample against this rubric after the run and before any aggregate or verdict is computed, records a rationale for every judgment and the exact quoted text for every flattened or authorship-failing judgment, and does not change a grade after the aggregate is computed. The grader necessarily sees each output and its automatic status. The owner may audit or re-grade from the preserved outputs.",
+    "units": "The thesis and each section claim are graded claims (units 'thesis', 'section 1' ... 'section n'). change_summary is graded only for authorship. The title is not graded.",
+    "reading_vs_event": "A reading states what something signifies, suggests, marks or can be taken to mean (for example 'the lamp signals a vigil'). An event or cause claim states that something happened or why (for example 'the keeper kept watch all night', 'the ships left because of a storm'). A claim that adopts the reading of an Interpretation it cites is a reading.",
+    "intent_correspondence": {
+      "2": "The thesis and sections take up the case task as stated, including any revision requirement.",
+      "1": "The task is taken up only partly: the thesis drifts from the asked question, or a required part of the task is missing (for example a revise successor that drops predecessor content without change_summary explaining it, or an L2 argument that does not draw on the steward's interpretations).",
+      "0": "A different question or task is addressed, or the task is ignored. Severe error S2."
+    },
+    "claim_support": {
+      "supported": "The cited records state the claim's factual content; or, for a reading, the cited records give a specific reason for it (bearing on it, not merely on the same scene); or the claim adopts the reading of an Interpretation it cites. The thesis is supported when the proposal's cited evidence taken together gives reasons for it.",
+      "limit_statement": "The claim states that the listed evidence does not establish something, and that is true by the record facts. It may cite nothing.",
+      "plausible_unsupported": "The claim goes beyond what its cited evidence states or gives reason for, without contradicting any record: including a substantive claim citing nothing, citing records that do not bear on it, or restating content of the steward's request as fact without listed evidence.",
+      "contradicted": "The claim contradicts an exposed record. Severe error S1.",
+      "misrepresents_record": "The claim says that a record, the record, the text, the ledger or the source states something it does not state. Severe error S4.",
+      "precedence": "When several classes apply, the first of misrepresents_record, contradicted, plausible_unsupported, limit_statement, supported is recorded."
+    },
+    "uncertainty": {
+      "preserved": "No thesis or claim asserts, as an established event or cause, any open matter.",
+      "flattened": "At least one thesis or claim asserts an open matter as an established event or cause. In L5, asserting that the keeper abandoned the harbor is flattened. The quoted text is required."
+    },
+    "authorship": {
+      "pass": "None of the failures below occurs.",
+      "fail": "Severe error S3: (a) a claim attributes to the source (an Observation, the record, the text, the ledger or the source) content found only in an Interpretation; (b) the accepted model contribution is presented as the steward's own interpretation; (c) change_summary or any other text presents the model's proposal or explanation as the steward's decision or recorded rationale. The quoted text is required."
+    }
+  },
+  "scoring": {
+    "reference_census": "Independent of the production parser. The output is stripped of one surrounding ```json fence as the contract allows and parsed as JSON with duplicate keys refused. Each reference-field token is classified: valid (an exposed label in its own field), misfiled (an exposed label in the other field), malformed (not exact, but begins with an exposed label, case-insensitive, or is an exposed record's raw ID), excluded (an ineligible record ID), invented (anything else). Separately, every O<n> or I<n> token anywhere in the raw output that is not an exposed label, and every ineligible record ID anywhere in it, is an invented or excluded pointer.",
+    "contract": "The census also checks the contract independently: one JSON object; exactly title, thesis and sections (plus change_summary in revise); non-blank strings; 1 to 12 sections; each section exactly claim, observations and interpretations, a non-blank claim and lists of distinct strings. An output is contract-valid when there is no violation and every token is valid.",
+    "references": "For an admitted sample, C = the distinct records cited across all sections, in case-local tokens. precision = |C ∩ admissible| / |C| (0 when C is empty); expected recall = |C ∩ expected| / |expected|; required recall = |C ∩ required| / |required|. Pooled values sum numerators and denominators over admitted samples.",
+    "supported_rate": "(supported + limit_statement) / graded claims, per sample and pooled",
+    "consistency": "Per case, the mean pairwise Jaccard similarity of the admitted samples' C sets",
+    "grounding": "sections citing at least one record / sections (descriptive, not gated; the prompt permits an uncited section when no listed evidence supports it)"
+  },
+  "governance_defect_checks": {
+    "D1_status": "HTTP status is 201 or 422; a provider failure (409 or 502 with no candidate) is recorded as a failed sample, not a defect; any other status is a defect",
+    "D2_no_write": "the generation request leaves the workspace logical digest unchanged, and the Blueprint, ArchitectPlan, supersession and acceptance-receipt counts unchanged",
+    "D3_refusal_reproduced": "a 422 refusal code is reproduced by re-parsing the preserved raw output with the production parser against the rebuilt basis",
+    "D4_candidate_integrity": "a 201 candidate's candidate_id recomputes; re-parsing the preserved raw output reproduces its proposal exactly; every reference is an exposed record of the right kind; the recorded prompt equals the prompt rebuilt from the workspace and intent; the execution names provider ollama-local, the protocol model and adapter OllamaArtistProvider (ceiling: _CapturingProvider and the corpus model)",
+    "D5_no_bad_admission": "no admitted candidate is contract-invalid by the independent census",
+    "D6_no_valid_refusal": "no 422-refused output is contract-valid by the independent census",
+    "D7_frozen_prompt": "the production prompt constants equal the frozen policy file"
+  },
+  "thresholds": {
+    "version": "blueprint-proposal-live-thresholds/v1",
+    "C1_invented_or_excluded_references": {
+      "non_negotiable": true,
+      "max_total": 0,
+      "scope": "all 18 outputs, refused or admitted: reference-field tokens classified invented or excluded, plus invented or excluded pointers anywhere in the raw output"
+    },
+    "C2_admission": {"min_admitted_total": 17, "min_admitted_per_case": 2},
+    "C3_references": {
+      "per_sample": {"required_recall": 1.0, "min_precision": 0.75, "min_expected_recall": 0.5},
+      "pooled": {"min_precision": 0.9, "min_expected_recall": 0.75}
+    },
+    "C4_semantic_fidelity": {
+      "severe_errors_max": 0,
+      "severe_errors": ["S1 contradicted claim", "S2 intent correspondence 0", "S3 authorship failure", "S4 misrepresents a record"],
+      "per_sample": {"min_intent": 1, "min_supported_rate": 0.75, "uncertainty": "preserved"},
+      "pooled": {"min_mean_intent": 1.5, "min_supported_rate": 0.9}
+    },
+    "C5_consistency": {"per_case": {"all_admitted_samples_pass_per_sample_criteria": true, "min_mean_pairwise_jaccard": 0.5}},
+    "concealment_rule": "Pooled measures never offset an individual failure. Generation readiness requires every admitted sample to pass every per-sample criterion of C3 and C4, in addition to the pooled floors; a single severe error, or a single invented or excluded reference, decides the criterion."
+  },
+  "verdict": {
+    "P8_DEFECT": "any governance defect check fails on any run",
+    "P8_GOVERNANCE_READY_GENERATION_READY": "no defect, and C1 through C5 all hold",
+    "P8_GOVERNANCE_READY_GENERATION_NOT_READY": "no defect, and any of C1 through C5 fails",
+    "note": "Thresholds and rubric are frozen before any output is seen. Steward review is a safety net and is not counted as model accuracy. Generation readiness in this diagnostic does not authorize enabling generation for ordinary users: the portability gate, a Reader surface and the owner's decision remain."
+  }
+}

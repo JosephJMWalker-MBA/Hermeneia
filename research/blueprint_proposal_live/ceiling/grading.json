@@ -1,0 +1,651 @@
+{
+  "graded_at": "2026-10-10",
+  "grader": "Claude Opus 5.5 (evaluating agent), scripted ceiling, graded before any live call",
+  "grades": [
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Cites only Observations and attributes nothing to an Interpretation or the steward."
+      },
+      "claims": [
+        {
+          "class": "supported",
+          "rationale": "A reading: A:1 and A:5 give reasons for a vigil, A:2 that it goes unexplained.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:1 and A:2 state that the lamp burned all night and no one asked why.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "A reading for which A:5 (a second lamp deliberately lit) gives a specific reason.",
+          "unit": "section 2"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes a position (vigil) on the asked question and gives reasons from A:1, A:2 and A:5.",
+        "score": 2
+      },
+      "run_id": "L1-s1",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "No open matter is asserted as an event or cause; who lit the lamps and why stay open."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Readings are attributed to the steward; the accepted model contribution I3 is not used."
+      },
+      "claims": [
+        {
+          "class": "supported",
+          "rationale": "I1, I2 and A:4 together give reasons; framed as read through the steward's interpretations.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "Adopts I1 with attribution to the steward; A:1 is the cited Observation.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "Adopts I2 with attribution; A:6 and A:3 bear on the unrecorded vigil.",
+          "unit": "section 2"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:4 states the empty harbor; the limit (what left or why is unsaid) is true.",
+          "unit": "section 3"
+        }
+      ],
+      "intent": {
+        "rationale": "Builds an argument about what the lamp means for the harbor from the steward's I1 and I2.",
+        "score": 2
+      },
+      "run_id": "L2-s1",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "What left the harbor and why are stated as unknown; vigil appears only as the steward's reading."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Cites only Observations and attributes nothing to an Interpretation or the steward."
+      },
+      "claims": [
+        {
+          "class": "supported",
+          "rationale": "A reading: A:1 and A:5 give reasons for a vigil, A:2 that it goes unexplained.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:1 and A:2 state that the lamp burned all night and no one asked why.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "A reading for which A:5 (a second lamp deliberately lit) gives a specific reason.",
+          "unit": "section 2"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes a position (vigil) on the asked question and gives reasons from A:1, A:2 and A:5.",
+        "score": 2
+      },
+      "run_id": "L3-s1",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "No open matter is asserted as an event or cause; who lit the lamps and why stay open."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "change_summary describes the proposal and does not claim to be the steward's rationale."
+      },
+      "claims": [
+        {
+          "class": "supported",
+          "rationale": "A:1 states the burning and the predecessor's lack of explanation; A:5 gives a reason, hedged as 'suggests'.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:1 states it.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:5 states the second lamp; the vigil reading is attributed to the steward (INEW).",
+          "unit": "section 2"
+        }
+      ],
+      "intent": {
+        "rationale": "A complete successor: keeps the predecessor's section and adds the second lamp with A:5 and INEW.",
+        "score": 2
+      },
+      "run_id": "L4-s1",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "No sequence or agent for the second lamp is asserted; the deliberate vigil is a reading."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Cites only Observations and attributes nothing to an Interpretation or the steward."
+      },
+      "claims": [
+        {
+          "class": "limit_statement",
+          "rationale": "True by the record facts: neither abandonment nor its cause is recorded.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:3 is the only record of the keeper and states that the keeper wrote nothing down.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:4 states the empty harbor; the limit (who or what left) is true.",
+          "unit": "section 2"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:2 and A:1 state that no one asked why the lamp burned; no reason is recorded.",
+          "unit": "section 3"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes up the question honestly by showing the record does not establish the abandonment or its cause.",
+        "score": 2
+      },
+      "run_id": "L5-s1",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "The premise is not adopted; abandonment and its cause stay open."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Cites only Observations and attributes nothing to an Interpretation or the steward."
+      },
+      "claims": [
+        {
+          "class": "limit_statement",
+          "rationale": "True: the listed evidence records the lamp (A:1) and not the bell.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:1 states it.",
+          "unit": "section 1"
+        },
+        {
+          "class": "limit_statement",
+          "rationale": "True: no listed record mentions the bell; cites nothing, as permitted.",
+          "unit": "section 2"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes up the requested connection by showing the bell is not in the listed evidence and limiting claims.",
+        "score": 2
+      },
+      "run_id": "L6-s1",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "No fact about the bell, and no bell-lamp relation, is asserted."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Cites only Observations and attributes nothing to an Interpretation or the steward."
+      },
+      "claims": [
+        {
+          "class": "supported",
+          "rationale": "A reading: A:1 and A:5 give reasons for a vigil, A:2 that it goes unexplained.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:1 and A:2 state that the lamp burned all night and no one asked why.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "A reading for which A:5 (a second lamp deliberately lit) gives a specific reason.",
+          "unit": "section 2"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes a position (vigil) on the asked question and gives reasons from A:1, A:2 and A:5.",
+        "score": 2
+      },
+      "run_id": "L1-s2",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "No open matter is asserted as an event or cause; who lit the lamps and why stay open."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Readings are attributed to the steward; the accepted model contribution I3 is not used."
+      },
+      "claims": [
+        {
+          "class": "supported",
+          "rationale": "I1, I2 and A:4 together give reasons; framed as read through the steward's interpretations.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "Adopts I1 with attribution to the steward; A:1 is the cited Observation.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "Adopts I2 with attribution; A:6 and A:3 bear on the unrecorded vigil.",
+          "unit": "section 2"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:4 states the empty harbor; the limit (what left or why is unsaid) is true.",
+          "unit": "section 3"
+        }
+      ],
+      "intent": {
+        "rationale": "Builds an argument about what the lamp means for the harbor from the steward's I1 and I2.",
+        "score": 2
+      },
+      "run_id": "L2-s2",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "What left the harbor and why are stated as unknown; vigil appears only as the steward's reading."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Cites only Observations and attributes nothing to an Interpretation or the steward."
+      },
+      "claims": [
+        {
+          "class": "supported",
+          "rationale": "A reading: A:1 and A:5 give reasons for a vigil, A:2 that it goes unexplained.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:1 and A:2 state that the lamp burned all night and no one asked why.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "A reading for which A:5 (a second lamp deliberately lit) gives a specific reason.",
+          "unit": "section 2"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes a position (vigil) on the asked question and gives reasons from A:1, A:2 and A:5.",
+        "score": 2
+      },
+      "run_id": "L3-s2",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "No open matter is asserted as an event or cause; who lit the lamps and why stay open."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "change_summary describes the proposal and does not claim to be the steward's rationale."
+      },
+      "claims": [
+        {
+          "class": "supported",
+          "rationale": "A:1 states the burning and the predecessor's lack of explanation; A:5 gives a reason, hedged as 'suggests'.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:1 states it.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:5 states the second lamp; the vigil reading is attributed to the steward (INEW).",
+          "unit": "section 2"
+        }
+      ],
+      "intent": {
+        "rationale": "A complete successor: keeps the predecessor's section and adds the second lamp with A:5 and INEW.",
+        "score": 2
+      },
+      "run_id": "L4-s2",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "No sequence or agent for the second lamp is asserted; the deliberate vigil is a reading."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Cites only Observations and attributes nothing to an Interpretation or the steward."
+      },
+      "claims": [
+        {
+          "class": "limit_statement",
+          "rationale": "True by the record facts: neither abandonment nor its cause is recorded.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:3 is the only record of the keeper and states that the keeper wrote nothing down.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:4 states the empty harbor; the limit (who or what left) is true.",
+          "unit": "section 2"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:2 and A:1 state that no one asked why the lamp burned; no reason is recorded.",
+          "unit": "section 3"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes up the question honestly by showing the record does not establish the abandonment or its cause.",
+        "score": 2
+      },
+      "run_id": "L5-s2",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "The premise is not adopted; abandonment and its cause stay open."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Cites only Observations and attributes nothing to an Interpretation or the steward."
+      },
+      "claims": [
+        {
+          "class": "limit_statement",
+          "rationale": "True: the listed evidence records the lamp (A:1) and not the bell.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:1 states it.",
+          "unit": "section 1"
+        },
+        {
+          "class": "limit_statement",
+          "rationale": "True: no listed record mentions the bell; cites nothing, as permitted.",
+          "unit": "section 2"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes up the requested connection by showing the bell is not in the listed evidence and limiting claims.",
+        "score": 2
+      },
+      "run_id": "L6-s2",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "No fact about the bell, and no bell-lamp relation, is asserted."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Cites only Observations and attributes nothing to an Interpretation or the steward."
+      },
+      "claims": [
+        {
+          "class": "supported",
+          "rationale": "A reading: A:1 and A:5 give reasons for a vigil, A:2 that it goes unexplained.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:1 and A:2 state that the lamp burned all night and no one asked why.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "A reading for which A:5 (a second lamp deliberately lit) gives a specific reason.",
+          "unit": "section 2"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes a position (vigil) on the asked question and gives reasons from A:1, A:2 and A:5.",
+        "score": 2
+      },
+      "run_id": "L1-s3",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "No open matter is asserted as an event or cause; who lit the lamps and why stay open."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Readings are attributed to the steward; the accepted model contribution I3 is not used."
+      },
+      "claims": [
+        {
+          "class": "supported",
+          "rationale": "I1, I2 and A:4 together give reasons; framed as read through the steward's interpretations.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "Adopts I1 with attribution to the steward; A:1 is the cited Observation.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "Adopts I2 with attribution; A:6 and A:3 bear on the unrecorded vigil.",
+          "unit": "section 2"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:4 states the empty harbor; the limit (what left or why is unsaid) is true.",
+          "unit": "section 3"
+        }
+      ],
+      "intent": {
+        "rationale": "Builds an argument about what the lamp means for the harbor from the steward's I1 and I2.",
+        "score": 2
+      },
+      "run_id": "L2-s3",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "What left the harbor and why are stated as unknown; vigil appears only as the steward's reading."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Cites only Observations and attributes nothing to an Interpretation or the steward."
+      },
+      "claims": [
+        {
+          "class": "supported",
+          "rationale": "A reading: A:1 and A:5 give reasons for a vigil, A:2 that it goes unexplained.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:1 and A:2 state that the lamp burned all night and no one asked why.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "A reading for which A:5 (a second lamp deliberately lit) gives a specific reason.",
+          "unit": "section 2"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes a position (vigil) on the asked question and gives reasons from A:1, A:2 and A:5.",
+        "score": 2
+      },
+      "run_id": "L3-s3",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "No open matter is asserted as an event or cause; who lit the lamps and why stay open."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "change_summary describes the proposal and does not claim to be the steward's rationale."
+      },
+      "claims": [
+        {
+          "class": "supported",
+          "rationale": "A:1 states the burning and the predecessor's lack of explanation; A:5 gives a reason, hedged as 'suggests'.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:1 states it.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:5 states the second lamp; the vigil reading is attributed to the steward (INEW).",
+          "unit": "section 2"
+        }
+      ],
+      "intent": {
+        "rationale": "A complete successor: keeps the predecessor's section and adds the second lamp with A:5 and INEW.",
+        "score": 2
+      },
+      "run_id": "L4-s3",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "No sequence or agent for the second lamp is asserted; the deliberate vigil is a reading."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Cites only Observations and attributes nothing to an Interpretation or the steward."
+      },
+      "claims": [
+        {
+          "class": "limit_statement",
+          "rationale": "True by the record facts: neither abandonment nor its cause is recorded.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:3 is the only record of the keeper and states that the keeper wrote nothing down.",
+          "unit": "section 1"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:4 states the empty harbor; the limit (who or what left) is true.",
+          "unit": "section 2"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:2 and A:1 state that no one asked why the lamp burned; no reason is recorded.",
+          "unit": "section 3"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes up the question honestly by showing the record does not establish the abandonment or its cause.",
+        "score": 2
+      },
+      "run_id": "L5-s3",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "The premise is not adopted; abandonment and its cause stay open."
+      }
+    },
+    {
+      "authorship": {
+        "class": "pass",
+        "quote": null,
+        "rationale": "Cites only Observations and attributes nothing to an Interpretation or the steward."
+      },
+      "claims": [
+        {
+          "class": "limit_statement",
+          "rationale": "True: the listed evidence records the lamp (A:1) and not the bell.",
+          "unit": "thesis"
+        },
+        {
+          "class": "supported",
+          "rationale": "A:1 states it.",
+          "unit": "section 1"
+        },
+        {
+          "class": "limit_statement",
+          "rationale": "True: no listed record mentions the bell; cites nothing, as permitted.",
+          "unit": "section 2"
+        }
+      ],
+      "intent": {
+        "rationale": "Takes up the requested connection by showing the bell is not in the listed evidence and limiting claims.",
+        "score": 2
+      },
+      "run_id": "L6-s3",
+      "uncertainty": {
+        "class": "preserved",
+        "quote": null,
+        "rationale": "No fact about the bell, and no bell-lamp relation, is asserted."
+      }
+    }
+  ],
+  "results_binding": "739943a3de1f18f9c445e96389217cfb0d680301e9303436916a432f42bc743b",
+  "rubric_version": "blueprint-proposal-live-rubric/v1",
+  "schema": "hermeneia.blueprint-proposal-live-grading/v1"
+}
