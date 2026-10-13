@@ -203,3 +203,30 @@ All five generation criteria failed:
 Generation stays disabled; the gate is unchanged. The evidence is
 `docs/verification/2026-10-10-p8-live-diagnostic.md` and
 `research/blueprint_proposal_live/phi4-mini/`.
+
+## 4. Correction: acceptance atomicity (2026-10-10, found under #251)
+
+P8 contract invariant 8 says the Blueprint, ArchitectPlan, edge and receipt
+commit atomically, or nothing commits. **It did not hold at merge (`09b72cc`)
+for create-mode acceptance.**
+
+`_persist_exact_blueprint_and_compile` called `ensure_architect_tables()`
+after writing the Blueprint and its links, and that function commits through
+`executescript()`. With a failure injected in `store_receipt` or plan
+compilation, the accept route answered 500 but left a committed
+`proposal-accepted` Blueprint with no plan and no receipt. Lineage would
+project that Blueprint as `unknown`. The revise path was unaffected.
+
+- **Coverage gap.** The P8 corpus never injected a failure after persistence,
+  which is why the tests missed it.
+- **Witnesses:** `tests/test_r251_legacy_blueprint_witnesses.py`
+  (`test_r3_p8_acceptance_commits_blueprint_plan_and_receipt_together`).
+- **Repair:** commit `7a403db` on branch `r251-legacy-blueprint-remediation`,
+  not yet merged. The table check now runs before the first write and never
+  inside a caller-owned transaction.
+- **Merge state.** Until that repair merges, `main` carries the defect. P8
+  generation is disabled by default, so acceptances can only occur where it
+  has been explicitly enabled.
+
+The historical records (contract, 2026-10-08 verification) are left as
+written.

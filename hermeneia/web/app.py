@@ -888,6 +888,11 @@ def create_app(
         from ..storage.hashing import make_blueprint_id
         from ..storage.sqlite import ensure_architect_tables
 
+        # ensure_architect_tables() commits (executescript). It runs only before any write and never inside
+        # a caller-owned transaction (P8 acceptance ensures first), so the Blueprint, links, plan and any
+        # caller provenance commit together or not at all (#251 R3).
+        if not conn.in_transaction:
+            ensure_architect_tables(conn)
         sections = candidate["sections"]
         ref_error = _validate_blueprint_references(conn, sections)
         if ref_error:
@@ -915,7 +920,6 @@ def create_app(
                 (bp_id, iid),
             )
 
-        ensure_architect_tables(conn)
         plan = compile_architect_plan(bp_id, conn)
         pr = plan["plan_row"]
         conn.execute(
@@ -6581,6 +6585,52 @@ def create_app(
             "superseded_by": outgoing,
         })
 
+    # #251: containment of the legacy model-to-canonical Blueprint writes
+    # (docs/design/r251-legacy-blueprint-remediation-v1.md §7). Unset means legacy; an unrecognized
+    # value fails closed to disabled.
+    _LEGACY_WRITE_MODES = ("legacy", "governed", "disabled")
+    _legacy_write_setting = os.environ.get("HERMENEIA_LEGACY_BLUEPRINT_WRITES", "legacy")
+    app.config.setdefault("LEGACY_BLUEPRINT_WRITES",
+                          _legacy_write_setting if _legacy_write_setting in _LEGACY_WRITE_MODES else "disabled")
+
+    def _legacy_blueprint_writes() -> str:
+        mode = app.config.get("LEGACY_BLUEPRINT_WRITES")
+        return mode if mode in _LEGACY_WRITE_MODES else "disabled"
+
+    def _strict_architect_references(ai_sections: list, shown_numbers: set, shown_interps: list, all_interp_ids: list):
+        """Exact OBS-n / INTERP-xxxxxxxx references to records shown in the prompt; every failure itemized."""
+        prefixes: dict[str, list[str]] = {}
+        for interp in shown_interps:
+            prefixes.setdefault(interp["id"][:8], []).append(interp["id"])
+        hidden = {iid[:8] for iid in all_interp_ids} - set(prefixes)
+        n_to_id = {n: oid for n, oid in shown_numbers}
+        invalid, resolved = [], []
+        for index, sec in enumerate(ai_sections, 1):  # numbered as the model returned them
+            obs_ids, interp_ids = [], []
+            if not _optional_text(sec, "claim"):  # a claimless section is skipped, as before (#244)
+                resolved.append((obs_ids, interp_ids))
+                continue
+            for ref in sec.get("obs_refs", []):
+                token = str(ref).strip()
+                obs = re.fullmatch(r"OBS-(\d+)", token)
+                if obs and int(obs.group(1)) in n_to_id:
+                    obs_ids.append(n_to_id[int(obs.group(1))])
+                    continue
+                reason = "unshown" if obs else "wrong_type" if re.fullmatch(r"INTERP-[0-9a-f]{8}", token) else "unresolved"
+                invalid.append({"section": index, "field": "obs_refs", "ref": ref, "reason": reason})
+            for ref in sec.get("interp_refs", []):
+                token = str(ref).strip()
+                found = re.fullmatch(r"INTERP-([0-9a-f]{8})", token)
+                matches = prefixes.get(found.group(1), []) if found else []
+                if len(matches) == 1:
+                    interp_ids.append(matches[0])
+                    continue
+                reason = ("ambiguous" if len(matches) > 1 else "excluded" if found and found.group(1) in hidden
+                          else "unknown" if found else "wrong_type" if re.fullmatch(r"OBS-\d+", token) else "unresolved")
+                invalid.append({"section": index, "field": "interp_refs", "ref": ref, "reason": reason})
+            resolved.append((obs_ids, interp_ids))
+        return resolved, invalid
+
     # ── /api/architect/generate ───────────────────────────────────────────────
 
     @app.route("/api/architect/generate", methods=["POST"])
@@ -6598,6 +6648,11 @@ def create_app(
         """
         import datetime as _dt, hashlib as _hl, traceback as _tb, re as _re
 
+        write_mode = _legacy_blueprint_writes()
+        if write_mode == "disabled":
+            return jsonify({"error": "Direct model-to-canonical Blueprint generation is disabled "
+                                     "(HERMENEIA_LEGACY_BLUEPRINT_WRITES); use governed proposal review",
+                            "code": "LEGACY_DIRECT_WRITE_DISABLED", "canonical_status": "not_persisted"}), 403
         if not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
@@ -6752,21 +6807,34 @@ Return ONLY valid JSON, no markdown, no explanation:
 
             # ── Resolve obs/interp refs to IDs ─────────────────────────────
             interp_id_map = {i["id"][:8]: i["id"] for i in interps}
+            if write_mode == "governed":  # exact references to shown records, or nothing is written (#251 R1/R2)
+                strict, invalid = _strict_architect_references(
+                    ai_sections, {(id_to_n[r["id"]], r["id"]) for r in sample_obs}, interps,
+                    [r[0] for r in conn.execute("SELECT id FROM interpretations")])
+                if invalid:
+                    return jsonify({"error": "The model cited references that are unresolved, of the wrong type, "
+                                             "excluded or not shown; nothing was written",
+                                    "code": "BLUEPRINT_REFERENCE_INVALID", "invalid_references": invalid,
+                                    "canonical_status": "not_persisted", "raw": raw[:500]}), 422
+                strict_refs = iter(strict)
             sections_data = []
             for sec in ai_sections:
                 claim = _optional_text(sec, "claim") or ""
                 obs_ids_sec = []
-                for ref in sec.get("obs_refs", []):
-                    m = _re.search(r"(\d+)", str(ref))
-                    if m:
-                        n = int(m.group(1))
-                        if n in n_to_id:
-                            obs_ids_sec.append(n_to_id[n])
                 interp_ids_sec = []
-                for ref in sec.get("interp_refs", []):
-                    short = str(ref).replace("INTERP-", "")[:8]
-                    if short in interp_id_map:
-                        interp_ids_sec.append(interp_id_map[short])
+                if write_mode == "governed":
+                    obs_ids_sec, interp_ids_sec = next(strict_refs)
+                else:
+                    for ref in sec.get("obs_refs", []):
+                        m = _re.search(r"(\d+)", str(ref))
+                        if m:
+                            n = int(m.group(1))
+                            if n in n_to_id:
+                                obs_ids_sec.append(n_to_id[n])
+                    for ref in sec.get("interp_refs", []):
+                        short = str(ref).replace("INTERP-", "")[:8]
+                        if short in interp_id_map:
+                            interp_ids_sec.append(interp_id_map[short])
                 if claim:
                     sections_data.append({
                         "claim": claim,
@@ -6780,6 +6848,11 @@ Return ONLY valid JSON, no markdown, no explanation:
             # ── Store blueprint ────────────────────────────────────────────
             now = _dt.datetime.now(_dt.timezone.utc).isoformat()
             bp_id = make_blueprint_id(title, thesis, sections_data)
+
+            # ensure_architect_tables() commits (executescript), so it runs before the first write:
+            # the Blueprint, its links and its plan then commit together or not at all (#251 R3).
+            from ..storage.sqlite import ensure_architect_tables
+            ensure_architect_tables(conn)
 
             conn.execute(
                 """INSERT OR IGNORE INTO narrative_blueprints
@@ -6798,12 +6871,8 @@ Return ONLY valid JSON, no markdown, no explanation:
                         "INSERT OR IGNORE INTO blueprint_interpretation_links (blueprint_id, interpretation_id) VALUES (?, ?)",
                         (bp_id, iid),
                     )
-            conn.commit()
 
             # ── Compile ArchitectPlan ──────────────────────────────────────
-            from ..storage.sqlite import ensure_architect_tables
-            ensure_architect_tables(conn)
-
             plan = compile_architect_plan(bp_id, conn)
             pr   = plan["plan_row"]
             plan_id = pr["id"]
@@ -6838,6 +6907,7 @@ Return ONLY valid JSON, no markdown, no explanation:
             }), 201
 
         except Exception as exc:
+            conn.rollback()
             return jsonify({
                 "error": str(exc),
                 "error_type": type(exc).__name__,
@@ -7432,16 +7502,32 @@ Return ONLY valid JSON, no markdown, no explanation:
         if not text:
             return jsonify({"error": "text is required"}), 400
 
+        write_mode = _legacy_blueprint_writes()
+        if save and write_mode != "legacy":  # never re-run the model to save (#251 R5)
+            return jsonify({"error": "Saving re-runs extraction; ratify the exact previewed Blueprint through "
+                                     "/api/pipeline/ratify-blueprint instead",
+                            "code": "EXACT_RATIFICATION_REQUIRED", "canonical_status": "not_persisted"}), 409
+
         if save and not db_path.exists():
             return jsonify({"error": "database not found"}), 404
 
-        from ..compiler.blueprint_extractor import extract_blueprint_from_text, BlueprintExtractionError
+        from ..compiler.blueprint_extractor import (
+            PLACEHOLDER_INTERFACE, extract_blueprint_from_text, provider_interface, BlueprintExtractionError)
         from ..narrative.artist_providers import get_provider
         import traceback as _tb
 
         try:
             kwargs = _provider_kwargs(provider)
             prov = get_provider(provider, **kwargs)
+            interface = provider_interface(prov)
+            # A placeholder is never presented as the output of an executed model (#251 R6).
+            execution = {"provider": provider, "interface": interface,
+                         "model_executed": interface != PLACEHOLDER_INTERFACE,
+                         "placeholder": interface == PLACEHOLDER_INTERFACE}
+            if execution["placeholder"] and write_mode != "legacy":
+                return jsonify({"error": "No model ran: the selected provider returns a placeholder, not an extraction",
+                                "code": "NO_MODEL_EXECUTED", "execution": execution,
+                                "canonical_status": "not_persisted"}), 409
             proposed = extract_blueprint_from_text(text, prov)
         except BlueprintExtractionError as exc:
             return jsonify({"error": str(exc), "error_type": "BlueprintExtractionError"}), 422
@@ -7449,7 +7535,7 @@ Return ONLY valid JSON, no markdown, no explanation:
             return jsonify({"error": str(exc), "detail": _tb.format_exc()}), 500
 
         if not save:
-            return jsonify({"proposed_blueprint": proposed}), 200
+            return jsonify({"proposed_blueprint": proposed, "execution": execution}), 200
 
         conn = _conn_rw()
         try:
@@ -7463,6 +7549,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                 "proposed_blueprint": candidate,
                 "blueprint_id": result["blueprint_id"],
                 "plan_id": result["plan_id"],
+                "execution": execution,
             }), 201
         except _ScopeAccessError as exc:
             conn.rollback()

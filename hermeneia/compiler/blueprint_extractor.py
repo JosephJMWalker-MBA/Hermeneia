@@ -119,12 +119,27 @@ def extract_blueprint_from_text(
     return _parse_and_validate(raw)
 
 
+PLACEHOLDER_INTERFACE = "placeholder"
+
+
+def provider_interface(provider: Any) -> str:
+    """The client interface _call_provider uses; "placeholder" means no model runs (#251 R6)."""
+    if hasattr(provider, "_client") and hasattr(provider._client, "messages"):
+        return "anthropic"
+    if hasattr(provider, "_client") and hasattr(provider._client, "chat"):
+        return "openai"
+    if hasattr(provider, "_model_obj"):
+        return "gemini"
+    return PLACEHOLDER_INTERFACE
+
+
 def _call_provider(provider: Any, system: str, user: str) -> str:
     """Call the provider's generate method using the same interface as the Artist."""
     name = getattr(provider, "name", None) or getattr(provider, "_name", "unknown")
+    interface = provider_interface(provider)
 
     # AnthropicArtistProvider uses client.messages.create directly
-    if hasattr(provider, "_client") and hasattr(provider._client, "messages"):
+    if interface == "anthropic":
         resp = provider._client.messages.create(
             model=provider._model,
             max_tokens=1024,
@@ -134,7 +149,7 @@ def _call_provider(provider: Any, system: str, user: str) -> str:
         return resp.content[0].text
 
     # OpenAI-compatible: provider._client.chat.completions.create
-    if hasattr(provider, "_client") and hasattr(provider._client, "chat"):
+    if interface == "openai":
         resp = provider._client.chat.completions.create(
             model=provider._model,
             max_tokens=1024,
@@ -146,7 +161,7 @@ def _call_provider(provider: Any, system: str, user: str) -> str:
         return resp.choices[0].message.content
 
     # Gemini
-    if hasattr(provider, "_model_obj"):
+    if interface == "gemini":
         full = system + "\n\n" + user
         resp = provider._model_obj.generate_content(full)
         return resp.text
