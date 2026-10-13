@@ -1,0 +1,455 @@
+{
+  "aggregate": {
+    "export_adversarial": {
+      "all_checks_passed": 3,
+      "cases": 3
+    },
+    "lawful": {
+      "all_checks_passed": 9,
+      "cases": 9
+    },
+    "restore_adversarial": {
+      "all_checks_passed": 10,
+      "cases": 10
+    }
+  },
+  "capability": "blueprint-dependency-chain-v1",
+  "cases": [
+    {
+      "blueprint_sources": [],
+      "case_id": "L1_empty_chain",
+      "checks": {
+        "capability_decisions_identical": true,
+        "capability_declared": true,
+        "counts_declared": true,
+        "coverage_covered": true,
+        "export_deterministic": true,
+        "lineage_chain_items_identical": true,
+        "receipt_verdicts_identical": true,
+        "rows_identical": true,
+        "source_unchanged_by_export": true
+      },
+      "kind": "lawful",
+      "lineage_chain": {},
+      "receipt_verdicts": [],
+      "rows": {
+        "ai_provenance": 0,
+        "architect_plan_paragraphs": 0,
+        "architect_plans": 0,
+        "blueprint_interpretation_links": 0,
+        "blueprint_observation_links": 0,
+        "blueprint_proposal_acceptances": 0,
+        "blueprint_supersessions": 0,
+        "interpretations": 0,
+        "narrative_blueprints": 0,
+        "proposed_interpretations": 0
+      }
+    },
+    {
+      "blueprint_sources": [
+        "extracted"
+      ],
+      "case_id": "L2_steward_interpretation_and_ratified_blueprint",
+      "checks": {
+        "capability_decisions_identical": true,
+        "capability_declared": true,
+        "counts_declared": true,
+        "coverage_covered": true,
+        "export_deterministic": true,
+        "lineage_chain_items_identical": true,
+        "receipt_verdicts_identical": true,
+        "rows_identical": true,
+        "source_unchanged_by_export": true
+      },
+      "kind": "lawful",
+      "lineage_chain": {
+        "architect_plans|recorded|derived": 1,
+        "interpretations|recorded|human": 1,
+        "narrative_blueprints|recorded|derived": 1
+      },
+      "receipt_verdicts": [],
+      "rows": {
+        "ai_provenance": 0,
+        "architect_plan_paragraphs": 1,
+        "architect_plans": 1,
+        "blueprint_interpretation_links": 1,
+        "blueprint_observation_links": 2,
+        "blueprint_proposal_acceptances": 0,
+        "blueprint_supersessions": 0,
+        "interpretations": 1,
+        "narrative_blueprints": 1,
+        "proposed_interpretations": 0
+      }
+    },
+    {
+      "blueprint_sources": [],
+      "case_id": "L3_e10_proposals_accepted_pending_rejected",
+      "checks": {
+        "capability_decisions_identical": true,
+        "capability_declared": true,
+        "counts_declared": true,
+        "coverage_covered": true,
+        "export_deterministic": true,
+        "lineage_chain_items_identical": true,
+        "receipt_verdicts_identical": true,
+        "rows_identical": true,
+        "source_unchanged_by_export": true
+      },
+      "kind": "lawful",
+      "lineage_chain": {
+        "interpretations|recorded|accepted_model": 1,
+        "proposed_interpretations|decision|human": 2,
+        "proposed_interpretations|recorded|model": 3
+      },
+      "receipt_verdicts": [],
+      "rows": {
+        "ai_provenance": 3,
+        "architect_plan_paragraphs": 0,
+        "architect_plans": 0,
+        "blueprint_interpretation_links": 0,
+        "blueprint_observation_links": 0,
+        "blueprint_proposal_acceptances": 0,
+        "blueprint_supersessions": 0,
+        "interpretations": 1,
+        "narrative_blueprints": 0,
+        "proposed_interpretations": 3
+      }
+    },
+    {
+      "blueprint_sources": [
+        "extracted",
+        "steward-authored"
+      ],
+      "case_id": "L4_blueprint_revision",
+      "checks": {
+        "capability_decisions_identical": true,
+        "capability_declared": true,
+        "counts_declared": true,
+        "coverage_covered": true,
+        "export_deterministic": true,
+        "lineage_chain_items_identical": true,
+        "receipt_verdicts_identical": true,
+        "rows_identical": true,
+        "source_unchanged_by_export": true
+      },
+      "kind": "lawful",
+      "lineage_chain": {
+        "architect_plans|recorded|derived": 2,
+        "interpretations|recorded|human": 1,
+        "narrative_blueprints|recorded|derived": 1,
+        "narrative_blueprints|recorded|human": 1,
+        "supersession_relations|recorded|unknown": 1
+      },
+      "receipt_verdicts": [],
+      "rows": {
+        "ai_provenance": 0,
+        "architect_plan_paragraphs": 2,
+        "architect_plans": 2,
+        "blueprint_interpretation_links": 1,
+        "blueprint_observation_links": 3,
+        "blueprint_proposal_acceptances": 0,
+        "blueprint_supersessions": 1,
+        "interpretations": 1,
+        "narrative_blueprints": 2,
+        "proposed_interpretations": 0
+      }
+    },
+    {
+      "blueprint_sources": [
+        "proposal-accepted"
+      ],
+      "case_id": "L5_p8_exact_acceptance",
+      "checks": {
+        "capability_decisions_identical": true,
+        "capability_declared": true,
+        "counts_declared": true,
+        "coverage_covered": true,
+        "export_deterministic": true,
+        "lineage_chain_items_identical": true,
+        "receipt_verdicts_identical": true,
+        "rows_identical": true,
+        "source_unchanged_by_export": true
+      },
+      "kind": "lawful",
+      "lineage_chain": {
+        "architect_plans|recorded|derived": 1,
+        "blueprint_proposal_acceptances|recorded|accepted_model": 1,
+        "narrative_blueprints|recorded|accepted_model": 1
+      },
+      "receipt_verdicts": [
+        "{\"candidate_replay\": \"verified\", \"model_output\": \"preserved_not_replayed\", \"record_integrity\": \"valid\", \"result_closure\": \"verified\"}"
+      ],
+      "rows": {
+        "ai_provenance": 0,
+        "architect_plan_paragraphs": 2,
+        "architect_plans": 1,
+        "blueprint_interpretation_links": 0,
+        "blueprint_observation_links": 3,
+        "blueprint_proposal_acceptances": 1,
+        "blueprint_supersessions": 0,
+        "interpretations": 0,
+        "narrative_blueprints": 1,
+        "proposed_interpretations": 0
+      }
+    },
+    {
+      "blueprint_sources": [
+        "extracted",
+        "proposal-edited"
+      ],
+      "case_id": "L6_p8_edit_and_accept_revision",
+      "checks": {
+        "capability_decisions_identical": true,
+        "capability_declared": true,
+        "counts_declared": true,
+        "coverage_covered": true,
+        "export_deterministic": true,
+        "lineage_chain_items_identical": true,
+        "receipt_verdicts_identical": true,
+        "rows_identical": true,
+        "source_unchanged_by_export": true
+      },
+      "kind": "lawful",
+      "lineage_chain": {
+        "architect_plans|recorded|derived": 2,
+        "blueprint_proposal_acceptances|recorded|human": 1,
+        "interpretations|recorded|human": 1,
+        "narrative_blueprints|recorded|derived": 1,
+        "narrative_blueprints|recorded|human": 1,
+        "supersession_relations|recorded|unknown": 1
+      },
+      "receipt_verdicts": [
+        "{\"candidate_replay\": \"verified\", \"model_output\": \"preserved_not_replayed\", \"record_integrity\": \"valid\", \"result_closure\": \"verified\"}"
+      ],
+      "rows": {
+        "ai_provenance": 0,
+        "architect_plan_paragraphs": 3,
+        "architect_plans": 2,
+        "blueprint_interpretation_links": 1,
+        "blueprint_observation_links": 3,
+        "blueprint_proposal_acceptances": 1,
+        "blueprint_supersessions": 1,
+        "interpretations": 1,
+        "narrative_blueprints": 2,
+        "proposed_interpretations": 0
+      }
+    },
+    {
+      "blueprint_sources": [
+        "ai-generated",
+        "extracted"
+      ],
+      "case_id": "L7_legacy_ai_generated_and_extracted_rows",
+      "checks": {
+        "capability_decisions_identical": true,
+        "capability_declared": true,
+        "counts_declared": true,
+        "coverage_covered": true,
+        "export_deterministic": true,
+        "lineage_chain_items_identical": true,
+        "receipt_verdicts_identical": true,
+        "rows_identical": true,
+        "source_unchanged_by_export": true
+      },
+      "kind": "lawful",
+      "lineage_chain": {
+        "architect_plans|recorded|derived": 2,
+        "narrative_blueprints|recorded|derived": 1,
+        "narrative_blueprints|recorded|unknown": 1
+      },
+      "receipt_verdicts": [],
+      "rows": {
+        "ai_provenance": 0,
+        "architect_plan_paragraphs": 2,
+        "architect_plans": 2,
+        "blueprint_interpretation_links": 0,
+        "blueprint_observation_links": 1,
+        "blueprint_proposal_acceptances": 0,
+        "blueprint_supersessions": 0,
+        "interpretations": 0,
+        "narrative_blueprints": 2,
+        "proposed_interpretations": 0
+      }
+    },
+    {
+      "blueprint_sources": [
+        "extracted"
+      ],
+      "case_id": "L8_chain_citing_an_excluded_document",
+      "checks": {
+        "capability_decisions_identical": true,
+        "capability_declared": true,
+        "counts_declared": true,
+        "coverage_covered": true,
+        "export_deterministic": true,
+        "lineage_chain_items_identical": true,
+        "receipt_verdicts_identical": true,
+        "rows_identical": true,
+        "source_unchanged_by_export": true
+      },
+      "kind": "lawful",
+      "lineage_chain": {},
+      "receipt_verdicts": [],
+      "rows": {
+        "ai_provenance": 0,
+        "architect_plan_paragraphs": 1,
+        "architect_plans": 1,
+        "blueprint_interpretation_links": 1,
+        "blueprint_observation_links": 2,
+        "blueprint_proposal_acceptances": 0,
+        "blueprint_supersessions": 0,
+        "interpretations": 1,
+        "narrative_blueprints": 1,
+        "proposed_interpretations": 0
+      }
+    },
+    {
+      "case_id": "L9_gate_off_bundle_is_wbs_1x_shaped",
+      "checks": {
+        "coverage_unsupported": true,
+        "no_chain_component": true,
+        "nothing_reconstructed": true
+      },
+      "kind": "lawful"
+    },
+    {
+      "case_id": "A1_tampered_receipt",
+      "checks": {
+        "declared_unsupported_with_code": true,
+        "no_chain_file_written": true,
+        "nothing_reconstructed": true,
+        "rest_of_workspace_exported": true,
+        "restore_reports_the_reason": true
+      },
+      "expected_code": "CHAIN_INTEGRITY_INVALID",
+      "kind": "export_adversarial"
+    },
+    {
+      "case_id": "A2_dangling_blueprint_link",
+      "checks": {
+        "declared_unsupported_with_code": true,
+        "no_chain_file_written": true,
+        "nothing_reconstructed": true,
+        "rest_of_workspace_exported": true,
+        "restore_reports_the_reason": true
+      },
+      "expected_code": "CHAIN_CLOSURE_INCOMPLETE",
+      "kind": "export_adversarial"
+    },
+    {
+      "case_id": "A3_interpretation_to_blueprint_edge",
+      "checks": {
+        "declared_unsupported_with_code": true,
+        "no_chain_file_written": true,
+        "nothing_reconstructed": true,
+        "rest_of_workspace_exported": true,
+        "restore_reports_the_reason": true
+      },
+      "expected_code": "CHAIN_SUPERSESSION_OUT_OF_SCOPE",
+      "kind": "export_adversarial"
+    },
+    {
+      "case_id": "A4_chain_file_edited_without_rehash",
+      "checks": {
+        "nothing_restored": true,
+        "refused": true
+      },
+      "kind": "restore_adversarial",
+      "message_names_the_chain": true,
+      "refused_at": "read_bundle"
+    },
+    {
+      "case_id": "A5_rehashed_bundle_with_plan_whose_blueprint_was_removed",
+      "checks": {
+        "nothing_restored": true,
+        "refused": true
+      },
+      "kind": "restore_adversarial",
+      "message_names_the_chain": false,
+      "refused_at": "restore_transaction"
+    },
+    {
+      "case_id": "A5b_rehashed_bundle_with_paragraphs_and_receipt_whose_plan_was_removed",
+      "checks": {
+        "nothing_restored": true,
+        "refused": true
+      },
+      "kind": "restore_adversarial",
+      "message_names_the_chain": true,
+      "refused_at": "restore_transaction"
+    },
+    {
+      "case_id": "A6_capability_declared_file_missing",
+      "checks": {
+        "nothing_restored": true,
+        "refused": true
+      },
+      "kind": "restore_adversarial",
+      "message_names_the_chain": true,
+      "refused_at": "read_bundle"
+    },
+    {
+      "case_id": "A7_file_present_without_capability",
+      "checks": {
+        "nothing_restored": true,
+        "refused": true
+      },
+      "kind": "restore_adversarial",
+      "message_names_the_chain": true,
+      "refused_at": "read_bundle"
+    },
+    {
+      "case_id": "A8_count_mismatch",
+      "checks": {
+        "nothing_restored": true,
+        "refused": true
+      },
+      "kind": "restore_adversarial",
+      "message_names_the_chain": true,
+      "refused_at": "read_bundle"
+    },
+    {
+      "case_id": "A9_duplicate_primary_key",
+      "checks": {
+        "nothing_restored": true,
+        "refused": true
+      },
+      "kind": "restore_adversarial",
+      "message_names_the_chain": true,
+      "refused_at": "read_bundle"
+    },
+    {
+      "case_id": "A10_unknown_column",
+      "checks": {
+        "nothing_restored": true,
+        "refused": true
+      },
+      "kind": "restore_adversarial",
+      "message_names_the_chain": true,
+      "refused_at": "read_bundle"
+    },
+    {
+      "case_id": "A11_declared_unsupported_and_chain_files",
+      "checks": {
+        "nothing_restored": true,
+        "refused": true
+      },
+      "kind": "restore_adversarial",
+      "message_names_the_chain": true,
+      "refused_at": "read_bundle"
+    },
+    {
+      "case_id": "A12_covered_chain_into_occupied_target_with_overwrite",
+      "checks": {
+        "occupied_target_unchanged": true,
+        "refused": true
+      },
+      "kind": "restore_adversarial",
+      "message_names_the_chain": true,
+      "refused_at": "occupied_target"
+    }
+  ],
+  "contract": "docs/design/blueprint-chain-portability-v1.md",
+  "method": "synthetic studies built through production write boundaries; exported with the gated chain component; restored into fresh targets; in-process fakes; no network, live model or real workspace",
+  "schema": "hermeneia.blueprint-chain-portability-results/v1"
+}

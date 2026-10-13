@@ -31,6 +31,7 @@ from ..study.evaluation import (
     score_evidence_preservation,
     score_unsupported_claims,
 )
+from .blueprint_chain import CAPABILITY as CHAIN_CAPABILITY, FILES as CHAIN_FILES, export_chain
 
 
 WBS_VERSION = "1.1"
@@ -292,8 +293,12 @@ def build_bundle_files(
     app_version: str = "",
     publication: dict[str, Any] | None = None,
     uploads_dir: Path | None = None,
+    blueprint_chain: bool = False,
 ) -> dict[str, bytes]:
     """Build the bundle from one caller-preserving SQLite read snapshot.
+
+    ``blueprint_chain`` (#252) adds the Blueprint dependency chain component. It is off unless the owner
+    opens the P8 portability gate; off, the bundle is byte-identical to the pre-#252 exporter.
 
     Receipts must close over the exact reference rows serialized with them.
     Concurrent retention cannot add a receipt after its dependency files have
@@ -306,7 +311,7 @@ def build_bundle_files(
         return _build_bundle_files_snapshot(
             conn, generated_at=generated_at, workspace_id=workspace_id,
             upload_files=upload_files, app_version=app_version, publication=publication,
-            uploads_dir=uploads_dir,
+            uploads_dir=uploads_dir, blueprint_chain=blueprint_chain,
         )
     finally:
         if owns_snapshot:
@@ -322,6 +327,7 @@ def _build_bundle_files_snapshot(
     app_version: str = "",
     publication: dict[str, Any] | None = None,
     uploads_dir: Path | None = None,
+    blueprint_chain: bool = False,
 ) -> dict[str, bytes]:
     """Build every bundle file (including manifest) as path → bytes.
 
@@ -381,6 +387,8 @@ def _build_bundle_files_snapshot(
     perspective_executions = _perspective_executions(conn)
     achievement_awards = _achievement_awards(conn)
     accepted_comparisons = _accepted_comparisons(conn)
+    # The Blueprint dependency chain (#252): all of it with closure, or a declared absence (never a partial chain).
+    chain_rows, chain_declaration = export_chain(conn) if blueprint_chain else (None, None)
     projections = _study_projections(highlights, field_notes)
     derived = _derived(
         conn,
@@ -414,6 +422,9 @@ def _build_bundle_files_snapshot(
         content[ACHIEVEMENT_AWARD_FILE] = (CANONICAL, _dumps(achievement_awards))
     if accepted_comparisons is not None:
         content[ACCEPTED_COMPARISON_FILE] = (CANONICAL, _dumps(accepted_comparisons))
+    if chain_rows is not None:
+        for key, rows in chain_rows.items():
+            content[CHAIN_FILES[key]] = (CANONICAL, _dumps(rows))
 
     # Uploads: the exact source bytes of the documents in this snapshot,
     # content-hash named (§4, §5.1). Other files are not canonical evidence.
@@ -472,6 +483,12 @@ def _build_bundle_files_snapshot(
         manifest.setdefault("required_capabilities", []).append(ACCEPTED_COMPARISON_CAPABILITY)
         manifest["required_capabilities"].sort()
         manifest["counts"][_ACCEPTED_COMPARISON_TABLE] = len(accepted_comparisons)
+    if chain_rows is not None:
+        manifest.setdefault("required_capabilities", []).append(CHAIN_CAPABILITY)
+        manifest["required_capabilities"].sort()
+        manifest["counts"].update({key: len(rows) for key, rows in chain_rows.items()})
+    elif chain_declaration is not None:
+        manifest["declared_unsupported"] = {CHAIN_CAPABILITY: chain_declaration}
 
     out: dict[str, bytes] = {path: data for path, (_role, data) in content.items()}
     out["manifest.json"] = _dumps(manifest)
@@ -552,6 +569,7 @@ def build_workspace_zip(
     generated_at: str,
     workspace_id: str | None = None,
     app_version: str = "",
+    blueprint_chain: bool = False,
 ) -> bytes:
     """Build the workspace bundle as a deterministic in-memory .zip.
 
@@ -571,6 +589,7 @@ def build_workspace_zip(
             uploads_dir=db_path.parent / "uploads",
             app_version=app_version,
             publication=_publication_component(conn, db_path),
+            blueprint_chain=blueprint_chain,
         )
     finally:
         conn.close()
@@ -617,6 +636,7 @@ def export_workspace_bundle(
     generated_at: str,
     workspace_id: str | None = None,
     app_version: str = "",
+    blueprint_chain: bool = False,
 ) -> dict[str, Any]:
     """Export the workspace to a bundle directory. Read-only over the DB.
 
@@ -637,6 +657,7 @@ def export_workspace_bundle(
             uploads_dir=db_path.parent / "uploads",
             app_version=app_version,
             publication=_publication_component(conn, db_path),
+            blueprint_chain=blueprint_chain,
         )
     finally:
         conn.close()
