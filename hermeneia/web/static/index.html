@@ -6254,6 +6254,44 @@ function _obPopulateProviders() {
   });
 }
 
+let _obPreviewedBlueprint = null;  // the exact proposal under review; ratification commits it, never a new extraction (#251 R5)
+let _obPreviewedCandidateId = null;  // proposal mode: the server-held candidate behind that preview (#251 v1.1)
+
+function _obExtractProposalHtml(bp, state) {
+  const sections = (bp.sections || []).map((s, i) =>
+    `<div class="ob-extract-section"><span style="color:var(--dim2);font-size:11px;margin-right:6px">${i+1}.</span>${x(s.claim)}</div>`
+  ).join('');
+  const savedBadge = state === 'saved'
+    ? `<span style="background:#2d6a4f;color:#b7e4c7;font-size:10px;padding:2px 7px;border-radius:4px;margin-left:8px">saved</span>` : '';
+  const actions = state === 'saved' ? `
+        <div class="ob-extract-actions">
+          <button class="btn-primary" onclick="e10Go('architect')">View in Architect →</button>
+          <button class="btn-trace" onclick="obToggleExtract()">Done</button>
+        </div>` : state === 'placeholder' ? `
+        <div class="ob-extract-note" style="color:#f87171">
+          No model ran — the selected provider returned a placeholder, not an extraction. Connect a provider and run again.
+        </div>
+        <div class="ob-extract-actions">
+          <button class="btn-trace" onclick="obToggleExtract()">Discard</button>
+        </div>` : `
+        <div class="ob-extract-actions">
+          <button class="btn-primary" onclick="obRatifyPreviewed()">Ratify &amp; Save Blueprint →</button>
+          <button class="btn-trace" onclick="obToggleExtract()">Discard</button>
+        </div>`;
+  return `
+      <div class="ob-extract-proposal">
+        <div class="ob-extract-proposal-title">${x(bp.title)}${savedBadge}</div>
+        <div class="ob-extract-proposal-thesis">"${x(bp.thesis)}"</div>
+        <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2);margin-bottom:6px">Supporting Claims</div>
+        ${sections}
+        <div class="ob-extract-note">
+          A wrong Blueprint is not a planning failure — it is a reading failure.
+          If this reconstruction is inaccurate, edit the section claims below or run again with a different provider.
+        </div>
+        ${actions}
+      </div>`;
+}
+
 async function obExtractBlueprint(save) {
   const text     = document.getElementById('ob-extract-text')?.value?.trim();
   const provider = document.getElementById('ob-extract-provider')?.value || 'null';
@@ -6265,6 +6303,8 @@ async function obExtractBlueprint(save) {
   btn.disabled = true;
   btn.textContent = 'Extracting…';
   propEl.style.display = 'none';
+  _obPreviewedBlueprint = null;
+  _obPreviewedCandidateId = null;
 
   try {
     const resp = await fetch('/api/pipeline/extract-blueprint', {
@@ -6279,38 +6319,53 @@ async function obExtractBlueprint(save) {
       return;
     }
     const bp = data.proposed_blueprint;
-    const sections = (bp.sections || []).map((s, i) =>
-      `<div class="ob-extract-section"><span style="color:var(--dim2);font-size:11px;margin-right:6px">${i+1}.</span>${x(s.claim)}</div>`
-    ).join('');
-    const savedBadge = data.blueprint_id
-      ? `<span style="background:#2d6a4f;color:#b7e4c7;font-size:10px;padding:2px 7px;border-radius:4px;margin-left:8px">saved</span>` : '';
+    const placeholder = !!(data.execution && data.execution.model_executed === false);
+    const state = data.blueprint_id ? 'saved' : placeholder ? 'placeholder' : 'preview';
+    _obPreviewedBlueprint = state === 'preview' ? bp : null;
+    _obPreviewedCandidateId = state === 'preview' && data.candidate ? data.candidate.candidate_id : null;
     propEl.style.display = 'block';
-    propEl.innerHTML = `
-      <div class="ob-extract-proposal">
-        <div class="ob-extract-proposal-title">${x(bp.title)}${savedBadge}</div>
-        <div class="ob-extract-proposal-thesis">"${x(bp.thesis)}"</div>
-        <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2);margin-bottom:6px">Supporting Claims</div>
-        ${sections}
-        <div class="ob-extract-note">
-          A wrong Blueprint is not a planning failure — it is a reading failure.
-          If this reconstruction is inaccurate, edit the section claims below or run again with a different provider.
-        </div>
-        ${data.blueprint_id ? `
-        <div class="ob-extract-actions">
-          <button class="btn-primary" onclick="e10Go('architect')">View in Architect →</button>
-          <button class="btn-trace" onclick="obToggleExtract()">Done</button>
-        </div>` : `
-        <div class="ob-extract-actions">
-          <button class="btn-primary" onclick="obExtractBlueprint(true)">Ratify &amp; Save Blueprint →</button>
-          <button class="btn-trace" onclick="obToggleExtract()">Discard</button>
-        </div>`}
-      </div>`;
+    propEl.innerHTML = _obExtractProposalHtml(bp, state);
   } catch (err) {
     propEl.style.display = 'block';
     propEl.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${err.message}</div>`;
   } finally {
     btn.disabled = false;
     btn.textContent = 'Extract Intent Hypothesis';
+  }
+}
+
+// Ratify & Save commits the exact previewed Blueprint through the human approval boundary (#251 R5).
+async function obRatifyPreviewed() {
+  const propEl = document.getElementById('ob-extract-proposal');
+  const reviewed = _obPreviewedBlueprint;
+  const candidateId = _obPreviewedCandidateId;
+  if (!propEl || !reviewed) return;
+  try {
+    // Proposal mode: accept the exact held candidate, which records the model provenance (#251 v1.1).
+    const resp = candidateId
+      ? await fetch(`/api/blueprint/proposals/${encodeURIComponent(candidateId)}/accept`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision: 'accept', candidate_id: candidateId }),
+        })
+      : await fetch('/api/pipeline/ratify-blueprint', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ proposed_blueprint: reviewed }),
+        });
+    const data = await resp.json();
+    if (!resp.ok) {
+      propEl.innerHTML = _obExtractProposalHtml(reviewed, 'preview')
+        + `<div style="color:#f87171;font-size:13px">✗ ${x(data.error || 'Ratification failed')}</div>`;
+      return;
+    }
+    _obPreviewedBlueprint = null;
+    _obPreviewedCandidateId = null;
+    const committed = candidateId ? (data.acceptance || {}).accepted_blueprint : data.committed_blueprint;
+    propEl.innerHTML = _obExtractProposalHtml(committed || reviewed, 'saved');
+  } catch (err) {
+    propEl.innerHTML = _obExtractProposalHtml(reviewed, 'preview')
+      + `<div style="color:#f87171;font-size:13px">✗ ${x(err.message)}</div>`;
   }
 }
 
@@ -17579,6 +17634,71 @@ function getActivePlanId() {
   return localStorage.getItem('hermeneia_active_plan_id') || '';
 }
 
+let _e10ArchitectCandidate = null;  // proposal mode: the held candidate under review (#251 v1.1)
+
+function _e10ArchitectProposalHtml(candidate, note) {
+  const bp = candidate.proposal.blueprint;
+  const view = candidate.binding.view;
+  const labels = Object.fromEntries([...view.observations, ...view.interpretations].map(e => [e.id, e.label]));
+  const sections = bp.sections.map((s, i) => {
+    const cited = [...s.supporting_observations, ...s.supporting_interpretations].map(id => labels[id] || id).join(', ');
+    const tag = cited ? ' <span style="color:var(--dim2);font-size:11px">[' + x(cited) + ']</span>' : '';
+    return '<div style="margin:4px 0"><span style="color:var(--dim2)">' + (i + 1) + '.</span> ' + x(s.claim) + tag + '</div>';
+  }).join('');
+  const warning = note ? '<div style="color:var(--red);margin-top:6px">' + note + '</div>' : '';
+  return `<div class="arc-proposal">
+      <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2)">Model proposal — nothing saved yet</div>
+      <div style="font-weight:600;margin-top:4px">${x(bp.title)}</div>
+      <div style="font-style:italic;margin:4px 0">"${x(bp.thesis)}"</div>
+      ${sections}
+      <div style="font-size:11px;color:var(--dim2);margin-top:6px">Proposed by ${x(candidate.extraction.execution.model_id)}. Accepting records this exact proposal and its provenance; it does not make the claims true.</div>
+      <div style="margin-top:8px">
+        <button class="btn-primary" onclick="e10AcceptArchitectProposal()">Accept exactly →</button>
+        <button class="btn-trace" onclick="e10DiscardArchitectProposal()">Discard</button>
+      </div>
+      ${warning}
+    </div>`;
+}
+
+async function e10AcceptArchitectProposal() {
+  const candidate = _e10ArchitectCandidate;
+  const status = document.getElementById('arc-gen-status');
+  if (!candidate || !status) return;
+  try {
+    const res = await fetch(`/api/blueprint/proposals/${encodeURIComponent(candidate.candidate_id)}/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'accept', candidate_id: candidate.candidate_id }),
+    });
+    const d = await res.json();
+    if (!res.ok) {
+      status.innerHTML = _e10ArchitectProposalHtml(candidate, `Not accepted: ${x(d.error || d.code || 'unknown')}`);
+      return;
+    }
+    _e10ArchitectCandidate = null;
+    status.innerHTML = `<span style="color:var(--green)">✓ Accepted: "${x(d.acceptance.accepted_blueprint.title)}" saved with its acceptance receipt</span>`;
+    await e10LoadArchitect();
+  } catch(e) {
+    status.innerHTML = _e10ArchitectProposalHtml(candidate, `Request failed: ${x(e.message)}`);
+  }
+}
+
+async function e10DiscardArchitectProposal() {
+  const candidate = _e10ArchitectCandidate;
+  const status = document.getElementById('arc-gen-status');
+  if (!candidate || !status) return;
+  try {
+    await fetch(`/api/blueprint/proposals/${encodeURIComponent(candidate.candidate_id)}/discard`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decision: 'discard', candidate_id: candidate.candidate_id }),
+    });
+  } finally {
+    _e10ArchitectCandidate = null;
+    status.innerHTML = 'Proposal discarded; nothing was saved.';
+  }
+}
+
 async function e10GenerateBlueprint() {
   const directive = document.getElementById('arc-directive')?.value?.trim();
   const provider  = document.getElementById('arc-gen-provider')?.value?.trim();
@@ -17597,6 +17717,11 @@ async function e10GenerateBlueprint() {
     const d = await res.json();
     if (!res.ok) {
       status.innerHTML = `<span style="color:var(--red)">Error: ${x(d.error || 'unknown')}</span>`;
+      return;
+    }
+    if (d.canonical_status === 'not_persisted' && d.candidate_id) {  // proposal mode (#251 v1.1): nothing saved yet
+      _e10ArchitectCandidate = d;
+      status.innerHTML = _e10ArchitectProposalHtml(d);
       return;
     }
     status.innerHTML = `<span style="color:var(--green)">✓ Blueprint created: "${x(d.title)}" — ${d.section_count} sections</span>`;
