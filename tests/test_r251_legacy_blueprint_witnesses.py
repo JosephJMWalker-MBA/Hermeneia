@@ -105,6 +105,8 @@ class Study:
     def generate(self, reply: dict):
         provider = SimpleNamespace(prompts=[])
         provider.render = lambda prompt: (provider.prompts.append(prompt), json.dumps(reply))[1]
+        # Only `proposal` mode reads the execution record (CI-011, contract v1.1); other modes never call it.
+        provider.execution_config = lambda: {"provider": "fake", "model_id": "fake-model"}
         with mock.patch("hermeneia.narrative.artist_providers.get_provider", return_value=provider):
             response = self.client.post("/api/architect/generate", json={"directive": "Build from the evidence.", "provider": "fake"})
         return response, provider.prompts
@@ -128,7 +130,7 @@ def _chat_replies(*replies):
     return SimpleNamespace(_model="fake", _client=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))), calls
 
 
-@pytest.mark.parametrize("mode", [exposed("legacy", R1UnresolvedReferenceDropped), "governed", "disabled"])
+@pytest.mark.parametrize("mode", [exposed("legacy", R1UnresolvedReferenceDropped), "governed", "proposal", "disabled"])
 def test_r1_unresolved_references_are_refused_not_dropped(isolated, mode):
     study = Study(isolated, mode, [DOC])
     response, _ = study.generate({"title": "T", "thesis": "Th", "sections": [
@@ -142,7 +144,7 @@ def test_r1_unresolved_references_are_refused_not_dropped(isolated, mode):
         assert {(r["ref"], r["reason"]) for r in body["invalid_references"]} == {("OBS-99", "unshown"), ("INTERP-deadbeef", "unknown")}
 
 
-@pytest.mark.parametrize("mode", [exposed("legacy", R2aWrongTypeBound), "governed", "disabled"])
+@pytest.mark.parametrize("mode", [exposed("legacy", R2aWrongTypeBound), "governed", "proposal", "disabled"])
 def test_r2a_a_label_of_another_kind_never_binds_an_observation(isolated, mode):
     study = Study(isolated, mode, [DOC])
     response, _ = study.generate({"title": "T", "thesis": "Th", "sections": [
@@ -156,7 +158,7 @@ def test_r2a_a_label_of_another_kind_never_binds_an_observation(isolated, mode):
         assert [(r["ref"], r["reason"]) for r in body["invalid_references"]] == [("I3", "unresolved")]
 
 
-@pytest.mark.parametrize("mode", [exposed("legacy", R2bUnshownRecordBound), "governed", "disabled"])
+@pytest.mark.parametrize("mode", [exposed("legacy", R2bUnshownRecordBound), "governed", "proposal", "disabled"])
 def test_r2b_a_reference_the_model_was_never_shown_never_binds(isolated, mode):
     documents = [[f"Document {d}, line {n}." for n in range(1, 31)] for d in ("one", "two", "three")]
     study = Study(isolated, mode, documents)
@@ -175,18 +177,19 @@ def test_r2b_a_reference_the_model_was_never_shown_never_binds(isolated, mode):
         assert [(r["ref"], r["reason"]) for r in body["invalid_references"]] == [("OBS-2", "unshown")]
 
 
-@pytest.mark.parametrize("mode", ["legacy", "governed", "disabled"])
+@pytest.mark.parametrize("mode", ["legacy", "governed", "proposal", "disabled"])
 def test_r3_blueprint_links_and_plan_commit_together_or_not_at_all(isolated, mode):
     study = Study(isolated, mode, [DOC])
     with mock.patch("hermeneia.compiler.architect.compile_architect_plan", side_effect=RuntimeError("compile failed")):
         response, _ = study.generate({"title": "T", "thesis": "Th", "sections": [{"claim": "C", "obs_refs": ["OBS-1"], "interp_refs": []}]})
     if response.status_code == 500 and len(study.blueprints()) == 1 and study.plans() == 0:
         raise R3OrphanBlueprint("plan compilation failed but the Blueprint stayed committed without a plan")
-    assert response.status_code in (403, 500) and not study.blueprints() and study.plans() == 0
+    held = mode == "proposal" and response.status_code == 201 and response.get_json()["canonical_status"] == "not_persisted"
+    assert (response.status_code in (403, 500) or held) and not study.blueprints() and study.plans() == 0
     assert study.rows("SELECT COUNT(*) FROM blueprint_observation_links")[0][0] == 0
 
 
-@pytest.mark.parametrize("mode", [exposed("legacy", R4ModelDirectWrite), exposed("governed", R4ModelDirectWrite), "disabled"])
+@pytest.mark.parametrize("mode", [exposed("legacy", R4ModelDirectWrite), exposed("governed", R4ModelDirectWrite), "proposal", "disabled"])
 def test_r4_a_generation_request_never_writes_model_output_to_canonical_state(isolated, mode):
     study = Study(isolated, mode, [DOC])
     response, prompts = study.generate({"title": "T", "thesis": "Th", "sections": [{"claim": "C", "obs_refs": ["OBS-1"], "interp_refs": []}]})
@@ -199,11 +202,16 @@ def test_r4_a_generation_request_never_writes_model_output_to_canonical_state(is
         finally:
             conn.close()
         raise R4ModelDirectWrite(f"one request committed an ai-generated Blueprint and plan; Lineage authorship {authorship!r}")
+    if mode == "proposal":  # the model ran once; its reply is a held candidate, never a canonical write (v1.1 §3)
+        body = response.get_json()
+        assert response.status_code == 201 and body["canonical_status"] == "not_persisted" and len(prompts) == 1
+        assert body["schema"] == "hermeneia.legacy-architect-candidate/v1" and not study.blueprints() and study.plans() == 0
+        return
     _refused_without_rows(study, response, {"LEGACY_DIRECT_WRITE_DISABLED"})
     assert prompts == []
 
 
-@pytest.mark.parametrize("mode", [exposed("legacy", R5UnreviewedResample), "governed", "disabled"])
+@pytest.mark.parametrize("mode", [exposed("legacy", R5UnreviewedResample), "governed", "proposal", "disabled"])
 def test_r5_ratify_and_save_never_commits_an_unreviewed_model_result(isolated, mode):
     study = Study(isolated, mode, [DOC])
     provider, calls = _chat_replies(PREVIEWED, RESAMPLED)
@@ -218,7 +226,7 @@ def test_r5_ratify_and_save_never_commits_an_unreviewed_model_result(isolated, m
     assert len(calls) == 1
 
 
-@pytest.mark.parametrize("mode", [exposed("legacy", R6PlaceholderCommitted), "governed", "disabled"])
+@pytest.mark.parametrize("mode", [exposed("legacy", R6PlaceholderCommitted), "governed", "proposal", "disabled"])
 def test_r6_no_placeholder_blueprint_is_committed_when_no_model_ran(isolated, mode):
     study = Study(isolated, mode, [DOC])
     saved = study.client.post("/api/pipeline/extract-blueprint", json={"text": "Any source text at all.", "provider": "null", "save": True})

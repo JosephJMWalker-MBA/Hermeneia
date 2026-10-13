@@ -249,7 +249,15 @@ def parse_output(text: str, basis: dict) -> dict:
 
 def candidate_id(candidate: dict) -> str:
     body = {key: candidate[key] for key in ("schema", "mode", "binding", "extraction", "proposal")}
-    return "blueprint-proposal-candidate:sha256:" + hashlib.sha256(_CANDIDATE_DOMAIN + canonical_bytes(body)).hexdigest()
+    # The domain is the candidate's own schema; for P8 candidates these are P8's original bytes (#251 v1.1 §4).
+    domain = _CANDIDATE_DOMAIN if candidate["schema"] == CANDIDATE_SCHEMA else candidate["schema"].encode("utf-8") + b"\0"
+    return "blueprint-proposal-candidate:sha256:" + hashlib.sha256(domain + canonical_bytes(body)).hexdigest()
+
+
+def _legacy_schemas() -> tuple[str, ...]:
+    from .legacy_blueprint_candidates import SCHEMAS
+
+    return SCHEMAS
 
 
 def build_candidate(basis: dict, *, intent: str, prompt: str, execution: dict, output: str,
@@ -328,13 +336,22 @@ def validate_receipt(receipt) -> dict:
              and receipt["schema"] == RECEIPT_SCHEMA, "receipt fields")
     _require(receipt["id"] == receipt_id(receipt), "receipt identity digest mismatch")
     candidate, result, acceptance = receipt["candidate"], receipt["result"], receipt["acceptance"]
-    _require(isinstance(candidate, dict) and candidate.get("schema") == CANDIDATE_SCHEMA
+    _require(isinstance(candidate, dict) and (candidate.get("schema") == CANDIDATE_SCHEMA or candidate.get("schema") in _legacy_schemas())
              and candidate.get("candidate_id") == candidate_id(candidate) == acceptance.get("reviewed_candidate_id"), "candidate binding")
-    _require(candidate["mode"] == receipt["mode"] and candidate["extraction"]["policy_version"] == POLICY_VERSION
-             and candidate["extraction"]["prompt_version"] == PROMPT_VERSION, "unsupported candidate policy")
-    _require(candidate["extraction"]["prompt_sha256"] == text_digest(candidate["extraction"]["prompt"])
-             and candidate["extraction"]["output_sha256"] == text_digest(candidate["extraction"]["output"])
-             and candidate["binding"]["intent"]["sha256"] == text_digest(candidate["binding"]["intent"]["text"]), "candidate digests")
+    if candidate["schema"] == CANDIDATE_SCHEMA:
+        _require(candidate["mode"] == receipt["mode"] and candidate["extraction"]["policy_version"] == POLICY_VERSION
+                 and candidate["extraction"]["prompt_version"] == PROMPT_VERSION, "unsupported candidate policy")
+        _require(candidate["extraction"]["prompt_sha256"] == text_digest(candidate["extraction"]["prompt"])
+                 and candidate["extraction"]["output_sha256"] == text_digest(candidate["extraction"]["output"])
+                 and candidate["binding"]["intent"]["sha256"] == text_digest(candidate["binding"]["intent"]["text"]), "candidate digests")
+    else:  # a legacy generator's candidate (#251 v1.1 §5): its own integrity rules
+        from .legacy_blueprint_candidates import validate_candidate as validate_legacy_candidate
+
+        _require(candidate["mode"] == receipt["mode"], "unsupported candidate policy")
+        try:
+            validate_legacy_candidate(candidate)
+        except (ValueError, KeyError, TypeError) as exc:
+            raise InvalidReceipt(f"legacy candidate: {exc}") from exc
     _require(set(acceptance) == {"decision", "actor", "actor_identity", "accepted_at", "reviewed_candidate_id", "accepted_blueprint",
                                  "edited", "rationale", "meaning"} and acceptance["meaning"] == MEANING
              and acceptance["actor"] == "local_steward" and acceptance["actor_identity"] == "unknown", "acceptance fields")
@@ -440,9 +457,14 @@ def verify_receipt(conn: sqlite3.Connection, identifier: str) -> dict:
         result["record_integrity"] = "valid"
         candidate = receipt["candidate"]
         try:
-            basis = _replay_basis(conn, candidate)
-            same = (build_prompt(basis, candidate["binding"]["intent"]["text"]) == candidate["extraction"]["prompt"]
-                    and parse_output(candidate["extraction"]["output"], basis) == candidate["proposal"])
+            if candidate["schema"] == CANDIDATE_SCHEMA:
+                basis = _replay_basis(conn, candidate)
+                same = (build_prompt(basis, candidate["binding"]["intent"]["text"]) == candidate["extraction"]["prompt"]
+                        and parse_output(candidate["extraction"]["output"], basis) == candidate["proposal"])
+            else:
+                from .legacy_blueprint_candidates import replay_matches
+
+                same = replay_matches(conn, candidate)
             result["candidate_replay"] = "verified" if same else "mismatch"
         except (InvalidReceipt, ProposalRefused, ValueError, KeyError, TypeError):
             result["candidate_replay"] = "mismatch"

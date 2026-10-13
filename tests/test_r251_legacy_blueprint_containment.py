@@ -60,8 +60,8 @@ def test_gate_defaults_to_legacy_and_fails_closed(tmp_path, monkeypatch):
             monkeypatch.setenv("HERMENEIA_LEGACY_BLUEPRINT_WRITES", env)
         return create_app(db_path=tmp_path / str(env) / "w.db").config["LEGACY_BLUEPRINT_WRITES"]
 
-    assert [mode(None), mode("legacy"), mode("governed"), mode("disabled"), mode("enabled")] == [
-        "legacy", "legacy", "governed", "disabled", "disabled"]
+    assert [mode(None), mode("legacy"), mode("governed"), mode("proposal"), mode("disabled"), mode("enabled")] == [
+        "legacy", "legacy", "governed", "proposal", "disabled", "disabled"]
 
 
 def test_governed_itemizes_every_inexact_reference_and_writes_nothing(interpreted):
@@ -97,7 +97,7 @@ def test_disabled_stops_generation_before_any_provider_call_or_write(isolated): 
     assert prompts == [] and not study.blueprints()
 
 
-@pytest.mark.parametrize("mode", ["legacy", "governed", "disabled"])
+@pytest.mark.parametrize("mode", ["legacy", "governed", "proposal", "disabled"])
 def test_extract_responses_say_whether_a_model_ran(isolated, mode):  # noqa: F811
     study = Study(isolated, mode, [DOC])
     provider, _calls = _chat_replies(PREVIEWED)
