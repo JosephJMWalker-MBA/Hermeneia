@@ -6255,7 +6255,6 @@ function _obPopulateProviders() {
 }
 
 let _obPreviewedBlueprint = null;  // the exact proposal under review; ratification commits it, never a new extraction (#251 R5)
-let _obPreviewedCandidateId = null;  // proposal mode: the server-held candidate behind that preview (#251 v1.1)
 
 function _obExtractProposalHtml(bp, state) {
   const sections = (bp.sections || []).map((s, i) =>
@@ -6284,9 +6283,10 @@ function _obExtractProposalHtml(bp, state) {
         <div class="ob-extract-proposal-thesis">"${x(bp.thesis)}"</div>
         <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2);margin-bottom:6px">Supporting Claims</div>
         ${sections}
+        ${state === 'preview' ? '<div class="ob-extract-note">Preview — nothing saved yet.</div>' : ''}
         <div class="ob-extract-note">
           A wrong Blueprint is not a planning failure — it is a reading failure.
-          If this reconstruction is inaccurate, edit the section claims below or run again with a different provider.
+          If this reconstruction is inaccurate, run again with a different provider, or edit it in the Architect after saving.
         </div>
         ${actions}
       </div>`;
@@ -6304,7 +6304,6 @@ async function obExtractBlueprint(save) {
   btn.textContent = 'Extracting…';
   propEl.style.display = 'none';
   _obPreviewedBlueprint = null;
-  _obPreviewedCandidateId = null;
 
   try {
     const resp = await fetch('/api/pipeline/extract-blueprint', {
@@ -6318,11 +6317,14 @@ async function obExtractBlueprint(save) {
       propEl.innerHTML = `<div style="color:#f87171;font-size:13px">✗ ${data.error || 'Extraction failed'}</div>`;
       return;
     }
+    if (data.candidate && data.canonical_status === 'not_persisted') {  // proposal mode (#251 v1.1)
+      bpReviewOpen('onboarding', data.candidate);
+      return;
+    }
     const bp = data.proposed_blueprint;
     const placeholder = !!(data.execution && data.execution.model_executed === false);
     const state = data.blueprint_id ? 'saved' : placeholder ? 'placeholder' : 'preview';
     _obPreviewedBlueprint = state === 'preview' ? bp : null;
-    _obPreviewedCandidateId = state === 'preview' && data.candidate ? data.candidate.candidate_id : null;
     propEl.style.display = 'block';
     propEl.innerHTML = _obExtractProposalHtml(bp, state);
   } catch (err) {
@@ -6338,21 +6340,13 @@ async function obExtractBlueprint(save) {
 async function obRatifyPreviewed() {
   const propEl = document.getElementById('ob-extract-proposal');
   const reviewed = _obPreviewedBlueprint;
-  const candidateId = _obPreviewedCandidateId;
   if (!propEl || !reviewed) return;
   try {
-    // Proposal mode: accept the exact held candidate, which records the model provenance (#251 v1.1).
-    const resp = candidateId
-      ? await fetch(`/api/blueprint/proposals/${encodeURIComponent(candidateId)}/accept`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ decision: 'accept', candidate_id: candidateId }),
-        })
-      : await fetch('/api/pipeline/ratify-blueprint', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ proposed_blueprint: reviewed }),
-        });
+    const resp = await fetch('/api/pipeline/ratify-blueprint', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proposed_blueprint: reviewed }),
+    });
     const data = await resp.json();
     if (!resp.ok) {
       propEl.innerHTML = _obExtractProposalHtml(reviewed, 'preview')
@@ -6360,9 +6354,7 @@ async function obRatifyPreviewed() {
       return;
     }
     _obPreviewedBlueprint = null;
-    _obPreviewedCandidateId = null;
-    const committed = candidateId ? (data.acceptance || {}).accepted_blueprint : data.committed_blueprint;
-    propEl.innerHTML = _obExtractProposalHtml(committed || reviewed, 'saved');
+    propEl.innerHTML = _obExtractProposalHtml(data.committed_blueprint || reviewed, 'saved');
   } catch (err) {
     propEl.innerHTML = _obExtractProposalHtml(reviewed, 'preview')
       + `<div style="color:#f87171;font-size:13px">✗ ${x(err.message)}</div>`;
@@ -17634,68 +17626,182 @@ function getActivePlanId() {
   return localStorage.getItem('hermeneia_active_plan_id') || '';
 }
 
-let _e10ArchitectCandidate = null;  // proposal mode: the held candidate under review (#251 v1.1)
+// ── Held Blueprint proposal review (#251 v1.1) ─────────────────────────────
+// In proposal mode a legacy generator returns a server-held candidate. Nothing is saved
+// until the steward accepts it exactly, edits and accepts it, or discards it; each decision
+// goes to the P8 proposal routes, which write the acceptance receipt.
+const _bpReview = {};  // slot -> {candidate, editing, blocked, note, outcome}
+const _BP_REVIEW_TARGET = {architect: 'arc-gen-status', onboarding: 'ob-extract-proposal'};
 
-function _e10ArchitectProposalHtml(candidate, note) {
-  const bp = candidate.proposal.blueprint;
-  const view = candidate.binding.view;
-  const labels = Object.fromEntries([...view.observations, ...view.interpretations].map(e => [e.id, e.label]));
-  const sections = bp.sections.map((s, i) => {
-    const cited = [...s.supporting_observations, ...s.supporting_interpretations].map(id => labels[id] || id).join(', ');
-    const tag = cited ? ' <span style="color:var(--dim2);font-size:11px">[' + x(cited) + ']</span>' : '';
-    return '<div style="margin:4px 0"><span style="color:var(--dim2)">' + (i + 1) + '.</span> ' + x(s.claim) + tag + '</div>';
-  }).join('');
-  const warning = note ? '<div style="color:var(--red);margin-top:6px">' + note + '</div>' : '';
-  return `<div class="arc-proposal">
-      <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2)">Model proposal — nothing saved yet</div>
-      <div style="font-weight:600;margin-top:4px">${x(bp.title)}</div>
-      <div style="font-style:italic;margin:4px 0">"${x(bp.thesis)}"</div>
-      ${sections}
-      <div style="font-size:11px;color:var(--dim2);margin-top:6px">Proposed by ${x(candidate.extraction.execution.model_id)}. Accepting records this exact proposal and its provenance; it does not make the claims true.</div>
-      <div style="margin-top:8px">
-        <button class="btn-primary" onclick="e10AcceptArchitectProposal()">Accept exactly →</button>
-        <button class="btn-trace" onclick="e10DiscardArchitectProposal()">Discard</button>
-      </div>
-      ${warning}
-    </div>`;
+function _bpReviewLabels(candidate) {
+  const view = (candidate.binding || {}).view || {observations: [], interpretations: []};
+  return Object.fromEntries([...view.observations, ...view.interpretations].map(e => [e.id, e.label]));
 }
 
-async function e10AcceptArchitectProposal() {
-  const candidate = _e10ArchitectCandidate;
-  const status = document.getElementById('arc-gen-status');
-  if (!candidate || !status) return;
-  try {
-    const res = await fetch(`/api/blueprint/proposals/${encodeURIComponent(candidate.candidate_id)}/accept`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ decision: 'accept', candidate_id: candidate.candidate_id }),
+function _bpReviewHtml(slot) {
+  const r = _bpReview[slot];
+  const bp = r.candidate.proposal.blueprint;
+  const labels = _bpReviewLabels(r.candidate);
+  const cite = s => [...s.supporting_observations, ...s.supporting_interpretations].map(id => labels[id] || id).join(', ');
+  const header = r.outcome === 'accepted' ? 'Saved — accepted exactly, with its acceptance receipt'
+    : r.outcome === 'edited' ? 'Saved — your edited version; the model proposal is preserved in the receipt'
+    : r.outcome === 'discarded' ? 'Discarded — nothing was saved'
+    : r.blocked ? 'Not saved — this proposal can no longer be accepted'
+    : r.editing ? 'Editing the model proposal — nothing saved yet'
+    : 'Model proposal — nothing saved yet';
+  let body = '';
+  if (r.editing && !r.outcome && !r.blocked) {
+    body += '<label style="display:block;font-size:11px;color:var(--dim2)">Title</label>'
+      + '<input id="bp-review-' + slot + '-title" value="' + x(bp.title) + '" style="width:100%">'
+      + '<label style="display:block;font-size:11px;color:var(--dim2);margin-top:6px">Thesis</label>'
+      + '<textarea id="bp-review-' + slot + '-thesis" rows="2" style="width:100%">' + x(bp.thesis) + '</textarea>';
+    bp.sections.forEach((s, i) => {
+      const cited = cite(s);
+      body += '<label style="display:block;font-size:11px;color:var(--dim2);margin-top:6px">Section ' + (i + 1)
+        + (cited ? ' — cites ' + x(cited) : ' — cites nothing') + '</label>'
+        + '<textarea id="bp-review-' + slot + '-claim-' + i + '" rows="2" style="width:100%">' + x(s.claim) + '</textarea>';
     });
-    const d = await res.json();
-    if (!res.ok) {
-      status.innerHTML = _e10ArchitectProposalHtml(candidate, `Not accepted: ${x(d.error || d.code || 'unknown')}`);
-      return;
-    }
-    _e10ArchitectCandidate = null;
-    status.innerHTML = `<span style="color:var(--green)">✓ Accepted: "${x(d.acceptance.accepted_blueprint.title)}" saved with its acceptance receipt</span>`;
-    await e10LoadArchitect();
-  } catch(e) {
-    status.innerHTML = _e10ArchitectProposalHtml(candidate, `Request failed: ${x(e.message)}`);
+  } else {
+    body += '<div style="font-weight:600;margin-top:4px">' + x(bp.title) + '</div>'
+      + '<div style="font-style:italic;margin:4px 0">"' + x(bp.thesis) + '"</div>';
+    bp.sections.forEach((s, i) => {
+      const cited = cite(s);
+      body += '<div style="margin:4px 0"><span style="color:var(--dim2)">' + (i + 1) + '.</span> ' + x(s.claim)
+        + (cited ? ' <span style="color:var(--dim2);font-size:11px">[' + x(cited) + ']</span>' : '') + '</div>';
+    });
+  }
+  const model = ((r.candidate.extraction || {}).execution || {}).model_id;
+  const provenance = '<div style="font-size:11px;color:var(--dim2);margin-top:6px">Proposed by ' + x(model)
+    + '. Accepting records this exact proposal and its provenance; it does not make the claims true.</div>';
+  let actions = '';
+  if (!r.outcome && !r.blocked && r.editing) {
+    actions = '<button class="btn-primary" onclick="bpReviewSaveEdit(\'' + slot + '\')">Accept my edits →</button> '
+      + '<button class="btn-trace" onclick="bpReviewCancelEdit(\'' + slot + '\')">Cancel editing</button>';
+  } else if (!r.outcome && !r.blocked) {
+    actions = '<button class="btn-primary" onclick="bpReviewAccept(\'' + slot + '\')">Accept exactly →</button> '
+      + '<button class="btn-trace" onclick="bpReviewEdit(\'' + slot + '\')">Edit before accepting</button> '
+      + '<button class="btn-trace" onclick="bpReviewDiscard(\'' + slot + '\')">Discard</button>';
+  } else if (r.blocked) {
+    actions = '<button class="btn-trace" onclick="bpReviewDiscard(\'' + slot + '\')">Dismiss</button>';
+  } else if (slot === 'onboarding' && r.outcome !== 'discarded') {
+    actions = '<button class="btn-primary" onclick="e10Go(\'architect\')">View in Architect →</button>';
+  }
+  const note = r.note ? '<div style="color:var(--red);margin-top:6px">' + r.note + '</div>' : '';
+  return '<div class="bp-review" data-state="' + (r.outcome || (r.blocked ? 'blocked' : r.editing ? 'editing' : 'proposal')) + '">'
+    + '<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2)">' + header + '</div>'
+    + body + provenance + '<div style="margin-top:8px">' + actions + '</div>' + note + '</div>';
+}
+
+function _bpReviewRender(slot) {
+  const el = document.getElementById(_BP_REVIEW_TARGET[slot]);
+  if (!el) return;
+  if (el.style) el.style.display = 'block';
+  el.innerHTML = _bpReviewHtml(slot);
+}
+
+function bpReviewOpen(slot, candidate) {
+  _bpReview[slot] = {candidate, editing: false, blocked: false, expired: false, note: '', outcome: null};
+  _bpReviewRender(slot);
+}
+
+function bpReviewEdit(slot) {
+  const r = _bpReview[slot];
+  if (!r || r.outcome || r.blocked) return;
+  r.editing = true;
+  r.note = '';
+  _bpReviewRender(slot);
+}
+
+function bpReviewCancelEdit(slot) {
+  const r = _bpReview[slot];
+  if (!r) return;
+  r.editing = false;
+  r.note = '';
+  _bpReviewRender(slot);
+}
+
+async function _bpReviewDecide(slot, body) {
+  const r = _bpReview[slot];
+  const id = r.candidate.candidate_id;
+  const res = await fetch('/api/blueprint/proposals/' + encodeURIComponent(id) + '/' + (body.decision === 'discard' ? 'discard' : 'accept'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({candidate_id: id}, body)),
+  });
+  let d = {};
+  try { d = await res.json(); } catch (e) { d = {}; }
+  return {res, d};
+}
+
+function _bpReviewRefused(slot, d) {
+  const r = _bpReview[slot];
+  if (d.code === 'STALE_CANDIDATE') {
+    r.blocked = true;
+    r.note = 'The evidence this proposal was built from changed: ' + x((d.reasons || []).join('; ') || 'inputs changed')
+      + '. Generate a new proposal.';
+  } else if (d.code === 'UNKNOWN_CANDIDATE' || d.code === 'CANDIDATE_MISMATCH') {
+    r.blocked = true;
+    r.expired = true;
+    r.note = 'This proposal expired or was already discarded on the server. Generate a new proposal.';
+  } else {
+    r.note = 'Not accepted: ' + x(d.error || d.code || 'unknown error') + '. Nothing was saved.';
   }
 }
 
-async function e10DiscardArchitectProposal() {
-  const candidate = _e10ArchitectCandidate;
-  const status = document.getElementById('arc-gen-status');
-  if (!candidate || !status) return;
+async function _bpReviewAccepted(slot, outcome) {
+  const r = _bpReview[slot];
+  r.outcome = outcome;
+  r.editing = false;
+  r.note = '';
+  _bpReviewRender(slot);
+  if (slot === 'architect' && typeof e10LoadArchitect === 'function') await e10LoadArchitect();
+}
+
+async function bpReviewAccept(slot) {
+  const r = _bpReview[slot];
+  if (!r || r.outcome || r.blocked) return;
   try {
-    await fetch(`/api/blueprint/proposals/${encodeURIComponent(candidate.candidate_id)}/discard`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ decision: 'discard', candidate_id: candidate.candidate_id }),
-    });
+    const {res, d} = await _bpReviewDecide(slot, {decision: 'accept'});
+    if (!res.ok) { _bpReviewRefused(slot, d); _bpReviewRender(slot); return; }
+    await _bpReviewAccepted(slot, 'accepted');
+  } catch (e) {
+    r.note = 'Request failed: ' + x(e.message) + '. Nothing was saved.';
+    _bpReviewRender(slot);
+  }
+}
+
+async function bpReviewSaveEdit(slot) {
+  const r = _bpReview[slot];
+  if (!r || r.outcome || r.blocked) return;
+  const bp = r.candidate.proposal.blueprint;
+  const value = (suffix, fallback) => { const el = document.getElementById('bp-review-' + slot + '-' + suffix); return el ? el.value : fallback; };
+  const edited = {
+    title: value('title', bp.title),
+    thesis: value('thesis', bp.thesis),
+    sections: bp.sections.map((s, i) => ({claim: value('claim-' + i, s.claim),
+      supporting_observations: s.supporting_observations, supporting_interpretations: s.supporting_interpretations})),
+  };
+  try {
+    const {res, d} = await _bpReviewDecide(slot, {decision: 'edit_and_accept', blueprint: edited});
+    if (!res.ok) { _bpReviewRefused(slot, d); _bpReviewRender(slot); return; }
+    r.candidate = Object.assign({}, r.candidate, {proposal: Object.assign({}, r.candidate.proposal, {blueprint: edited})});
+    await _bpReviewAccepted(slot, 'edited');
+  } catch (e) {
+    r.note = 'Request failed: ' + x(e.message) + '. Nothing was saved.';
+    _bpReviewRender(slot);
+  }
+}
+
+async function bpReviewDiscard(slot) {
+  const r = _bpReview[slot];
+  if (!r || r.outcome) return;
+  try {
+    if (!r.expired) await _bpReviewDecide(slot, {decision: 'discard'});  // a stale candidate is still held
   } finally {
-    _e10ArchitectCandidate = null;
-    status.innerHTML = 'Proposal discarded; nothing was saved.';
+    r.outcome = 'discarded';
+    r.editing = false;
+    r.note = '';
+    _bpReviewRender(slot);
   }
 }
 
@@ -17720,8 +17826,7 @@ async function e10GenerateBlueprint() {
       return;
     }
     if (d.canonical_status === 'not_persisted' && d.candidate_id) {  // proposal mode (#251 v1.1): nothing saved yet
-      _e10ArchitectCandidate = d;
-      status.innerHTML = _e10ArchitectProposalHtml(d);
+      bpReviewOpen('architect', d);
       return;
     }
     status.innerHTML = `<span style="color:var(--green)">✓ Blueprint created: "${x(d.title)}" — ${d.section_count} sections</span>`;
