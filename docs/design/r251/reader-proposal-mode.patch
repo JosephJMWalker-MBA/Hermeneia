@@ -1,0 +1,279 @@
+diff --git a/hermeneia/web/static/index.html b/hermeneia/web/static/index.html
+index 274e491..7487b55 100644
+--- a/hermeneia/web/static/index.html
++++ b/hermeneia/web/static/index.html
+@@ -6255,6 +6255,7 @@ function _obPopulateProviders() {
+ }
+ 
+ let _obPreviewedBlueprint = null;  // the exact proposal under review; ratification commits it, never a new extraction (#251 R5)
++let _obPreviewedCandidateId = null;  // proposal mode: the server-held candidate behind that preview (#251 v1.1)
+ 
+ function _obExtractProposalHtml(bp, state) {
+   const sections = (bp.sections || []).map((s, i) =>
+@@ -6303,6 +6304,7 @@ async function obExtractBlueprint(save) {
+   btn.textContent = 'Extracting…';
+   propEl.style.display = 'none';
+   _obPreviewedBlueprint = null;
++  _obPreviewedCandidateId = null;
+ 
+   try {
+     const resp = await fetch('/api/pipeline/extract-blueprint', {
+@@ -6320,6 +6322,7 @@ async function obExtractBlueprint(save) {
+     const placeholder = !!(data.execution && data.execution.model_executed === false);
+     const state = data.blueprint_id ? 'saved' : placeholder ? 'placeholder' : 'preview';
+     _obPreviewedBlueprint = state === 'preview' ? bp : null;
++    _obPreviewedCandidateId = state === 'preview' && data.candidate ? data.candidate.candidate_id : null;
+     propEl.style.display = 'block';
+     propEl.innerHTML = _obExtractProposalHtml(bp, state);
+   } catch (err) {
+@@ -6335,13 +6338,21 @@ async function obExtractBlueprint(save) {
+ async function obRatifyPreviewed() {
+   const propEl = document.getElementById('ob-extract-proposal');
+   const reviewed = _obPreviewedBlueprint;
++  const candidateId = _obPreviewedCandidateId;
+   if (!propEl || !reviewed) return;
+   try {
+-    const resp = await fetch('/api/pipeline/ratify-blueprint', {
+-      method: 'POST',
+-      headers: { 'Content-Type': 'application/json' },
+-      body: JSON.stringify({ proposed_blueprint: reviewed }),
+-    });
++    // Proposal mode: accept the exact held candidate, which records the model provenance (#251 v1.1).
++    const resp = candidateId
++      ? await fetch(`/api/blueprint/proposals/${encodeURIComponent(candidateId)}/accept`, {
++          method: 'POST',
++          headers: { 'Content-Type': 'application/json' },
++          body: JSON.stringify({ decision: 'accept', candidate_id: candidateId }),
++        })
++      : await fetch('/api/pipeline/ratify-blueprint', {
++          method: 'POST',
++          headers: { 'Content-Type': 'application/json' },
++          body: JSON.stringify({ proposed_blueprint: reviewed }),
++        });
+     const data = await resp.json();
+     if (!resp.ok) {
+       propEl.innerHTML = _obExtractProposalHtml(reviewed, 'preview')
+@@ -6349,7 +6360,9 @@ async function obRatifyPreviewed() {
+       return;
+     }
+     _obPreviewedBlueprint = null;
+-    propEl.innerHTML = _obExtractProposalHtml(data.committed_blueprint || reviewed, 'saved');
++    _obPreviewedCandidateId = null;
++    const committed = candidateId ? (data.acceptance || {}).accepted_blueprint : data.committed_blueprint;
++    propEl.innerHTML = _obExtractProposalHtml(committed || reviewed, 'saved');
+   } catch (err) {
+     propEl.innerHTML = _obExtractProposalHtml(reviewed, 'preview')
+       + `<div style="color:#f87171;font-size:13px">✗ ${x(err.message)}</div>`;
+@@ -17621,6 +17634,71 @@ function getActivePlanId() {
+   return localStorage.getItem('hermeneia_active_plan_id') || '';
+ }
+ 
++let _e10ArchitectCandidate = null;  // proposal mode: the held candidate under review (#251 v1.1)
++
++function _e10ArchitectProposalHtml(candidate, note) {
++  const bp = candidate.proposal.blueprint;
++  const view = candidate.binding.view;
++  const labels = Object.fromEntries([...view.observations, ...view.interpretations].map(e => [e.id, e.label]));
++  const sections = bp.sections.map((s, i) => {
++    const cited = [...s.supporting_observations, ...s.supporting_interpretations].map(id => labels[id] || id).join(', ');
++    const tag = cited ? ' <span style="color:var(--dim2);font-size:11px">[' + x(cited) + ']</span>' : '';
++    return '<div style="margin:4px 0"><span style="color:var(--dim2)">' + (i + 1) + '.</span> ' + x(s.claim) + tag + '</div>';
++  }).join('');
++  const warning = note ? '<div style="color:var(--red);margin-top:6px">' + note + '</div>' : '';
++  return `<div class="arc-proposal">
++      <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2)">Model proposal — nothing saved yet</div>
++      <div style="font-weight:600;margin-top:4px">${x(bp.title)}</div>
++      <div style="font-style:italic;margin:4px 0">"${x(bp.thesis)}"</div>
++      ${sections}
++      <div style="font-size:11px;color:var(--dim2);margin-top:6px">Proposed by ${x(candidate.extraction.execution.model_id)}. Accepting records this exact proposal and its provenance; it does not make the claims true.</div>
++      <div style="margin-top:8px">
++        <button class="btn-primary" onclick="e10AcceptArchitectProposal()">Accept exactly →</button>
++        <button class="btn-trace" onclick="e10DiscardArchitectProposal()">Discard</button>
++      </div>
++      ${warning}
++    </div>`;
++}
++
++async function e10AcceptArchitectProposal() {
++  const candidate = _e10ArchitectCandidate;
++  const status = document.getElementById('arc-gen-status');
++  if (!candidate || !status) return;
++  try {
++    const res = await fetch(`/api/blueprint/proposals/${encodeURIComponent(candidate.candidate_id)}/accept`, {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify({ decision: 'accept', candidate_id: candidate.candidate_id }),
++    });
++    const d = await res.json();
++    if (!res.ok) {
++      status.innerHTML = _e10ArchitectProposalHtml(candidate, `Not accepted: ${x(d.error || d.code || 'unknown')}`);
++      return;
++    }
++    _e10ArchitectCandidate = null;
++    status.innerHTML = `<span style="color:var(--green)">✓ Accepted: "${x(d.acceptance.accepted_blueprint.title)}" saved with its acceptance receipt</span>`;
++    await e10LoadArchitect();
++  } catch(e) {
++    status.innerHTML = _e10ArchitectProposalHtml(candidate, `Request failed: ${x(e.message)}`);
++  }
++}
++
++async function e10DiscardArchitectProposal() {
++  const candidate = _e10ArchitectCandidate;
++  const status = document.getElementById('arc-gen-status');
++  if (!candidate || !status) return;
++  try {
++    await fetch(`/api/blueprint/proposals/${encodeURIComponent(candidate.candidate_id)}/discard`, {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify({ decision: 'discard', candidate_id: candidate.candidate_id }),
++    });
++  } finally {
++    _e10ArchitectCandidate = null;
++    status.innerHTML = 'Proposal discarded; nothing was saved.';
++  }
++}
++
+ async function e10GenerateBlueprint() {
+   const directive = document.getElementById('arc-directive')?.value?.trim();
+   const provider  = document.getElementById('arc-gen-provider')?.value?.trim();
+@@ -17641,6 +17719,11 @@ async function e10GenerateBlueprint() {
+       status.innerHTML = `<span style="color:var(--red)">Error: ${x(d.error || 'unknown')}</span>`;
+       return;
+     }
++    if (d.canonical_status === 'not_persisted' && d.candidate_id) {  // proposal mode (#251 v1.1): nothing saved yet
++      _e10ArchitectCandidate = d;
++      status.innerHTML = _e10ArchitectProposalHtml(d);
++      return;
++    }
+     status.innerHTML = `<span style="color:var(--green)">✓ Blueprint created: "${x(d.title)}" — ${d.section_count} sections</span>`;
+     await e10LoadArchitect();
+   } catch(e) {
+diff --git a/tests/test_reader_proposal_mode_ui.py b/tests/test_reader_proposal_mode_ui.py
+new file mode 100644
+index 0000000..914870e
+--- /dev/null
++++ b/tests/test_reader_proposal_mode_ui.py
+@@ -0,0 +1,123 @@
++"""#251 v1.1: the Reader shows a held legacy candidate as a proposal and accepts it exactly.
++
++In `proposal` mode "Generate Blueprint →" receives a server-held candidate,
++not a created Blueprint. The Architect panel must say that nothing is saved,
++show the proposal with its cited labels, and commit it only through the P8
++accept route; Discard saves nothing. Onboarding "Ratify & Save" accepts the
++held candidate behind its preview when there is one, and otherwise ratifies
++the exact preview (governed). The real functions run under Node with a fake
++DOM and fetch.
++"""
++from __future__ import annotations
++
++import json
++from pathlib import Path
++import shutil
++import subprocess
++
++import pytest
++
++from test_evidence_board_ui import _extract_function
++
++INDEX = Path(__file__).parent.parent / "hermeneia" / "web" / "static" / "index.html"
++ID = "blueprint-proposal-candidate:sha256:" + "a" * 64
++BLUEPRINT = {"title": "The unasked lamp", "thesis": "The lamp records a vigil.",
++             "sections": [{"claim": "The lamp burns.", "supporting_observations": ["o1"], "supporting_interpretations": ["i1"]}]}
++CANDIDATE = {"schema": "hermeneia.legacy-architect-candidate/v1", "candidate_id": ID, "canonical_status": "not_persisted",
++             "binding": {"view": {"observations": [{"id": "o1", "label": "OBS-1"}], "interpretations": [{"id": "i1", "label": "INTERP-0123abcd"}]}},
++             "extraction": {"execution": {"model_id": "fake-model:1b"}}, "proposal": {"blueprint": BLUEPRINT, "model_explanation": None}}
++RECEIPT = {"id": "receipt", "acceptance": {"accepted_blueprint": BLUEPRINT}}
++PREVIEW = {"title": "Previewed proposal", "thesis": "What the steward reviewed.", "sections": [{"claim": "Reviewed claim."}]}
++EXECUTED = {"provider": "fake", "interface": "openai", "model_executed": True, "placeholder": False}
++
++
++def _run(functions: tuple[str, ...], responses: list[dict], steps: str) -> dict:
++    node = shutil.which("node")
++    if not node:
++        pytest.skip("node not available for the Reader proposal-mode test")
++    source = INDEX.read_text()
++    script = r"""
++const els = {'arc-directive': {value: 'Build from the evidence.'}, 'arc-gen-provider': {value: 'fake'},
++             'arc-gen-btn': {disabled: false}, 'arc-gen-status': {textContent: '', innerHTML: ''},
++             'ob-extract-text': {value: 'A source text.'}, 'ob-extract-provider': {value: 'fake'},
++             'ob-extract-proposal': {style: {}, innerHTML: ''}, 'ob-extract-btn': {disabled: false, textContent: ''}};
++const document = {getElementById: id => els[id] || null};
++const x = s => String(s ?? '');
++const alert = () => {};
++const responses = RESPONSES;
++const calls = [];
++let reloads = 0;
++const e10LoadArchitect = async () => { reloads += 1; };
++const fetch = async (url, init) => { calls.push({url, body: JSON.parse(init.body)}); const r = responses.shift();
++  return {ok: r.ok, json: async () => r.json}; };
++let _obPreviewedBlueprint = null;
++let _obPreviewedCandidateId = null;
++let _e10ArchitectCandidate = null;
++""" + "\n".join(_extract_function(source, signature) for signature in functions) + r"""
++(async () => { STEPS
++  const status = els['arc-gen-status'];
++  console.log(JSON.stringify({calls, reloads, status: status.innerHTML || status.textContent,
++    onboarding: els['ob-extract-proposal'].innerHTML, held: _e10ArchitectCandidate && _e10ArchitectCandidate.candidate_id}));
++})();
++"""
++    script = script.replace("RESPONSES", json.dumps(responses)).replace("STEPS", steps)
++    result = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=30)
++    assert result.returncode == 0, result.stderr
++    return json.loads(result.stdout)
++
++
++ARCHITECT = ("function _e10ArchitectProposalHtml(", "async function e10AcceptArchitectProposal(",
++             "async function e10DiscardArchitectProposal(", "async function e10GenerateBlueprint(")
++ONBOARDING = ("function _obExtractProposalHtml(", "async function obExtractBlueprint(", "async function obRatifyPreviewed(")
++
++
++def test_a_legacy_creation_is_still_reported_as_created():
++    out = _run(ARCHITECT, [{"ok": True, "json": {"blueprint_id": "b", "plan_id": "p", "title": "T", "section_count": 2}}],
++               "await e10GenerateBlueprint();")
++    assert "Blueprint created" in out["status"] and out["reloads"] == 1 and out["held"] is None
++
++
++def test_a_held_candidate_is_shown_as_a_proposal_never_as_created():
++    out = _run(ARCHITECT, [{"ok": True, "json": CANDIDATE}], "await e10GenerateBlueprint();")
++    assert "nothing saved yet" in out["status"] and "Blueprint created" not in out["status"]
++    assert "[OBS-1, INTERP-0123abcd]" in out["status"] and "fake-model:1b" in out["status"]
++    assert out["reloads"] == 0 and out["held"] == ID and [c["url"] for c in out["calls"]] == ["/api/architect/generate"]
++
++
++def test_accept_commits_only_the_held_candidate_through_the_p8_route():
++    out = _run(ARCHITECT, [{"ok": True, "json": CANDIDATE}, {"ok": True, "json": RECEIPT}],
++               "await e10GenerateBlueprint(); await e10AcceptArchitectProposal();")
++    accept = out["calls"][1]
++    assert accept["url"] == "/api/blueprint/proposals/" + ID.replace(":", "%3A") + "/accept"
++    assert accept["body"] == {"decision": "accept", "candidate_id": ID}
++    assert "Accepted" in out["status"] and out["reloads"] == 1 and out["held"] is None
++
++
++def test_a_refused_acceptance_keeps_the_proposal_under_review():
++    out = _run(ARCHITECT, [{"ok": True, "json": CANDIDATE}, {"ok": False, "json": {"code": "STALE_CANDIDATE", "error": "inputs changed"}}],
++               "await e10GenerateBlueprint(); await e10AcceptArchitectProposal();")
++    assert "Not accepted: inputs changed" in out["status"] and "nothing saved yet" in out["status"] and out["held"] == ID
++
++
++def test_discard_saves_nothing():
++    out = _run(ARCHITECT, [{"ok": True, "json": CANDIDATE}, {"ok": True, "json": {"state": "discarded"}}],
++               "await e10GenerateBlueprint(); await e10DiscardArchitectProposal();")
++    assert out["calls"][1]["url"].endswith("/discard") and out["calls"][1]["body"] == {"decision": "discard", "candidate_id": ID}
++    assert out["status"] == "Proposal discarded; nothing was saved." and out["reloads"] == 0 and out["held"] is None
++
++
++def test_onboarding_accepts_the_held_candidate_behind_its_preview():
++    preview = {"proposed_blueprint": PREVIEW, "execution": EXECUTED, "candidate": {"candidate_id": ID}, "canonical_status": "not_persisted"}
++    out = _run(ONBOARDING, [{"ok": True, "json": preview}, {"ok": True, "json": {"acceptance": {"accepted_blueprint": PREVIEW}}}],
++               "await obExtractBlueprint(false); await obRatifyPreviewed();")
++    assert [c["url"] for c in out["calls"]] == ["/api/pipeline/extract-blueprint", "/api/blueprint/proposals/" + ID.replace(":", "%3A") + "/accept"]
++    assert out["calls"][1]["body"] == {"decision": "accept", "candidate_id": ID}
++    assert "saved" in out["onboarding"] and "Previewed proposal" in out["onboarding"]
++
++
++def test_onboarding_without_a_candidate_ratifies_the_exact_preview():
++    out = _run(ONBOARDING, [{"ok": True, "json": {"proposed_blueprint": PREVIEW, "execution": EXECUTED}},
++                            {"ok": True, "json": {"blueprint_id": "b", "plan_id": "p", "committed_blueprint": PREVIEW}}],
++               "await obExtractBlueprint(false); await obRatifyPreviewed();")
++    assert [c["url"] for c in out["calls"]] == ["/api/pipeline/extract-blueprint", "/api/pipeline/ratify-blueprint"]
++    assert out["calls"][1]["body"] == {"proposed_blueprint": PREVIEW}

@@ -102,6 +102,13 @@ def extract_blueprint_from_text(
     Raises:
         BlueprintExtractionError if the LLM response cannot be parsed as a valid Blueprint.
     """
+    system, prompt = extraction_request(text, max_input_chars=max_input_chars)
+    raw = _call_provider(provider, system, prompt)
+    return _parse_and_validate(raw)
+
+
+def extraction_request(text: str, *, max_input_chars: int = 40_000) -> tuple[str, str]:
+    """The exact (system, user) request the extractor sends; recorded for CI-011 (#251 v1.1)."""
     if not text or not text.strip():
         raise BlueprintExtractionError("No text provided for Blueprint extraction.")
 
@@ -114,12 +121,18 @@ def extract_blueprint_from_text(
         + truncated
         + "\n\nReturn the Blueprint JSON now."
     )
+    return _EXTRACTION_SYSTEM_PROMPT, prompt
 
-    raw = _call_provider(provider, _EXTRACTION_SYSTEM_PROMPT, prompt)
-    return _parse_and_validate(raw)
+
+def request_parameters(provider: Any) -> dict:
+    """What _call_provider actually sends besides the prompts: model and token limit (CI-011)."""
+    interface = provider_interface(provider)
+    return {"interface": interface, "model_id": getattr(provider, "_model", None),
+            "max_tokens": MAX_TOKENS if interface in ("anthropic", "openai") else None}
 
 
 PLACEHOLDER_INTERFACE = "placeholder"
+MAX_TOKENS = 1024
 
 
 def provider_interface(provider: Any) -> str:
@@ -133,6 +146,11 @@ def provider_interface(provider: Any) -> str:
     return PLACEHOLDER_INTERFACE
 
 
+def send_extraction_request(provider: Any, system: str, user: str) -> str:
+    """Send the exact request and return the raw reply, for CI-011 capture (#251 v1.1)."""
+    return _call_provider(provider, system, user)
+
+
 def _call_provider(provider: Any, system: str, user: str) -> str:
     """Call the provider's generate method using the same interface as the Artist."""
     name = getattr(provider, "name", None) or getattr(provider, "_name", "unknown")
@@ -142,7 +160,7 @@ def _call_provider(provider: Any, system: str, user: str) -> str:
     if interface == "anthropic":
         resp = provider._client.messages.create(
             model=provider._model,
-            max_tokens=1024,
+            max_tokens=MAX_TOKENS,
             system=system,
             messages=[{"role": "user", "content": user}],
         )
@@ -152,7 +170,7 @@ def _call_provider(provider: Any, system: str, user: str) -> str:
     if interface == "openai":
         resp = provider._client.chat.completions.create(
             model=provider._model,
-            max_tokens=1024,
+            max_tokens=MAX_TOKENS,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -218,6 +236,11 @@ def _parse_and_validate(raw: str) -> dict:
         "thesis": str(data["thesis"]).strip(),
         "sections": normalized_sections,
     }
+
+
+def parse_extraction(raw: str) -> dict:
+    """The extractor's parser, public for candidate replay (#251 v1.1)."""
+    return _parse_and_validate(raw)
 
 
 class BlueprintExtractionError(ValueError):

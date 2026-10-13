@@ -6586,9 +6586,9 @@ def create_app(
         })
 
     # #251: containment of the legacy model-to-canonical Blueprint writes
-    # (docs/design/r251-legacy-blueprint-remediation-v1.md §7). Unset means legacy; an unrecognized
-    # value fails closed to disabled.
-    _LEGACY_WRITE_MODES = ("legacy", "governed", "disabled")
+    # (docs/design/r251-legacy-blueprint-remediation-v1.md §7; `proposal` per v1.1 §3). Unset means legacy;
+    # an unrecognized value fails closed to disabled.
+    _LEGACY_WRITE_MODES = ("legacy", "governed", "proposal", "disabled")
     _legacy_write_setting = os.environ.get("HERMENEIA_LEGACY_BLUEPRINT_WRITES", "legacy")
     app.config.setdefault("LEGACY_BLUEPRINT_WRITES",
                           _legacy_write_setting if _legacy_write_setting in _LEGACY_WRITE_MODES else "disabled")
@@ -6597,39 +6597,65 @@ def create_app(
         mode = app.config.get("LEGACY_BLUEPRINT_WRITES")
         return mode if mode in _LEGACY_WRITE_MODES else "disabled"
 
-    def _strict_architect_references(ai_sections: list, shown_numbers: set, shown_interps: list, all_interp_ids: list):
-        """Exact OBS-n / INTERP-xxxxxxxx references to records shown in the prompt; every failure itemized."""
-        prefixes: dict[str, list[str]] = {}
-        for interp in shown_interps:
-            prefixes.setdefault(interp["id"][:8], []).append(interp["id"])
-        hidden = {iid[:8] for iid in all_interp_ids} - set(prefixes)
-        n_to_id = {n: oid for n, oid in shown_numbers}
-        invalid, resolved = [], []
-        for index, sec in enumerate(ai_sections, 1):  # numbered as the model returned them
-            obs_ids, interp_ids = [], []
-            if not _optional_text(sec, "claim"):  # a claimless section is skipped, as before (#244)
-                resolved.append((obs_ids, interp_ids))
-                continue
-            for ref in sec.get("obs_refs", []):
-                token = str(ref).strip()
-                obs = re.fullmatch(r"OBS-(\d+)", token)
-                if obs and int(obs.group(1)) in n_to_id:
-                    obs_ids.append(n_to_id[int(obs.group(1))])
-                    continue
-                reason = "unshown" if obs else "wrong_type" if re.fullmatch(r"INTERP-[0-9a-f]{8}", token) else "unresolved"
-                invalid.append({"section": index, "field": "obs_refs", "ref": ref, "reason": reason})
-            for ref in sec.get("interp_refs", []):
-                token = str(ref).strip()
-                found = re.fullmatch(r"INTERP-([0-9a-f]{8})", token)
-                matches = prefixes.get(found.group(1), []) if found else []
-                if len(matches) == 1:
-                    interp_ids.append(matches[0])
-                    continue
-                reason = ("ambiguous" if len(matches) > 1 else "excluded" if found and found.group(1) in hidden
-                          else "unknown" if found else "wrong_type" if re.fullmatch(r"OBS-\d+", token) else "unresolved")
-                invalid.append({"section": index, "field": "interp_refs", "ref": ref, "reason": reason})
-            resolved.append((obs_ids, interp_ids))
-        return resolved, invalid
+    def _held_legacy_proposal(candidate: dict):
+        """Hold a legacy generator's candidate in P8's bounded store; only a P8 steward decision commits it (#251 v1.1)."""
+        with blueprint_proposal_lock:
+            while len(blueprint_proposal_candidates) >= 100:
+                del blueprint_proposal_candidates[next(iter(blueprint_proposal_candidates))]
+            blueprint_proposal_candidates[candidate["candidate_id"]] = {"candidate": candidate, "receipt": None}
+
+    def _proposal_refusal(refusal, output: str | None = None):
+        from ..blueprint_proposals import text_digest
+
+        body = {"error": str(refusal), "code": refusal.code, "canonical_status": "not_persisted"}
+        if getattr(refusal, "invalid_references", None) is not None:
+            body["invalid_references"] = refusal.invalid_references
+        if output is not None:
+            body.update(output=output, output_sha256=text_digest(output))
+        return jsonify(body), refusal.status
+
+    def _architect_proposal(conn, provider: str, directive: str, view: dict, prompt: str, hidden_prefixes: frozenset):
+        """`proposal` mode: the same legacy prompt; the model's reply becomes a held candidate, never a write."""
+        from ..blueprint_proposals import ProposalRefused
+        from ..legacy_blueprint_candidates import architect_binding, architect_candidate
+        from ..narrative.artist_providers import get_provider
+
+        def refused(code, status, message):
+            return jsonify({"error": message, "code": code, "canonical_status": "not_persisted"}), status
+
+        try:
+            binding = architect_binding(conn, directive, view)
+        except ProposalRefused as refusal:
+            return _proposal_refusal(refusal)
+        try:
+            prov = get_provider(provider, **_provider_kwargs(provider))
+        except Exception:
+            return refused("PROVIDER_FAILED", 502, "The selected provider could not be constructed; nothing was written")
+        configure = getattr(prov, "execution_config", None)
+        try:
+            before = configure() if callable(configure) else None
+        except Exception:
+            before = None
+        if not isinstance(before, dict):
+            return refused("EXECUTION_NOT_RECORDABLE", 409, "The provider exposes no execution record (CI-011); nothing was held")
+        if before.get("provider") == "null" or not before.get("model_id"):
+            return refused("NO_MODEL_EXECUTED", 409, "No model would run: the selected provider is a placeholder")
+        created_at = utc_now_iso()
+        try:
+            output = prov.render(prompt)
+            execution = configure()
+        except Exception:
+            return refused("PROVIDER_FAILED", 502, "The provider failed; nothing was written")
+        if not isinstance(output, str) or not isinstance(execution, dict):
+            return refused("PROVIDER_FAILED", 502, "The provider returned no text; nothing was written")
+        execution = {**execution, "provider_id": provider, "adapter": type(prov).__name__}
+        try:
+            candidate = architect_candidate(binding, prompt=prompt, execution=execution, output=output, created_at=created_at,
+                                            completed_at=utc_now_iso(), hidden_prefixes=hidden_prefixes)
+        except ProposalRefused as refusal:
+            return _proposal_refusal(refusal, output)
+        _held_legacy_proposal(candidate)
+        return jsonify({**candidate, "canonical_status": "not_persisted"}), 201
 
     # ── /api/architect/generate ───────────────────────────────────────────────
 
@@ -6706,83 +6732,28 @@ def create_app(
                     continue
                 interps.append(interp)
 
-            interp_lines = []
-            for i in interps:
-                n = id_to_n.get(i["id"]) or id_to_n.get(i["observation_id"], "?")
-                obs_n = id_to_n.get(i["observation_id"], "?")
-                role = i["source_role"] or "primary"
-                role_note = (
-                    "primary evidence"
-                    if role == "primary"
-                    else f"NON-PRIMARY {role} evidence from {i['original_filename']}; do not treat as primary"
-                )
-                interp_lines.append(
-                    f"INTERP-{i['id'][:8]} [OBS-{obs_n}] [{i['evidential_status']}] [{role_note}]: {i['text']}"
-                )
+            from ..legacy_blueprint_candidates import architect_prompt, role_note, strict_architect_references
+
+            # The exact prompt view (#251 v1.1 §4): what each line shows, bound by a proposal-mode candidate.
+            interp_view = [{"label": f"INTERP-{i['id'][:8]}", "id": i["id"],
+                            "observation_label": f"OBS-{id_to_n.get(i['observation_id'], '?')}",
+                            "evidential_status": i["evidential_status"],
+                            "role_note": role_note(i["source_role"], i["original_filename"]), "text": i["text"]}
+                           for i in interps]
 
             # ── Sample observations (spread across corpus) ─────────────────
             step = max(1, len(all_obs) // 40)
             sample_obs = all_obs[::step][:40]
-            obs_lines = []
-            for r in sample_obs:
-                role = r["source_role"] or "primary"
-                role_note = (
-                    "primary evidence"
-                    if role == "primary"
-                    else f"NON-PRIMARY {role} evidence from {r['original_filename']}; do not treat as primary"
-                )
-                obs_lines.append(
-                    f"OBS-{id_to_n[r['id']]} (p.{r['page']}) [{role_note}]: {r['raw_text'][:200]}"
-                )
+            obs_view = [{"label": f"OBS-{id_to_n[r['id']]}", "id": r["id"], "page": r["page"],
+                         "role_note": role_note(r["source_role"], r["original_filename"]), "text": r["raw_text"][:200]}
+                        for r in sample_obs]
+            view = {"interpretations": interp_view, "observations": obs_view, "observations_total": len(all_obs)}
+            hidden_prefixes = frozenset(r[0][:8] for r in conn.execute("SELECT id FROM interpretations"))
 
             # ── Build prompt ───────────────────────────────────────────────
-            prompt = f"""You are the Hermeneia Architect. Your job is evidence-first research design, not thesis generation.
-
-RESEARCH DIRECTIVE:
-{directive}
-
-CRITICAL INSTRUCTION — READ BEFORE PROCEEDING:
-Do NOT start from a thesis and find supporting evidence.
-Start from the evidence and let the structure emerge.
-
-SOURCE ROLE RULE:
-Excluded documents are absent from this prompt. If a line is labelled NON-PRIMARY,
-preserve that role in reasoning and do not treat commentary, reference, notes, or
-exploratory material as primary evidence.
-
-Your process must be:
-1. Survey the observations and interpretations for everything relevant to the directive
-2. Group related evidence into distinct analytical sections
-3. State a claim for each section that the evidence actually supports
-4. Derive a thesis LAST, as a synthesis of what the sections establish
-
-For a directive about metaphors, each section should be ONE metaphor or metaphor cluster with ALL its relevant observations. A 10-page analysis requires 8–12 sections minimum. Do not collapse multiple distinct metaphors into one section.
-
-ACCEPTED INTERPRETATIONS ({len(interps)} total):
-{chr(10).join(interp_lines) or '(none yet — use observations only)'}
-
-OBSERVATION SAMPLE ({len(sample_obs)} of {len(all_obs)} total):
-{chr(10).join(obs_lines)}
-
-RULES:
-- Each section = one distinct idea, metaphor, motif, or analytical point
-- Each section must cite at least one OBS-N from the list above
-- Do not invent observations or interpretations not in the lists above
-- Aim for 8–12 sections for a research assignment; do not compress
-- The thesis is derived from the sections, not imposed on them
-
-Return ONLY valid JSON, no markdown, no explanation:
-{{
-  "title": "descriptive title for this analysis",
-  "thesis": "one-sentence thesis synthesized from all sections below",
-  "sections": [
-    {{
-      "claim": "the specific analytical claim this section establishes",
-      "obs_refs": ["OBS-19", "OBS-23"],
-      "interp_refs": ["INTERP-ab12cd34"]
-    }}
-  ]
-}}"""
+            prompt = architect_prompt(directive, view)
+            if write_mode == "proposal":  # propose only; an exact steward decision commits (#251 v1.1 §3)
+                return _architect_proposal(conn, provider, directive, view, prompt, hidden_prefixes)
 
             provider_kwargs = _provider_kwargs(provider)
             prov = get_provider(provider, **provider_kwargs)
@@ -6808,9 +6779,8 @@ Return ONLY valid JSON, no markdown, no explanation:
             # ── Resolve obs/interp refs to IDs ─────────────────────────────
             interp_id_map = {i["id"][:8]: i["id"] for i in interps}
             if write_mode == "governed":  # exact references to shown records, or nothing is written (#251 R1/R2)
-                strict, invalid = _strict_architect_references(
-                    ai_sections, {(id_to_n[r["id"]], r["id"]) for r in sample_obs}, interps,
-                    [r[0] for r in conn.execute("SELECT id FROM interpretations")])
+                strict, invalid = strict_architect_references(
+                    ai_sections, {(id_to_n[r["id"]], r["id"]) for r in sample_obs}, interps, hidden_prefixes)
                 if invalid:
                     return jsonify({"error": "The model cited references that are unresolved, of the wrong type, "
                                              "excluded or not shown; nothing was written",
@@ -7528,6 +7498,8 @@ Return ONLY valid JSON, no markdown, no explanation:
                 return jsonify({"error": "No model ran: the selected provider returns a placeholder, not an extraction",
                                 "code": "NO_MODEL_EXECUTED", "execution": execution,
                                 "canonical_status": "not_persisted"}), 409
+            if write_mode == "proposal" and not save:  # the preview is the candidate a steward accepts (#251 v1.1)
+                return _extract_proposal(prov, provider, text, execution)
             proposed = extract_blueprint_from_text(text, prov)
         except BlueprintExtractionError as exc:
             return jsonify({"error": str(exc), "error_type": "BlueprintExtractionError"}), 422
@@ -7562,6 +7534,42 @@ Return ONLY valid JSON, no markdown, no explanation:
             return jsonify({"error": str(exc), "detail": _tb.format_exc()}), 500
         finally:
             conn.close()
+
+    def _extract_proposal(prov, provider: str, text: str, label: dict):
+        """`proposal` mode: the extractor's exact request and reply become a held candidate (CI-011)."""
+        from ..blueprint_proposals import ProposalRefused
+        from ..compiler.blueprint_extractor import extraction_request, request_parameters, send_extraction_request
+        from ..legacy_blueprint_candidates import EXTRACT_MAX_INPUT_CHARS, extract_candidate
+
+        parameters = request_parameters(prov)
+        if not isinstance(parameters["model_id"], str) or not parameters["model_id"].strip():
+            return jsonify({"error": "The provider exposes no model identity (CI-011); nothing was held",
+                            "code": "EXECUTION_NOT_RECORDABLE", "execution": label, "canonical_status": "not_persisted"}), 409
+        system, prompt = extraction_request(text, max_input_chars=EXTRACT_MAX_INPUT_CHARS)
+        created_at = utc_now_iso()
+        try:
+            output = send_extraction_request(prov, system, prompt)
+        except Exception:
+            return jsonify({"error": "The provider failed; nothing was written", "code": "PROVIDER_FAILED",
+                            "execution": label, "canonical_status": "not_persisted"}), 502
+        if not isinstance(output, str):
+            return jsonify({"error": "The provider returned no text", "code": "PROVIDER_FAILED", "execution": label,
+                            "canonical_status": "not_persisted"}), 502
+        configure = getattr(prov, "execution_config", None)
+        try:
+            adapter_config = configure() if callable(configure) else None
+        except Exception:
+            adapter_config = None
+        execution = {"provider_id": provider, **parameters, "adapter": type(prov).__name__, "adapter_config": adapter_config}
+        try:
+            candidate = extract_candidate(source_text=text, max_input_chars=EXTRACT_MAX_INPUT_CHARS, system_prompt=system,
+                                          prompt=prompt, execution=execution, output=output, created_at=created_at,
+                                          completed_at=utc_now_iso())
+        except ProposalRefused as refusal:
+            return _proposal_refusal(refusal, output)
+        _held_legacy_proposal(candidate)
+        return jsonify({"proposed_blueprint": candidate["proposal"]["blueprint"], "execution": label, "candidate": candidate,
+                        "canonical_status": "not_persisted"}), 200
 
     @app.route("/api/pipeline/ratify-blueprint", methods=["POST"])
     def api_pipeline_ratify_blueprint():
