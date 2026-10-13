@@ -255,3 +255,39 @@ and compares. The committed dataset is `research/blueprint_chain_portability/v1`
 Tests are in `tests/test_blueprint_chain_portability.py`. The full suite must
 be clean except the inherited Reader baseline, and existing WBS bundles and
 tests must restore unchanged.
+
+## 8. Amendment 1 (2026-10-13, found during implementation): chain export is gated
+
+**Finding.** Exporting the chain unconditionally would make every fresh
+export carry `blueprint-dependency-chain-v1`, and `preview_restore` would
+then report P8 acceptance history `covered`. That contradicts two
+authorities:
+
+- `blueprint-proposal-p8-disposition.md` §1: until the portability gate
+  passes, acceptance history is "explicitly declared unsupported by WBS".
+- #252 criterion 9: the gate opens "only by owner decision after 1–8 pass".
+
+It also changes P8's committed governance dataset, whose WBS case pins that
+declaration. Two P8 tests failed when the export was unconditional. That is
+evidence of a conflict, not of a defect in P8.
+
+**Decision recorded here.**
+
+- **Export is off by default.** Chain export is an explicit export option,
+  `blueprint_chain=False` by default, in `build_bundle_files`,
+  `build_workspace_zip` and `export_workspace_bundle`.
+- **Web gate.** The app follows P8's gate pattern: `WBS_BLUEPRINT_CHAIN`,
+  default `disabled`, enabled only by
+  `HERMENEIA_WBS_BLUEPRINT_CHAIN=enabled`.
+- **Disabled means unchanged.** The bundle is byte-identical to the
+  pre-#252 exporter: no chain files, no capability, no
+  `declared_unsupported`. P8's declaration and dataset are unchanged.
+- **Enabled** applies §2–§3 exactly. `declared_unsupported` appears only
+  when an enabled export finds a closure, integrity, scope or schema
+  failure.
+- **Restore** always understands the component (§4). A bundle carrying the
+  chain can only come from an enabled export. Restore support alone neither
+  implies nor exposes portability for default users.
+- **Opening the P8 portability gate** means enabling chain export by
+  default. It remains the owner's decision under criterion 9, and it does
+  not clear P8's other release blockers.
