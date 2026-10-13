@@ -27,6 +27,12 @@ from typing import Any
 
 from ..perspective_identity import FRAME_V2_SCHEME, validate_frame_v2_row_identity
 from ..storage.sqlite import SQLiteStore
+from .coverage import restore_coverage
+from .blueprint_chain import (
+    CAPABILITY as _CHAIN_CAPABILITY, COMPONENTS as _CHAIN_COMPONENTS, COVERAGE_KEY as _CHAIN_COVERAGE,
+    RECEIPT_KEY as _CHAIN_RECEIPTS, ChainComponentError, insert_component as _insert_chain,
+    read_component as _read_chain_component,
+)
 
 
 # Restore order respects foreign keys:
@@ -66,13 +72,16 @@ _PUBLICATION_CAPABILITY = "publication-authoring-v0"
 _PUBLICATION_PREFIX = "publication/"
 SUPPORTED_CAPABILITIES = frozenset({
     _PUBLICATION_CAPABILITY, _PERSPECTIVE_EXECUTION_CAPABILITY, _ACHIEVEMENT_AWARD_CAPABILITY,
-    _ACCEPTED_COMPARISON_CAPABILITY,
+    _ACCEPTED_COMPARISON_CAPABILITY, _CHAIN_CAPABILITY,
 })
 
 # Tables whose presence means the workspace is not empty.
 _OCCUPANCY_TABLES = [table for table, _ in _TABLE_FILES] + [
     "workspace_investigation", "publication_works", _PERSPECTIVE_EXECUTION_TABLE,
     _ACHIEVEMENT_AWARD_TABLE, _ACCEPTED_COMPARISON_TABLE,
+    # The Blueprint dependency chain (#252); each remaining chain table needs one of these parents.
+    "ai_provenance", "proposed_interpretations", "interpretations", "narrative_blueprints", "architect_plans",
+    _BLUEPRINT_PROPOSAL_TABLE,
 ]
 
 
@@ -151,6 +160,10 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
     perspective_executions, receipt_coverage = _read_perspective_executions(root, manifest)
     achievement_awards, award_coverage = _read_achievement_awards(root, manifest)
     accepted_comparisons, comparison_coverage = _read_accepted_comparisons(root, manifest)
+    try:
+        blueprint_chain, chain_coverage = _read_chain_component(root, manifest)
+    except ChainComponentError as exc:
+        raise RestoreError(str(exc)) from exc
     publication = _read_publication_component(root, manifest)
     investigation = _load("investigation.json")
     uploads_dir = root / "corpus" / "uploads"
@@ -166,11 +179,20 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
         "perspective_executions": perspective_executions,
         "achievement_awards": achievement_awards,
         "accepted_comparisons": accepted_comparisons,
+        "blueprint_chain": blueprint_chain,
         "coverage": {_PERSPECTIVE_EXECUTION_TABLE: receipt_coverage,
                      _ACHIEVEMENT_AWARD_TABLE: award_coverage,
                      _ACCEPTED_COMPARISON_TABLE: comparison_coverage,
-                     # Declared, never silently omitted: WBS 1.x carries no Blueprint closure (P8 §5).
-                     _BLUEPRINT_PROPOSAL_TABLE: {"status": "unsupported", "reason": _BLUEPRINT_PROPOSAL_REASON}},
+                     _CHAIN_COVERAGE: chain_coverage,
+                     # Declared, never silently omitted: only the chain component carries receipts with their
+                     # closure (#252); without it, P8's original unsupported declaration stands (P8 §5).
+                     _BLUEPRINT_PROPOSAL_TABLE: (
+                         {"status": "covered", "extant_records": len(blueprint_chain[_CHAIN_RECEIPTS]),
+                          "reason": chain_coverage["reason"]}
+                         if blueprint_chain is not None else
+                         {"status": "unsupported", "reason": _BLUEPRINT_PROPOSAL_REASON}),
+                     # Blueprint-chain portability is not complete study portability (#252 coverage audit).
+                     **restore_coverage(manifest, chain_covered=blueprint_chain is not None)},
         "investigation": investigation,
         "uploads": uploads,
         "publication": publication,
@@ -454,8 +476,8 @@ def _refuse_occupied_target(conn: sqlite3.Connection, *, award_coverage: bool, o
     ).fetchone() is not None
     if not _workspace_is_empty(conn) and (not overwrite or award_coverage or award_target_occupied):
         raise RestoreError(
-            "target workspace is not empty; refusing to restore (WBS v1 has "
-            "no award-history merge or overwrite). Restore into a fresh database."
+            "target workspace is not empty; refusing to restore (WBS v1 has no "
+            "award-history or Blueprint-chain merge or overwrite). Restore into a fresh database."
         )
 
 
@@ -478,6 +500,8 @@ def preview_restore(db_path: str | Path, bundle_dir: str | Path) -> dict[str, An
         counts[_ACHIEVEMENT_AWARD_TABLE] = len(bundle["achievement_awards"])
     if bundle["coverage"][_ACCEPTED_COMPARISON_TABLE]["status"] == "covered":
         counts[_ACCEPTED_COMPARISON_TABLE] = len(bundle["accepted_comparisons"])
+    if bundle["blueprint_chain"] is not None:
+        counts.update({key: len(rows) for key, rows in bundle["blueprint_chain"].items()})
     counts["uploads"] = len(bundle["uploads"])
     if bundle["publication"] is not None:
         for table, rows in bundle["publication"]["tables"].items():
@@ -508,13 +532,15 @@ def restore_workspace(
     db_path = Path(db_path)
     bundle = read_bundle(bundle_dir)
     award_coverage = bundle["coverage"][_ACHIEVEMENT_AWARD_TABLE]["status"] == "covered"
+    # Immutable history (awards, the Blueprint chain) is never merged into or over an occupied target.
+    immutable_history = award_coverage or bundle["blueprint_chain"] is not None
 
     # A refused immutable-history merge must leave even startup/migration DDL
     # outside the occupied target. Recheck after startup for a concurrent writer.
     if db_path.exists():
         existing = sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True)
         try:
-            _refuse_occupied_target(existing, award_coverage=award_coverage, overwrite=overwrite)
+            _refuse_occupied_target(existing, award_coverage=immutable_history, overwrite=overwrite)
         finally:
             existing.close()
 
@@ -526,7 +552,7 @@ def restore_workspace(
     staging: Path | None = None
     installed: list[Path] = []
     try:
-        _refuse_occupied_target(conn, award_coverage=award_coverage, overwrite=overwrite)
+        _refuse_occupied_target(conn, award_coverage=immutable_history, overwrite=overwrite)
 
         # Publication artifacts are staged and hash-verified before any row is
         # inserted, installed before the commit, and discarded on any failure,
@@ -542,7 +568,7 @@ def restore_workspace(
         try:
             # Hold the write reservation during the final fresh-target check;
             # a concurrent insert must not turn restore into an implicit merge.
-            _refuse_occupied_target(conn, award_coverage=award_coverage, overwrite=overwrite)
+            _refuse_occupied_target(conn, award_coverage=immutable_history, overwrite=overwrite)
             for table, _rel in _TABLE_FILES:
                 columns = _table_columns(conn, table)
                 rows = bundle["tables"][table]
@@ -602,6 +628,12 @@ def restore_workspace(
                 restored[_ACCEPTED_COMPARISON_TABLE] = _insert_rows(
                     conn, _ACCEPTED_COMPARISON_TABLE, comparison_rows, set(_ACCEPTED_COMPARISON_COLUMNS),
                 )
+
+            if bundle["blueprint_chain"] is not None:
+                try:
+                    restored.update(_insert_chain(conn, bundle["blueprint_chain"]))
+                except ChainComponentError as exc:
+                    raise RestoreError(str(exc)) from exc
 
             investigation = bundle["investigation"]
             if investigation is not None:
