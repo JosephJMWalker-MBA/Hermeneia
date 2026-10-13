@@ -309,11 +309,20 @@ exporter writes**:
 - `reports/governance.json`, for steward decisions, findings and
   ratification records.
 
-They are outside #252's frozen scope. Restore does not yet declare them, so
-a bundle silently lacks them. That is a known gap to close or declare in a
-later packet. One consequence: P1 capability decisions that read
-`inquiry_notes` (`preserve_question`) do not survive export and restore
-today.
+They are outside #252's frozen scope and remain unimplemented. Since the
+2026-10-13 coverage audit (`blueprint-chain-portability-v1.md` §9) they are
+no longer silently absent:
+- every export records how many such records it left behind
+  (`manifest.not_exported`), together with custom Expression Profiles,
+  reading progress and the compile-time derived indexes;
+- restore reports each surface `unsupported` under `coverage.not_carried`,
+  and `coverage.study_portability` is `partial`;
+- the Reader's import preview lists them.
+
+Nothing is reconstructed, and the derived indexes are not rebuilt by
+restore. Blueprint-chain portability is therefore **not** complete study
+portability. One consequence: P1 capability decisions that read
+`inquiry_notes` (`preserve_question`) do not survive export and restore.
 
 ---
 

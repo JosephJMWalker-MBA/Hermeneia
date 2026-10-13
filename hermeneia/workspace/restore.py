@@ -27,6 +27,7 @@ from typing import Any
 
 from ..perspective_identity import FRAME_V2_SCHEME, validate_frame_v2_row_identity
 from ..storage.sqlite import SQLiteStore
+from .coverage import restore_coverage
 from .blueprint_chain import (
     CAPABILITY as _CHAIN_CAPABILITY, COMPONENTS as _CHAIN_COMPONENTS, COVERAGE_KEY as _CHAIN_COVERAGE,
     RECEIPT_KEY as _CHAIN_RECEIPTS, ChainComponentError, insert_component as _insert_chain,
@@ -189,7 +190,9 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
                          {"status": "covered", "extant_records": len(blueprint_chain[_CHAIN_RECEIPTS]),
                           "reason": chain_coverage["reason"]}
                          if blueprint_chain is not None else
-                         {"status": "unsupported", "reason": _BLUEPRINT_PROPOSAL_REASON})},
+                         {"status": "unsupported", "reason": _BLUEPRINT_PROPOSAL_REASON}),
+                     # Blueprint-chain portability is not complete study portability (#252 coverage audit).
+                     **restore_coverage(manifest, chain_covered=blueprint_chain is not None)},
         "investigation": investigation,
         "uploads": uploads,
         "publication": publication,

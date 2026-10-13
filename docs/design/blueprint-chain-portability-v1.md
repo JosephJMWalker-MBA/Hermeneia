@@ -291,3 +291,56 @@ evidence of a conflict, not of a defect in P8.
 - **Opening the P8 portability gate** means enabling chain export by
   default. It remains the owner's decision under criterion 9, and it does
   not clear P8's other release blockers.
+
+## 9. Amendment 2 (2026-10-13, owner-directed coverage audit): chain portability is not study portability
+
+**Owner decisions of 2026-10-13.**
+- G1 is approved: the §2 spec correction is adopted.
+- G3, opening the gate, is deferred.
+
+**Classification.** Each of the 45 runtime tables in a fresh schema-21 store
+falls into exactly one class, and a test enforces it:
+
+| Class | Tables |
+| --- | --- |
+| Exported by WBS files | `source_documents`, `source_extractions`, `observations`, `reader_highlights`, `perspectives`, Perspective `supersession_relations`, `investigation_log`, `workspace_investigation` |
+| Carried by capability components | Perspective execution receipts, achievement awards, accepted comparisons, the eight publication/authoring tables (when a publication is attached) |
+| Blueprint chain (§2, gated) | the ten chain tables |
+| System | `schema_version`, `workspace_identity` (the manifest carries the workspace ID) |
+| **Not carried** (`hermeneia/workspace/coverage.py`) | listed below |
+
+The not-carried surfaces are:
+
+| Surface | Tables | Kind |
+| --- | --- | --- |
+| `study_reviews` | `observation_reviews`, `inquiry_notes` | history |
+| `reports` | `rendered_narratives`, `critic_reports`, `validation_reports` | history |
+| `governance` | `steward_decisions`, `findings`, `ratification_records`, `witness_sessions` | history |
+| `custom_expression_profiles` | `expression_profiles` with `source` not `built-in` | history |
+| `reading_progress` | `reading_progress` | state |
+| `derived_indexes` | `observation_derived`, `terms`, `observation_terms`, `provenance` | derived and **not rebuilt by restore** |
+
+**Declarations, never repairs.**
+- **Export.** Every export records `manifest.not_exported`, counted from its
+  read snapshot. When the chain is not exported (gate off, or declared
+  unsupported), `blueprint_dependency_chain` is listed with its counts and
+  reason. A missing table counts as `null` (unknown).
+- **Restore.** `read_bundle`, `preview_restore` and `restore_workspace`
+  report:
+  - `coverage.study_portability = {status: "partial", …}`, with
+    `source_counts` set to `recorded` or `unknown`;
+  - `coverage.not_carried[surface]` as `unsupported`, with the source
+    counts, or `"unknown"` for older bundles.
+
+  Nothing is reconstructed, backfilled or rebuilt.
+- **Reader.**
+  - The export drawer says "some record types are not included yet",
+    replacing "a portable .zip bundle of your work".
+  - The import preview lists every not-carried surface, with its source
+    count or "count unknown", and says nothing is recreated.
+
+**Compatibility.** Adding `not_exported` changes the bytes of every default
+manifest. This is deliberate: it is additive, older restorers ignore it, and
+bundles stay deterministic. Default bundles otherwise carry no chain files,
+capability or declaration, so P8's unsupported declaration and dataset are
+unchanged.

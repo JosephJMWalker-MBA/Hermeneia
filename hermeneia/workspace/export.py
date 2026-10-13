@@ -31,7 +31,8 @@ from ..study.evaluation import (
     score_evidence_preservation,
     score_unsupported_claims,
 )
-from .blueprint_chain import CAPABILITY as CHAIN_CAPABILITY, FILES as CHAIN_FILES, export_chain
+from .blueprint_chain import CAPABILITY as CHAIN_CAPABILITY, COMPONENTS as CHAIN_COMPONENTS, FILES as CHAIN_FILES, export_chain
+from .coverage import not_exported
 
 
 WBS_VERSION = "1.1"
@@ -489,6 +490,13 @@ def _build_bundle_files_snapshot(
         manifest["counts"].update({key: len(rows) for key, rows in chain_rows.items()})
     elif chain_declaration is not None:
         manifest["declared_unsupported"] = {CHAIN_CAPABILITY: chain_declaration}
+    # What this bundle leaves behind, counted from the same snapshot (#252 coverage audit); never repaired.
+    manifest["not_exported"] = not_exported(
+        conn,
+        chain_tables=None if chain_rows is not None else tuple(sorted({table for _k, table, _p, _pk, _c in CHAIN_COMPONENTS})),
+        chain_reason=None if chain_rows is not None else (
+            chain_declaration["reason"] if chain_declaration is not None else
+            "Blueprint chain export is gated off; P8 acceptance history and its closure are not in this bundle."))
 
     out: dict[str, bytes] = {path: data for path, (_role, data) in content.items()}
     out["manifest.json"] = _dumps(manifest)
