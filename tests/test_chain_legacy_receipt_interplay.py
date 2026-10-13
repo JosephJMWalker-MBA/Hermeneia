@@ -60,3 +60,24 @@ def test_a_legacy_origin_receipt_round_trips_with_closure(tmp_path):
         "model_output": "preserved_not_replayed"}
     blueprint_id = receipt["result"]["resulting_blueprint_id"]
     assert _authorship(target, blueprint_id) == _authorship(study.db, blueprint_id) == "accepted_model"
+
+
+def test_with_the_chain_gate_closed_a_legacy_origin_receipt_is_declared_left_behind(tmp_path):
+    """The D3/G3 coupling: under a closed gate, proposal-mode provenance is local-only, and the bundle says so."""
+    with lab.isolated(tmp_path):
+        study = proposal_mode.Study(tmp_path)
+        candidate = study.generate(proposal_mode.FakeArchitect(proposal_mode.REPLY)).get_json()
+        study.decide(candidate["candidate_id"], {"decision": "accept"})
+    manifest = export_workspace_bundle(study.db, tmp_path / "bundle", generated_at="2026-10-13T12:00:00+00:00", workspace_id="w")
+    left = manifest["not_exported"]["blueprint_dependency_chain"]["tables"]
+    assert CAPABILITY not in manifest.get("required_capabilities", [])
+    assert left["blueprint_proposal_acceptances"] == 1 and left["narrative_blueprints"] == 1
+    target = tmp_path / "restored" / "workspace.db"
+    result = restore_workspace(target, tmp_path / "bundle")
+    assert result["coverage"]["not_carried"]["blueprint_dependency_chain"]["source_records"]["blueprint_proposal_acceptances"] == 1
+    assert result["coverage"]["blueprint_proposal_acceptances"]["status"] == "unsupported"
+    conn = lab._read_only(target)
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM blueprint_proposal_acceptances").fetchone()[0] == 0
+    finally:
+        conn.close()
