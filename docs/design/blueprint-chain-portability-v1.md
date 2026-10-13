@@ -318,7 +318,25 @@ The not-carried surfaces are:
 | `governance` | `steward_decisions`, `findings`, `ratification_records`, `witness_sessions` | history |
 | `custom_expression_profiles` | `expression_profiles` with `source` not `built-in` | history |
 | `reading_progress` | `reading_progress` | state |
-| `derived_indexes` | `observation_derived`, `terms`, `observation_terms`, `provenance` | derived and **not rebuilt by restore** |
+| `derived_indexes` | `observation_derived`, `terms`, `observation_terms` | derived and **not rebuilt by restore** |
+| `observation_provenance` | `provenance` | compile-time provenance and **not rebuilt by restore** |
+
+**Real-study finding (2026-10-13, G2).** The audit first classed `provenance`
+as a derived index. The private-copy validation showed its weight: 2,369
+provenance rows in the source and 0 after restore. Readers of that table then
+change meaning:
+
+- the Critic provenance evaluation reports an Observation without a
+  provenance row as "transformation"/"transformed";
+- narrative trust summaries compare `provenance.verbatim_text` with the
+  Observation text;
+- the Reader projection reads character offsets from it.
+
+It is therefore declared as its own surface. The defect is pinned by two
+strict-xfail witnesses in `tests/test_wbs_coverage_declarations.py`,
+`RestoredProvenanceLost` and `RestoredObservationLooksTransformed`. It is not
+repaired here: carrying or rebuilding it changes WBS evidence semantics and
+needs its own contract.
 
 **Declarations, never repairs.**
 - **Export.** Every export records `manifest.not_exported`, counted from its

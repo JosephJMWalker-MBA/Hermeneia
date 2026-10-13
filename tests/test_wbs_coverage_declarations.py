@@ -70,6 +70,7 @@ def test_a_default_export_counts_everything_it_leaves_behind(study, tmp_path):
     assert left["custom_expression_profiles"]["tables"] == {"expression_profiles": 1}
     assert left["reading_progress"]["tables"] == {"reading_progress": 1}
     assert left["derived_indexes"]["kind"] == "derived_not_rebuilt" and left["derived_indexes"]["tables"]["observation_derived"] > 0
+    assert left["observation_provenance"]["kind"] == "provenance_not_rebuilt" and left["observation_provenance"]["tables"]["provenance"] > 0
     chain = left[CHAIN_SURFACE]
     assert chain["tables"]["interpretations"] == 1 and chain["tables"]["narrative_blueprints"] == 1 and "gated off" in chain["reason"]
 
@@ -128,3 +129,41 @@ def test_every_runtime_table_is_classified(tmp_path):
     chain = {table for _key, table, _path, _pk, _cols in COMPONENTS}
     declared = {table for _surface, names, _kind, _reason in NOT_CARRIED for table in names}
     assert tables == exported | system | chain | declared, sorted(tables ^ (exported | system | chain | declared))
+
+
+# Permanent negative witnesses (found by the 2026-10-13 real-study validation). Restore neither carries nor
+# rebuilds compile-time provenance, so evidence-integrity checks change meaning after a round trip. Declared
+# above, not repaired here; a repair must demonstrate a strict unexpected pass before these markers go.
+
+class RestoredProvenanceLost(AssertionError):
+    """A restored workspace holds Observations without their compile-time provenance rows."""
+
+
+class RestoredObservationLooksTransformed(AssertionError):
+    """The Critic provenance check would classify a restored, untouched Observation as transformed."""
+
+
+@pytest.mark.xfail(strict=True, raises=RestoredProvenanceLost, reason="WBS carries no Observation provenance (coverage audit)")
+def test_restore_keeps_compile_time_observation_provenance(study, tmp_path):
+    export_workspace_bundle(study, tmp_path / "bundle", generated_at=GENERATED_AT, workspace_id="w")
+    target = tmp_path / "restored" / "workspace.db"
+    restore_workspace(target, tmp_path / "bundle")
+    if _count(study, "provenance") > 0 and _count(target, "provenance") == 0 and _count(target, "observations") > 0:
+        raise RestoredProvenanceLost(f"{_count(study, 'provenance')} provenance rows in the source, 0 after restore")
+
+
+@pytest.mark.xfail(strict=True, raises=RestoredObservationLooksTransformed, reason="WBS carries no Observation provenance (coverage audit)")
+def test_an_untouched_observation_is_still_preserved_after_restore(study, tmp_path):
+    export_workspace_bundle(study, tmp_path / "bundle", generated_at=GENERATED_AT, workspace_id="w")
+    target = tmp_path / "restored" / "workspace.db"
+    restore_workspace(target, tmp_path / "bundle")
+    conn = sqlite3.connect(target)
+    try:
+        (observation,), = conn.execute("SELECT id FROM observations ORDER BY id LIMIT 1").fetchall()
+        has_provenance = conn.execute("SELECT 1 FROM provenance WHERE observation_id = ?", (observation,)).fetchone() is not None
+    finally:
+        conn.close()
+    # The Critic provenance evaluation (compiler/evaluation_functions/provenance.py) treats an Observation
+    # without a provenance row as "transformation"/"transformed" rather than "preservation"/"preserved".
+    if not has_provenance:
+        raise RestoredObservationLooksTransformed(f"restored Observation {observation[:12]} has no provenance row")

@@ -23,8 +23,12 @@ NOT_CARRIED: tuple[tuple[str, tuple[str, ...], str, str], ...] = (
      "Expression Profiles other than the built-in defaults are not written by any WBS exporter."),
     ("reading_progress", ("reading_progress",), "state",
      "Per-document reading progress is not written by any WBS exporter."),
-    ("derived_indexes", ("observation_derived", "terms", "observation_terms", "provenance"), "derived_not_rebuilt",
-     "Compile-time derived indexes are neither exported nor rebuilt by restore; a restored workspace has them empty."),
+    ("derived_indexes", ("observation_derived", "terms", "observation_terms"), "derived_not_rebuilt",
+     "Compile-time search and term indexes are neither exported nor rebuilt by restore; a restored workspace has them empty."),
+    ("observation_provenance", ("provenance",), "provenance_not_rebuilt",
+     "Compile-time Observation provenance (verbatim text, character offsets) is neither exported nor rebuilt by restore. "
+     "In a restored workspace the Critic's provenance check reports Observations as transformed, narrative trust summaries "
+     "cannot confirm verbatim text, and Reader character offsets are unavailable."),
 )
 CHAIN_SURFACE = "blueprint_dependency_chain"
 PORTABILITY_REASON = ("A WBS bundle carries the documented surfaces only. The surfaces under not_carried are absent from "
