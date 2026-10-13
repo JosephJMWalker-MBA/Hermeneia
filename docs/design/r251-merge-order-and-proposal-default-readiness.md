@@ -79,3 +79,32 @@ code returns.
 - P8 generation stays gated (`BLUEPRINT_PROPOSAL_GENERATION`).
 - `architect/import` keeps its legacy reference resolver (a human path,
   recorded in v1 §4).
+
+## Integration verification (2026-10-13)
+
+- **What was merged.** A scratch merge `f2a2872` of this branch (`706cb63`,
+  which contains #253 and #254) with #255 (`f47b4ec`). It merged
+  automatically. It is not pushed; it is evidence only.
+
+| Run | Passed | Skipped | Failed | Expected failures |
+| --- | --- | --- | --- | --- |
+| Clean `main` `09b72cc` | 2913 | 21 | 6 | 0 |
+| Integration merge | 2999 | 21 | 6 | 9 strict |
+
+- **Failures.** The integration's failure set is **identical** to `main`'s:
+  - `test_reader_accessibility` ×2;
+  - `test_reader_blueprint_workstation`;
+  - `test_reader_record_view` ×2;
+  - `test_reader_voice_profile`.
+
+  The skip set is identical as well.
+- **Expected failures.** No unexpected pass occurred. The 9 strict xfails
+  are:
+  - R1, R2a, R2b, R5 and R6 in `legacy`, and R4 in `legacy` and `governed`,
+    exactly as the contract's witness matrix states;
+  - the two G2-found Observation-provenance witnesses.
+- **Datasets.** Every offline dataset reproduces on the merge: P5, P6, P7
+  (Layer 1, candidate, authored), P8 governance, P8 ceiling, P8 phi4-mini,
+  and P10.
+- **Later test.** `37883e5` (#255) was added after this run. It is
+  test-only: the closed-gate interplay test. It passes on the merge, 2 of 2.
