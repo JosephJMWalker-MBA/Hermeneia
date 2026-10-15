@@ -108,3 +108,24 @@ code returns.
   and P10.
 - **Later test.** `37883e5` (#255) was added after this run. It is
   test-only: the closed-gate interplay test. It passes on the merge, 2 of 2.
+
+## Update (2026-10-15)
+
+**Merge order is now five PRs, plus one independent PR:**
+#253 → #254 → this branch (#256) → #255 →
+[#257](https://github.com/JosephJMWalker-MBA/Hermeneia/pull/257).
+
+- **#257** repairs the provenance and index loss on WBS restore that G2
+  found (`observation-compile-records-v1`, on by default). It is stacked on
+  #255. New default bundles are refused by earlier restorers (its decision
+  R1). The two G2 provenance witnesses now pass.
+- **[#258](https://github.com/JosephJMWalker-MBA/Hermeneia/pull/258)** is
+  based on `main`, independent of the stack, and may merge at any point. It
+  repairs the six inherited Reader failures. They were stale test pins, left
+  behind by `8428ffe` and `f36328d`; no product code changed.
+
+**Whole stack.** A scratch merge of this branch, #257 and #258 gives 3026
+passed, 21 skipped, 7 strict xfails and **0 failed**. The 7 xfails are the
+R-witnesses in `legacy` and `governed` only.
+
+**Unchanged.** D3 and G3 are still deferred, and E1–E5 are still open.
