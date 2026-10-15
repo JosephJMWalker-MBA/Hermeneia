@@ -9,6 +9,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from reader_workstation_routing import wf_go_routes
+
 INDEX = Path(__file__).parent.parent / "hermeneia" / "web" / "static" / "index.html"
 
 
@@ -27,7 +29,7 @@ def test_record_tab_and_panel_present():
     assert 'id="cr-bottom-resource-record"' in index
     assert 'data-workstation-resource="record"' in index
     assert 'aria-controls="cr-record-ledger"' in index
-    assert "_crToggleBottomWorkstationResource('record')" in index
+    assert "onclick=\"_wfGo('record')\"" in index  # since f36328d; routes to the record workstation mode
     assert 'id="cr-record-ledger"' in index
     assert 'id="cr-record-ledger" hidden' in index
 
@@ -36,7 +38,9 @@ def test_record_is_a_workstation_mode_not_a_separate_drawer():
     index = _index()
     assert "record: document.getElementById('cr-record-ledger')" in index
     assert "else if (mode === 'record')" in index
-    assert "['cr-bottom-resource-record', () => _crToggleBottomWorkstationResource('record')]" in index
+    # Since f36328d the rail binds through _wfGo, which opens the same workstation mode (checked by behavior).
+    assert "['cr-bottom-resource-record', () => _wfGo('record')]" in index
+    assert wf_go_routes("record")["record"] == {"opened": "record", "entered_reader": True, "closed": False}
 
 
 def test_record_uses_readonly_narrative_endpoints():

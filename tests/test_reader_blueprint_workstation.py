@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from reader_workstation_routing import wf_go_routes
+
 ROOT = Path(__file__).parent.parent
 INDEX = ROOT / "hermeneia" / "web" / "static" / "index.html"
 APP = ROOT / "hermeneia" / "web" / "app.py"
@@ -103,7 +105,9 @@ def test_blueprint_is_a_workstation_mode_not_a_separate_drawer():
     # resource bindings — so _crSyncBottomWorkstationState shows only one at a time.
     assert "blueprint: document.getElementById('cr-blueprint-draft')" in index
     assert "else if (mode === 'blueprint')" in index
-    assert "['cr-bottom-resource-blueprint', () => _crToggleBottomWorkstationResource('blueprint')]" in index
+    # Since f36328d the rail binds through _wfGo, which opens the same workstation mode (checked by behavior).
+    assert "['cr-bottom-resource-blueprint', () => _wfGo('blueprint')]" in index
+    assert wf_go_routes("blueprint")["blueprint"] == {"opened": "blueprint", "entered_reader": True, "closed": False}
     assert "if (mode === 'render' || mode === 'critic') return 'blueprint';" in index
 
 
