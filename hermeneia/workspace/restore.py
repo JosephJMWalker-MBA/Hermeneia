@@ -27,6 +27,11 @@ from typing import Any
 
 from ..perspective_identity import FRAME_V2_SCHEME, validate_frame_v2_row_identity
 from ..storage.sqlite import SQLiteStore
+from .compile_records import (
+    CAPABILITY as _COMPILE_RECORDS_CAPABILITY, COVERAGE_KEY as _COMPILE_RECORDS_COVERAGE, CompileRecordsError,
+    insert_component as _insert_compile_records, read_component as _read_compile_records,
+    rebuild_derived_indexes as _rebuild_derived_indexes,
+)
 from .coverage import restore_coverage
 from .blueprint_chain import (
     CAPABILITY as _CHAIN_CAPABILITY, COMPONENTS as _CHAIN_COMPONENTS, COVERAGE_KEY as _CHAIN_COVERAGE,
@@ -72,7 +77,7 @@ _PUBLICATION_CAPABILITY = "publication-authoring-v0"
 _PUBLICATION_PREFIX = "publication/"
 SUPPORTED_CAPABILITIES = frozenset({
     _PUBLICATION_CAPABILITY, _PERSPECTIVE_EXECUTION_CAPABILITY, _ACHIEVEMENT_AWARD_CAPABILITY,
-    _ACCEPTED_COMPARISON_CAPABILITY, _CHAIN_CAPABILITY,
+    _ACCEPTED_COMPARISON_CAPABILITY, _CHAIN_CAPABILITY, _COMPILE_RECORDS_CAPABILITY,
 })
 
 # Tables whose presence means the workspace is not empty.
@@ -162,7 +167,8 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
     accepted_comparisons, comparison_coverage = _read_accepted_comparisons(root, manifest)
     try:
         blueprint_chain, chain_coverage = _read_chain_component(root, manifest)
-    except ChainComponentError as exc:
+        compile_records, compile_coverage = _read_compile_records(root, manifest)
+    except (ChainComponentError, CompileRecordsError) as exc:
         raise RestoreError(str(exc)) from exc
     publication = _read_publication_component(root, manifest)
     investigation = _load("investigation.json")
@@ -180,10 +186,12 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
         "achievement_awards": achievement_awards,
         "accepted_comparisons": accepted_comparisons,
         "blueprint_chain": blueprint_chain,
+        "compile_records": compile_records,
         "coverage": {_PERSPECTIVE_EXECUTION_TABLE: receipt_coverage,
                      _ACHIEVEMENT_AWARD_TABLE: award_coverage,
                      _ACCEPTED_COMPARISON_TABLE: comparison_coverage,
                      _CHAIN_COVERAGE: chain_coverage,
+                     _COMPILE_RECORDS_COVERAGE: compile_coverage,
                      # Declared, never silently omitted: only the chain component carries receipts with their
                      # closure (#252); without it, P8's original unsupported declaration stands (P8 §5).
                      _BLUEPRINT_PROPOSAL_TABLE: (
@@ -192,7 +200,8 @@ def read_bundle(bundle_dir: str | Path) -> dict[str, Any]:
                          if blueprint_chain is not None else
                          {"status": "unsupported", "reason": _BLUEPRINT_PROPOSAL_REASON}),
                      # Blueprint-chain portability is not complete study portability (#252 coverage audit).
-                     **restore_coverage(manifest, chain_covered=blueprint_chain is not None)},
+                     **restore_coverage(manifest, chain_covered=blueprint_chain is not None,
+                                        compile_records_covered=compile_records is not None)},
         "investigation": investigation,
         "uploads": uploads,
         "publication": publication,
@@ -502,6 +511,8 @@ def preview_restore(db_path: str | Path, bundle_dir: str | Path) -> dict[str, An
         counts[_ACCEPTED_COMPARISON_TABLE] = len(bundle["accepted_comparisons"])
     if bundle["blueprint_chain"] is not None:
         counts.update({key: len(rows) for key, rows in bundle["blueprint_chain"].items()})
+    if bundle["compile_records"] is not None:
+        counts.update({table: len(rows) for table, rows in bundle["compile_records"].items()})
     counts["uploads"] = len(bundle["uploads"])
     if bundle["publication"] is not None:
         for table, rows in bundle["publication"]["tables"].items():
@@ -573,6 +584,19 @@ def restore_workspace(
                 columns = _table_columns(conn, table)
                 rows = bundle["tables"][table]
                 restored[table] = _insert_rows(conn, table, rows, columns)
+
+            # Observation provenance and derived indexes: verbatim when carried. Otherwise provenance stays
+            # absent (never manufactured) and only the CI-016 derived indexes are rebuilt, and declared.
+            try:
+                if bundle["compile_records"] is not None:
+                    restored.update(_insert_compile_records(conn, bundle["compile_records"]))
+                else:
+                    rebuild = _rebuild_derived_indexes(conn)
+                    restored.update(rebuild["rebuilt_records"])
+                    bundle["coverage"][_COMPILE_RECORDS_COVERAGE] = {**bundle["coverage"][_COMPILE_RECORDS_COVERAGE],
+                                                                     "derived_indexes": rebuild}
+            except CompileRecordsError as exc:
+                raise RestoreError(str(exc)) from exc
 
             columns = _table_columns(conn, "supersession_relations")
             restored["perspective_supersessions"] = _insert_rows(

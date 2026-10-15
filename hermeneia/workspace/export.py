@@ -32,6 +32,8 @@ from ..study.evaluation import (
     score_unsupported_claims,
 )
 from .blueprint_chain import CAPABILITY as CHAIN_CAPABILITY, COMPONENTS as CHAIN_COMPONENTS, FILES as CHAIN_FILES, export_chain
+from .compile_records import CAPABILITY as COMPILE_RECORDS_CAPABILITY, FILES as COMPILE_RECORDS_FILES, ROLES as COMPILE_RECORDS_ROLES
+from .compile_records import export_component as export_compile_records, observations_without_provenance
 from .coverage import not_exported
 
 
@@ -390,6 +392,8 @@ def _build_bundle_files_snapshot(
     accepted_comparisons = _accepted_comparisons(conn)
     # The Blueprint dependency chain (#252): all of it with closure, or a declared absence (never a partial chain).
     chain_rows, chain_declaration = export_chain(conn) if blueprint_chain else (None, None)
+    # Observation provenance and derived indexes (provenance-loss repair): verbatim with closure, or declared absent.
+    compile_rows, compile_declaration = export_compile_records(conn)
     projections = _study_projections(highlights, field_notes)
     derived = _derived(
         conn,
@@ -426,6 +430,9 @@ def _build_bundle_files_snapshot(
     if chain_rows is not None:
         for key, rows in chain_rows.items():
             content[CHAIN_FILES[key]] = (CANONICAL, _dumps(rows))
+    if compile_rows is not None:
+        for table, rows in compile_rows.items():
+            content[COMPILE_RECORDS_FILES[table]] = (COMPILE_RECORDS_ROLES[table], _dumps(rows))
 
     # Uploads: the exact source bytes of the documents in this snapshot,
     # content-hash named (§4, §5.1). Other files are not canonical evidence.
@@ -490,13 +497,22 @@ def _build_bundle_files_snapshot(
         manifest["counts"].update({key: len(rows) for key, rows in chain_rows.items()})
     elif chain_declaration is not None:
         manifest["declared_unsupported"] = {CHAIN_CAPABILITY: chain_declaration}
+    if compile_rows is not None:
+        manifest.setdefault("required_capabilities", []).append(COMPILE_RECORDS_CAPABILITY)
+        manifest["required_capabilities"].sort()
+        manifest["counts"].update({table: len(rows) for table, rows in compile_rows.items()})
+        # Carried as the source holds them: an Observation without provenance stays without it.
+        manifest["counts"]["observations_without_provenance"] = observations_without_provenance(conn)
+    else:
+        manifest.setdefault("declared_unsupported", {})[COMPILE_RECORDS_CAPABILITY] = compile_declaration
     # What this bundle leaves behind, counted from the same snapshot (#252 coverage audit); never repaired.
     manifest["not_exported"] = not_exported(
         conn,
         chain_tables=None if chain_rows is not None else tuple(sorted({table for _k, table, _p, _pk, _c in CHAIN_COMPONENTS})),
         chain_reason=None if chain_rows is not None else (
             chain_declaration["reason"] if chain_declaration is not None else
-            "Blueprint chain export is gated off; P8 acceptance history and its closure are not in this bundle."))
+            "Blueprint chain export is gated off; P8 acceptance history and its closure are not in this bundle."),
+        compile_records_carried=compile_rows is not None)
 
     out: dict[str, bytes] = {path: data for path, (_role, data) in content.items()}
     out["manifest.json"] = _dumps(manifest)

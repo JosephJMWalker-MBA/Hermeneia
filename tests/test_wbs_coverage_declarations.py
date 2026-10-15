@@ -20,7 +20,7 @@ import synthetic_study_lab as lab
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.web.app import create_app
 from hermeneia.workspace import export_workspace_bundle
-from hermeneia.workspace.coverage import CHAIN_SURFACE, NOT_CARRIED
+from hermeneia.workspace.coverage import CHAIN_SURFACE, COMPILE_RECORD_SURFACES, NOT_CARRIED
 from hermeneia.workspace.restore import preview_restore, restore_workspace
 from test_constitutional_p0 import _seed_full_chain
 
@@ -63,14 +63,15 @@ def study(tmp_path):
 def test_a_default_export_counts_everything_it_leaves_behind(study, tmp_path):
     manifest = export_workspace_bundle(study, tmp_path / "bundle", generated_at=GENERATED_AT, workspace_id="w")
     left = manifest["not_exported"]
-    assert set(left) == {surface for surface, *_ in NOT_CARRIED} | {CHAIN_SURFACE}
+    # Provenance and the derived indexes are carried by the compile-records component since the repair.
+    assert set(left) == {surface for surface, *_ in NOT_CARRIED} - set(COMPILE_RECORD_SURFACES) | {CHAIN_SURFACE}
+    assert manifest["counts"]["provenance"] == _count(study, "provenance") > 0
+    assert manifest["counts"]["observations_without_provenance"] == 0
     assert left["study_reviews"]["tables"] == {"observation_reviews": 1, "inquiry_notes": 1}
     assert left["reports"]["tables"]["rendered_narratives"] == 1 and left["reports"]["tables"]["validation_reports"] == 1
     assert left["governance"]["tables"]["witness_sessions"] == 1
     assert left["custom_expression_profiles"]["tables"] == {"expression_profiles": 1}
     assert left["reading_progress"]["tables"] == {"reading_progress": 1}
-    assert left["derived_indexes"]["kind"] == "derived_not_rebuilt" and left["derived_indexes"]["tables"]["observation_derived"] > 0
-    assert left["observation_provenance"]["kind"] == "provenance_not_rebuilt" and left["observation_provenance"]["tables"]["provenance"] > 0
     chain = left[CHAIN_SURFACE]
     assert chain["tables"]["interpretations"] == 1 and chain["tables"]["narrative_blueprints"] == 1 and "gated off" in chain["reason"]
 
@@ -83,11 +84,17 @@ def test_restore_declares_every_surface_unsupported_and_reconstructs_none(study,
     for coverage in (preview["coverage"], result["coverage"]):
         assert coverage["study_portability"] == {"status": "partial", "reason": coverage["study_portability"]["reason"],
                                                  "source_counts": "recorded"}
+        assert coverage["observation_compile_records"]["status"] == "covered"
         for surface, *_ in NOT_CARRIED:
+            if surface in COMPILE_RECORD_SURFACES:
+                assert surface not in coverage["not_carried"]
+                continue
             assert coverage["not_carried"][surface]["status"] == "unsupported"
             assert coverage["not_carried"][surface]["source_records"] == manifest["not_exported"][surface]["tables"]
         assert coverage["not_carried"][CHAIN_SURFACE]["source_records"]["interpretations"] == 1
-    for _surface, tables, _kind, _reason in NOT_CARRIED:
+    for surface, tables, _kind, _reason in NOT_CARRIED:
+        if surface in COMPILE_RECORD_SURFACES:
+            continue
         for table in tables:
             where = "WHERE source IS NOT 'built-in'" if table == "expression_profiles" else ""
             assert _count(target, table, where) == 0, table
@@ -131,9 +138,10 @@ def test_every_runtime_table_is_classified(tmp_path):
     assert tables == exported | system | chain | declared, sorted(tables ^ (exported | system | chain | declared))
 
 
-# Permanent negative witnesses (found by the 2026-10-13 real-study validation). Restore neither carries nor
-# rebuilds compile-time provenance, so evidence-integrity checks change meaning after a round trip. Declared
-# above, not repaired here; a repair must demonstrate a strict unexpected pass before these markers go.
+# Regression witnesses (found by the 2026-10-13 real-study validation). Restore lost compile-time provenance,
+# so evidence-integrity checks changed meaning after a round trip. The observation-compile-records repair
+# (docs/design/wbs-observation-compile-records-v1.md) showed strict unexpected passes on 2026-10-15 before
+# these xfail markers were removed; the assertions are unchanged.
 
 class RestoredProvenanceLost(AssertionError):
     """A restored workspace holds Observations without their compile-time provenance rows."""
@@ -143,7 +151,6 @@ class RestoredObservationLooksTransformed(AssertionError):
     """The Critic provenance check would classify a restored, untouched Observation as transformed."""
 
 
-@pytest.mark.xfail(strict=True, raises=RestoredProvenanceLost, reason="WBS carries no Observation provenance (coverage audit)")
 def test_restore_keeps_compile_time_observation_provenance(study, tmp_path):
     export_workspace_bundle(study, tmp_path / "bundle", generated_at=GENERATED_AT, workspace_id="w")
     target = tmp_path / "restored" / "workspace.db"
@@ -152,7 +159,6 @@ def test_restore_keeps_compile_time_observation_provenance(study, tmp_path):
         raise RestoredProvenanceLost(f"{_count(study, 'provenance')} provenance rows in the source, 0 after restore")
 
 
-@pytest.mark.xfail(strict=True, raises=RestoredObservationLooksTransformed, reason="WBS carries no Observation provenance (coverage audit)")
 def test_an_untouched_observation_is_still_preserved_after_restore(study, tmp_path):
     export_workspace_bundle(study, tmp_path / "bundle", generated_at=GENERATED_AT, workspace_id="w")
     target = tmp_path / "restored" / "workspace.db"
