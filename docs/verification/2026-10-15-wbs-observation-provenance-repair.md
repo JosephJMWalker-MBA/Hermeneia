@@ -123,6 +123,34 @@ The G2 safeguards were repeated:
   It is consistent with SQLite WAL and shared-memory bookkeeping after the
   migration had just written. The as-stored copy was byte-identical.
 
+### Critic classification and Reader offsets on the real study
+
+This was a second fresh private copy, under the same safeguards. The original's 7 files were unchanged, and the copy was deleted afterwards.
+
+**Critic.** A probe Blueprint cited every Observation. It was ratified through the product route, on the copy only; chain export was enabled for this scratch probe alone. An identical null-provider narrative was stored on each side, and `evaluate_provenance` ran over all 2,369 obligations.
+
+| Restored from | Findings identical to the source | Statuses |
+| --- | --- | --- |
+| Default bundle (component carried) | **yes** | 2,369 `preserved` |
+| Earlier-exporter bundle (component stripped) | no | 2,369 `transformed` |
+
+**Reader offsets.** Related observations were compared for every page and the page-less form: 86 probes, 870 items, all with a canonical span.
+
+| Restored from | Responses identical | Items with a span |
+| --- | --- | --- |
+| Default bundle | 86 / 86 | 870 / 870 |
+| Earlier-exporter bundle | 86 / 86 | 870 / 870 |
+
+**Why provenance loss left the Reader unchanged on this study.** All 2,369 provenance rows have `location_precision = sentence` and **null** character offsets. The Reader's spans therefore come from deterministic sentence segmentation (`basis: sentence_segmentation`), which does not read provenance. This is a measured property of this study, not a general one: a study compiled with stored offsets would lose `provenance_char_offsets` spans without the component.
+
+**What the earlier loss actually changed on this study:**
+- the Critic's classification of every cited Observation;
+- Lineage's provenance records;
+- the 2,369 paragraph bounding boxes;
+- the compile-run identity.
+
+All four are now preserved.
+
 ## Authority question (not acted on)
 
 ADR-0042 calls a missing provenance row "transformation"/"transformed". In
