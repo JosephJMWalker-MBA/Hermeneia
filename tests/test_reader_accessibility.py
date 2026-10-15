@@ -666,9 +666,22 @@ def test_read_page_button_is_rendered_in_page_header_with_accessible_label():
 
     assert 'class="cr-read-page-btn"' in render_page
     assert 'type="button"' in render_page
-    assert 'onclick="_crReadCurrentPage()"' in render_page
+    # Since 8428ffe (live Reader audit) the button toggles Read / Pause / Resume, with a separate Stop button.
+    assert 'onclick="_crToggleCurrentPageSpeech()"' in render_page
+    assert 'id="cr-read-page-stop" type="button" onclick="a11yStop()" aria-label="Stop reading" hidden' in render_page
     assert 'aria-label="Read page ${x(_crPage)} aloud"' in render_page
     assert "▶ Read page" in render_page
+    # When nothing on this page is being read, the toggle starts reading the current page.
+    behavior = _run_accessibility_node(
+        "let active=false; let read=0; let paused=0;\n"
+        "function _crCurrentPageSpeechIsActive(){return active;}\n"
+        "function _crReadCurrentPage(){read+=1; return true;}\n"
+        "function a11yPauseResume(){paused+=1;}\n"
+        + _extract_fn(html, "_crToggleCurrentPageSpeech")
+        + "_crToggleCurrentPageSpeech(); active=true; _crToggleCurrentPageSpeech();\n"
+        "process.stdout.write(JSON.stringify({read, paused}));\n"
+    )
+    assert behavior == {"read": 1, "paused": 1}
 
 
 def test_read_current_page_enabled_speaks_structural_page_without_selection():
@@ -929,6 +942,8 @@ def test_failed_or_missing_page_cannot_speak_prior_page_source():
         "function _requestReadingToolsSpeech(){requests+=1;}\n"
         + _extract_fn(html, "_crCurrentPageSpeechText")
         + _extract_fn(html, "_crReadCurrentPage")
+        # _crRenderPage syncs the speech controls since 8428ffe; the real function (no controls here) returns early.
+        + _extract_fn(html, "_crSyncPageSpeechControls")
         + _extract_fn(html, "_crRenderPage")
         + "_crRenderPage();\n"
         "_crReadCurrentPage();\n"
