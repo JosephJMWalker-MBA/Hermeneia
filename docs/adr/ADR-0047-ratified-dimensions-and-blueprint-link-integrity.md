@@ -91,6 +91,21 @@ obligation**, as ADR-0042 already requires. It records the observation in
 | `transformed` | material alteration | false |
 | `not_evaluated` | not evaluated in this invocation | false: the check ran (ADR-0046 rejects this for the same reason) |
 
+**Evidence keeps three facts distinct** (Steward review, 2026-10-16). The
+missing link itself is demonstrable. What cannot be verified is the
+obligation's provenance relationship to the Blueprint. So:
+
+| Fact | Values |
+| --- | --- |
+| `observation_exists` | true or false |
+| `provenance_exists` (the custody record) | true or false |
+| `blueprint_link_exists` | true; **false** for a demonstrated missing link; **null** when the plan's Blueprint cannot be resolved, so the link is unknown |
+
+`unverifiable` here specifically means **the obligation's provenance
+relationship to the Blueprint cannot be verified**. ADR-0046 D-2's reading
+states each fact as established or not established. Implementation-ready
+(not active) in the L2-b packet.
+
 **Precedence within one obligation.**
 1. Observation missing → `omitted`.
 2. Otherwise, custody record missing → `unverifiable`.
