@@ -16,6 +16,8 @@ from .hashing import make_semantic_hash
 
 SCHEMA_VERSION = 21  # append-only Blueprint proposal acceptance receipts (P8)
 
+from .schema_guard import check_schema_marker
+
 # Supersession triggers must be dropped and recreated whenever the canonical object
 # list grows. SQLite has no ALTER TRIGGER.
 _SUPERSESSION_TRIGGER_MIGRATION = """
@@ -1256,6 +1258,10 @@ RATIFIED_FINDING_DISPOSITIONS = frozenset({
     ("preservation", "preserved"), ("omission", "omitted"), ("transformation", "transformed"),
     ("injection", "injected"), ("not_evaluated", "not_evaluated"),
 })
+# Dimension-scoped additions the write guard admits. ADR-0046 U ("unverifiable", provenance only) is pending: it moves
+# into ACTIVE_DIMENSION_DISPOSITIONS only at activation, after ratification (tests/test_adr0046_activation_gate.py).
+ACTIVE_DIMENSION_DISPOSITIONS: dict[str, frozenset] = {}
+PENDING_DIMENSION_DISPOSITIONS = {"provenance": frozenset({("unverifiable", "unverifiable")})}
 _FINDING_COLUMNS = ("id", "rendered_narrative_id", "architect_plan_id", "dimension", "obligation_id", "operation",
                     "status", "evidence", "evaluation_method", "constitution_version", "created_at")
 
@@ -1278,6 +1284,12 @@ class SQLiteStore:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        try:
+            # ADR-0048: read the marker before any DDL, migration or write.
+            check_schema_marker(self._conn, SCHEMA_VERSION)
+        except BaseException:
+            self._conn.close()
+            raise
         self._conn.row_factory = sqlite3.Row
         self._atomic = False
         self._apply_schema()
@@ -1324,9 +1336,9 @@ class SQLiteStore:
                 (SCHEMA_VERSION, datetime.now(timezone.utc).isoformat()),
             )
             self._conn.commit()
-        elif row[0] != SCHEMA_VERSION:
+        elif row[0] < SCHEMA_VERSION:
             # Migrate: DDL is already idempotent (CREATE TABLE IF NOT EXISTS).
-            # Only the version record needs updating.
+            # Only the version record needs updating. It never decreases (ADR-0048).
             self._conn.execute(
                 "UPDATE schema_version SET version = ?, applied_at = ?",
                 (SCHEMA_VERSION, datetime.now(timezone.utc).isoformat()),
@@ -2454,7 +2466,8 @@ class SQLiteStore:
         if not rows:
             return report
         unsupported = [row.get("id") for row in rows
-                       if (row.get("operation"), row.get("status")) not in RATIFIED_FINDING_DISPOSITIONS]
+                       if (row.get("operation"), row.get("status")) not in RATIFIED_FINDING_DISPOSITIONS
+                       and (row.get("operation"), row.get("status")) not in ACTIVE_DIMENSION_DISPOSITIONS.get(row.get("dimension"), ())]
         if unsupported:
             raise FindingLedgerRefusal("unsupported_value", unsupported,
                                        "operation/status is not a ratified disposition (ADR-0041 §5)")

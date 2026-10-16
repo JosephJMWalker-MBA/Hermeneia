@@ -13,8 +13,9 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 
-OPERATION_STATES = ("preservation", "omission", "transformation", "injection", "not_evaluated")
-STATUS_STATES = ("preserved", "omitted", "transformed", "injected", "not_evaluated")
+# `unverifiable` (ADR-0046 U, provenance only) is counted once it can be recorded; until then its count stays 0.
+OPERATION_STATES = ("preservation", "omission", "transformation", "injection", "not_evaluated", "unverifiable")
+STATUS_STATES = ("preserved", "omitted", "transformed", "injected", "not_evaluated", "unverifiable")
 
 
 def audit_dashboard(

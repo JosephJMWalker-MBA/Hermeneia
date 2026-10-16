@@ -51,6 +51,8 @@ def cmd_explorer_discover(
         console.print(f"[red]Database not found:[/] {db_path}")
         sys.exit(1)
 
+    from .target import require_cli_supported_schema
+    require_cli_supported_schema(db_path)
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
 

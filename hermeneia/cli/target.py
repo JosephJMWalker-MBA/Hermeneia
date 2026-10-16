@@ -18,6 +18,22 @@ class DatabaseTargetError(SystemExit):
 
 
 def resolve_db_target(bundle_or_db: str | Path | None, default: str = DEFAULT_DB) -> Path:
+    target = _resolve_db_target(bundle_or_db, default)
+    require_cli_supported_schema(target)
+    return target
+
+
+def require_cli_supported_schema(db_path: str | Path) -> None:
+    """ADR-0048: refuse a newer workspace before any CLI command opens it for writing."""
+    from ..storage.schema_guard import SchemaMarkerError, require_supported_schema
+    from ..storage.sqlite import SCHEMA_VERSION
+    try:
+        require_supported_schema(db_path, SCHEMA_VERSION)
+    except SchemaMarkerError as exc:
+        raise DatabaseTargetError(str(exc)) from exc
+
+
+def _resolve_db_target(bundle_or_db: str | Path | None, default: str) -> Path:
     if bundle_or_db is None:
         return Path(default)
     target = Path(bundle_or_db)

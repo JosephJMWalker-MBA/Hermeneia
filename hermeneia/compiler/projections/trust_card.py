@@ -59,7 +59,7 @@ def trust_card(
         dim = f["dimension"]
         if dim not in dim_counts:
             dim_counts[dim] = {"preserved": 0, "omitted": 0, "transformed": 0,
-                               "injected": 0, "not_evaluated": 0, "total": 0}
+                               "injected": 0, "not_evaluated": 0, "unverifiable": 0, "total": 0}
         dim_counts[dim][f["status"]] += 1
         dim_counts[dim]["total"] += 1
 

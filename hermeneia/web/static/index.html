@@ -16686,7 +16686,7 @@ async function e10LoadFindings() {
   host.className = '';
   host.innerHTML = data.findings.length
     ? `<div class="e10-stack">${data.findings.map(f => `<div class="e10-card">
-        <div class="e10-meta">${x(f.dimension)} · ${x(f.status)} · ${shortId(f.id)}</div>
+        <div class="e10-meta">${x(f.dimension)} · ${x(f.reading ? f.reading.attribution : f.status)} · ${shortId(f.id)}</div>
         <div class="e10-text">${x(f.operation || '')}</div>
         <button class="btn-trace" onclick="e10FindingLineage('${x(f.id)}')">Show Lineage</button>
       </div>`).join('')}</div>`
@@ -16701,6 +16701,7 @@ async function e10FindingLineage(id) {
   host.innerHTML = `<div class="e10-card">
     <div class="e10-meta">Finding · ${shortId(data.finding.id)}</div>
     <div class="e10-text">${x(data.finding.dimension)} / ${x(data.finding.status)}</div>
+    ${e10FindingReadingHtml(data.finding.reading)}
     <div class="e10-lineage">
       ${e10LineageRow('Finding', data.finding.id, data.finding.operation)}
       <div class="e10-lineage-arrow">↓</div>
@@ -16728,6 +16729,19 @@ async function e10InterpretationLineage(proposalId) {
     <div class="e10-lineage">${graph.nodes.map((n, i) => `${i ? '<div class="e10-lineage-arrow">↓</div>' : ''}${e10LineageNodeHtml(n)}`).join('')}</div>
   </div>`;
   e10Go('lineage');
+}
+
+// ADR-0046 D-2: name the evaluator version and say what this Finding's own evidence did and did not establish.
+function e10FindingReadingHtml(reading) {
+  if (!reading) return '';
+  const list = (label, items) => items && items.length
+    ? `<div class="e10-text"><strong>${x(label)}:</strong> ${items.map(x).join('; ')}</div>` : '';
+  return `<div class="e10-reading">
+    <div class="e10-meta">${x(reading.attribution)}</div>
+    ${list('Its evidence established', reading.established)}
+    ${list('It did not establish', reading.not_established)}
+    ${reading.ratified_dimension === false ? '<div class="e10-text">Unratified dimension (historical)</div>' : ''}
+  </div>`;
 }
 
 function e10LineageRow(cls, id, summary) {

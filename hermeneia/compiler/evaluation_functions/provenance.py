@@ -23,7 +23,10 @@ guarantees = ["deterministic", "complete", "read_only", "orthogonal", "zero_llm"
 
 # ── Internal constants ────────────────────────────────────────────────────────
 DIMENSION = dimension
-EVALUATION_METHOD = "provenance-v1.0"
+EVALUATION_METHOD = "provenance-v1.0"  # the active method (ADR-0042)
+# ADR-0046 U: an absent provenance record is `unverifiable`, not a transformation. Implementation-ready only: it is
+# not the default until ADR-0046 is ratified and activated (tests/test_adr0046_activation_gate.py enforces this).
+UNVERIFIABLE_METHOD = "provenance-v1.1"
 
 CONSTITUTIONAL_PROFILE = {
     "constitution_version": "1.0.0",
@@ -38,6 +41,8 @@ def evaluate_provenance(
     rendered_narrative_id: str,
     architect_plan_id: str,
     conn: sqlite3.Connection,
+    *,
+    method: str = EVALUATION_METHOD,
 ) -> list[dict]:
     """Run the Provenance Evaluation Function.
 
@@ -45,6 +50,8 @@ def evaluate_provenance(
     Raises ValueError if plan or narrative cannot be loaded.
     Raises RuntimeError if Completeness Invariant is violated.
     """
+    if method not in (EVALUATION_METHOD, UNVERIFIABLE_METHOD):
+        raise ValueError(f"unknown provenance evaluation method: {method}")
     now = datetime.now(timezone.utc).isoformat()
 
     narrative = conn.execute(
@@ -92,6 +99,8 @@ def evaluate_provenance(
 
             if obs_exists and prov_exists:
                 operation, status = "preservation", "preserved"
+            elif obs_exists and not prov_exists and method == UNVERIFIABLE_METHOD:
+                operation, status = "unverifiable", "unverifiable"
             elif obs_exists and not prov_exists:
                 operation, status = "transformation", "transformed"
             else:
@@ -115,7 +124,7 @@ def evaluate_provenance(
                 "operation": operation,
                 "status": status,
                 "evidence": evidence,
-                "evaluation_method": EVALUATION_METHOD,
+                "evaluation_method": method,
                 "constitution_version": json.dumps(CONSTITUTIONAL_PROFILE, sort_keys=True),
                 "created_at": now,
             })

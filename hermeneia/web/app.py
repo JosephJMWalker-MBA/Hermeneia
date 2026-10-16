@@ -205,6 +205,11 @@ def create_app(
     db_path = Path(db_path)
     app = Flask(__name__, static_folder=str(STATIC_DIR))
 
+    # ADR-0048: refuse a newer workspace before any startup migration touches it.
+    from ..storage.schema_guard import require_supported_schema as _require_supported_schema
+    from ..storage.sqlite import SCHEMA_VERSION as _SCHEMA_VERSION
+    _require_supported_schema(db_path, _SCHEMA_VERSION)
+
     # Run all pending schema migrations on startup if the DB exists
     if db_path.exists():
         from ..storage.sqlite import ensure_profile_tables as _migrate
@@ -605,6 +610,13 @@ def create_app(
     def _conn_rw() -> sqlite3.Connection:
         """Read-write connection for pipeline write endpoints (Artist, Critic)."""
         conn = sqlite3.connect(str(db_path))
+        try:
+            # ADR-0048: a newer build may have migrated the workspace since startup.
+            from ..storage.schema_guard import check_schema_marker
+            check_schema_marker(conn, _SCHEMA_VERSION)
+        except BaseException:
+            conn.close()
+            raise
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
         return conn
@@ -6250,7 +6262,9 @@ def create_app(
             """
         ).fetchall()
         conn.close()
-        return jsonify({"count": len(rows), "findings": [dict(row) for row in rows]})
+        from ..compiler.projections.finding_readings import finding_reading
+        findings = [{**dict(row), "reading": finding_reading(dict(row))} for row in rows]
+        return jsonify({"count": len(findings), "findings": findings})
 
     @app.route("/api/e10/findings/<finding_id>/lineage")
     def api_e10_finding_lineage(finding_id: str):
@@ -6278,6 +6292,8 @@ def create_app(
         except (_LineageError, _ScopeAccessError):
             graph = None
         conn.close()
+        from ..compiler.projections.finding_readings import finding_reading
+        finding["reading"] = finding_reading(finding)
         return jsonify({"finding": finding, "lineage": graph})
 
     # ── /api/lineage/rendered_narratives ────────────────────────────────────
