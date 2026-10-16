@@ -47,7 +47,11 @@ class Scenario:
         conn.close()
         migrate_findings_vocabulary(self.db)
         self.original = rows(self.db, "findings")
+        # Disposition changed (what a revision must carry) vs. any recorded difference (what D-3 compares). They
+        # differ once v1.1 records more facts than v1.0, as ADR-0047 L2-b's blueprint_link_exists does.
         self.changed = [n for o, n in zip(self.v10, self.v11) if (o["operation"], o["status"]) != (n["operation"], n["status"])]
+        self.divergent = [n for o, n in zip(self.v10, self.v11)
+                          if (o["operation"], o["status"], o["evidence"]) != (n["operation"], n["status"], n["evidence"])]
 
     def decision(self) -> dict:
         conn = connect(self.db)
@@ -82,7 +86,8 @@ def test_baseline_d3_refuses_the_revision_and_preserves_the_original(scenario):
     with pytest.raises(FindingLedgerRefusal) as refused:
         scenario.pair.persist(scenario.db, scenario.v11)
     assert refused.value.refusal_class == "divergent_result"
-    assert sorted(refused.value.finding_ids) == sorted(f["id"] for f in scenario.changed)
+    assert sorted(refused.value.finding_ids) == sorted(f["id"] for f in scenario.divergent)
+    assert {f["id"] for f in scenario.changed} <= {f["id"] for f in scenario.divergent}
     assert rows(scenario.db, "findings") == scenario.original
     assert scenario.decision() == {"finding_id": scenario.decided["id"], "status": "transformed"}
 
@@ -218,3 +223,12 @@ def test_option_c_does_not_weaken_d3(scenario):
     _revise(scenario, scenario.v11, first, V11, "2026-10-16T00:00:00+00:00")
     with pytest.raises(FindingLedgerRefusal):
         scenario.pair.persist(scenario.db, scenario.v11)
+
+
+def test_a_method_that_records_more_facts_diverges_on_evidence_alone(scenario):
+    """Open question for ADR-0049: with ADR-0047 L2-b, v1.1 records blueprint_link_exists for every obligation, so the
+    three obligations whose disposition is unchanged still differ in evidence. D-3 refuses all of them; a revision
+    keyed on disposition carries only two. U-only v1.1 has no evidence-only divergence."""
+    evidence_only = [f for f in scenario.divergent if f not in scenario.changed]
+    records_link = any("blueprint_link_exists" in f["evidence"] for f in scenario.v11)
+    assert len(evidence_only) == (3 if records_link else 0)

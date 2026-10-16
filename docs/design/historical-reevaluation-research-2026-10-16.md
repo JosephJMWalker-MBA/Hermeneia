@@ -95,5 +95,17 @@ unchanged.
    gets an ordinary ID. One that revises gets a revision ID. Both are correct
    locally, but a future Findings-portability component must carry the
    supersession relations and must not equate the two.
-5. **Verdicts.** The trust card and dashboards should count heads only, and
+6. **What triggers a revision: disposition, or any recorded difference?**
+   This was found at integration with ADR-0047 L2-b.
+   - **The cause.** L2-b's v1.1 records one more fact (`blueprint_link_exists`)
+     for every obligation.
+   - **The effect.** After activation, all five obligations diverge from v1.0
+     on evidence, while only two change disposition. D-3, which compares
+     evidence, refuses all five.
+   - **Proposed:** revise when the disposition changes. Report an evidence-only
+     difference as `retained`, with the newer facts named, under a D-3
+     refinement that compares only the facts both methods record. That
+     refinement would amend ADR-0046 D-3 and needs authority. Tested in
+     `test_a_method_that_records_more_facts_diverges_on_evidence_alone`.
+7. **Verdicts.** The trust card and dashboards should count heads only, and
    show superseded Findings as history.

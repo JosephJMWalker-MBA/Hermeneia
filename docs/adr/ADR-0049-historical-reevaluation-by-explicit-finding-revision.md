@@ -67,6 +67,12 @@ but the authorized correction cannot be recorded.
 
 ## Not decided here
 
+- **Revision trigger.** Revise on a changed disposition only, or on any
+  recorded difference? A newer method that records more facts (ADR-0047
+  L2-b) differs in evidence on **every** obligation. The research recommends
+  disposition plus a D-3 refinement for evidence-only differences. That
+  refinement needs its own authority.
+
 - Who may trigger a revision batch (proposed: the Steward, explicitly).
 - How a future Findings-portability component carries revisions and their
   relations.
