@@ -16,6 +16,7 @@ from typing import Callable
 
 import pytest
 
+from hermeneia.compiler.staging.interpretation import accept_proposed_interpretation
 from hermeneia.perspective_identity import frame_v2_row_from_draft
 from hermeneia.storage.hashing import (
     make_critic_report_id,
@@ -233,6 +234,78 @@ WRITERS["insert_steward_decision"] = Writer(
     }),
     probe="SELECT COUNT(*) FROM steward_decisions",
 )
+
+# --- AI staging (ADR-0009) ---
+
+
+def _provenance() -> dict:
+    return {
+        "id": "provenance-1", "staged_object_id": "proposal-1", "generating_model": "fake-model",
+        "model_version": "", "generation_timestamp": NOW, "prompt_reference": "template-1",
+        "prompt_reference_type": "template_id", "parent_object_ids": "[]", "generation_parameters": "{}",
+        "schema_version": "ADR-0009-v1.0", "accepting_steward": None, "acceptance_timestamp": None,
+        "acceptance_rationale": None, "created_at": NOW,
+    }
+
+
+def _proposal(ids: dict) -> dict:
+    return {
+        "id": "proposal-1", "observation_id": ids["obs_id"], "perspective": "literary", "perspective_id": None,
+        "text": "A machine reading.", "evidential_status": "speculative",
+        "evidence_observation_ids": json.dumps([ids["obs_id"]]), "ai_provenance_id": "provenance-1",
+        "status": "pending", "steward_id": None, "decided_at": None, "steward_rationale": None, "created_at": NOW,
+    }
+
+
+def _stage(store: SQLiteStore, ids: dict) -> None:
+    store.insert_ai_provenance(_provenance())
+    store.insert_proposed_interpretation(_proposal(ids))
+
+
+WRITERS["insert_ai_provenance"] = Writer(
+    write=lambda store, ids: store.insert_ai_provenance(_provenance()),
+    probe="SELECT COUNT(*) FROM ai_provenance",
+)
+WRITERS["complete_ai_provenance_acceptance"] = Writer(
+    prepare=lambda store, ids: store.insert_ai_provenance(_provenance()),
+    write=lambda store, ids: store.complete_ai_provenance_acceptance("provenance-1", "steward", NOW, "Grounded."),
+    probe="SELECT accepting_steward FROM ai_provenance",
+)
+WRITERS["insert_proposed_interpretation"] = Writer(
+    prepare=lambda store, ids: store.insert_ai_provenance(_provenance()),
+    write=lambda store, ids: store.insert_proposed_interpretation(_proposal(ids)),
+    probe="SELECT COUNT(*) FROM proposed_interpretations",
+)
+WRITERS["decide_proposed_interpretation"] = Writer(
+    prepare=_stage,
+    write=lambda store, ids: store.decide_proposed_interpretation("proposal-1", "rejected", "steward", NOW, "Ungrounded."),
+    probe="SELECT status FROM proposed_interpretations",
+)
+WRITERS["insert_interpretation_with_provenance"] = Writer(
+    prepare=lambda store, ids: store.insert_ai_provenance(_provenance()),
+    write=lambda store, ids: store.insert_interpretation_with_provenance({
+        **_interpretation(ids, "A machine reading."),
+        "confidence": "ai-accepted", "source": "ai-accepted", "ai_provenance_id": "provenance-1",
+    }),
+    probe="SELECT COUNT(*) FROM interpretations",
+)
+
+
+def test_a_steward_acceptance_inside_atomic_rolls_back_as_one(chain):
+    """accept_proposed_interpretation makes three writes; inside atomic() they stand or fall together."""
+    store, ids = chain
+    _stage(store, ids)
+    state = ("SELECT (SELECT status FROM proposed_interpretations) || '/' || "
+             "(SELECT COUNT(accepting_steward) FROM ai_provenance) || '/' || (SELECT COUNT(*) FROM interpretations)")
+    assert _committed(store.db_path, state) == "pending/0/1"
+    with pytest.raises(LaterFailure):
+        with store.atomic():
+            accept_proposed_interpretation("proposal-1", "steward", "Grounded.", store)
+            raise LaterFailure
+    assert _committed(store.db_path, state) == "pending/0/1"
+    with store.atomic():
+        accept_proposed_interpretation("proposal-1", "steward", "Grounded.", store)
+    assert _committed(store.db_path, state) == "accepted/1/2"
 
 
 def test_a_repeated_revision_inside_atomic_does_not_commit_the_block_early(chain):

@@ -2687,7 +2687,7 @@ class SQLiteStore:
             """,
             record,
         )
-        self._conn.commit()
+        self._commit()
 
     def complete_ai_provenance_acceptance(
         self,
@@ -2707,7 +2707,7 @@ class SQLiteStore:
             """,
             (accepting_steward, acceptance_timestamp, acceptance_rationale, ai_provenance_id),
         )
-        self._conn.commit()
+        self._commit()
 
     def get_ai_provenance(self, ai_provenance_id: str) -> dict | None:
         row = self._conn.execute(
@@ -2738,7 +2738,7 @@ class SQLiteStore:
             """,
             proposal,
         )
-        self._conn.commit()
+        self._commit()
 
     def get_proposed_interpretation(self, proposal_id: str) -> dict | None:
         row = self._conn.execute(
@@ -2770,7 +2770,7 @@ class SQLiteStore:
             """,
             (status, steward_id, decided_at, steward_rationale, proposal_id),
         )
-        self._conn.commit()
+        self._commit()
 
     def pending_proposed_interpretations(self) -> list[dict]:
         rows = self._conn.execute(
@@ -2820,7 +2820,7 @@ class SQLiteStore:
             """,
             interp,
         )
-        self._conn.commit()
+        self._commit()
 
     def close(self) -> None:
         self._conn.close()
