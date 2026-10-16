@@ -362,3 +362,22 @@ manifest. This is deliberate: it is additive, older restorers ignore it, and
 bundles stay deterministic. Default bundles otherwise carry no chain files,
 capability or declaration, so P8's unsupported declaration and dataset are
 unchanged.
+
+## 10. Amendment 3 (2026-10-16, proposed with ADR-0047 L2-a; not ratified)
+
+**What it adds.** One more `CHAIN_INTEGRITY_INVALID` condition: a paragraph
+of an ArchitectPlan requires an Observation that the plan's Blueprint does not
+link in `blueprint_observation_links`.
+
+**Effects.** It reuses the existing code, the existing precedence and the
+existing all-or-nothing behavior:
+- **Export** declares the chain unsupported and carries the rest of the
+  workspace.
+- **Restore** refuses a bundle that carries such a chain, and writes nothing.
+
+**Historical compatibility.**
+- A workspace that already holds such a plan is not rewritten, and it still
+  opens and is evaluated.
+- Its chain is declared, not carried, until the record is superseded through
+  normal Blueprint revision.
+- The Critic's read-time link check (ADR-0047 L2-b) is separate.

@@ -202,6 +202,8 @@ def test_a_cited_observation_the_blueprint_does_not_link_is_not_classified_prese
 
 
 # L2 (ADR-0047): write-time and restore-time integrity, and read-time recording of the link fact.
+# The L2-a witnesses showed XPASS(strict) under the L2-a packet (blueprint-link-integrity) and are regressions now;
+# the L2-b witnesses stay strict-xfail until L2-b is ratified and activated with U.
 
 class UnlinkedObligationWritten(AssertionError):
     """A plan whose obligations are not all linked to its Blueprint is written (ADR-0047 L2-a)."""
@@ -215,7 +217,6 @@ class LinkAbsenceNotRecorded(AssertionError):
     """The Finding's evidence does not record that the Blueprint link was absent (ADR-0047 L2-b)."""
 
 
-@pytest.mark.xfail(strict=True, raises=UnlinkedObligationWritten, reason="ADR-0047 L2-a proposed: the store API accepts it")
 def test_the_store_api_refuses_a_plan_with_unlinked_obligations(study):
     try:
         study.write_plan_through_the_store_api()
@@ -230,7 +231,6 @@ _CHAIN_EXPORT = "blueprint_chain" in inspect.signature(export_workspace_bundle).
 
 
 @pytest.mark.skipif(not _CHAIN_EXPORT, reason="needs the WBS Blueprint chain component (#255)")
-@pytest.mark.xfail(strict=True, raises=UnlinkedChainRestored, reason="ADR-0047 L2-a proposed: chain closure does not check links")
 def test_an_inconsistent_historical_chain_is_neither_exported_as_covered_nor_restored(study, tmp_path):
     study.cite_unlinked_observation()  # a historical or corrupted record; no product route writes it
     assert study.unlinked_plans()
