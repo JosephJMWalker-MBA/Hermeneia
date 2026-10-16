@@ -1286,6 +1286,33 @@ class SQLiteStore:
         if not self._atomic:
             self._conn.commit()
 
+    @contextmanager
+    def _own_transaction(self):
+        """Run one method's writes all or nothing, holding the write lock throughout.
+
+        Outside atomic() this is the method's own IMMEDIATE transaction. Inside
+        atomic() it is a savepoint, so the block's earlier writes are not
+        committed early and a refusal undoes only this method's writes.
+        """
+        if self._atomic:
+            self._conn.execute("SAVEPOINT own_transaction")
+            try:
+                yield
+            except Exception:
+                self._conn.execute("ROLLBACK TO own_transaction")
+                self._conn.execute("RELEASE own_transaction")
+                raise
+            self._conn.execute("RELEASE own_transaction")
+            return
+        self._conn.commit()
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+        except Exception:
+            self._conn.rollback()
+            raise
+        self._conn.commit()
+
     def _apply_schema(self) -> None:
         self._conn.executescript(DDL)
         self._conn.executescript(_SUPERSESSION_TRIGGER_MIGRATION)
@@ -1678,7 +1705,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def insert_frame_perspective(self, row: dict, *, predecessor_perspective_id: str | None = None) -> dict:
         """Insert a frame-v2 Perspective, or verify an idempotent repeat."""
@@ -1719,7 +1746,7 @@ class SQLiteStore:
             prepared,
         )
         if not outer_transaction:
-            self._conn.commit()
+            self._commit()
         return self.get_perspective_by_id(str(prepared["id"])) or prepared
 
     def get_perspective_by_id(self, perspective_id: str) -> dict | None:
@@ -1787,9 +1814,7 @@ class SQLiteStore:
             if not isinstance(prepared.get(key), str):
                 prepared[key] = json.dumps(prepared.get(key) or [], sort_keys=True, ensure_ascii=True, separators=(",", ":"))
         validate_frame_v2_row_identity(prepared, predecessor_perspective_id=predecessor_id)
-        self._conn.commit()
-        self._conn.execute("BEGIN IMMEDIATE")
-        try:
+        with self._own_transaction():
             predecessor = self.get_perspective_by_id(predecessor_id)
             if predecessor is None:
                 raise ValueError("unknown predecessor Perspective")
@@ -1808,7 +1833,6 @@ class SQLiteStore:
                     dict(existing),
                     predecessor_perspective_id=predecessor_id,
                 )
-                self._conn.commit()
                 return dict(existing)
             if not self.perspective_is_current_leaf(predecessor_id):
                 raise ValueError("Only the current Perspective leaf can be revised.")
@@ -1826,11 +1850,7 @@ class SQLiteStore:
                 """,
                 (predecessor_id, successor_id, reason, ratified_at),
             )
-            self._conn.commit()
             return row
-        except Exception:
-            self._conn.rollback()
-            raise
 
     def _perspective_path_exists(self, start_id: str, target_id: str) -> bool:
         if start_id == target_id:

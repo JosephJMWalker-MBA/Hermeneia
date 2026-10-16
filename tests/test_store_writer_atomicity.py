@@ -16,7 +16,8 @@ from typing import Callable
 
 import pytest
 
-from hermeneia.storage.hashing import make_interpretation_id
+from hermeneia.perspective_identity import frame_v2_row_from_draft
+from hermeneia.storage.hashing import make_interpretation_id, make_perspective_id
 from hermeneia.storage.sqlite import SQLiteStore
 from test_constitutional_p0 import _seed_full_chain
 
@@ -90,6 +91,78 @@ WRITERS["insert_supersession_relation"] = Writer(
     }),
     probe="SELECT COUNT(*) FROM supersession_relations",
 )
+
+# --- perspectives ---
+
+
+def _frame(purpose: str = "Examine how institutions gain, lose, or borrow legitimacy.", predecessor: str | None = None) -> dict:
+    draft = {
+        "label": "Institutional Trust Reader",
+        "purpose": purpose,
+        "questions": ["Who is expected to trust whom?"],
+        "challenges": ["Challenge unsupported legitimacy claims."],
+        "limitations": ["May overemphasize institutions."],
+    }
+    return frame_v2_row_from_draft(draft, declared_by="Primary Human Steward", declared_date=NOW,
+                                   predecessor_perspective_id=predecessor)[0]
+
+
+def _revise(store: SQLiteStore, ids: dict | None = None) -> dict:
+    root = _frame()["id"]
+    return store.insert_perspective_revision(root, _frame("Trace how institutions ask to be believed.", root),
+                                             "Sharper trust language.", NOW)
+
+
+PERSPECTIVES_AND_EDGES = "SELECT (SELECT COUNT(*) FROM perspectives) || '/' || (SELECT COUNT(*) FROM supersession_relations)"
+
+WRITERS["register_perspective"] = Writer(
+    write=lambda store, ids: store.register_perspective({
+        "id": make_perspective_id("historical"), "name": "historical", "description": "", "created_at": NOW,
+    }),
+    probe="SELECT COUNT(*) FROM perspectives",
+)
+WRITERS["insert_frame_perspective"] = Writer(
+    write=lambda store, ids: store.insert_frame_perspective(_frame()),
+    probe="SELECT COUNT(*) FROM perspectives",
+)
+WRITERS["insert_perspective_revision"] = Writer(
+    prepare=lambda store, ids: store.insert_frame_perspective(_frame()),
+    write=_revise,
+    probe=PERSPECTIVES_AND_EDGES,
+)
+
+
+def test_a_repeated_revision_inside_atomic_does_not_commit_the_block_early(chain):
+    store, _ids = chain
+    store.insert_frame_perspective(_frame())
+    _revise(store)  # committed; the repeat below takes the idempotent path
+    before = _committed(store.db_path, "SELECT COUNT(*) FROM perspectives")
+    with pytest.raises(LaterFailure):
+        with store.atomic():
+            store.register_perspective({
+                "id": make_perspective_id("historical"), "name": "historical", "description": "", "created_at": NOW,
+            })
+            _revise(store)
+            raise LaterFailure
+    assert _committed(store.db_path, "SELECT COUNT(*) FROM perspectives") == before
+
+
+def test_a_refused_revision_inside_atomic_undoes_only_its_own_writes(chain):
+    """The refusal comes after the successor row is written; the caller catches it and the block goes on."""
+    store, _ids = chain
+    store.insert_frame_perspective(_frame())
+    store._conn.execute("""
+        CREATE TEMP TRIGGER refuse_supersession BEFORE INSERT ON supersession_relations
+        BEGIN SELECT RAISE(ABORT, 'refused for this test'); END
+    """)
+    with store.atomic():
+        store.register_perspective({
+            "id": make_perspective_id("historical"), "name": "historical", "description": "", "created_at": NOW,
+        })
+        with pytest.raises(sqlite3.IntegrityError, match="refused for this test"):
+            _revise(store)
+    assert _committed(store.db_path, "SELECT COUNT(*) FROM perspectives WHERE name = 'historical'") == 1  # the block's own write
+    assert _committed(store.db_path, PERSPECTIVES_AND_EDGES) == "3/0"  # literary, historical, root; no successor
 
 
 @pytest.mark.parametrize("name", sorted(WRITERS))
