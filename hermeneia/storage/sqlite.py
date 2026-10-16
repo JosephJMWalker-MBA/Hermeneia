@@ -16,6 +16,8 @@ from .hashing import make_semantic_hash
 
 SCHEMA_VERSION = 21  # append-only Blueprint proposal acceptance receipts (P8)
 
+from .schema_guard import check_schema_marker
+
 # Supersession triggers must be dropped and recreated whenever the canonical object
 # list grows. SQLite has no ALTER TRIGGER.
 _SUPERSESSION_TRIGGER_MIGRATION = """
@@ -1278,6 +1280,12 @@ class SQLiteStore:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        try:
+            # ADR-0048: read the marker before any DDL, migration or write.
+            check_schema_marker(self._conn, SCHEMA_VERSION)
+        except BaseException:
+            self._conn.close()
+            raise
         self._conn.row_factory = sqlite3.Row
         self._atomic = False
         self._apply_schema()
@@ -1324,9 +1332,9 @@ class SQLiteStore:
                 (SCHEMA_VERSION, datetime.now(timezone.utc).isoformat()),
             )
             self._conn.commit()
-        elif row[0] != SCHEMA_VERSION:
+        elif row[0] < SCHEMA_VERSION:
             # Migrate: DDL is already idempotent (CREATE TABLE IF NOT EXISTS).
-            # Only the version record needs updating.
+            # Only the version record needs updating. It never decreases (ADR-0048).
             self._conn.execute(
                 "UPDATE schema_version SET version = ?, applied_at = ?",
                 (SCHEMA_VERSION, datetime.now(timezone.utc).isoformat()),
