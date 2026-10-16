@@ -14,6 +14,9 @@ Two canonical objects are created or updated during acceptance:
 
 Rejection only updates the staging row. The ai_provenance acceptance fields remain NULL.
 Rejected objects are never deleted (ADR-0009).
+
+Proposal and acceptance each run in one store.atomic() block: their writes commit
+together or not at all, and inside a caller's own block they belong to that block.
 """
 import json
 from datetime import datetime, timezone
@@ -94,7 +97,6 @@ def propose_interpretation(
         raise StagingError(f"prompt_reference_type must be one of {sorted(_VALID_PROMPT_REF_TYPES)}")
 
     evidence_ids = [str(oid) for oid in (evidence_observation_ids or [])]
-    _require_active_observation_set(conn, [observation_id, *evidence_ids])
 
     now = datetime.now(timezone.utc).isoformat()
     gen_ts = generation_timestamp or now
@@ -120,7 +122,6 @@ def propose_interpretation(
         "acceptance_rationale": None,
         "created_at": now,
     }
-    conn.insert_ai_provenance(provenance)
 
     proposal = {
         "id": proposal_id,
@@ -137,7 +138,12 @@ def propose_interpretation(
         "steward_rationale": None,
         "created_at": now,
     }
-    conn.insert_proposed_interpretation(proposal)
+
+    # One staged object: the scope check and both writes hold one write lock, all or nothing.
+    with conn.atomic():
+        _require_active_observation_set(conn, [observation_id, *evidence_ids])
+        conn.insert_ai_provenance(provenance)
+        conn.insert_proposed_interpretation(proposal)
 
     return proposal
 
@@ -152,7 +158,7 @@ def accept_proposed_interpretation(
 ) -> dict:
     """Accept a staged proposal and promote it to canonical interpretations.
 
-    Three writes in sequence:
+    Three writes, committed together or not at all:
     1. proposed_interpretations.status → 'accepted'
     2. ai_provenance acceptance fields populated
     3. interpretations: canonical row inserted (INSERT OR IGNORE)
@@ -170,60 +176,62 @@ def accept_proposed_interpretation(
     if not acceptance_rationale or not acceptance_rationale.strip():
         raise StagingError("acceptance_rationale is required")
 
-    proposal = conn.get_proposed_interpretation(proposal_id)
-    if proposal is None:
-        raise StagingError(f"ProposedInterpretation {proposal_id!r} not found")
-    if proposal["status"] != "pending":
-        raise StagingError(
-            f"ProposedInterpretation {proposal_id!r} is already {proposal['status']!r} — cannot accept"
+    # One steward act: the pending and scope checks and all three writes hold one write lock.
+    with conn.atomic():
+        proposal = conn.get_proposed_interpretation(proposal_id)
+        if proposal is None:
+            raise StagingError(f"ProposedInterpretation {proposal_id!r} not found")
+        if proposal["status"] != "pending":
+            raise StagingError(
+                f"ProposedInterpretation {proposal_id!r} is already {proposal['status']!r} — cannot accept"
+            )
+
+        try:
+            evidence_ids = json.loads(proposal["evidence_observation_ids"] or "[]")
+        except (TypeError, json.JSONDecodeError):
+            evidence_ids = []
+        if not isinstance(evidence_ids, list):
+            evidence_ids = []
+        _require_active_observation_set(conn, [proposal["observation_id"], *[str(oid) for oid in evidence_ids]])
+
+        now = datetime.now(timezone.utc).isoformat()
+        ts = accepted_at or now
+
+        # 1. Mark staging row accepted
+        conn.decide_proposed_interpretation(
+            proposal_id,
+            status="accepted",
+            steward_id=accepting_steward,
+            decided_at=ts,
+            steward_rationale=acceptance_rationale,
         )
 
-    try:
-        evidence_ids = json.loads(proposal["evidence_observation_ids"] or "[]")
-    except (TypeError, json.JSONDecodeError):
-        evidence_ids = []
-    if not isinstance(evidence_ids, list):
-        evidence_ids = []
-    _require_active_observation_set(conn, [proposal["observation_id"], *[str(oid) for oid in evidence_ids]])
+        # 2. Complete ai_provenance acceptance record
+        conn.complete_ai_provenance_acceptance(
+            ai_provenance_id=proposal["ai_provenance_id"],
+            accepting_steward=accepting_steward,
+            acceptance_timestamp=ts,
+            acceptance_rationale=acceptance_rationale,
+        )
 
-    now = datetime.now(timezone.utc).isoformat()
-    ts = accepted_at or now
-
-    # 1. Mark staging row accepted
-    conn.decide_proposed_interpretation(
-        proposal_id,
-        status="accepted",
-        steward_id=accepting_steward,
-        decided_at=ts,
-        steward_rationale=acceptance_rationale,
-    )
-
-    # 2. Complete ai_provenance acceptance record
-    conn.complete_ai_provenance_acceptance(
-        ai_provenance_id=proposal["ai_provenance_id"],
-        accepting_steward=accepting_steward,
-        acceptance_timestamp=ts,
-        acceptance_rationale=acceptance_rationale,
-    )
-
-    # 3. Insert canonical interpretation
-    canonical_id = make_interpretation_id(
-        proposal["observation_id"], proposal["perspective"], proposal["text"]
-    )
-    canonical = {
-        "id": canonical_id,
-        "observation_id": proposal["observation_id"],
-        "perspective": proposal["perspective"],
-        "perspective_id": proposal["perspective_id"],
-        "text": proposal["text"],
-        "evidential_status": proposal["evidential_status"],
-        "evidence_observation_ids": proposal["evidence_observation_ids"],
-        "confidence": "ai-accepted",
-        "source": "ai-accepted",
-        "ai_provenance_id": proposal["ai_provenance_id"],
-        "created_at": ts,
-    }
-    conn.insert_interpretation_with_provenance(canonical)
+        # 3. Insert canonical interpretation
+        canonical_id = make_interpretation_id(
+            proposal["observation_id"], proposal["perspective"], proposal["text"]
+        )
+        canonical = {
+            "id": canonical_id,
+            "observation_id": proposal["observation_id"],
+            "perspective": proposal["perspective"],
+            "perspective_id": proposal["perspective_id"],
+            "text": proposal["text"],
+            "evidential_status": proposal["evidential_status"],
+            "evidence_observation_ids": proposal["evidence_observation_ids"],
+            "confidence": "ai-accepted",
+            "source": "ai-accepted",
+            "ai_provenance_id": proposal["ai_provenance_id"],
+            "created_at": ts,
+        }
+        conn.insert_interpretation_with_provenance(canonical)
 
     return canonical
 
