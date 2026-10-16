@@ -196,6 +196,8 @@ def test_a_missing_workspace_is_created_normally(tmp_path):
 REVIEWED_CONNECTION_SITES = {
     "hermeneia/storage/sqlite.py": 2,       # SQLiteStore (guarded); backup_to() writes a new destination file
     "hermeneia/storage/schema_guard.py": 1,  # the probe itself, which only reads
+    "hermeneia/storage/findings_vocabulary.py": 1,  # the schema-22 migration (ADR-0046 U): checks the marker first;
+                                                    # run only at activation, after the store's guard
     "hermeneia/web/app.py": 4,              # startup migration (after the startup guard); _conn (read-only URI);
                                             # _conn_rw (guarded); a new database created through SQLiteStore
     "hermeneia/workspace/export.py": 1,     # read-only URI, after the export guard

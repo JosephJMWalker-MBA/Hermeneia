@@ -6262,7 +6262,9 @@ def create_app(
             """
         ).fetchall()
         conn.close()
-        return jsonify({"count": len(rows), "findings": [dict(row) for row in rows]})
+        from ..compiler.projections.finding_readings import finding_reading
+        findings = [{**dict(row), "reading": finding_reading(dict(row))} for row in rows]
+        return jsonify({"count": len(findings), "findings": findings})
 
     @app.route("/api/e10/findings/<finding_id>/lineage")
     def api_e10_finding_lineage(finding_id: str):
@@ -6290,6 +6292,8 @@ def create_app(
         except (_LineageError, _ScopeAccessError):
             graph = None
         conn.close()
+        from ..compiler.projections.finding_readings import finding_reading
+        finding["reading"] = finding_reading(finding)
         return jsonify({"finding": finding, "lineage": graph})
 
     # ── /api/lineage/rendered_narratives ────────────────────────────────────

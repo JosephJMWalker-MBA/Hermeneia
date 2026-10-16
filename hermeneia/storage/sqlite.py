@@ -1258,6 +1258,10 @@ RATIFIED_FINDING_DISPOSITIONS = frozenset({
     ("preservation", "preserved"), ("omission", "omitted"), ("transformation", "transformed"),
     ("injection", "injected"), ("not_evaluated", "not_evaluated"),
 })
+# Dimension-scoped additions the write guard admits. ADR-0046 U ("unverifiable", provenance only) is pending: it moves
+# into ACTIVE_DIMENSION_DISPOSITIONS only at activation, after ratification (tests/test_adr0046_activation_gate.py).
+ACTIVE_DIMENSION_DISPOSITIONS: dict[str, frozenset] = {}
+PENDING_DIMENSION_DISPOSITIONS = {"provenance": frozenset({("unverifiable", "unverifiable")})}
 _FINDING_COLUMNS = ("id", "rendered_narrative_id", "architect_plan_id", "dimension", "obligation_id", "operation",
                     "status", "evidence", "evaluation_method", "constitution_version", "created_at")
 
@@ -2462,7 +2466,8 @@ class SQLiteStore:
         if not rows:
             return report
         unsupported = [row.get("id") for row in rows
-                       if (row.get("operation"), row.get("status")) not in RATIFIED_FINDING_DISPOSITIONS]
+                       if (row.get("operation"), row.get("status")) not in RATIFIED_FINDING_DISPOSITIONS
+                       and (row.get("operation"), row.get("status")) not in ACTIVE_DIMENSION_DISPOSITIONS.get(row.get("dimension"), ())]
         if unsupported:
             raise FindingLedgerRefusal("unsupported_value", unsupported,
                                        "operation/status is not a ratified disposition (ADR-0041 §5)")
