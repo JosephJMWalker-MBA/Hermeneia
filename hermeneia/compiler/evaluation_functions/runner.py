@@ -3,6 +3,7 @@ Evaluation Function Runner — executes all registered EFs for a (narrative, pla
 
 This is the single entry point for the Critic's Finding generation step.
 Each EF is run independently; a failure in one does not block others.
+Only dimensions in RATIFIED_DIMENSIONS run (ADR-0047 S1); any other is refused and reported, never executed.
 
 Returns a RunResult with per-dimension findings and errors.
 The caller is responsible for persisting the findings.
@@ -13,18 +14,18 @@ import sqlite3
 from dataclasses import dataclass, field
 from typing import Callable
 
+from .base import RATIFIED_DIMENSIONS
+
 # ── EF registry (ordered by dependency depth, shallowest first) ───────────────
 
 def _load_efs() -> list[tuple[str, Callable]]:
     from .structural        import evaluate_structural
-    from .semantic          import evaluate_semantic
     from .provenance        import evaluate_provenance
     from .observation_coverage import evaluate_observation_coverage
     from .accessibility     import evaluate_accessibility
     from .constitutional    import evaluate_constitutional
     return [
         ("structural",          evaluate_structural),
-        ("semantic",            evaluate_semantic),
         ("provenance",          evaluate_provenance),
         ("observation_coverage", evaluate_observation_coverage),
         ("accessibility",       evaluate_accessibility),
@@ -48,6 +49,7 @@ class RunResult:
     rendered_narrative_id: str
     architect_plan_id: str
     ef_results: list[EFResult] = field(default_factory=list)
+    refused_dimensions: list[str] = field(default_factory=list)  # unratified: not executed (ADR-0047 S1)
 
     @property
     def all_findings(self) -> list[dict]:
@@ -95,8 +97,13 @@ def run_all_evaluation_functions(
         architect_plan_id=architect_plan_id,
     )
 
+    if dimensions is not None:
+        result.refused_dimensions = sorted(set(dimensions) - RATIFIED_DIMENSIONS)
     for dimension, ef_func in _load_efs():
         if dimensions is not None and dimension not in dimensions:
+            continue
+        if dimension not in RATIFIED_DIMENSIONS:
+            result.refused_dimensions = sorted(set(result.refused_dimensions) | {dimension})
             continue
         try:
             findings = ef_func(rendered_narrative_id, architect_plan_id, conn)

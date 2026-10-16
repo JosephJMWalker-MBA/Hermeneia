@@ -53,6 +53,10 @@ def audit_dashboard(
             dimensions[dim]["total"] = 0
         dimensions[dim][f["status"]] += 1
         dimensions[dim]["total"] += 1
+    # ADR-0047 S1: historical Findings of an unratified dimension stay inspectable, labelled as such.
+    from ..evaluation_functions.base import RATIFIED_DIMENSIONS
+    for dim, counts in dimensions.items():
+        counts["ratified"] = dim in RATIFIED_DIMENSIONS
 
     return {
         "narrative_id": rendered_narrative_id,

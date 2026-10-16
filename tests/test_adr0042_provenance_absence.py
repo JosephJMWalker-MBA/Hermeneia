@@ -70,12 +70,13 @@ def test_provenance_v1_truth_table_over_the_four_observable_states(pair):
         assert (finding["status"] == "transformed") == (render(finding) == ABSENT)
 
 
-def test_only_the_unratified_semantic_dimension_records_not_evaluated_today(pair):
-    """Blast radius of amending `not_evaluated`: its only current producer is a dimension outside the registry."""
+def test_no_ratified_dimension_records_not_evaluated(pair):
+    """Blast radius of amending `not_evaluated`. Before ADR-0047 S1 its only producer was the unratified `semantic`
+    dimension; with S1, no Critic run records it at all."""
     pair.run_critic_route(pair.source)
     recorded = {(f["dimension"], f["status"]) for f in rows(pair.source, "findings")}
-    assert {dimension for dimension, status in recorded if status == "not_evaluated"} == {"semantic"}
-    assert "semantic" not in RATIFIED_DIMENSIONS
+    assert {dimension for dimension, status in recorded if status == "not_evaluated"} == set()
+    assert {dimension for dimension, _status in recorded} <= RATIFIED_DIMENSIONS
 
 
 def test_existing_projections_give_the_same_verdict_for_transformed_and_not_evaluated(pair, tmp_path):

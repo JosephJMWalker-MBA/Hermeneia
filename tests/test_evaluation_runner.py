@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from hermeneia.compiler.evaluation_functions.base import RATIFIED_DIMENSIONS
 from hermeneia.compiler.evaluation_functions.runner import (
     RunResult,
     run_all_evaluation_functions,
@@ -75,10 +76,10 @@ def test_run_result_covers_all_registered_dimensions(seeded):
     result = run_all_evaluation_functions(ids["narrative_id"], ids["plan_id"], conn)
     conn.close()
 
+    # ADR-0047 S1: exactly the ratified dimensions run; the unratified `semantic` function is no longer registered.
     dimensions = {r.dimension for r in result.ef_results}
-    expected = {"structural", "semantic", "provenance",
-                "observation_coverage", "accessibility", "constitutional"}
-    assert expected == dimensions
+    assert dimensions == {"structural", "provenance", "observation_coverage", "accessibility", "constitutional"}
+    assert dimensions == RATIFIED_DIMENSIONS and result.refused_dimensions == []
 
 
 def test_run_result_each_ef_result_has_dimension(seeded):
@@ -118,8 +119,10 @@ def test_dimensions_filter(seeded):
     )
     conn.close()
 
+    # ADR-0047 S1: a requested unratified dimension is refused and reported, never executed.
     dims = {r.dimension for r in result.ef_results}
-    assert dims == {"structural", "semantic"}
+    assert dims == {"structural"}
+    assert result.refused_dimensions == ["semantic"]
 
 
 def test_ef_error_does_not_block_others(seeded, monkeypatch):
