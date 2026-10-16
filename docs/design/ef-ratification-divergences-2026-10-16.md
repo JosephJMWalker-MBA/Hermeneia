@@ -1,7 +1,8 @@
 # Evaluation Function ratification divergences: investigation (2026-10-16)
 
-**Status:** investigation record, for Steward decision. **Nothing here is
-changed or decided.** Evaluators, the runner, the Finding store and every
+**Status:** investigation record. The decisions are proposed in
+**ADR-0047** (ratification candidate), written after the Steward's review
+of 2026-10-16. **Nothing here is changed or decided.** Evaluators, the runner, the Finding store and every
 historical Finding are as on `main`.
 
 **Origin.** This came out of the ADR-0046 review (#259), and is kept
@@ -70,7 +71,8 @@ phantom-obligation test does.
 | | Remedy | Consequence |
 | --- | --- | --- |
 | **L1** | Implement the per-Finding link check | needs a ratified disposition for "not linked", which ADR-0042 lacks. Adds a link fact to `evidence`. A new `evaluation_method`. Subject to ADR-0046 D-3 (divergence and retention) |
-| **L2 (recommended)** | Amend ADR-0042 to move the guarantee to where it is established: an **executable invariant** that every plan obligation is linked to its Blueprint, enforced at Blueprint/plan write and restore, and tested. The Provenance EF keeps its existence checks | smallest; no Finding vocabulary or EF change; the invariant already holds for every product writer (tested). Imported or restored chains (#255) would be checked at closure |
+| L2 (first proposal) | Replace the per-Finding check with an **executable invariant** enforced at Blueprint/plan write and restore | **superseded by the Steward's revision** (2026-10-16): historical, imported or corrupted records can violate an invariant that current writers keep, so the evaluator must still detect it |
+| **L2 revised (ADR-0047)** | Enforce the invariant at write and restore (L2-a) **and** keep read-time detection: the EF checks the link, records `blueprint_link_exists`, and never reports `preserved` without it (L2-b) | ADR-0042 is extended, not weakened. The missing-link disposition is an explicit decision; `unverifiable` is recommended |
 | L3 | Record and defer | the ratified text keeps claiming a check the code does not make |
 
 ---

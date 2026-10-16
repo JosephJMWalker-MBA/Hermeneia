@@ -10,6 +10,7 @@ Record: docs/design/ef-ratification-divergences-2026-10-16.md.
 """
 from __future__ import annotations
 
+import inspect
 import io
 import json
 from pathlib import Path
@@ -18,14 +19,17 @@ import sqlite3
 import pytest
 
 import synthetic_study_lab as lab
+from hermeneia.compiler.architect import compile_architect_plan
 from hermeneia.compiler.evaluation_functions import semantic as semantic_ef
 from hermeneia.compiler.evaluation_functions.base import RATIFIED_DIMENSIONS, validate_ef_contract
 from hermeneia.compiler.evaluation_functions.provenance import evaluate_provenance
 from hermeneia.compiler.evaluation_functions.runner import _load_efs
 from hermeneia.compiler.projections.trust_card import trust_card
-from hermeneia.storage.hashing import make_expression_profile_id, make_rendered_narrative_id
+from hermeneia.storage.hashing import make_blueprint_id, make_expression_profile_id, make_rendered_narrative_id
 from hermeneia.storage.sqlite import SQLiteStore
 from hermeneia.web.app import create_app
+from hermeneia.workspace import export_workspace_bundle
+from hermeneia.workspace.restore import restore_workspace
 
 LINES = ["The lamp burned all night.", "Nobody asked why it burned.", "The keeper's ledger records only the oil.",
          "In the morning the wick was new."]
@@ -104,6 +108,37 @@ class Study:
         finally:
             conn.close()
 
+    def unlinked_plans(self, db: Path | None = None) -> dict[str, set[str]]:
+        """Plans whose cited Observations are not all linked to their Blueprint: {plan_id: unlinked}."""
+        conn = _connect(db or self.db)
+        try:
+            found = {}
+            for plan_id, blueprint_id in conn.execute("SELECT id, blueprint_id FROM architect_plans"):
+                cited = {o for (raw,) in conn.execute("SELECT required_observations FROM architect_plan_paragraphs WHERE plan_id = ?",
+                                                      (plan_id,)) for o in json.loads(raw)}
+                linked = {o for (o,) in conn.execute("SELECT observation_id FROM blueprint_observation_links WHERE blueprint_id = ?",
+                                                     (blueprint_id,))}
+                if cited - linked:
+                    found[plan_id] = cited - linked
+            return found
+        finally:
+            conn.close()
+
+    def write_plan_through_the_store_api(self) -> None:
+        """The one writer that takes links separately from the sections: SQLiteStore.insert_blueprint."""
+        sections = [{"claim": "Store-written.", "supporting_observations": self.observations[:2], "supporting_interpretations": []}]
+        blueprint_id = make_blueprint_id("Store", "Written.", sections)
+        store = SQLiteStore(self.db)
+        try:
+            store.insert_blueprint({"id": blueprint_id, "title": "Store", "thesis": "Written.", "sections": json.dumps(sections),
+                                    "source": "steward-authored", "created_at": "2026-10-16T12:00:00+00:00"},
+                                   self.observations[:1], [])
+            plan = compile_architect_plan(blueprint_id, store._conn)
+            store.insert_architect_plan(plan["plan_row"], plan["paragraph_rows"])
+            store._conn.commit()
+        finally:
+            store.close()
+
     def run_critic_route(self) -> list[dict]:
         lab._ok(self.client.post("/api/pipeline/run-critic", json={"narrative_id": self.narrative_id}))
         conn = _connect(self.db)
@@ -137,10 +172,12 @@ def test_product_blueprint_writers_keep_every_plan_obligation_linked(study):
             "title": "The lamp", "thesis": "The lamp burns unexplained.",
             "sections": [{"claim": "It burns.", "supporting_observations": study.observations[1:3], "supporting_interpretations": []},
                          {"claim": "The wick was new.", "supporting_observations": study.observations[3:], "supporting_interpretations": []}]}}))
+    imported = lab._ok(study.client.post("/api/architect/import", json={
+        "title": "Imported", "thesis": "The ledger is silent.", "sections": [{"claim": "It records oil.", "obs_refs": ["OBS-1", "OBS-3"]}]}))
     conn = _connect(study.db)
     try:
         plans = conn.execute("SELECT id, blueprint_id FROM architect_plans").fetchall()
-        assert {p["id"] for p in plans} == {study.plan_id, revised["plan_id"]}
+        assert {p["id"] for p in plans} == {study.plan_id, revised["plan_id"], imported["plan_id"]}
         for plan in plans:
             cited = {o for (raw,) in conn.execute("SELECT required_observations FROM architect_plan_paragraphs WHERE plan_id = ?",
                                                   (plan["id"],)) for o in json.loads(raw)}
@@ -162,6 +199,59 @@ def test_a_cited_observation_the_blueprint_does_not_link_is_not_classified_prese
     finding = study.provenance_findings()[unlinked]
     if finding["status"] == "preserved":
         raise BlueprintLinkNotChecked(f"{unlinked[:12]}: linked={study.facts(unlinked)['linked']}, status=preserved")
+
+
+# L2 (ADR-0047): write-time and restore-time integrity, and read-time recording of the link fact.
+
+class UnlinkedObligationWritten(AssertionError):
+    """A plan whose obligations are not all linked to its Blueprint is written (ADR-0047 L2-a)."""
+
+
+class UnlinkedChainRestored(AssertionError):
+    """A chain with an unlinked plan obligation is carried as covered and restored (ADR-0047 L2-a)."""
+
+
+class LinkAbsenceNotRecorded(AssertionError):
+    """The Finding's evidence does not record that the Blueprint link was absent (ADR-0047 L2-b)."""
+
+
+@pytest.mark.xfail(strict=True, raises=UnlinkedObligationWritten, reason="ADR-0047 L2-a proposed: the store API accepts it")
+def test_the_store_api_refuses_a_plan_with_unlinked_obligations(study):
+    try:
+        study.write_plan_through_the_store_api()
+    except (ValueError, sqlite3.DatabaseError):
+        assert study.unlinked_plans() == {}, "a refused write must store nothing"
+        return
+    if study.unlinked_plans():
+        raise UnlinkedObligationWritten(f"plans with unlinked obligations: {len(study.unlinked_plans())}")
+
+
+_CHAIN_EXPORT = "blueprint_chain" in inspect.signature(export_workspace_bundle).parameters
+
+
+@pytest.mark.skipif(not _CHAIN_EXPORT, reason="needs the WBS Blueprint chain component (#255)")
+@pytest.mark.xfail(strict=True, raises=UnlinkedChainRestored, reason="ADR-0047 L2-a proposed: chain closure does not check links")
+def test_an_inconsistent_historical_chain_is_neither_exported_as_covered_nor_restored(study, tmp_path):
+    study.cite_unlinked_observation()  # a historical or corrupted record; no product route writes it
+    assert study.unlinked_plans()
+    export_workspace_bundle(study.db, tmp_path / "bundle", generated_at="2026-10-16T12:00:00+00:00", workspace_id="w",
+                            blueprint_chain=True)
+    target = tmp_path / "restored" / "workspace.db"
+    try:
+        restore_workspace(target, tmp_path / "bundle")
+    except Exception:  # noqa: BLE001 - any refusal satisfies the boundary; the target must then hold nothing
+        assert not target.exists() or study.unlinked_plans(target) == {}
+        return
+    if study.unlinked_plans(target):
+        raise UnlinkedChainRestored(f"restored plans with unlinked obligations: {len(study.unlinked_plans(target))}")
+
+
+@pytest.mark.xfail(strict=True, raises=LinkAbsenceNotRecorded, reason="ADR-0047 L2-b proposed: provenance-v1.0 records no link fact")
+def test_the_evidence_records_that_the_blueprint_link_was_absent(study):
+    unlinked = study.cite_unlinked_observation()
+    observed = json.loads(study.provenance_findings()[unlinked]["evidence"])["observed_render"]
+    if observed.get("blueprint_link_exists") is not False:
+        raise LinkAbsenceNotRecorded(f"observed_render: {observed}")
 
 
 # ── 2. The unratified `semantic` dimension ──────────────────────────────────
