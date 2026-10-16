@@ -1885,7 +1885,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def interpretations_for_observation(self, observation_id: str) -> list[dict]:
         cur = self._conn.execute(
@@ -1955,7 +1955,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def supersessions_from(self, old_id: str) -> list[dict]:
         cur = self._conn.execute(
@@ -2142,7 +2142,7 @@ class SQLiteStore:
                 f"UPDATE source_documents SET {', '.join(updates)} WHERE id = ?",
                 params,
             )
-            self._conn.commit()
+            self._commit()
 
         return self.get_source_document(doc_id)
 
