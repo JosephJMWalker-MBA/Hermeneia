@@ -100,9 +100,12 @@ obligation**, as ADR-0042 already requires. It records the observation in
 Both booleans are always recorded, so the reading (ADR-0046 D-2) shows which
 record was absent.
 
-**Version.** L2-b and ADR-0046 U activate together as `provenance-v1.1`, behind
-ADR-0046's activation gate. If U is not ratified, L2-b cannot be implemented
-honestly, and its witnesses stay strict-xfail.
+**Version.** L2-b never activates before ADR-0046 U.
+- ADR-0046's implementation-ready packet builds `provenance-v1.1` with U only.
+- If L2-b is ratified before v1.1 is ever activated, the two may share v1.1.
+  Otherwise L2-b is a further method version (`provenance-v1.2`).
+- If U is not ratified, L2-b cannot be implemented honestly, and its
+  witnesses stay strict-xfail.
 
 **Existing inconsistent records.** They are never rewritten. Opening a
 workspace that contains them is not refused: only **new** writes are. They
@@ -130,8 +133,7 @@ Passing tests pin:
 1. **S1 alone.** It is stacked on the ADR-0046 D-3 packet and needs no
    schema change. `UnratifiedDimensionPersisted` converts.
 2. **L2-a.** The store-API and chain export/restore checks; no schema change.
-3. **L2-b,** together with ADR-0046's U activation (`provenance-v1.1`). Never
-   before it.
+3. **L2-b,** with or after ADR-0046's U activation; never before it.
 
 ---
 
