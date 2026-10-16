@@ -132,9 +132,18 @@ def _run_and_display_evaluation_functions(
         return
 
     if run.all_findings:
+        from ..storage.sqlite import FindingLedgerRefusal
         store = SQLiteStore(db_path)
-        store.insert_findings_batch(run.all_findings)
-        store.close()
+        try:
+            ledger = store.insert_findings_batch(run.all_findings)
+        except FindingLedgerRefusal as refusal:
+            console.print(f"[red]✗  Finding ledger refused this run; nothing was recorded: {refusal}[/]")
+            return
+        finally:
+            store.close()
+        if ledger["retained"]:
+            console.print(f"[yellow]⚠  {len(ledger['retained'])} stored Finding(s) from an older evaluator "
+                          f"version were retained, not replaced.[/]")
 
     table = Table(box=box.SIMPLE_HEAVY, show_header=True, header_style="bold")
     table.add_column("Dimension", style="cyan", min_width=20)
