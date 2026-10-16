@@ -1918,7 +1918,7 @@ class SQLiteStore:
             "INSERT OR IGNORE INTO blueprint_interpretation_links (blueprint_id, interpretation_id) VALUES (?, ?)",
             [(row["id"], iid) for iid in set(interp_ids)],
         )
-        self._conn.commit()
+        self._commit()  # deferred inside store.atomic(), so a refusal rolls the block back
 
     def blueprints_for_observation(self, observation_id: str) -> list[dict]:
         """Return all blueprints that cite this observation in any section."""
@@ -2176,7 +2176,9 @@ class SQLiteStore:
     # --- architect_plans (append-only, deterministic) ---
 
     def insert_architect_plan(self, plan_row: dict, paragraph_rows: list[dict]) -> None:
-        """Atomically insert a plan and its ordered paragraphs."""
+        """Atomically insert a plan and its ordered paragraphs, refusing unlinked obligations (ADR-0047 L2-a)."""
+        from ..compiler.architect import require_plan_obligations_linked
+        require_plan_obligations_linked(self._conn, plan_row["blueprint_id"], paragraph_rows)
         self._conn.execute(
             """
             INSERT OR IGNORE INTO architect_plans
@@ -2199,7 +2201,7 @@ class SQLiteStore:
             """,
             paragraph_rows,
         )
-        self._conn.commit()
+        self._commit()  # deferred inside store.atomic(), so a refusal rolls the block back
 
     def architect_plan_for_blueprint(self, blueprint_id: str) -> dict | None:
         """Return the most recent ArchitectPlan for a given Blueprint, with its paragraphs."""

@@ -162,6 +162,17 @@ def chain_problems(conn: sqlite3.Connection) -> list[tuple[str, str]]:
     for (plan_id,) in conn.execute("SELECT DISTINCT plan_id FROM architect_plan_paragraphs"):
         if plan_id not in plans:
             problems.append(("CHAIN_CLOSURE_INCOMPLETE", f"architect_plan_paragraphs → architect_plans {plan_id}"))
+    # ADR-0047 L2-a: every Observation a plan requires is linked to the plan's Blueprint. An inconsistent historical
+    # chain is declared, not carried; a bundle carrying one is refused at restore.
+    linked: dict[str, set[str]] = {}
+    for blueprint_id, observation in conn.execute("SELECT blueprint_id, observation_id FROM blueprint_observation_links"):
+        linked.setdefault(blueprint_id, set()).add(observation)
+    owners = dict(conn.execute("SELECT id, blueprint_id FROM architect_plans").fetchall())
+    for plan_id, order_idx, raw in conn.execute(
+            "SELECT plan_id, order_idx, required_observations FROM architect_plan_paragraphs ORDER BY plan_id, order_idx"):
+        required = _id_list(raw)
+        if required is None or not set(required) <= linked.get(owners.get(plan_id), set()):
+            problems.append(("CHAIN_INTEGRITY_INVALID", f"architect_plan_paragraphs {plan_id}:{order_idx} → blueprint_observation_links"))
 
     edges = {tuple(row) for row in conn.execute("SELECT old_id, new_id, reason, ratified_at FROM supersession_relations")}
     plan_owner = dict(conn.execute("SELECT id, blueprint_id FROM architect_plans").fetchall())
