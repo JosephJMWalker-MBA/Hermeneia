@@ -24,8 +24,10 @@ guarantees = ["deterministic", "complete", "read_only", "orthogonal", "zero_llm"
 # ── Internal constants ────────────────────────────────────────────────────────
 DIMENSION = dimension
 EVALUATION_METHOD = "provenance-v1.0"  # the active method (ADR-0042)
-# ADR-0046 U: an absent provenance record is `unverifiable`, not a transformation. Implementation-ready only: it is
-# not the default until ADR-0046 is ratified and activated (tests/test_adr0046_activation_gate.py enforces this).
+# ADR-0046 U: an absent provenance record is `unverifiable`, not a transformation. ADR-0047 L2-b: the obligation's
+# Blueprint link is checked and recorded; a demonstrably missing link, or one that cannot be determined, leaves the
+# obligation's provenance relationship unverifiable. Implementation-ready only: not the default until ratified and
+# activated (tests/test_adr0046_activation_gate.py enforces this).
 UNVERIFIABLE_METHOD = "provenance-v1.1"
 
 CONSTITUTIONAL_PROFILE = {
@@ -75,6 +77,15 @@ def evaluate_provenance(
         raise ValueError(f"No paragraphs found for plan: {architect_plan_id}")
 
     findings: list[dict] = []
+    linked: set[str] | None = None  # None: the plan's Blueprint cannot be resolved, so a link cannot be determined
+    if method == UNVERIFIABLE_METHOD:
+        owner = conn.execute(
+            "SELECT b.id FROM architect_plans p JOIN narrative_blueprints b ON b.id = p.blueprint_id WHERE p.id = ?",
+            (architect_plan_id,),
+        ).fetchone()
+        if owner is not None:
+            linked = {row[0] for row in conn.execute(
+                "SELECT observation_id FROM blueprint_observation_links WHERE blueprint_id = ?", (owner[0],))}
 
     for para in paragraphs:
         order_idx: int = para["order_idx"]
@@ -97,10 +108,15 @@ def evaluate_provenance(
                 "SELECT 1 FROM provenance WHERE observation_id = ?", (obs_id,)
             ).fetchone() is not None
 
-            if obs_exists and prov_exists:
-                operation, status = "preservation", "preserved"
-            elif obs_exists and not prov_exists and method == UNVERIFIABLE_METHOD:
+            observed_render = {"observation_exists": obs_exists, "provenance_exists": prov_exists}
+            if method == UNVERIFIABLE_METHOD:
+                link_exists = None if linked is None else obs_id in linked
+                observed_render["blueprint_link_exists"] = link_exists
+
+            if method == UNVERIFIABLE_METHOD and obs_exists and not (prov_exists and link_exists):
                 operation, status = "unverifiable", "unverifiable"
+            elif obs_exists and prov_exists:
+                operation, status = "preservation", "preserved"
             elif obs_exists and not prov_exists:
                 operation, status = "transformation", "transformed"
             else:
@@ -108,10 +124,7 @@ def evaluate_provenance(
 
             evidence = json.dumps({
                 "contract_obligation": obs_id,
-                "observed_render": {
-                    "observation_exists": obs_exists,
-                    "provenance_exists": prov_exists,
-                },
+                "observed_render": observed_render,
                 "supporting_trace": [rendered_narrative_id, architect_plan_id, f"paragraph:{order_idx}"],
             }, ensure_ascii=True)
 

@@ -245,7 +245,12 @@ def test_provenance_v1_1_records_unverifiable_for_an_absent_record_and_nothing_e
         "missing_observation": ("omission", "omitted"),
     }
     assert len(v11) == len(v10)  # completeness
-    assert {o: (f["id"], render(f)) for o, f in v11.items()} == {o: (f["id"], render(f)) for o, f in v10.items()}
+    # Same Finding IDs; v1.1 records the v1.0 facts unchanged plus the Blueprint link (ADR-0047 L2-b).
+    assert {o: f["id"] for o, f in v11.items()} == {o: f["id"] for o, f in v10.items()}
+    assert {o: {k: v for k, v in render(f).items() if k != "blueprint_link_exists"} for o, f in v11.items()} == \
+        {o: render(f) for o, f in v10.items()}
+    # Every cited Observation is linked to the Blueprint; the phantom obligation's citation is not.
+    assert {o: render(f)["blueprint_link_exists"] for o, f in v11.items()} == {o: o in pair.observations for o in v11}
     assert {f["evaluation_method"] for f in v11.values()} == {"provenance-v1.1"}
     with pytest.raises(ValueError, match="unknown provenance evaluation method"):
         provenance.evaluate_provenance(pair.narrative_id, pair.plan_id, connect(pair.restored), method="provenance-v9")
