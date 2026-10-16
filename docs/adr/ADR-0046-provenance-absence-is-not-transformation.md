@@ -1,266 +1,308 @@
 # ADR-0046: An Absent Provenance Record Is Not a Transformation
 
 **Status:** PROPOSED
-**Version:** 0.1
-**Date:** 2026-10-15
+**Version:** 0.2
+**Date:** 2026-10-16
 **Supersedes:** ADR-0042 in part, IF RATIFIED. Only the Provenance EF's
-missing-provenance branch and its stated meaning are in scope.
-**Relies on:** ADR-0041:
-- §3 and Amendment I (identity);
-- §5 (vocabulary);
-- Amendment II (evidence);
-- Amendment III (completeness).
+missing-provenance disposition and its stated meaning are in scope.
+**Relies on:**
+- ADR-0041 §5 and its extension clause ("other dimensions may ratify additional
+  operations via future ADR");
+- ADR-0041 Amendments I to III;
+- `finding.spec.md` §5 ("Provenance … may require other operations or
+  statuses").
 
-**Related:**
-- CI-015;
-- [#257](https://github.com/JosephJMWalker-MBA/Hermeneia/pull/257) (WBS
-  provenance repair) and its 2026-10-15 real-study verification;
-- the G2 validation on #255.
+**Related:** [#257](https://github.com/JosephJMWalker-MBA/Hermeneia/pull/257)
+(real-study evidence).
+**Constitutional cost of error:** Medium.
 
-**Constitutional cost of error:** Medium. It changes one disposition of one
-ratified Evaluation Function. It changes no Finding schema, identity rule or
-historical Finding.
+**Steward review, 2026-10-16:**
+- v0.1 D-1 **revise**: compare an explicit `unverifiable` with an amended
+  `not_evaluated`;
+- D-2 **principle accepted**: presentation must name the evaluator version and
+  what its evidence established;
+- D-3 **principle accepted**: strengthen it.
 
-Nothing in this ADR is implemented. The evaluator, the Finding store and every
-historical Finding are unchanged until the Primary Human Steward ratifies it.
-Evidence: `tests/test_adr0042_provenance_absence.py`.
+**Nothing in this ADR is implemented.** The evaluator, the Finding store, the
+schema, every historical Finding, ADR-0041, ADR-0042 and the Authority Index
+are unchanged.
+
+**Evidence:**
+- `tests/test_adr0042_provenance_absence.py`: 13 pinned facts and 6 strict
+  witnesses;
+- `tests/test_adr0046_unverifiable_rehearsal.py`: 5 measurements of the
+  option-U migration on test databases.
 
 ---
 
 ## Context
 
-**What ADR-0042 says.** Its Provenance EF classifies an Observation that
-exists without a provenance record as `operation=transformation`,
-`status=transformed`, "a degraded state".
+**ADR-0042's rule.** It classifies an Observation that exists without a
+provenance record as `transformation` / `transformed`.
 
-**Why that contradicts ADR-0041.** ADR-0041 §5 defines:
-- `transformation`: "transmits a changed version of the obligation";
-- `transformed`: "present but materially altered".
+**ADR-0041 §5's definitions.** `transformed` means "present but materially
+altered", and `transformation` "transmits a changed version". ADR-0042 itself
+says a missing record means the Observation "cannot be independently
+witnessed".
 
-ADR-0042 itself says what absence means: "If provenance is missing, it cannot
-be independently witnessed." That is an inability to verify, not evidence of
-alteration.
+**Real study** (#257 verification; not accessed again):
+- An earlier-exporter restore gave **2,369 `transformed`** for 2,369 unaltered
+  Observations.
+- A default restore gave 2,369 `preserved`.
 
-**Real study, 2026-10-15.** The evidence is preserved in #257's verification
-and was not accessed again for this proposal.
-- **Default bundle.** Restoring `study-d88c4a642956` gave all 2,369
-  obligations `preserved`, identical to the source.
-- **Earlier-exporter bundle.** It carries the same hash-verified Observations
-  but no compile records. Restoring it gave **2,369 `transformed`**. The
-  evidence was unchanged; only the custody record was missing.
-
-**Synthetic study.** The same state is reached through the product's own
-routes:
-- the Source Documents, Extractions and Observations are row-identical;
+**Synthetic study**, built through the product's own routes:
+- the documents, extractions and Observations are row-identical;
 - the provenance record is absent;
-- `provenance-v1.0` reports every cited Observation `transformed`;
-- it uses **the same Finding IDs** that report `preserved` in the source.
+- `provenance-v1.0` reports `transformed` under the **same Finding IDs** that
+  report `preserved` in the source.
 
 ### The four observable states
 
-Stored records alone distinguish all four states. `provenance-v1.0` does not
-distinguish them correctly.
+| State | Stored records | `provenance-v1.0` records |
+| --- | --- | --- |
+| Preserved provenance | Observation, and a record whose `verbatim_text` equals `raw_text` | `preservation` / `preserved` |
+| **Missing provenance** | Observation, no record | **`transformation` / `transformed`** |
+| **Demonstrated alteration** | Observation, and a record that disagrees with it | **`preservation` / `preserved`** |
+| Missing Observation | no Observation | `omission` / `omitted` |
 
-| State | Stored records | `provenance-v1.0` | Honest reading |
-| --- | --- | --- | --- |
-| Preserved provenance | Observation, and a provenance row whose `verbatim_text` equals `raw_text` | `preservation` / `preserved` | preserved |
-| **Missing provenance** | Observation, no provenance row | **`transformation` / `transformed`** | custody unverifiable; the evidence is unaltered |
-| **Demonstrated alteration** | Observation, and a provenance row that disagrees with it (`verbatim_text` ≠ `raw_text`) | **`preservation` / `preserved`** | altered custody record |
-| Missing Observation | no Observation | `omission` / `omitted` | omitted |
-
-**Two consequences, proved by the truth-table test:**
-- In `provenance-v1.0`, absence is the **only** path to `transformed`. A
-  demonstrated alteration is classified `preserved`, because the EF checks
-  existence, not agreement.
-- Every historical `provenance-v1.0` `transformed` Finding is therefore
-  **exactly** recognizable from its own evidence:
-  `observed_render = {"observation_exists": true, "provenance_exists": false}`.
-
-Today, only the narrative trust summary detects alteration: its
-`provenance_failures` compares `verbatim_text` with `raw_text`.
+Absence is the only path to `transformed`, and `provenance-v1.0` never compares
+the record with the Observation. Both are tested.
 
 ---
 
-## Decision (proposed)
+## D-1 (revised): the disposition for an absent custody record
 
-### D-1. Absence is recorded as `not_evaluated`, with the absence in evidence
+### The two candidates
 
-In the Provenance EF, an Observation that exists without a provenance record
-yields:
+**U: an explicit `unverifiable`, scoped to the provenance dimension.**
 
-```text
-operation = not_evaluated
-status    = not_evaluated
-evidence.observed_render = {"observation_exists": true, "provenance_exists": false}   (unchanged)
-evaluation_method = "provenance-v1.1"
-```
+| Value | Meaning |
+| --- | --- |
+| operation `unverifiable` | The function examined the obligation and found that the record required to verify it is absent |
+| status `unverifiable` | The evidence exists but cannot be verified; neither preservation nor alteration is established |
 
-**Every other branch, the obligation identity, the Finding identity formula and
-the completeness invariant are unchanged.** Every obligation still has exactly
-one Finding.
+- **Ratified meanings:** none change. U is added under ADR-0041 §5's own
+  extension clause.
+- **Scope:** the provenance dimension only. Other dimensions need their own
+  ratification. The D-3 guard enforces the scope.
 
-**Interpretation clause.** In the provenance dimension, an obligation whose
-custody record is absent cannot be authoritatively evaluated. ADR-0041's
-`not_evaluated` ("No authoritative evaluation exists") is the disposition. The
-absence is a machine observation; per Amendment II it belongs in `evidence`,
-not in the disposition.
+**N: amend the ratified meaning of `not_evaluated`.**
+- The operation's meaning changes from "not evaluated in this invocation" to
+  "no authoritative disposition was reached; evidence records why".
+- This supersedes ADR-0041 §5 in part, for a token that every dimension
+  shares.
+- **N′**, a fallback, scopes the amendment to the provenance dimension.
 
-### D-2. Historical Findings are not reclassified
+### Comparison (measured where marked)
 
-- Every existing Finding keeps its ID, operation, status and evidence.
-- No Finding is superseded, rewritten or deleted. The storage triggers refuse
-  update and delete in any case.
-- Steward decisions stay bound to the Findings they decided.
+| Criterion | U: `unverifiable` | N / N′: amended `not_evaluated` |
+| --- | --- | --- |
+| Operation meaning honest | yes, by definition | only by redefinition; the check did run |
+| Status meaning honest | yes | yes ("No authoritative evaluation exists") |
+| Vocabulary | one token, one state | one token, two senses; only `evidence` tells them apart |
+| Ratified meanings changed | **none** (additive) | ADR-0041 §5 `not_evaluated`: every dimension under N, provenance under N′ |
+| Effect on existing Findings | none | **measured:** today the only producer of `not_evaluated` is the **unratified** `semantic` dimension, which already uses it in the "basis absent" sense. N would retroactively legitimize that use before the Steward decides on `semantic`. N′ avoids this |
+| Presentation | `unverifiable` is shown as such | every surface says "Not evaluated" for a check that ran, unless projections read the evidence |
+| Schema | `findings` CHECK vocabulary, which can only change by **rebuilding the table** | none |
+| Migration (**rehearsed**) | a one-time rebuild per workspace in one transaction, with foreign keys off. Every Finding row is identical; all other schema objects are identical; integrity and foreign keys check clean; immutability and supersession guards still enforce; steward decisions and supersession relations still join. It **requires legacy rename mode**: without it, SQLite rejects the rename because the supersession guards name `findings`, and the transaction rolls back whole | none |
+| Projections (**measured**) | `trust_card` and `audit_dashboard` raise `KeyError` on `unverifiable` and must learn the value. The Reader's Critic views follow | wording only. The trust card verdict is unchanged (`partial`) |
+| Older builds on a migrated workspace (**measured**) | their projections fail. Their store silently **rewrites the schema marker down** to their own version and does not refuse | unaffected |
+| A store that is not migrated (**measured**) | `INSERT OR IGNORE` drops the new value silently. Under D-3 it is refused instead | n/a |
 
-Projections **may** describe a `provenance-v1.0` `transformed` Finding whose
-evidence records `provenance_exists: false` as:
+### Recommendation: U, scoped to the provenance dimension
 
-> provenance record absent; recorded as transformed by provenance-v1.0
+U is the smallest **constitutionally honest** alternative:
+- it changes no ratified meaning;
+- it states exactly what the evidence established;
+- it settles nothing about other dimensions.
 
-This is presentation only. It is exact, by the truth table above.
+Its costs are mechanical, and the rehearsal measured them. N is smaller only
+in schema. Its honesty depends on redefining a ratified cross-dimension term
+and on every projection reading evidence. N would also settle the `semantic`
+question by implication.
 
-### D-3. A divergent re-evaluation fails closed
+U requires these preconditions, in order:
+1. **P1: D-3 lands first.** A build that cannot store `unverifiable` must refuse
+   it, not drop it.
+2. **P2: a newer-schema refusal.** `SQLiteStore` refuses a workspace whose
+   schema version exceeds its own. It should ship at least one release before
+   the migration.
+   - **Separate authorization.** This changes startup behavior for every
+     workspace, so P2 needs its own decision.
+   - **Residual risk.** Builds that predate P2 would still open a migrated
+     workspace: they would downgrade its version marker and fail in
+     projections. They lose no Findings, because the rows and triggers are
+     intact.
+3. **P3: projections learn `unverifiable`.**
+   - **Trust card rule.** `unverifiable` is not success. As with `transformed`
+     today, a dimension is `pass` only when every Finding is preserved.
+   - **Reader views.** They render the value. Changes to the Reader's
+     `index.html` must be coordinated with the owner's uncommitted edits there.
+4. **P4: scope is enforced at the write guard.** The rebuilt CHECK admits the
+   token for every dimension (rehearsed), so the D-3 guard holds the
+   per-dimension vocabulary.
 
-**The problem.** Finding identity names the evaluated obligation, not its
-result or the method that produced it (ADR-0041 Amendment I). `provenance-v1.1`
-will therefore compute IDs that `provenance-v1.0` Findings already hold.
-`insert_findings_batch` uses `INSERT OR IGNORE`, so the new result would be
-discarded silently and the run would still appear to succeed.
+**If the Steward declines a schema migration now,** N′ is the only honest
+fallback, provided that:
+- it is scoped to the provenance dimension;
+- every projection presents an `evidence.provenance_exists = false` Finding as
+  "custody record absent", not "Not evaluated".
 
-**The rule.** If a computed Finding's ID already exists with a different
-`operation`, `status` or `evidence`, the Finding is **not** written and the run
-reports the divergence. Differences only in `evaluation_method`,
-`constitution_version` or `created_at` are not divergence. Identical
-re-evaluation stays idempotent; the Critic route relies on that to complete a
-partial ledger.
+**Choose once.** Adopting N′ and later U would leave three historical senses
+for one state.
 
-### Out of scope (recorded, not decided)
+---
 
-- **Alteration detection** (`verbatim_text` ≠ `raw_text`). Detecting a
-  demonstrated alteration in the Provenance EF would be a new check. It needs
-  its own decision. Until then, only the trust summary detects it.
-- **The Blueprint-link check.** ADR-0042's method also requires
-  `blueprint_observation_links`, but `provenance-v1.0` does not query it. This
-  is a specification/code divergence.
-- **The `semantic` EF.** It is not in `RATIFIED_DIMENSIONS`, yet the runner
-  executes it and its Findings are persisted. It also uses `transformed` for a
-  thin evidential trace.
-- **Article VI** says generation shall fail when required provenance cannot be
-  established. Whether this applies to provenance-less Observations is
-  unexamined.
+## D-2 (principle accepted): historical presentation
+
+- **No Finding is rewritten, reclassified, superseded or deleted.** Steward
+  decisions stay bound to the Finding as recorded. Tested: an update and a
+  delete are refused, and a decision still joins its `transformed` Finding.
+- **Every presentation of a Finding names its `evaluation_method`** and states
+  what its evidence **established** and what it **did not establish**.
+  - The reading is a pure function of the Finding's own `evaluation_method`,
+    `operation`, `status` and `evidence`; it needs no live lookup.
+  - The disposition is attributed, not restated: "recorded as transformed by
+    provenance-v1.0".
+- **Mixed ledgers** show each Finding's method. No aggregate may hide that a
+  narrative's Findings come from different evaluator versions.
+
+**The `provenance-v1.0` readings.** They are total over all four combinations
+of `observed_render`. Tested exact and unambiguous.
+
+| Recorded | Evidence | Established | Not established |
+| --- | --- | --- | --- |
+| `preservation` / `preserved` | Observation ✓, record ✓ | the Observation existed; a provenance record existed | that the record agrees with the Observation; that the Observation is linked to the plan's Blueprint |
+| `transformation` / `transformed` | Observation ✓, record ✗ | the Observation existed; no provenance record existed | **any alteration**; the Observation's custody |
+| `omission` / `omitted` | Observation ✗ (record ✗ or ✓) | no Observation with this ID existed (and whether a record did) | — |
+
+The `preserved` row matters too. A v1.0 "preserved" Finding never compared
+the record with the Observation. The demonstrated-alteration state reads
+exactly like the preserved one, which is tested.
+
+---
+
+## D-3 (principle accepted, strengthened): the ledger write guard
+
+The guard sits at the **single Finding persistence boundary**,
+`SQLiteStore.insert_findings_batch`, which both the Critic route and the CLI
+use. It classifies every computed Finding.
+
+| Class | Condition | Outcome |
+| --- | --- | --- |
+| Identical retry | ID stored; `operation`, `status`, `evidence`, `evaluation_method` and `constitution_version` all equal | nothing written; counted `identical`; **success** (idempotent) |
+| **Retained older evaluator version** | ID stored; `operation`, `status` and `evidence` equal; `evaluation_method` or `constitution_version` differs | nothing written; the stored Finding stands; **reported** as `retained` with both methods; success |
+| **Divergent result** | ID stored; `operation`, `status` or `evidence` differs | **refused** |
+| **Unsupported value** | the operation, status or their pair is not ratified for the dimension | **refused** |
+| **Failed insertion** | a write did not produce exactly the computed row, for any reason: constraint, trigger or driver | **refused** |
+
+- **All or nothing.** A refusal writes nothing, together with the Critic report
+  in the same transaction. It names the class and the IDs. `created_at` is
+  never compared.
+- **Return contract:** `{inserted, identical, retained}`. Each `retained` entry
+  carries `id`, `stored_method` and `computed_method`.
+- **Feasible without any schema change.** A reference guard (applied
+  temporarily, not committed) made all five D-3 witnesses show
+  `XPASS(strict)`. Under it, the Critic route's idempotency test and the E1–E5
+  Evaluation Function suites passed: 107 passed. The only failures were the
+  five "today" characterizations, as expected.
+- **Dependency.** Checking the dimension against `RATIFIED_DIMENSIONS` would
+  refuse the `semantic` dimension's Findings. They are persisted today,
+  although the dimension is unratified (see the separate investigation). That
+  check must be enabled together with the Steward's `semantic` decision. Until
+  then, the guard checks operation, status and pair only, as the reference
+  guard did.
+
+| Witness (strict xfail) | Class |
+| --- | --- |
+| `ProvenanceAbsenceReadAsAlteration` | D-1 (XPASS under U or N; mutation-checked) |
+| `DivergentReevaluationDiscarded` | divergent, including writing nothing beside it |
+| `UnsupportedValueAccepted` ×2 | unknown status (dropped today); unratified pair (stored today) |
+| `FailedInsertionUnreported` | NOT NULL violation (dropped today) |
+| `RetainedOlderVersionUnreported` | retained older version |
+
+`test_an_identical_reevaluation_is_idempotent` must keep passing.
 
 ---
 
 ## Alternatives considered
 
-Each alternative is applied to the 2,369 real-study obligations restored from
-an earlier-exporter bundle.
-
-| | Remedy | Real study | Ontology or schema change | Decision |
-| --- | --- | --- | --- | --- |
-| A | Keep `transformation` / `transformed` | 2,369 claimed alterations of unaltered evidence | none | **rejected**: contradicts ADR-0041 §5 |
-| **B** | **`not_evaluated` / `not_evaluated`; the absence stays in evidence (D-1)** | 2,369 `not_evaluated`, with the reason recorded in each Finding | **none** | **proposed** |
-| C | New explicit status and operation (for example `unverifiable`) | 2,369 under the new status | ADR-0041 §5 vocabulary; table rebuild | fallback (see below) |
-| D | Put the method version into Finding identity, then supersede v1.0 Findings | 2,369 new Findings and supersession relations | ADR-0041 Amendment I, for **every** dimension | not now |
-| E | `omission` / `omitted` | 2,369 claimed absences of Observations that exist | none | **rejected**: false |
-| F | Projection relabelling only | the stored Findings still assert alteration | none | insufficient alone; adopted for history (D-2) |
-
-### Why not a new status (C)?
-
-`finding.spec.md` allows provenance-specific vocabulary when a domain ratifies
-it, so C is lawful. Its costs were measured:
-1. **ADR-0041 §5 must be amended.** That changes Finding ontology, which
-   ADR-0042 explicitly did not authorize ("Any modification to Finding
-   schema").
-2. **The `findings` CHECK vocabulary must change.** SQLite cannot alter a CHECK
-   constraint, so the canonical, trigger-guarded Finding table would have to be
-   rebuilt in every workspace. That is a copy of immutable history.
-3. **Un-migrated workspaces lose Findings silently.** Tested: the CHECK
-   constraint refuses an unknown status, but `INSERT OR IGNORE` also ignores
-   CHECK violations. The new Findings would therefore be **dropped without
-   error**. That breaks completeness silently, which is the worst failure for a
-   ledger.
-4. **Projections need changes.** From code reading:
-   - `trust_card` counts statuses in a dictionary with fixed keys, so an unknown
-     status raises `KeyError`;
-   - the audit dashboard's `STATUS_STATES` enumerates the five statuses.
-
-Choose C instead of B only if the Steward judges that ADR-0041's
-`not_evaluated` operation ("not evaluated in this invocation") cannot bear the
-meaning "evaluated, but no custody record exists to evaluate".
-
-### Is `not_evaluated` honest?
-
-| Test | Result |
-| --- | --- |
-| Status meaning: "No authoritative evaluation exists" | **holds**: absence of the custody record leaves custody unevaluable |
-| Operation meaning: "not evaluated in this invocation" | **stretched**: the function ran and observed the absence. The interpretation clause in D-1 closes this explicitly |
-| `not_evaluated` "is not a success state" | holds: no false pass |
-| Information loss | none: `observed_render` keeps both booleans, so projections can tell "no custody record" apart from any other `not_evaluated` |
-| Precedent | the `semantic` EF already maps an absent evidential chain to `not_evaluated`. It is weak precedent, because that dimension is not ratified |
+| | Remedy | Decision |
+| --- | --- | --- |
+| A | Keep `transformation` / `transformed` | rejected: contradicts ADR-0041 §5 |
+| **U** | **`unverifiable`, provenance-scoped** | **recommended** |
+| N | Amend `not_evaluated` for every dimension | rejected: cross-dimension and retroactive; blesses the unratified `semantic` use |
+| N′ | Amend `not_evaluated` for provenance only | fallback, if no schema migration now |
+| D | Method-versioned Finding identity, plus supersession | not now: changes ADR-0041 Amendment I for every dimension |
+| E | `omission` / `omitted` | rejected: the Observation exists |
+| F | Relabel in projections only | insufficient: new Findings would still assert alteration. Kept for history (D-2) |
 
 ---
 
-## Compatibility analysis
+## Compatibility analysis (U with D-2 and D-3)
 
-| Surface | Effect of B (D-1 to D-3) |
+| Surface | Effect |
 | --- | --- |
-| Finding schema and CHECK vocabulary | unchanged |
-| Finding and obligation identity | unchanged formula. `provenance-v1.0` and `-v1.1` Findings for the same obligation share an ID. Within a workspace, the stored Finding stands and D-3 makes any divergence visible |
-| Historical Findings and steward decisions | unchanged (D-2) |
-| Completeness invariant | unchanged: one Finding per obligation, tested |
-| Trust card | the provenance verdict is the same, `partial`, for all-`transformed` and all-`not_evaluated`. Tested |
-| Audit dashboard, Reader fidelity view | already render `not_evaluated`. Counts move from `transformed` to `not_evaluated` |
-| WBS | No WBS exporter writes Findings; #255 declares them not carried. There is no cross-workspace collision today. Any future Findings-portability component **must refuse** a bundle whose Finding ID exists in the target with different content: fail closed, as for R1 |
-| Older code over a newer workspace | `not_evaluated` is in the old vocabulary and renders. Older code has no D-3 guard: its `transformed` re-evaluation would be discarded silently in favor of the stored `not_evaluated`. That is the same silent path D-3 closes going forward |
-| R1 | unaffected. New bundles still refuse restoration by older restorers |
-| CI-015, Article I | no evidence is touched; no historical Finding is touched |
+| Finding and obligation identity | unchanged formula. v1.0 and v1.1 Findings for an obligation share an ID. The stored one stands; D-3 refuses divergence and reports retention |
+| Historical Findings, steward decisions, supersession relations | unchanged; the rehearsal preserves every row and relation |
+| Completeness invariant | unchanged: one Finding per obligation |
+| Schema | `findings` CHECK only, by a rehearsed rebuild; schema version 21 → 22 |
+| Projections and Reader | must learn `unverifiable` (P3). Today they raise `KeyError` |
+| Older builds | they open a migrated workspace without refusing, downgrade the marker and fail in projections. P2 closes this for later builds |
+| WBS | no exporter writes Findings; #255 declares them not carried. Any future Findings component must refuse an ID collision with different content (fail closed, as for R1) |
+| R1 | unaffected |
+| CI-015, Article I | no evidence and no historical Finding is touched |
 
-**Tests that change when this is implemented:**
-- **This file:**
-  - the two strict witnesses must show `XPASS(strict)` before their markers are
-    removed (both were mutation-checked);
-  - the `provenance-v1.0` characterization tests are updated to `v1.1`.
-- **#257, if merged first.** `test_wbs_compile_records` asserts `transformed`
-  for component-less restores. Its comment cites ADR-0042 as unchanged. It takes
-  the ratified disposition.
-- **The gap.** `test_era2_sprint_e3` has no test of the missing-provenance
-  branch. The truth-table test here covers it.
+**Tests that change on implementation:**
+- **This branch:** each witness must show `XPASS(strict)` before its marker is
+  removed. The "today" characterizations become regressions of the new
+  behavior.
+- **#257, if merged first:** `test_wbs_compile_records` asserts `transformed`
+  for component-less restores, and takes the ratified disposition.
+- **The runner suite:** `test_evaluation_runner` pins `semantic` as a
+  registered dimension, which bears on the `semantic` decision.
 
 ---
 
 ## Recommended migration strategy
 
-1. **Ratify D-1, D-2 and D-3**, or C in place of D-1.
-2. **Implement as one bounded packet:**
-   - the `provenance-v1.1` branch;
-   - the D-3 divergence guard at the Finding-store boundary (the Critic route
-     and the CLI both persist through `insert_findings_batch`);
-   - the D-2 projection wording.
-3. **No data migration, backfill or forced re-evaluation.** Historical
-   Findings stay as recorded and are described exactly by D-2.
-4. **Re-running the Critic** on a narrative that holds a `provenance-v1.0`
-   `transformed` Finding for an absent record is refused under D-3. The Steward
-   sees the stored Finding and the divergence. Recording the new disposition
-   under a new identity would be Alternative D, a separate decision.
-5. **Convert the witnesses** only after `XPASS(strict)`.
-6. **Authority Index.** On ratification, add this row to the Supersession
-   Register:
+1. **Ratify** U, D-2 and D-3. Authorize P2 separately.
+2. **Release A** needs no schema change:
+   - the D-3 guard (operation, status and pair, divergence, read-back,
+     retained report);
+   - P2;
+   - D-2 presentation.
 
-   | Earlier authority | Status | Successor | Superseded scope | Reason |
-   | --- | --- | --- | --- | --- |
-   | ADR-0042 | SUPERSEDED IN PART | ADR-0046 | Provenance EF: the missing-provenance disposition and its stated meaning | An absent custody record makes custody unevaluable; it does not show material alteration (ADR-0041 §5) |
+   Witnesses W2 to W5 convert.
+3. **Release B:**
+   - the schema-22 rebuild, using the rehearsed procedure: one transaction,
+     foreign keys off, legacy rename, `foreign_key_check`, a row-identity
+     assertion before commit, rollback on any failure;
+   - `provenance-v1.1` emitting `unverifiable`;
+   - the projection and Reader updates (P3);
+   - the guard admitting `unverifiable` for provenance only (P4).
+
+   W1 converts.
+4. **No backfill, re-evaluation or historical rewrite.** Re-running the Critic
+   over a v1.0 `transformed` Finding is refused as divergent and reported.
+5. **Authority Index, on ratification:**
+   - ADR-0042 becomes SUPERSEDED IN PART by ADR-0046, for the missing-record
+     disposition.
+   - ADR-0041 is **not** superseded under U, which is additive under §5. Under
+     N′ it would be superseded in part, for the provenance dimension.
 
 ---
 
 ## Smallest defensible decision
 
-**D-1 with D-2** corrects the false claim within the existing ontology:
-- no new status;
-- no schema change;
-- no change to the Finding identity formula;
-- no historical Finding touched.
+**Ratify U (`unverifiable`, provenance-scoped), D-2 and D-3, with P2 authorized
+separately.**
+- It uses ADR-0041's existing extension clause, so no ratified meaning
+  changes.
+- Finding identity semantics are unchanged.
+- No historical Finding is touched.
+- The one schema change is a rehearsed, row-preserving rebuild, guarded by D-3
+  and preceded by P2.
 
-**D-3** is the guard that keeps the change from being lost silently under
-unchanged IDs. Without it, workspaces that already hold `provenance-v1.0`
-Findings would go on showing `transformed`, and nothing would say why.
+**D-3 is independent of the D-1 choice**, needs no schema change, and can land
+first.
