@@ -17,7 +17,13 @@ from typing import Callable
 import pytest
 
 from hermeneia.perspective_identity import frame_v2_row_from_draft
-from hermeneia.storage.hashing import make_interpretation_id, make_perspective_id
+from hermeneia.storage.hashing import (
+    make_expression_profile_id,
+    make_interpretation_id,
+    make_perspective_id,
+    make_rendered_narrative_id,
+    make_validation_report_id,
+)
 from hermeneia.storage.sqlite import SQLiteStore
 from test_constitutional_p0 import _seed_full_chain
 
@@ -129,6 +135,37 @@ WRITERS["insert_perspective_revision"] = Writer(
     prepare=lambda store, ids: store.insert_frame_perspective(_frame()),
     write=_revise,
     probe=PERSPECTIVES_AND_EDGES,
+)
+
+
+# --- expression chain ---
+
+WRITERS["insert_expression_profile"] = Writer(
+    write=lambda store, ids: store.insert_expression_profile({
+        "id": make_expression_profile_id("plain-en"), "slug": "plain-en", "name": "Plain English",
+        "description": "Test profile", "language": "en", "audience": "general", "reading_level": "general",
+        "tone": "plain", "voice": "active", "artist_prompt": "Write plainly.", "critic_expectations": "[]",
+        "source": "test", "created_at": NOW,
+    }),
+    probe="SELECT COUNT(*) FROM expression_profiles",
+)
+WRITERS["insert_rendered_narrative"] = Writer(
+    write=lambda store, ids: store.insert_rendered_narrative({
+        "id": make_rendered_narrative_id(ids["plan_id"], "other", ids["profile_id"]),
+        "architect_plan_id": ids["plan_id"], "provider": "other", "expression_profile_id": ids["profile_id"],
+        "text": "Evidence remains fixed.", "prompt_used": "Test prompt.", "created_at": NOW,
+    }),
+    probe="SELECT COUNT(*) FROM rendered_narratives",
+)
+WRITERS["insert_validation_report"] = Writer(
+    write=lambda store, ids: store.insert_validation_report({
+        "id": make_validation_report_id(ids["narrative_id"]), "rendered_narrative_id": ids["narrative_id"],
+        "architect_plan_id": ids["plan_id"], "expression_profile_id": ids["profile_id"],
+        "semantic_fidelity": 1.0, "required_terms_present": "[]", "required_terms_missing": "[]",
+        "unsupported_claims": "[]", "omitted_observations": "[]", "omitted_interpretations": "[]",
+        "semantic_drift": 0.0, "warnings": "[]", "approved": 1, "created_at": NOW,
+    }),
+    probe="SELECT COUNT(*) FROM validation_reports",
 )
 
 

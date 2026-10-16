@@ -2257,7 +2257,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def expression_profile_by_slug(self, slug: str) -> dict | None:
         row = self._conn.execute(
@@ -2295,7 +2295,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def rendered_narrative_for_plan(
         self,
@@ -2355,7 +2355,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def validation_report_for_narrative(self, rendered_narrative_id: str) -> dict | None:
         row = self._conn.execute(
