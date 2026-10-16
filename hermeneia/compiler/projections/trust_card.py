@@ -63,7 +63,15 @@ def trust_card(
         dim_counts[dim][f["status"]] += 1
         dim_counts[dim]["total"] += 1
 
-    dimension_verdicts = {dim: _dimension_verdict(counts) for dim, counts in dim_counts.items()}
+    # ADR-0047 S1: a verdict never rests on an unratified dimension. Its historical Findings stay visible, apart.
+    from ..evaluation_functions.base import RATIFIED_DIMENSIONS
+    dimension_verdicts = {dim: _dimension_verdict(counts) for dim, counts in dim_counts.items()
+                          if dim in RATIFIED_DIMENSIONS}
+    unratified_dimensions = {
+        dim: {"verdict": _dimension_verdict(counts), "finding_count": counts["total"],
+              "label": "unratified dimension (historical)"}
+        for dim, counts in dim_counts.items() if dim not in RATIFIED_DIMENSIONS
+    }
 
     verdict_order = {"fail": 0, "partial": 1, "not_evaluated": 2, "pass": 3}
     if not dimension_verdicts:
@@ -80,6 +88,7 @@ def trust_card(
         "rendered_at": narrative["created_at"],
         "overall": overall,
         "dimensions": dimension_verdicts,
+        "unratified_dimensions": unratified_dimensions,
         "finding_count": len(findings),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }

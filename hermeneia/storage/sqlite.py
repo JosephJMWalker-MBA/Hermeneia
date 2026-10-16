@@ -2458,6 +2458,10 @@ class SQLiteStore:
         if unsupported:
             raise FindingLedgerRefusal("unsupported_value", unsupported,
                                        "operation/status is not a ratified disposition (ADR-0041 §5)")
+        from ..compiler.evaluation_functions.base import RATIFIED_DIMENSIONS
+        unratified = [row.get("id") for row in rows if row.get("dimension") not in RATIFIED_DIMENSIONS]
+        if unratified:
+            raise FindingLedgerRefusal("unsupported_value", unratified, "the dimension is not ratified (ADR-0047 S1)")
         conn = self._conn
         conn.execute("SAVEPOINT finding_ledger")
         try:

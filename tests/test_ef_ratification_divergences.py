@@ -4,8 +4,9 @@
 2. The `semantic` dimension is executed by the runner and its Findings are persisted, although it is absent from
    `RATIFIED_DIMENSIONS` and ADR-0042 ratified that function's successor under another name.
 
-Nothing here changes behavior. Passing tests pin what the code does; strict-xfail witnesses pin what the ratified
-text requires and must show XPASS(strict) before their markers are removed, after the Steward decides a remedy.
+Passing tests pin what the code does; strict-xfail witnesses pin what the ratified text requires and must show
+XPASS(strict) before their markers are removed. The S1 packet (ef-ratified-dimensions-only) converted
+UnratifiedDimensionPersisted; the L2 witnesses remain strict-xfail.
 Record: docs/design/ef-ratification-divergences-2026-10-16.md.
 """
 from __future__ import annotations
@@ -24,9 +25,10 @@ from hermeneia.compiler.evaluation_functions import semantic as semantic_ef
 from hermeneia.compiler.evaluation_functions.base import RATIFIED_DIMENSIONS, validate_ef_contract
 from hermeneia.compiler.evaluation_functions.provenance import evaluate_provenance
 from hermeneia.compiler.evaluation_functions.runner import _load_efs
+from hermeneia.compiler.projections.audit_dashboard import audit_dashboard
 from hermeneia.compiler.projections.trust_card import trust_card
 from hermeneia.storage.hashing import make_blueprint_id, make_expression_profile_id, make_rendered_narrative_id
-from hermeneia.storage.sqlite import SQLiteStore
+from hermeneia.storage.sqlite import FindingLedgerRefusal, SQLiteStore
 from hermeneia.web.app import create_app
 from hermeneia.workspace import export_workspace_bundle
 from hermeneia.workspace.restore import restore_workspace
@@ -256,26 +258,55 @@ def test_the_evidence_records_that_the_blueprint_link_was_absent(study):
 
 # ── 2. The unratified `semantic` dimension ──────────────────────────────────
 
-def test_the_runner_executes_a_dimension_outside_the_ratified_registry(study):
+def test_the_runner_registers_and_runs_only_ratified_dimensions(study):
+    """ADR-0047 S1. The `semantic` module stays as unratified research code; the contract check alone never
+    consulted the registry, so the runner and the ledger write guard enforce it."""
     registered = [dimension for dimension, _function in _load_efs()]
-    assert "semantic" in registered and "semantic" not in RATIFIED_DIMENSIONS
-    assert sorted(set(registered) - RATIFIED_DIMENSIONS) == ["semantic"]
-    # The module contract does not consult the registry, so it raises no violation.
+    assert set(registered) == RATIFIED_DIMENSIONS and "semantic" not in registered
     assert semantic_ef.dimension == "semantic" and validate_ef_contract(semantic_ef) == []
 
 
-def test_the_critic_route_persists_unratified_semantic_findings_into_the_canonical_ledger(study):
-    findings = study.run_critic_route()
-    assert {f["dimension"] for f in findings} - RATIFIED_DIMENSIONS == {"semantic"}
-    semantic = [f for f in findings if f["dimension"] == "semantic"]
-    assert semantic and {f["evaluation_method"] for f in semantic} == {semantic_ef.EVALUATION_METHOD}
+def test_historical_semantic_findings_stay_inspectable_labelled_and_outside_the_verdict(study):
+    """Findings a pre-S1 build wrote are kept as recorded; new ones are refused at the write guard."""
     conn = _connect(study.db)
     try:
-        with pytest.raises(sqlite3.DatabaseError, match="Finding immutable"):
-            conn.execute("DELETE FROM findings WHERE dimension = 'semantic'")
-        assert "semantic" in trust_card(study.narrative_id, conn)["dimensions"]
+        historical = semantic_ef.evaluate_semantic(study.narrative_id, study.plan_id, conn)
+        for finding in historical:  # written as a pre-S1 build did, past today's guard
+            conn.execute(f"INSERT INTO findings ({', '.join(finding)}) VALUES ({', '.join('?' for _ in finding)})", list(finding.values()))
+        conn.commit()
     finally:
         conn.close()
+    assert historical
+    findings = study.run_critic_route()  # runs only ratified dimensions and leaves history alone
+    assert sorted(f["id"] for f in findings if f["dimension"] == "semantic") == sorted(f["id"] for f in historical)
+    conn = _connect(study.db)
+    try:
+        card = trust_card(study.narrative_id, conn)
+        assert "semantic" not in card["dimensions"]
+        assert card["unratified_dimensions"]["semantic"]["label"] == "unratified dimension (historical)"
+        assert audit_dashboard(study.narrative_id, conn)["dimensions"]["semantic"]["ratified"] is False
+        with pytest.raises(sqlite3.DatabaseError, match="Finding immutable"):
+            conn.execute("DELETE FROM findings WHERE dimension = 'semantic'")
+    finally:
+        conn.close()
+    store = SQLiteStore(study.db)
+    try:
+        with pytest.raises(FindingLedgerRefusal) as refused:
+            store.insert_findings_batch([dict(historical[0], id="n" * 64)])
+        assert refused.value.refusal_class == "unsupported_value"
+    finally:
+        store.close()
+
+
+def test_the_cli_critic_path_writes_only_ratified_dimensions(study):
+    from hermeneia.cli import critic_cmd
+    conn = _connect(study.db)
+    try:
+        critic_cmd._run_and_display_evaluation_functions(study.narrative_id, study.plan_id, study.db, conn)
+        dimensions = {r[0] for r in conn.execute("SELECT DISTINCT dimension FROM findings")}
+    finally:
+        conn.close()
+    assert dimensions and dimensions <= RATIFIED_DIMENSIONS
 
 
 def test_the_semantic_function_uses_ratified_dispositions_outside_their_adr_0041_meanings():
@@ -289,8 +320,6 @@ class UnratifiedDimensionPersisted(AssertionError):
     """A Finding whose dimension is absent from RATIFIED_DIMENSIONS is written to the canonical ledger."""
 
 
-@pytest.mark.xfail(strict=True, raises=UnratifiedDimensionPersisted,
-                   reason="runner registers `semantic`, absent from RATIFIED_DIMENSIONS (ADR-0042 ratified it as observation_coverage)")
 def test_the_critic_route_persists_only_ratified_dimensions(study):
     unratified = sorted({f["dimension"] for f in study.run_critic_route()} - RATIFIED_DIMENSIONS)
     if unratified:

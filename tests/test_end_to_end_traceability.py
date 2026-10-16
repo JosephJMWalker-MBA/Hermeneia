@@ -205,8 +205,8 @@ def test_observation_lineage_reaches_source_document(client):
 
 # ── Findings coverage ─────────────────────────────────────────────────────────
 
-def test_findings_stored_for_all_six_dimensions(full_chain):
-    """The EF runner produced and persisted Findings for all 6 dimensions."""
+def test_findings_stored_for_every_ratified_dimension(full_chain):
+    """The EF runner produced and persisted Findings for every ratified dimension, and only those (ADR-0047 S1)."""
     db_path, ids = full_chain
     conn = sqlite3.connect(str(db_path))
     rows = conn.execute(
@@ -217,7 +217,7 @@ def test_findings_stored_for_all_six_dimensions(full_chain):
 
     dimensions = {row[0] for row in rows}
     expected = {
-        "structural", "semantic", "provenance",
+        "structural", "provenance",
         "observation_coverage", "accessibility", "constitutional",
     }
     assert expected == dimensions
