@@ -8,6 +8,7 @@ source-role write) still sees the row.
 """
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass
 import json
 from pathlib import Path
@@ -364,3 +365,38 @@ def test_outside_atomic_the_write_commits_at_once(chain, name):
     before = _committed(store.db_path, writer.probe)
     writer.write(store, ids)
     assert _committed(store.db_path, writer.probe) != before
+
+
+# --- tripwire ---
+
+IMMEDIATE = {
+    "atomic": "opens and closes the block",
+    "_commit": "the deferral point itself",
+    "_own_transaction": "a method's own transaction, outside atomic() only",
+    "_apply_schema": "schema, at open",
+    "_apply_column_migrations": "schema, at open",
+    "_apply_perspective_schema_migration": "schema, at open",
+    "_ensure_perspective_indexes_and_triggers": "schema, at open",
+    "backup_to": "flushes pending writes before copying the database",
+}
+# Converted on the blueprint-link-integrity branch (ADR-0047 L2-a): allowed here, not required.
+CONVERTED_ELSEWHERE = {"insert_blueprint", "insert_architect_plan"}
+
+
+def _methods_committing_directly() -> set[str]:
+    tree = ast.parse((Path(__file__).resolve().parents[1] / "hermeneia/storage/sqlite.py").read_text(encoding="utf-8"))
+    (store,) = [node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "SQLiteStore"]
+    methods = set()
+    for method in store.body:
+        if not isinstance(method, ast.FunctionDef):
+            continue
+        for node in ast.walk(method):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "commit"
+                    and isinstance(node.func.value, ast.Attribute) and node.func.value.attr == "_conn"):
+                methods.add(method.name)
+    return methods
+
+
+def test_only_schema_backup_and_transaction_control_commit_directly():
+    """Every other SQLiteStore write calls self._commit(), so it defers inside store.atomic()."""
+    assert _methods_committing_directly() - IMMEDIATE.keys() - CONVERTED_ELSEWHERE == set()
