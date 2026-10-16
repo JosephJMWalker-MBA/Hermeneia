@@ -1,7 +1,7 @@
 # ADR-0046: An Absent Provenance Record Is Not a Transformation
 
-**Status:** PROPOSED
-**Version:** 0.2
+**Status:** PROPOSED (ratification candidate)
+**Version:** 0.3
 **Date:** 2026-10-16
 **Supersedes:** ADR-0042 in part, IF RATIFIED. Only the Provenance EF's
 missing-provenance disposition and its stated meaning are in scope.
@@ -23,9 +23,22 @@ missing-provenance disposition and its stated meaning are in scope.
   what its evidence established;
 - D-3 **principle accepted**: strengthen it.
 
-**Nothing in this ADR is implemented.** The evaluator, the Finding store, the
-schema, every historical Finding, ADR-0041, ADR-0042 and the Authority Index
-are unchanged.
+**Steward recommendations, 2026-10-16** (an engineering brief; it confers no
+authority):
+- adopt U, D-2 and D-3;
+- authorize P2 (ADR-0048);
+- adopt S1 and a revised L2 (ADR-0047).
+
+This version turns those recommendations into a ratification candidate.
+**Authority arises only from the ratification record at the end of this ADR**,
+completed by the Primary Human Steward.
+
+**Nothing changes evaluation semantics before ratification.**
+- The implementation PRs are drafts.
+- The `unverifiable` activation (schema 22 and `provenance-v1.1` as the
+  default) is a separate, final step, and an executable gate blocks it until
+  this ADR records ratification.
+- ADR-0041, ADR-0042 and the Authority Index are unchanged.
 
 **Evidence:**
 - `tests/test_adr0042_provenance_absence.py`: 13 pinned facts and 6 strict
@@ -109,7 +122,7 @@ the record with the Observation. Both are tested.
 | Older builds on a migrated workspace (**measured**) | their projections fail. Their store silently **rewrites the schema marker down** to their own version and does not refuse | unaffected |
 | A store that is not migrated (**measured**) | `INSERT OR IGNORE` drops the new value silently. Under D-3 it is refused instead | n/a |
 
-### Recommendation: U, scoped to the provenance dimension
+### Decision proposed for ratification: U, scoped to the provenance dimension
 
 U is the smallest **constitutionally honest** alternative:
 - it changes no ratified meaning;
@@ -124,11 +137,10 @@ question by implication.
 U requires these preconditions, in order:
 1. **P1: D-3 lands first.** A build that cannot store `unverifiable` must refuse
    it, not drop it.
-2. **P2: a newer-schema refusal.** `SQLiteStore` refuses a workspace whose
-   schema version exceeds its own. It should ship at least one release before
-   the migration.
-   - **Separate authorization.** This changes startup behavior for every
-     workspace, so P2 needs its own decision.
+2. **P2: a newer-schema refusal** (**ADR-0048**, its own ratification). Every
+   writing entry point refuses a workspace whose schema version exceeds its
+   own, before any initialization, migration or mutation. It must ship at
+   least one release before the migration.
    - **Residual risk.** Builds that predate P2 would still open a migrated
      workspace: they would downgrade its version marker and fail in
      projections. They lose no Findings, because the rows and triggers are
@@ -206,12 +218,13 @@ use. It classifies every computed Finding.
   `XPASS(strict)`. Under it, the Critic route's idempotency test and the E1–E5
   Evaluation Function suites passed: 107 passed. The only failures were the
   five "today" characterizations, as expected.
-- **Dependency.** Checking the dimension against `RATIFIED_DIMENSIONS` would
-  refuse the `semantic` dimension's Findings. They are persisted today,
-  although the dimension is unratified (see the separate investigation). That
-  check must be enabled together with the Steward's `semantic` decision. Until
-  then, the guard checks operation, status and pair only, as the reference
-  guard did.
+- **Dependency.** The dimension check (refusing dimensions outside
+  `RATIFIED_DIMENSIONS`) belongs to **ADR-0047 S1** and lands with it. Until
+  then, the guard checks operation, status and pair only.
+- **Legitimate partial-run recovery.** A ledger left incomplete (by older code,
+  or by a CLI run in which some Evaluation Functions failed) is completed by a
+  retry: the stored Findings count as `identical` and the missing ones are
+  inserted.
 
 | Witness (strict xfail) | Class |
 | --- | --- |
@@ -264,32 +277,36 @@ use. It classifies every computed Finding.
 
 ---
 
-## Recommended migration strategy
+## Implementation packets and activation order
 
-1. **Ratify** U, D-2 and D-3. Authorize P2 separately.
-2. **Release A** needs no schema change:
-   - the D-3 guard (operation, status and pair, divergence, read-back,
-     retained report);
-   - P2;
-   - D-2 presentation.
+Each packet is a separate draft PR. **None is merged before its authority is
+ratified.**
 
-   Witnesses W2 to W5 convert.
-3. **Release B:**
-   - the schema-22 rebuild, using the rehearsed procedure: one transaction,
-     foreign keys off, legacy rename, `foreign_key_check`, a row-identity
-     assertion before commit, rollback on any failure;
-   - `provenance-v1.1` emitting `unverifiable`;
-   - the projection and Reader updates (P3);
-   - the guard admitting `unverifiable` for provenance only (P4).
+| Order | Packet | Authority | Schema | Changes evaluation semantics |
+| --- | --- | --- | --- | --- |
+| 1 | **D-3**: the ledger write guard (witnesses W2 to W5 convert) | ADR-0046 D-3 | none | no; persistence only |
+| 2 | **P2**: newer-schema refusal at every writing entry point | ADR-0048 | none | no |
+| 3 | **S1**: ratified dimensions only; historical `semantic` Findings stay and are labelled | ADR-0047 S1 | none | yes: no new `semantic` Findings |
+| 4 | **D-2 and U, implementation-ready**: historical readings and projections; the schema-22 migration and `provenance-v1.1`, both present but **not activated** | ADR-0046 D-1 and D-2 | migration code only; `SCHEMA_VERSION` stays 21 | D-2: presentation only. U: none until activated |
+| 5 | **U activation**: `SCHEMA_VERSION` 22, the migration on open, `provenance-v1.1` as the default, `unverifiable` admitted for provenance only, the Authority Index rows (witness W1 converts) | ADR-0046 ratified, **and** P2 released at least one release earlier | the `findings` rebuild | yes |
 
-   W1 converts.
-4. **No backfill, re-evaluation or historical rewrite.** Re-running the Critic
-   over a v1.0 `transformed` Finding is refused as divergent and reported.
-5. **Authority Index, on ratification:**
-   - ADR-0042 becomes SUPERSEDED IN PART by ADR-0046, for the missing-record
-     disposition.
-   - ADR-0041 is **not** superseded under U, which is additive under §5. Under
-     N′ it would be superseded in part, for the provenance dimension.
+**Rules for every packet:**
+- **No backfill, re-evaluation or historical rewrite.** Re-running the Critic
+  over a v1.0 `transformed` Finding is refused as divergent and reported.
+- **No real workspace is migrated** without separate approval. The rehearsal
+  and the packet-4 tests run on test databases only.
+- **The gate on activation.** In packet 4, a test fails if the provenance
+  evaluator's default method is `provenance-v1.1`, or `SCHEMA_VERSION` ≥ 22,
+  while this ADR's status is not RATIFIED.
+
+**On ratification**, the Authority Index Supersession Register gains:
+
+| Earlier authority | Status | Successor | Superseded scope | Reason |
+| --- | --- | --- | --- | --- |
+| ADR-0042 | SUPERSEDED IN PART | ADR-0046 | Provenance EF: the missing-provenance disposition and its stated meaning | An absent custody record makes custody unverifiable; it does not show material alteration (ADR-0041 §5) |
+
+ADR-0041 is **not** superseded: `unverifiable` is additive under its §5
+extension clause.
 
 ---
 
@@ -306,3 +323,20 @@ separately.**
 
 **D-3 is independent of the D-1 choice**, needs no schema change, and can land
 first.
+
+---
+
+## Ratification record
+
+To be completed **only** by the Primary Human Steward. Until it is completed,
+this ADR is PROPOSED and confers no authority.
+
+| Field | Value |
+| --- | --- |
+| Decision | ☐ ratified in full ☐ ratified in part (list) ☐ returned |
+| Scope ratified | ☐ D-1 (U) ☐ D-2 ☐ D-3 |
+| Ratified by | |
+| Date | |
+| Ratified proposal HEAD | |
+| Amendments at ratification | |
+
