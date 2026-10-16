@@ -1251,6 +1251,28 @@ def ensure_critic_tables(conn: "sqlite3.Connection") -> None:
     conn.commit()
 
 
+# ADR-0041 §5: the ratified operation/status pairs. A dimension-specific addition needs its own ratification.
+RATIFIED_FINDING_DISPOSITIONS = frozenset({
+    ("preservation", "preserved"), ("omission", "omitted"), ("transformation", "transformed"),
+    ("injection", "injected"), ("not_evaluated", "not_evaluated"),
+})
+_FINDING_COLUMNS = ("id", "rendered_narrative_id", "architect_plan_id", "dimension", "obligation_id", "operation",
+                    "status", "evidence", "evaluation_method", "constitution_version", "created_at")
+
+
+class FindingLedgerRefusal(ValueError):
+    """ADR-0046 D-3: a Finding batch was refused and nothing in it was written."""
+
+    def __init__(self, refusal_class: str, finding_ids: list, detail: str):
+        self.refusal_class = refusal_class
+        self.finding_ids = list(finding_ids)
+        self.detail = detail
+        super().__init__(f"Finding ledger refused ({refusal_class}, {len(self.finding_ids)} Finding(s)): {detail}")
+
+    def as_dict(self) -> dict:
+        return {"class": self.refusal_class, "finding_ids": self.finding_ids, "detail": self.detail}
+
+
 class SQLiteStore:
     def __init__(self, db_path: str | Path):
         self.db_path = Path(db_path)
@@ -2419,22 +2441,72 @@ class SQLiteStore:
 
     # --- findings (ADR-0041 Evaluation Functions, append-only) ---
 
-    def insert_findings_batch(self, rows: list[dict]) -> None:
-        """Atomically insert a batch of Findings. INSERT OR IGNORE — idempotent."""
-        self._conn.executemany(
-            """
-            INSERT OR IGNORE INTO findings
-                (id, rendered_narrative_id, architect_plan_id, dimension,
-                 obligation_id, operation, status, evidence,
-                 evaluation_method, constitution_version, created_at)
-            VALUES
-                (:id, :rendered_narrative_id, :architect_plan_id, :dimension,
-                 :obligation_id, :operation, :status, :evidence,
-                 :evaluation_method, :constitution_version, :created_at)
-            """,
-            rows,
-        )
+    def insert_findings_batch(self, rows: list[dict]) -> dict:
+        """Write a batch of Findings through the ledger guard (ADR-0046 D-3): all or nothing.
+
+        A Finding already stored with the same operation, status and evidence is not written again: `identical`
+        when its method and constitutional profile also match (an idempotent retry), else `retained` (the stored
+        Finding from an older evaluator version stands, and is reported). Raises FindingLedgerRefusal, writing
+        nothing, for an unsupported value, a divergent result or a failed insertion. Historical Findings are
+        never changed.
+        """
+        report: dict = {"inserted": [], "identical": [], "retained": []}
+        if not rows:
+            return report
+        unsupported = [row.get("id") for row in rows
+                       if (row.get("operation"), row.get("status")) not in RATIFIED_FINDING_DISPOSITIONS]
+        if unsupported:
+            raise FindingLedgerRefusal("unsupported_value", unsupported,
+                                       "operation/status is not a ratified disposition (ADR-0041 §5)")
+        conn = self._conn
+        conn.execute("SAVEPOINT finding_ledger")
+        try:
+            batch: dict[str, tuple] = {}
+            pending, divergent = [], []
+            for row in rows:
+                content = (row.get("operation"), row.get("status"), row.get("evidence"))
+                if row.get("id") in batch:
+                    if batch[row.get("id")] != content:
+                        divergent.append(row.get("id"))
+                    continue
+                batch[row.get("id")] = content
+                stored = conn.execute(
+                    "SELECT operation, status, evidence, evaluation_method, constitution_version FROM findings WHERE id = ?",
+                    (row.get("id"),),
+                ).fetchone()
+                if stored is None:
+                    pending.append(row)
+                elif tuple(stored)[:3] != content:
+                    divergent.append(row.get("id"))
+                elif tuple(stored)[3:] == (row.get("evaluation_method"), row.get("constitution_version")):
+                    report["identical"].append(row.get("id"))
+                else:
+                    report["retained"].append({"id": row.get("id"), "stored_method": stored["evaluation_method"],
+                                               "computed_method": row.get("evaluation_method")})
+            if divergent:
+                raise FindingLedgerRefusal("divergent_result", divergent,
+                                           "a stored Finding with the same identity records a different result")
+            for row in pending:
+                values = [row.get(column) for column in _FINDING_COLUMNS]
+                try:
+                    written = conn.execute(
+                        f"INSERT INTO findings ({', '.join(_FINDING_COLUMNS)}) VALUES ({', '.join('?' for _ in _FINDING_COLUMNS)})",
+                        values,
+                    ).rowcount
+                except sqlite3.Error as exc:
+                    raise FindingLedgerRefusal("failed_insertion", [row.get("id")], str(exc)) from exc
+                stored = conn.execute(f"SELECT {', '.join(_FINDING_COLUMNS)} FROM findings WHERE id = ?",
+                                      (row.get("id"),)).fetchone()
+                if written != 1 or stored is None or list(stored) != values:
+                    raise FindingLedgerRefusal("failed_insertion", [row.get("id")], "the stored row differs from the computed Finding")
+                report["inserted"].append(row.get("id"))
+            conn.execute("RELEASE finding_ledger")
+        except BaseException:
+            conn.execute("ROLLBACK TO finding_ledger")
+            conn.execute("RELEASE finding_ledger")
+            raise
         self._commit()
+        return report
 
     def findings_for_narrative(self, rendered_narrative_id: str, dimension: str | None = None) -> list[dict]:
         """Return all Findings for a given RenderedNarrative, optionally filtered by dimension."""

@@ -4,6 +4,7 @@ Nothing here changes evaluation semantics; ADR-0046 is PROPOSED, not ratified.
 - Passing tests pin what `provenance-v1.0`, the Critic route and the Finding store do today.
 - Strict-xfail witnesses pin what the proposal says must stop. They must show XPASS(strict) only after the Primary
   Human Steward ratifies an amendment and it is implemented; only then are their markers removed.
+- The D-3 witnesses are converted (the ledger guard); W1 (D-1) remains strict-xfail until U is activated.
 
 The witness state is built in tests/adr0046_witness_state.py. The `unverifiable` schema rehearsal is in
 tests/test_adr0046_unverifiable_rehearsal.py. Proposal: docs/adr/ADR-0046-provenance-absence-is-not-transformation.md.
@@ -128,7 +129,7 @@ def test_each_historical_v1_finding_has_exactly_one_reading_from_its_own_fields(
     assert "that the record agrees with the Observation" in readings["preserved_provenance"][1]
 
 
-# ── D-3: what the Finding store does today with each failure class ───────────
+# ── D-3: historical Findings and idempotent retries ─────────────────────────
 
 def _with(findings: list[dict], **fields) -> list[dict]:
     """Hypothetical computed Findings (test data only; no evaluator is changed)."""
@@ -162,46 +163,9 @@ def test_an_identical_reevaluation_is_idempotent(pair):
     assert rows(pair.restored, "findings") == stored
 
 
-def test_today_a_divergent_reevaluation_is_discarded_silently(pair):
-    historical = pair.critic(pair.restored)
-    pair.persist(pair.restored, historical)
-    assert pair.persist(pair.restored, _with(historical, operation="not_evaluated", status="not_evaluated")) is None
-    assert {(f["status"], f["evaluation_method"]) for f in rows(pair.restored, "findings")} == {("transformed", "provenance-v1.0")}
-
-
-def test_today_an_unsupported_status_is_discarded_silently(pair):
-    """The CHECK vocabulary refuses it, but INSERT OR IGNORE also ignores CHECK violations."""
-    finding = dict(pair.critic(pair.restored)[0], status="bogus")
-    assert pair.persist(pair.restored, [finding]) is None
-    assert rows(pair.restored, "findings") == []
-    conn = connect(pair.restored)
-    try:
-        with pytest.raises(sqlite3.IntegrityError, match="CHECK constraint failed"):
-            conn.execute(f"INSERT INTO findings ({', '.join(finding)}) VALUES ({', '.join('?' for _ in finding)})",
-                         list(finding.values()))
-    finally:
-        conn.close()
-
-
-def test_today_an_unratified_operation_status_pair_is_stored(pair):
-    pair.persist(pair.restored, _with(pair.critic(pair.restored)[:1], operation="preservation", status="omitted"))
-    assert [(f["operation"], f["status"]) for f in rows(pair.restored, "findings")] == [("preservation", "omitted")]
-
-
-def test_today_a_failed_insertion_is_discarded_silently(pair):
-    """NOT NULL is ignored by INSERT OR IGNORE too: the Finding is lost and the call succeeds."""
-    assert pair.persist(pair.restored, _with(pair.critic(pair.restored)[:1], evidence=None)) is None
-    assert rows(pair.restored, "findings") == []
-
-
-def test_today_a_retained_older_evaluator_version_is_not_reported(pair):
-    historical = pair.critic(pair.restored)
-    pair.persist(pair.restored, historical)
-    assert pair.persist(pair.restored, _with(historical, evaluation_method="provenance-v1.1")) is None
-    assert {f["evaluation_method"] for f in rows(pair.restored, "findings")} == {"provenance-v1.0"}
-
-
-# ── Witnesses: what the proposal says must stop ─────────────────────────────
+# ── Witnesses ─────────────────────────────────────────────────────────────────
+# W1 (D-1) stays strict-xfail until U is ratified and activated. The D-3 witnesses showed XPASS(strict)
+# under the ledger guard (findings-ledger-guard) and are now regressions with their assertions unchanged.
 
 class ProvenanceAbsenceReadAsAlteration(AssertionError):
     """An unchanged Observation whose provenance record is absent is classified as materially altered."""
@@ -245,8 +209,6 @@ def _refused_without_writing(pair, batch: list[dict], expected_rows: list[dict])
     return False
 
 
-@pytest.mark.xfail(strict=True, raises=DivergentReevaluationDiscarded,
-                   reason="Findings are stored with INSERT OR IGNORE; ADR-0046 D-3 proposes failing closed")
 def test_a_divergent_reevaluation_fails_closed_and_writes_nothing(pair):
     historical = pair.critic(pair.restored)
     half = len(historical) // 2
@@ -257,7 +219,6 @@ def test_a_divergent_reevaluation_fails_closed_and_writes_nothing(pair):
         raise DivergentReevaluationDiscarded(f"{half} divergent Findings dropped; {len(historical) - half} written beside them")
 
 
-@pytest.mark.xfail(strict=True, raises=UnsupportedValueAccepted, reason="ADR-0046 D-3 proposes refusing unsupported values")
 @pytest.mark.parametrize("fields", [{"status": "bogus"}, {"operation": "preservation", "status": "omitted"}],
                          ids=["unknown-status", "unratified-pair"])
 def test_an_unsupported_value_is_refused(pair, fields):
@@ -265,13 +226,11 @@ def test_an_unsupported_value_is_refused(pair, fields):
         raise UnsupportedValueAccepted(f"{fields} accepted; stored: {len(rows(pair.restored, 'findings'))}")
 
 
-@pytest.mark.xfail(strict=True, raises=FailedInsertionUnreported, reason="ADR-0046 D-3 proposes read-back verification")
 def test_a_failed_insertion_is_refused(pair):
     if not _refused_without_writing(pair, _with(pair.critic(pair.restored), evidence=None), []):
         raise FailedInsertionUnreported("Findings violating NOT NULL were dropped and the write reported success")
 
 
-@pytest.mark.xfail(strict=True, raises=RetainedOlderVersionUnreported, reason="ADR-0046 D-3 proposes a ledger write report")
 def test_a_retained_older_evaluator_version_is_reported(pair):
     historical = pair.critic(pair.restored)
     pair.persist(pair.restored, historical)

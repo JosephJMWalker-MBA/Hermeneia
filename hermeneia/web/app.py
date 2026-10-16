@@ -7894,7 +7894,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                     "ef_errors": ef_errors,
                 }), 500
 
-            from ..storage.sqlite import SQLiteStore
+            from ..storage.sqlite import FindingLedgerRefusal, SQLiteStore
             store = SQLiteStore(db_path)
             try:
                 with store.atomic():
@@ -7921,19 +7921,31 @@ Return ONLY valid JSON, no markdown, no explanation:
                             report["created_at"],
                         ),
                     ).rowcount == 1
-                    before = store._conn.total_changes
-                    store.insert_findings_batch(ef_run_result.all_findings)
-                    findings_completed = store._conn.total_changes - before
+                    ledger = store.insert_findings_batch(ef_run_result.all_findings)
+                    findings_completed = len(ledger["inserted"])
                 existing = store._conn.execute(
                     "SELECT * FROM validation_reports WHERE id = ?", (report["id"],)
                 ).fetchone()
+            except FindingLedgerRefusal as refusal:
+                # ADR-0046 D-3: the report and its Findings are recorded together or not at all.
+                return jsonify({
+                    "status": "refused",
+                    "error": "The Finding ledger refused this run; no Critic report or Findings were recorded.",
+                    "refusal": refusal.as_dict(),
+                }), 409
             finally:
                 store.close()
+            ledger_summary = {
+                "inserted": len(ledger["inserted"]),
+                "identical": len(ledger["identical"]),
+                "retained": ledger["retained"],
+            }
             if not created:
                 return jsonify({
                     "status": "already_exists",
                     "report": dict(existing),
                     "findings_completed": findings_completed,
+                    "ledger": ledger_summary,
                 }), 200
 
             pf = report.get("profile_fidelity")
@@ -7948,6 +7960,7 @@ Return ONLY valid JSON, no markdown, no explanation:
                     for dim, findings in ef_run_result.findings_by_dimension.items()
                 },
                 "ef_errors": None,
+                "ledger": ledger_summary,
             }}), 201
 
         except Exception as exc:
