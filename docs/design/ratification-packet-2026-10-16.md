@@ -103,3 +103,64 @@ The other two ADRs need no supersession row:
    ADR-0048). It is a separate step.
 6. **Private-copy validation:** approve one before any real workspace is
    migrated.
+
+## 6. Second pass (2026-10-16): integrity, re-evaluation and release preparation
+
+The Steward's review recommendations for ADR-0046 (U, D-2, D-3), ADR-0048 and
+ADR-0047 (S1, L2-a, and L2-b as `unverifiable` for an unverified Blueprint
+relationship) are **recommendations, not ratification**. Every ratification
+record stays blank.
+
+### New draft PRs
+
+| PR | Contents | Authority needed | Active? |
+| --- | --- | --- | --- |
+| #268 | L2-a: link integrity at every plan write, plus chain export (declares) and restore (refuses). The L2-a witnesses are converted. It also fixes `insert_blueprint` and `insert_architect_plan` committing inside `store.atomic()` | ADR-0047 L2-a | on merge |
+| #269 | L2-b, implementation-ready: v1.1 records `blueprint_link_exists` (true, false = demonstrated, null = unknown) distinctly from the custody record | ADR-0047 L2-b, with U activation | **no** |
+| #270 | Research packet and proposed **ADR-0049** (historical re-evaluation by explicit Finding revision) | ADR-0049 | **no**; nothing implemented |
+| #267 (separate session) | the remaining store writers defer their commit inside `store.atomic()` | none beyond review | on merge |
+
+### Release preparation (in #266)
+
+- **The boundary is executable.** Schema 22 cannot be active until
+  `REFUSING_RELEASE_TAG` names a git tag whose tree holds ADR-0048's refusal at
+  schema 21. The gate is verified against the ADR-0048 branch, `main` and
+  `v0.6.0`.
+- **The R2 procedure** is `migrate_with_verified_backup`: a SQLite-API backup,
+  proved logically equal, then the rebuild. It is dormant.
+- **The private-copy test of the real study** (counts only, original never
+  opened): 4,770 Findings, 3 steward decisions and 1 supersession relation
+  migrated identically.
+  - **Failure injection:** a failed check after the destructive steps, a
+    conflicting object, a read-only file and `SIGKILL` inside the transaction.
+    Each left the ledger intact.
+  - **Downgrade:** marked 22, the workspace is refused by this build.
+  - **Restore drill:** reopening the backup gives an identical ledger.
+  - **Historical re-evaluation:** an earlier-exporter history (2,369
+    `transformed`) migrates intact, and D-3 refuses its 2,369 corrected
+    determinations.
+- **The release sequence:** R1 at schema 21 (the boundary), then R2 at schema
+  22 (activation). See `docs/design/release-sequence-2026-10-16.md`.
+
+### Independent validation
+
+| PR | Evidence |
+| --- | --- |
+| #258 | full suite **0 failed** (2919 passed), including under load |
+| #261 | its deterministic regression test fails on `main` and passes on #261. The original upload witness, run beside a full suite, failed **4/40 on `main` and 0/40 on #261**; under CPU load alone, 0/30 on each. Full suite: only `main`'s six Reader failures (fixed by #258) |
+
+### Interactions found
+
+- **U together with L2-b.** v1.1 records one more fact for every obligation,
+  so after activation D-3 refuses **every** re-evaluation of a historical
+  provenance Finding, not only the changed ones. This is the revision-trigger
+  question in ADR-0049.
+- **Release identity.** Package 0.1.0 conflicts with the only tag, `v0.6.0`.
+  An owner decision is needed.
+
+### Merge order (plan only; integration verification precedes each merge)
+
+1. The existing stack: #253 → #254 → #256 → #255 → #257.
+2. Then: #259 → #263 → #260 → #265 → #268 → #264 → #266 → #269.
+3. #258, #261 and #267 may merge at any point before R1.
+4. #270 merges only as a research record, or after ADR-0049 is decided.
