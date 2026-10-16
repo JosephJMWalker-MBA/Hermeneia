@@ -17,8 +17,11 @@ from .hashing import make_semantic_hash
 SCHEMA_VERSION = 21  # append-only Blueprint proposal acceptance receipts (P8)
 
 # Supersession triggers must be dropped and recreated whenever the canonical object
-# list grows. SQLite has no ALTER TRIGGER.
+# list grows. SQLite has no ALTER TRIGGER. Every store open runs this, so it is one
+# IMMEDIATE transaction: concurrent opens cannot interleave (both drop, then both
+# create, and one fails) and no connection ever sees the existence checks absent.
 _SUPERSESSION_TRIGGER_MIGRATION = """
+BEGIN IMMEDIATE;
 DROP TRIGGER IF EXISTS supersession_relations_old_exists;
 DROP TRIGGER IF EXISTS supersession_relations_new_exists;
 
@@ -65,6 +68,7 @@ BEGIN
         OR EXISTS (SELECT 1 FROM ratification_records WHERE id = NEW.new_id)
     );
 END;
+COMMIT;
 """
 
 DDL = """
@@ -1288,7 +1292,11 @@ class SQLiteStore:
 
     def _apply_schema(self) -> None:
         self._conn.executescript(DDL)
-        self._conn.executescript(_SUPERSESSION_TRIGGER_MIGRATION)
+        try:
+            self._conn.executescript(_SUPERSESSION_TRIGGER_MIGRATION)
+        except BaseException:
+            self._conn.rollback()
+            raise
         self._apply_column_migrations()
         ensure_profile_tables(self._conn)
         from ..authoring.store import ensure_authoring_schema
