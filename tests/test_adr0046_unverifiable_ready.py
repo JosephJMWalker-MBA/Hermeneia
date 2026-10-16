@@ -173,6 +173,28 @@ def test_a_workspace_marked_22_is_refused_by_this_build_and_a_lowered_marker_is_
     assert migrate_findings_vocabulary(db) == {"status": "already_migrated"}
 
 
+def test_the_r2_procedure_takes_a_verified_backup_before_migrating(ledger, tmp_path):
+    db, backup = ledger.source, tmp_path / "backups" / "pre-schema-22.db"
+    before = rows(db, "findings")
+    result = findings_vocabulary.migrate_with_verified_backup(db, backup)
+    assert result["status"] == "migrated" and rows(db, "findings") == before
+    assert rows(backup, "findings") == before and not admits_unverifiable(sqlite3.connect(backup))  # the pre-migration ledger
+    with pytest.raises(FindingsMigrationError, match="refusing to overwrite"):
+        findings_vocabulary.migrate_with_verified_backup(db, backup)
+
+
+def test_a_failed_r2_migration_keeps_the_verified_backup_and_rolls_back(ledger, tmp_path, monkeypatch):
+    db, backup = ledger.source, tmp_path / "pre-schema-22.db"
+    before = rows(db, "findings")
+    real, calls = findings_vocabulary._ledger, []
+    monkeypatch.setattr(findings_vocabulary, "_ledger",
+                        lambda conn: (calls.append(1), real(conn) if len(calls) == 1 else (0, ""))[1])
+    with pytest.raises(FindingsMigrationError):
+        findings_vocabulary.migrate_with_verified_backup(db, backup)
+    assert rows(db, "findings") == before and not admits_unverifiable(sqlite3.connect(db))
+    assert rows(backup, "findings") == before
+
+
 # ── Write guard and projections around `unverifiable` ───────────────────────
 
 def test_before_activation_the_write_guard_refuses_unverifiable_even_on_a_migrated_ledger(pair):

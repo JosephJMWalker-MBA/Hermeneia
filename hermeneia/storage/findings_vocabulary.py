@@ -16,6 +16,10 @@ from .schema_guard import check_schema_marker
 
 UNVERIFIABLE = "unverifiable"
 TARGET_SCHEMA_VERSION = 22
+# The release boundary (ADR-0048, ADR-0046): the git tag of the first release that shipped the newer-schema refusal at
+# schema 21. Schema 22 may activate only after that release exists (tests/test_adr0046_activation_gate.py verifies the
+# tag holds the refusal). None until such a release is cut.
+REFUSING_RELEASE_TAG: str | None = None
 _OPERATIONS = "'preservation','omission','transformation','injection','not_evaluated'"
 _STATUSES = "'preserved','omitted','transformed','injected','not_evaluated'"
 
@@ -80,3 +84,34 @@ def migrate_findings_vocabulary(db_path: str | Path) -> dict:
         return {"status": "migrated", "findings": before[0]}
     finally:
         conn.close()
+
+
+def _logical_digest(conn: sqlite3.Connection) -> str:
+    return hashlib.sha256("\n".join(conn.iterdump()).encode("utf-8")).hexdigest()
+
+
+def migrate_with_verified_backup(db_path: str | Path, backup_path: str | Path) -> dict:
+    """The R2 migration procedure (docs/design/release-sequence-2026-10-16.md): back up through SQLite's backup API,
+    prove the backup logically equal and intact, then rebuild. Not called on open until activation.
+
+    A failed rebuild rolls back in place and the verified backup is kept; nothing is deleted.
+    """
+    db_path, backup_path = Path(db_path), Path(backup_path)
+    if backup_path.exists():
+        raise FindingsMigrationError(f"backup target already exists; refusing to overwrite it: {backup_path.name}")
+    source = sqlite3.connect(str(db_path))
+    try:
+        check_schema_marker(source, TARGET_SCHEMA_VERSION)
+        backup_path.parent.mkdir(parents=True, exist_ok=True)
+        target = sqlite3.connect(str(backup_path))
+        try:
+            source.backup(target)
+            if target.execute("PRAGMA integrity_check").fetchone()[0] != "ok" or _logical_digest(target) != _logical_digest(source):
+                raise FindingsMigrationError("the backup is not an exact copy; nothing was migrated")
+            digest = _logical_digest(target)
+        finally:
+            target.close()
+    finally:
+        source.close()
+    result = migrate_findings_vocabulary(db_path)
+    return {**result, "backup": str(backup_path), "backup_logical_digest": digest}
