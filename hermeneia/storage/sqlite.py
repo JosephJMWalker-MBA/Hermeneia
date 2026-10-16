@@ -2388,7 +2388,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def get_critic_report(self, report_id: str) -> dict | None:
         row = self._conn.execute(
@@ -2429,7 +2429,7 @@ class SQLiteStore:
             "UPDATE critic_reports SET normalized = 1, normalization_notes = ? WHERE id = ?",
             (normalization_notes, report_id),
         )
-        self._conn.commit()
+        self._commit()
 
     def critic_report_count(self) -> int:
         try:
@@ -2563,7 +2563,7 @@ class SQLiteStore:
             """,
             record,
         )
-        self._conn.commit()
+        self._commit()
 
     def ratification_records_for_narrative(self, rendered_narrative_id: str) -> list[dict]:
         """All RatificationRecords for a RenderedNarrative, oldest first."""
@@ -2600,7 +2600,7 @@ class SQLiteStore:
             """,
             session,
         )
-        self._conn.commit()
+        self._commit()
 
     def sessions_for_narrative(self, rendered_narrative_id: str) -> list[dict]:
         """All WitnessSessions for a RenderedNarrative, oldest first."""
@@ -2636,7 +2636,7 @@ class SQLiteStore:
             """,
             decision,
         )
-        self._conn.commit()
+        self._commit()
 
     def decisions_for_finding(self, finding_id: str) -> list[dict]:
         """All StewardDecisions that govern a specific Finding, oldest first."""

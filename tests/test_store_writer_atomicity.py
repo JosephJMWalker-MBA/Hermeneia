@@ -18,11 +18,16 @@ import pytest
 
 from hermeneia.perspective_identity import frame_v2_row_from_draft
 from hermeneia.storage.hashing import (
+    make_critic_report_id,
     make_expression_profile_id,
+    make_finding_id,
     make_interpretation_id,
     make_perspective_id,
+    make_ratification_record_id,
     make_rendered_narrative_id,
+    make_steward_decision_id,
     make_validation_report_id,
+    make_witness_session_id,
 )
 from hermeneia.storage.sqlite import SQLiteStore
 from test_constitutional_p0 import _seed_full_chain
@@ -166,6 +171,67 @@ WRITERS["insert_validation_report"] = Writer(
         "semantic_drift": 0.0, "warnings": "[]", "approved": 1, "created_at": NOW,
     }),
     probe="SELECT COUNT(*) FROM validation_reports",
+)
+
+# --- Critic and governance records ---
+
+
+def _critic_report(ids: dict) -> dict:
+    return {
+        "id": make_critic_report_id("proposal-1", "conservative", NOW), "proposal_id": "proposal-1",
+        "observation_id": ids["obs_id"], "policy": "conservative", "claims": "[]", "evidence_passages": "[]",
+        "overall_verdict": "supported", "normalized": 0, "normalization_notes": None,
+        "generated_at": NOW, "created_at": NOW,
+    }
+
+
+def _finding_id(ids: dict) -> str:
+    return make_finding_id(ids["narrative_id"], "structural", "o" * 64)
+
+
+def _insert_finding(store: SQLiteStore, ids: dict) -> None:
+    store.insert_findings_batch([{
+        "id": _finding_id(ids), "rendered_narrative_id": ids["narrative_id"], "architect_plan_id": ids["plan_id"],
+        "dimension": "structural", "obligation_id": "o" * 64, "operation": "preservation", "status": "preserved",
+        "evidence": "{}", "evaluation_method": "structural-v1.0", "constitution_version": "{}", "created_at": NOW,
+    }])
+
+
+WRITERS["insert_critic_report"] = Writer(
+    write=lambda store, ids: store.insert_critic_report(_critic_report(ids)),
+    probe="SELECT COUNT(*) FROM critic_reports",
+)
+WRITERS["mark_critic_report_normalized"] = Writer(
+    prepare=lambda store, ids: store.insert_critic_report(_critic_report(ids)),
+    write=lambda store, ids: store.mark_critic_report_normalized(_critic_report(ids)["id"], "Claims reviewed."),
+    probe="SELECT normalized FROM critic_reports",
+)
+WRITERS["insert_ratification_record"] = Writer(
+    write=lambda store, ids: store.insert_ratification_record({
+        "id": make_ratification_record_id(ids["narrative_id"], "steward", NOW),
+        "rendered_narrative_id": ids["narrative_id"], "ratified_by": "steward", "ratified_at": NOW,
+        "steward_declaration": "Ratified.", "finding_count": 0, "steward_decision_count": 0,
+        "witness_session_count": 0, "constitution_version": "{}", "audit_snapshot": "{}", "created_at": NOW,
+    }),
+    probe="SELECT COUNT(*) FROM ratification_records",
+)
+WRITERS["insert_witness_session"] = Writer(
+    write=lambda store, ids: store.insert_witness_session({
+        "id": make_witness_session_id(ids["narrative_id"], "general-reader", NOW),
+        "rendered_narrative_id": ids["narrative_id"], "witness_profile": "general-reader",
+        "task_description": "Summarize the claim.", "task_completed": 1, "notes": None,
+        "facilitated_by": "steward", "session_date": NOW, "constitution_version": "{}", "created_at": NOW,
+    }),
+    probe="SELECT COUNT(*) FROM witness_sessions",
+)
+WRITERS["insert_steward_decision"] = Writer(
+    prepare=_insert_finding,
+    write=lambda store, ids: store.insert_steward_decision({
+        "id": make_steward_decision_id(_finding_id(ids), "accepted", NOW), "finding_id": _finding_id(ids),
+        "verdict": "accepted", "rationale": "Preserved.", "steward_id": "steward", "decided_at": NOW,
+        "constitution_version": "{}", "created_at": NOW,
+    }),
+    probe="SELECT COUNT(*) FROM steward_decisions",
 )
 
 
