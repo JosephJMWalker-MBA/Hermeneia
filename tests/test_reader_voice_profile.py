@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 
+from reader_workstation_routing import wf_go_routes
+
 INDEX = Path(__file__).parent.parent / "hermeneia" / "web" / "static" / "index.html"
 
 
@@ -47,7 +49,9 @@ def test_voice_is_a_workstation_mode_not_a_separate_drawer():
     index = _index()
     assert "voice: document.getElementById('cr-voice-profile')" in index
     assert "else if (mode === 'voice')" in index
-    assert "['cr-bottom-resource-expression', () => _crToggleBottomWorkstationResource('voice')]" in index
+    # Since f36328d the rail binds through _wfGo; "expression" opens the voice workstation mode (checked by behavior).
+    assert "['cr-bottom-resource-expression', () => _wfGo('expression')]" in index
+    assert wf_go_routes("expression")["expression"] == {"opened": "voice", "entered_reader": True, "closed": False}
     assert "['cr-expression-subtab-voice', () => _crOpenBottomWorkstation('voice')]" in index
     assert "if (mode === 'voice' || mode === 'draft') return 'expression';" in index
 
