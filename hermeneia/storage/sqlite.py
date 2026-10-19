@@ -1290,6 +1290,33 @@ class SQLiteStore:
         if not self._atomic:
             self._conn.commit()
 
+    @contextmanager
+    def _own_transaction(self):
+        """Run one method's writes all or nothing, holding the write lock throughout.
+
+        Outside atomic() this is the method's own IMMEDIATE transaction. Inside
+        atomic() it is a savepoint, so the block's earlier writes are not
+        committed early and a refusal undoes only this method's writes.
+        """
+        if self._atomic:
+            self._conn.execute("SAVEPOINT own_transaction")
+            try:
+                yield
+            except Exception:
+                self._conn.execute("ROLLBACK TO own_transaction")
+                self._conn.execute("RELEASE own_transaction")
+                raise
+            self._conn.execute("RELEASE own_transaction")
+            return
+        self._conn.commit()
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+        except Exception:
+            self._conn.rollback()
+            raise
+        self._conn.commit()
+
     def _apply_schema(self) -> None:
         self._conn.executescript(DDL)
         try:
@@ -1686,7 +1713,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def insert_frame_perspective(self, row: dict, *, predecessor_perspective_id: str | None = None) -> dict:
         """Insert a frame-v2 Perspective, or verify an idempotent repeat."""
@@ -1727,7 +1754,7 @@ class SQLiteStore:
             prepared,
         )
         if not outer_transaction:
-            self._conn.commit()
+            self._commit()
         return self.get_perspective_by_id(str(prepared["id"])) or prepared
 
     def get_perspective_by_id(self, perspective_id: str) -> dict | None:
@@ -1795,9 +1822,7 @@ class SQLiteStore:
             if not isinstance(prepared.get(key), str):
                 prepared[key] = json.dumps(prepared.get(key) or [], sort_keys=True, ensure_ascii=True, separators=(",", ":"))
         validate_frame_v2_row_identity(prepared, predecessor_perspective_id=predecessor_id)
-        self._conn.commit()
-        self._conn.execute("BEGIN IMMEDIATE")
-        try:
+        with self._own_transaction():
             predecessor = self.get_perspective_by_id(predecessor_id)
             if predecessor is None:
                 raise ValueError("unknown predecessor Perspective")
@@ -1816,7 +1841,6 @@ class SQLiteStore:
                     dict(existing),
                     predecessor_perspective_id=predecessor_id,
                 )
-                self._conn.commit()
                 return dict(existing)
             if not self.perspective_is_current_leaf(predecessor_id):
                 raise ValueError("Only the current Perspective leaf can be revised.")
@@ -1834,11 +1858,7 @@ class SQLiteStore:
                 """,
                 (predecessor_id, successor_id, reason, ratified_at),
             )
-            self._conn.commit()
             return row
-        except Exception:
-            self._conn.rollback()
-            raise
 
     def _perspective_path_exists(self, start_id: str, target_id: str) -> bool:
         if start_id == target_id:
@@ -1893,7 +1913,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def interpretations_for_observation(self, observation_id: str) -> list[dict]:
         cur = self._conn.execute(
@@ -1963,7 +1983,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def supersessions_from(self, old_id: str) -> list[dict]:
         cur = self._conn.execute(
@@ -2150,7 +2170,7 @@ class SQLiteStore:
                 f"UPDATE source_documents SET {', '.join(updates)} WHERE id = ?",
                 params,
             )
-            self._conn.commit()
+            self._commit()
 
         return self.get_source_document(doc_id)
 
@@ -2245,7 +2265,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def expression_profile_by_slug(self, slug: str) -> dict | None:
         row = self._conn.execute(
@@ -2283,7 +2303,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def rendered_narrative_for_plan(
         self,
@@ -2343,7 +2363,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def validation_report_for_narrative(self, rendered_narrative_id: str) -> dict | None:
         row = self._conn.execute(
@@ -2376,7 +2396,7 @@ class SQLiteStore:
             """,
             row,
         )
-        self._conn.commit()
+        self._commit()
 
     def get_critic_report(self, report_id: str) -> dict | None:
         row = self._conn.execute(
@@ -2417,7 +2437,7 @@ class SQLiteStore:
             "UPDATE critic_reports SET normalized = 1, normalization_notes = ? WHERE id = ?",
             (normalization_notes, report_id),
         )
-        self._conn.commit()
+        self._commit()
 
     def critic_report_count(self) -> int:
         try:
@@ -2551,7 +2571,7 @@ class SQLiteStore:
             """,
             record,
         )
-        self._conn.commit()
+        self._commit()
 
     def ratification_records_for_narrative(self, rendered_narrative_id: str) -> list[dict]:
         """All RatificationRecords for a RenderedNarrative, oldest first."""
@@ -2588,7 +2608,7 @@ class SQLiteStore:
             """,
             session,
         )
-        self._conn.commit()
+        self._commit()
 
     def sessions_for_narrative(self, rendered_narrative_id: str) -> list[dict]:
         """All WitnessSessions for a RenderedNarrative, oldest first."""
@@ -2624,7 +2644,7 @@ class SQLiteStore:
             """,
             decision,
         )
-        self._conn.commit()
+        self._commit()
 
     def decisions_for_finding(self, finding_id: str) -> list[dict]:
         """All StewardDecisions that govern a specific Finding, oldest first."""
@@ -2675,7 +2695,7 @@ class SQLiteStore:
             """,
             record,
         )
-        self._conn.commit()
+        self._commit()
 
     def complete_ai_provenance_acceptance(
         self,
@@ -2695,7 +2715,7 @@ class SQLiteStore:
             """,
             (accepting_steward, acceptance_timestamp, acceptance_rationale, ai_provenance_id),
         )
-        self._conn.commit()
+        self._commit()
 
     def get_ai_provenance(self, ai_provenance_id: str) -> dict | None:
         row = self._conn.execute(
@@ -2726,7 +2746,7 @@ class SQLiteStore:
             """,
             proposal,
         )
-        self._conn.commit()
+        self._commit()
 
     def get_proposed_interpretation(self, proposal_id: str) -> dict | None:
         row = self._conn.execute(
@@ -2758,7 +2778,7 @@ class SQLiteStore:
             """,
             (status, steward_id, decided_at, steward_rationale, proposal_id),
         )
-        self._conn.commit()
+        self._commit()
 
     def pending_proposed_interpretations(self) -> list[dict]:
         rows = self._conn.execute(
@@ -2808,7 +2828,7 @@ class SQLiteStore:
             """,
             interp,
         )
-        self._conn.commit()
+        self._commit()
 
     def close(self) -> None:
         self._conn.close()
