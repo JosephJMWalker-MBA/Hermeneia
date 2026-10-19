@@ -10,12 +10,12 @@ Constitutional note:
 Two canonical objects are created or updated during acceptance:
     1. proposed_interpretations.status → 'accepted'
     2. ai_provenance.accepting_steward / acceptance_timestamp / acceptance_rationale populated
-    3. interpretations: new canonical row inserted (INSERT OR IGNORE)
+    3. interpretations: new canonical row inserted and verified
 
 Rejection only updates the staging row. The ai_provenance acceptance fields remain NULL.
 Rejected objects are never deleted (ADR-0009).
 
-Proposal and acceptance each run in one store.atomic() block: their writes commit
+Proposal, acceptance and rejection run in store.atomic() blocks: their writes commit
 together or not at all, and inside a caller's own block they belong to that block.
 """
 import json
@@ -30,6 +30,7 @@ from ...storage.hashing import (
 CONSTITUTION_VERSION = "ADR-0009-v1.0"
 _VALID_EVIDENTIAL_STATUSES = frozenset({"established", "contested", "speculative", "uncertain"})
 _VALID_PROMPT_REF_TYPES = frozenset({"template_id", "hash", "full_text"})
+_VALID_RESPONSE_MODES = frozenset({"triage", "interpretive", "skeptical"})
 
 
 class StagingError(Exception):
@@ -72,6 +73,7 @@ def propose_interpretation(
     generation_parameters: dict | None = None,
     perspective_id: str | None = None,
     evidence_observation_ids: list[str] | None = None,
+    response_mode: str = "interpretive",
 ) -> dict:
     """Stage an AI-generated Interpretation candidate.
 
@@ -95,6 +97,8 @@ def propose_interpretation(
         raise StagingError("prompt_reference is required")
     if prompt_reference_type not in _VALID_PROMPT_REF_TYPES:
         raise StagingError(f"prompt_reference_type must be one of {sorted(_VALID_PROMPT_REF_TYPES)}")
+    if response_mode not in _VALID_RESPONSE_MODES:
+        raise StagingError(f"response_mode must be one of {sorted(_VALID_RESPONSE_MODES)}")
 
     evidence_ids = [str(oid) for oid in (evidence_observation_ids or [])]
 
@@ -133,6 +137,7 @@ def propose_interpretation(
         "evidence_observation_ids": json.dumps(evidence_ids),
         "ai_provenance_id": prov_id,
         "status": "pending",
+        "response_mode": response_mode,
         "steward_id": None,
         "decided_at": None,
         "steward_rationale": None,
@@ -161,7 +166,7 @@ def accept_proposed_interpretation(
     Three writes, committed together or not at all:
     1. proposed_interpretations.status → 'accepted'
     2. ai_provenance acceptance fields populated
-    3. interpretations: canonical row inserted (INSERT OR IGNORE)
+    3. interpretations: a new canonical row inserted and verified
 
     Returns the canonical interpretation dict.
 
@@ -194,6 +199,18 @@ def accept_proposed_interpretation(
             evidence_ids = []
         _require_active_observation_set(conn, [proposal["observation_id"], *[str(oid) for oid in evidence_ids]])
 
+        # The content-derived ID cannot silently reattribute an existing immutable
+        # canonical Interpretation to a later model or steward (ADR-0009/ADR-0010).
+        canonical_id = make_interpretation_id(
+            proposal["observation_id"], proposal["perspective"], proposal["text"]
+        )
+        if conn._conn.execute(
+            "SELECT 1 FROM interpretations WHERE id = ?", (canonical_id,)
+        ).fetchone() is not None:
+            raise StagingError(
+                f"Canonical Interpretation {canonical_id!r} already exists; proposal remains pending"
+            )
+
         now = datetime.now(timezone.utc).isoformat()
         ts = accepted_at or now
 
@@ -215,9 +232,6 @@ def accept_proposed_interpretation(
         )
 
         # 3. Insert canonical interpretation
-        canonical_id = make_interpretation_id(
-            proposal["observation_id"], proposal["perspective"], proposal["text"]
-        )
         canonical = {
             "id": canonical_id,
             "observation_id": proposal["observation_id"],
@@ -232,6 +246,15 @@ def accept_proposed_interpretation(
             "created_at": ts,
         }
         conn.insert_interpretation_with_provenance(canonical)
+        # The storage writer currently uses INSERT OR IGNORE. An ignored insert
+        # must not be represented as a successful human acceptance.
+        persisted = conn._conn.execute(
+            "SELECT * FROM interpretations WHERE id = ?", (canonical_id,)
+        ).fetchone()
+        if persisted is None or any(persisted[k] != value for k, value in canonical.items()):
+            raise StagingError(
+                "Canonical Interpretation was not persisted exactly; proposal remains pending"
+            )
 
     return canonical
 
@@ -263,26 +286,26 @@ def reject_proposed_interpretation(
     if not rejection_rationale or not rejection_rationale.strip():
         raise StagingError("rejection_rationale is required")
 
-    proposal = conn.get_proposed_interpretation(proposal_id)
-    if proposal is None:
-        raise StagingError(f"ProposedInterpretation {proposal_id!r} not found")
-    if proposal["status"] != "pending":
-        raise StagingError(
-            f"ProposedInterpretation {proposal_id!r} is already {proposal['status']!r} — cannot reject"
+    # Lock pending status and decision together, including competing accept/reject.
+    with conn.atomic():
+        proposal = conn.get_proposed_interpretation(proposal_id)
+        if proposal is None:
+            raise StagingError(f"ProposedInterpretation {proposal_id!r} not found")
+        if proposal["status"] != "pending":
+            raise StagingError(
+                f"ProposedInterpretation {proposal_id!r} is already {proposal['status']!r} — cannot reject"
+            )
+
+        now = datetime.now(timezone.utc).isoformat()
+        ts = rejected_at or now
+        conn.decide_proposed_interpretation(
+            proposal_id,
+            status="rejected",
+            steward_id=rejecting_steward,
+            decided_at=ts,
+            steward_rationale=rejection_rationale,
         )
-
-    now = datetime.now(timezone.utc).isoformat()
-    ts = rejected_at or now
-
-    conn.decide_proposed_interpretation(
-        proposal_id,
-        status="rejected",
-        steward_id=rejecting_steward,
-        decided_at=ts,
-        steward_rationale=rejection_rationale,
-    )
-
-    return conn.get_proposed_interpretation(proposal_id)
+        return conn.get_proposed_interpretation(proposal_id)
 
 
 def staging_queue(conn) -> dict:
