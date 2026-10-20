@@ -16382,6 +16382,7 @@ async function e10TestProvider(participant) {
 }
 
 async function e10SelectObservation(id) {
+  if (_e10Selected !== id) _e10LastPartialFailures = null;
   _e10Selected = id;
   _e10Detail = await get(`/api/e10/observations/${encodeURIComponent(id)}`);
   _e10ActiveProposal = (_e10Detail.proposals || []).find(p => p.status === 'pending') || null;
