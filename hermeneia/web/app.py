@@ -10815,7 +10815,7 @@ def create_app(
                 select_from + """
                    WHERE o.source_document_id = ? AND ABS(o.page - ?) <= 1
                      AND sd.excluded_from_analysis = 0
-                   ORDER BY ABS(o.page - ?), o.paragraph
+                   ORDER BY ABS(o.page - ?), o.paragraph, o.sentence, o.id
                    LIMIT 10""",
                 (doc_id, page, page)
             ).fetchall()
@@ -10824,7 +10824,7 @@ def create_app(
                 select_from + """
                    WHERE o.source_document_id = ?
                      AND sd.excluded_from_analysis = 0
-                   ORDER BY o.page, o.paragraph
+                   ORDER BY o.page, o.paragraph, o.sentence, o.id
                    LIMIT 20""",
                 (doc_id,)
             ).fetchall()

@@ -46,24 +46,35 @@ def _count(conn: sqlite3.Connection, table: str) -> int | None:
     return conn.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
 
 
-def not_exported(conn: sqlite3.Connection, *, chain_tables: tuple[str, ...] | None, chain_reason: str | None) -> dict:
+# Surfaces the Observation compile-records component carries when a bundle has it.
+COMPILE_RECORD_SURFACES = ("derived_indexes", "observation_provenance")
+
+
+def not_exported(conn: sqlite3.Connection, *, chain_tables: tuple[str, ...] | None, chain_reason: str | None,
+                 compile_records_carried: bool = False) -> dict:
     """Source record counts left behind by this export, per surface; None means the table is absent (unknown)."""
     out = {surface: {"kind": kind, "tables": {table: _count(conn, table) for table in tables}, "reason": reason}
-           for surface, tables, kind, reason in NOT_CARRIED}
+           for surface, tables, kind, reason in NOT_CARRIED
+           if not (compile_records_carried and surface in COMPILE_RECORD_SURFACES)}
     if chain_tables is not None:
         out[CHAIN_SURFACE] = {"kind": "history", "tables": {table: _count(conn, table) for table in chain_tables},
                               "reason": chain_reason}
     return out
 
 
-def restore_coverage(manifest: dict, *, chain_covered: bool) -> dict:
+def restore_coverage(manifest: dict, *, chain_covered: bool, compile_records_covered: bool = False) -> dict:
     """Declared absence for every surface a bundle does not carry, with the source counts when the bundle has them."""
     recorded = manifest.get("not_exported") if isinstance(manifest.get("not_exported"), dict) else None
     surfaces = {}
     for surface, tables, kind, reason in NOT_CARRIED:
+        if compile_records_covered and surface in COMPILE_RECORD_SURFACES:
+            continue
         entry = (recorded or {}).get(surface)
         surfaces[surface] = {"status": "unsupported", "kind": kind, "reason": reason,
                              "source_records": entry.get("tables") if isinstance(entry, dict) else "unknown"}
+    if not compile_records_covered and "derived_indexes" in surfaces:
+        # CI-016: restore rebuilds these from the restored Observations; provenance is never rebuilt.
+        surfaces["derived_indexes"]["status"] = "rebuilt_on_restore"
     if not chain_covered and recorded is not None and isinstance(recorded.get(CHAIN_SURFACE), dict):
         entry = recorded[CHAIN_SURFACE]
         surfaces[CHAIN_SURFACE] = {"status": "unsupported", "kind": "history", "reason": entry.get("reason"),
