@@ -16579,7 +16579,15 @@ async function e10GenerateInterpretations() {
     host.innerHTML = `<div class="e10-empty" style="color:var(--red)">✗ ${x(err.message)}</div>`;
     return;
   }
-  host.innerHTML = (data.proposals || []).map(e10ProposalCard).join('') || '<div class="e10-empty">No proposals returned.</div>';
+  const partialNotice = data.partial
+    ? '<div class="e10-empty" role="status">Some participants failed, but '
+      + x(data.created_count) + ' proposal(s) were saved for review. '
+      + (data.failures || []).map(f => x(f.participant) + ': ' + x(f.error)).join('; ')
+      + '</div>'
+    : '';
+  host.innerHTML = partialNotice
+    + ((data.proposals || []).map(e10ProposalCard).join('')
+       || '<div class="e10-empty">No proposals returned.</div>');
   _e10Detail = await get(`/api/e10/observations/${encodeURIComponent(_e10Selected)}`);
   _e10ActiveProposal = (data.proposals || [])[0] || null;
   e10RenderReview();
