@@ -2733,18 +2733,19 @@ class SQLiteStore:
 
     def insert_proposed_interpretation(self, proposal: dict) -> None:
         """Write a proposed interpretation to staging. Status starts as 'pending'."""
+        bound = {**proposal, "response_mode": proposal.get("response_mode", "interpretive")}
         self._conn.execute(
             """
             INSERT OR IGNORE INTO proposed_interpretations
                 (id, observation_id, perspective, perspective_id, text,
                  evidential_status, evidence_observation_ids, ai_provenance_id,
-                 status, steward_id, decided_at, steward_rationale, created_at)
+                 status, response_mode, steward_id, decided_at, steward_rationale, created_at)
             VALUES
                 (:id, :observation_id, :perspective, :perspective_id, :text,
                  :evidential_status, :evidence_observation_ids, :ai_provenance_id,
-                 :status, :steward_id, :decided_at, :steward_rationale, :created_at)
+                 :status, :response_mode, :steward_id, :decided_at, :steward_rationale, :created_at)
             """,
-            proposal,
+            bound,
         )
         self._commit()
 

@@ -5934,6 +5934,7 @@ def create_app(
                         "primary_document": corpus_context.get("primary_work"),
                     },
                     evidence_observation_ids=[observation_id],
+                    response_mode=response_mode,
                 )
                 proposals.append(proposal)
         except StagingError as exc:
@@ -5941,14 +5942,7 @@ def create_app(
         finally:
             store.close()
 
-        # Write response_mode onto each proposal row
-        rw = _conn_rw()
-        for proposal in proposals:
-            rw.execute(
-                "UPDATE proposed_interpretations SET response_mode = ? WHERE id = ?",
-                (response_mode, proposal["id"]),
-            )
-        rw.commit()
+        # Each proposal already carries response_mode in its atomic staging write.
 
         conn = _conn()
         enriched = []
