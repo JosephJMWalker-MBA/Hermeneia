@@ -3711,6 +3711,7 @@ function setRegister(val) {
 }
 let _activeCell = null, _covOpen = false;
 let _e10Selected = null, _e10Detail = null, _e10ActiveProposal = null;
+let _e10LastPartialFailures = null;  // only the current generation attempt; never canonical history
 let _e10Providers = null;
 let _e10ProviderNotices = {};
 let _e10OllamaInstallJobs = {};
@@ -16381,6 +16382,7 @@ async function e10TestProvider(participant) {
 }
 
 async function e10SelectObservation(id) {
+  if (_e10Selected !== id) _e10LastPartialFailures = null;
   _e10Selected = id;
   _e10Detail = await get(`/api/e10/observations/${encodeURIComponent(id)}`);
   _e10ActiveProposal = (_e10Detail.proposals || []).find(p => p.status === 'pending') || null;
@@ -16562,6 +16564,7 @@ async function e10GenerateInterpretations() {
     return;
   }
   const host = document.getElementById('lab-results');
+  _e10LastPartialFailures = null;
   host.innerHTML = '<div class="e10-empty">Generating proposals…</div>';
   let data;
   try {
@@ -16579,7 +16582,16 @@ async function e10GenerateInterpretations() {
     host.innerHTML = `<div class="e10-empty" style="color:var(--red)">✗ ${x(err.message)}</div>`;
     return;
   }
-  host.innerHTML = (data.proposals || []).map(e10ProposalCard).join('') || '<div class="e10-empty">No proposals returned.</div>';
+  _e10LastPartialFailures = data.partial ? data : null;
+  const partialNotice = data.partial
+    ? '<div class="e10-empty" role="status">Some participants failed, but '
+      + x(data.created_count) + ' proposal(s) were saved for review. '
+      + (data.failures || []).map(f => x(f.participant) + ': ' + x(f.error)).join('; ')
+      + '</div>'
+    : '';
+  host.innerHTML = partialNotice
+    + ((data.proposals || []).map(e10ProposalCard).join('')
+       || '<div class="e10-empty">No proposals returned.</div>');
   _e10Detail = await get(`/api/e10/observations/${encodeURIComponent(_e10Selected)}`);
   _e10ActiveProposal = (data.proposals || [])[0] || null;
   e10RenderReview();
@@ -16599,7 +16611,13 @@ function e10RenderReview() {
   const o = _e10Detail.observation;
   const proposals = _e10Detail.proposals || [];
   host.className = '';
-  host.innerHTML = `
+  const failureNotice = _e10LastPartialFailures
+    ? '<div class="e10-empty" role="status">' + x(_e10LastPartialFailures.created_count)
+      + ' proposal(s) were saved for review; other participants failed: '
+      + (_e10LastPartialFailures.failures || []).map(f => x(f.participant) + ': ' + x(f.error)).join('; ')
+      + '</div>'
+    : '';
+  host.innerHTML = failureNotice + `
     <div class="e10-card">
       <div class="e10-meta">Observation</div>
       <div class="e10-text">"${x(o.raw_text)}"</div>

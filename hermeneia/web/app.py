@@ -5871,6 +5871,7 @@ def create_app(
             if observation is None:
                 return jsonify({"error": "observation not found"}), 404
             proposals = []
+            failures = []
             generated_at = datetime.now(timezone.utc).isoformat()
             for key, label, model in participants:
                 _provider_id = _E10_PARTICIPANTS[key][1]
@@ -5896,7 +5897,8 @@ def create_app(
                         "latency_ms": int((_time.monotonic() - _gen_start) * 1000),
                         "error": _gen_error,
                     })
-                    raise StagingError(f"Explorer failed for participant {key!r}: {exc}") from exc
+                    failures.append({"participant": key, "stage": "generation", "error": f"Explorer failed for participant {key!r}: {exc}"})
+                    continue
                 except Exception as exc:
                     _gen_error = str(exc)
                     _log_performance_event({
@@ -5906,7 +5908,8 @@ def create_app(
                         "latency_ms": int((_time.monotonic() - _gen_start) * 1000),
                         "error": _gen_error,
                     })
-                    raise StagingError(f"Provider error for participant {key!r}: {exc}") from exc
+                    failures.append({"participant": key, "stage": "generation", "error": f"Provider error for participant {key!r}: {exc}"})
+                    continue
                 _log_performance_event({
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "participant": key, "role": "Explorer",
@@ -5914,33 +5917,41 @@ def create_app(
                     "latency_ms": int((_time.monotonic() - _gen_start) * 1000),
                     "error": None,
                 })
-                proposal = propose_interpretation(
-                    observation_id=observation_id,
-                    perspective=label,
-                    text=interp_text,
-                    evidential_status="speculative",
-                    generating_model=_e10_executed_model(_adapter, selected_model or model),
-                    prompt_reference=prompt_used,
-                    prompt_reference_type="full_text",
-                    conn=store,
-                    generation_timestamp=generated_at,
-                    parent_object_ids=[observation_id],
-                    generation_parameters={
-                        "surface": "E10 Interpretation Lab",
-                        "participant": key,
-                        "mode": "explorer-llm",
-                        "observation_source_role": corpus_context.get("observation_role", "primary"),
-                        "observation_source_document": corpus_context.get("observation_source"),
-                        "primary_document": corpus_context.get("primary_work"),
-                    },
-                    evidence_observation_ids=[observation_id],
-                    response_mode=response_mode,
-                )
+                try:
+                    proposal = propose_interpretation(
+                        observation_id=observation_id,
+                        perspective=label,
+                        text=interp_text,
+                        evidential_status="speculative",
+                        generating_model=_e10_executed_model(_adapter, selected_model or model),
+                        prompt_reference=prompt_used,
+                        prompt_reference_type="full_text",
+                        conn=store,
+                        generation_timestamp=generated_at,
+                        parent_object_ids=[observation_id],
+                        generation_parameters={
+                            "surface": "E10 Interpretation Lab",
+                            "participant": key,
+                            "mode": "explorer-llm",
+                            "observation_source_role": corpus_context.get("observation_role", "primary"),
+                            "observation_source_document": corpus_context.get("observation_source"),
+                            "primary_document": corpus_context.get("primary_work"),
+                        },
+                        evidence_observation_ids=[observation_id],
+                        response_mode=response_mode,
+                    )
+                except StagingError as exc:
+                    failures.append({"participant": key, "stage": "staging", "error": str(exc)})
+                    continue
                 proposals.append(proposal)
-        except StagingError as exc:
-            return jsonify({"error": str(exc)}), 400
         finally:
             store.close()
+
+        # Each accepted staging write is already committed; never conceal it behind
+        # a later participant's failure. No success means the normal 4xx path.
+        if failures and not proposals:
+            return jsonify({"error": "; ".join(f["error"] for f in failures),
+                            "created_count": 0, "partial": False, "failures": failures}), 400
 
         # Each proposal already carries response_mode in its atomic staging write.
 
@@ -5969,7 +5980,8 @@ def create_app(
             payload["response_mode"] = response_mode
             enriched.append(payload)
         conn.close()
-        return jsonify({"created_count": len(enriched), "proposals": enriched}), 201
+        return jsonify({"created_count": len(enriched), "proposals": enriched,
+                        "partial": bool(failures), "failures": failures}), 201
 
     @app.route("/api/e10/interpretations/discover", methods=["POST"])
     def api_e10_discover_interpretations():
@@ -6036,6 +6048,7 @@ def create_app(
 
         store = _store()
         proposals = []
+        failures = []
         skipped = 0
         generated_at = datetime.now(timezone.utc).isoformat()
 
@@ -6082,33 +6095,49 @@ def create_app(
                             corpus_context,
                         )
                     except ExplorerError as exc:
-                        raise StagingError(f"Explorer failed for participant {key!r}: {exc}") from exc
+                        failures.append({"participant": key, "stage": "generation",
+                                         "bucket_observation_ids": sorted_evidence_ids,
+                                         "error": f"Explorer failed for participant {key!r}: {exc}"})
+                        continue
+                    except Exception as exc:
+                        failures.append({"participant": key, "stage": "generation",
+                                         "bucket_observation_ids": sorted_evidence_ids,
+                                         "error": f"Provider error for participant {key!r}: {exc}"})
+                        continue
 
-                    proposal = propose_interpretation(
-                        observation_id=primary_obs_id,
-                        perspective=label,
-                        text=interp_text,
-                        evidential_status="speculative",
-                        generating_model=_e10_executed_model(_adapter, selected_model or model),
-                        prompt_reference=prompt_used,
-                        prompt_reference_type="full_text",
-                        conn=store,
-                        generation_timestamp=generated_at,
-                        parent_object_ids=sorted_evidence_ids,
-                        generation_parameters={
-                            "surface": "E10 Explorer Discovery",
-                            "participant": key,
-                            "mode": "explorer-bucket",
-                            "bucket_size": len(bucket_ids),
-                            "bucket_observation_ids": sorted_evidence_ids,
-                        },
-                        evidence_observation_ids=sorted_evidence_ids,
-                    )
+                    try:
+                        proposal = propose_interpretation(
+                            observation_id=primary_obs_id,
+                            perspective=label,
+                            text=interp_text,
+                            evidential_status="speculative",
+                            generating_model=_e10_executed_model(_adapter, selected_model or model),
+                            prompt_reference=prompt_used,
+                            prompt_reference_type="full_text",
+                            conn=store,
+                            generation_timestamp=generated_at,
+                            parent_object_ids=sorted_evidence_ids,
+                            generation_parameters={
+                                "surface": "E10 Explorer Discovery",
+                                "participant": key,
+                                "mode": "explorer-bucket",
+                                "bucket_size": len(bucket_ids),
+                                "bucket_observation_ids": sorted_evidence_ids,
+                            },
+                            evidence_observation_ids=sorted_evidence_ids,
+                        )
+                    except StagingError as exc:
+                        failures.append({"participant": key, "stage": "staging", "error": str(exc), "bucket_observation_ids": sorted_evidence_ids})
+                        continue
                     proposals.append(proposal)
-        except StagingError as exc:
-            return jsonify({"error": str(exc)}), 400
         finally:
             store.close()
+
+        if failures and not proposals:
+            return jsonify({"error": "; ".join(f["error"] for f in failures),
+                            "bucket_count": len(buckets), "created_count": 0,
+                            "skipped_count": skipped, "partial": False,
+                            "failures": failures}), 400
 
         conn_ro2 = _conn()
         enriched = [
@@ -6127,6 +6156,8 @@ def create_app(
             "created_count": len(enriched),
             "skipped_count": skipped,
             "proposals": enriched,
+            "partial": bool(failures),
+            "failures": failures,
         }), 201
 
     @app.route("/api/e10/proposals/<proposal_id>/accept", methods=["POST"])
