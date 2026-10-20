@@ -51,10 +51,14 @@ workspace/
 │   ├── field_notes.json   # investigation_log (append-only)
 │   ├── questions.json     # unresolved questions (highlight- and field-note-sourced)
 │   ├── buckets.json       # theme + evidence buckets
-│   └── rankings.json      # per-highlight ranks
+│   ├── rankings.json      # per-highlight ranks
+│   └── blueprints.json, blueprint_*links.json, architect_plan*.json,
+│       blueprint_supersessions.json, blueprint_proposal_acceptances.json
+│                          # Blueprint chain component, gated (§6.2)
 ├── synthesis/             # compiled synthesis packets (derived)
 ├── evaluation/            # scorer verdicts + reports (derived)
-├── reports/               # rendered narratives, critic reports (machine output)
+├── reports/               # interpretations.json, proposed_interpretations.json,
+│                          # ai_provenance.json (Blueprint chain, gated, §6.2)
 └── lineage/               # backward references, #62 (derived)
 ```
 
@@ -207,10 +211,16 @@ Git history becomes an **intellectual** history, not a binary snapshot.
 | `perspectives` | `study/perspectives.json` | authored |
 | Perspective `supersession_relations` | `study/perspective_supersessions.json` | authored |
 | `investigation_log` | `study/field_notes.json` | authored |
-| `observation_reviews`, `inquiry_notes` | `study/reviews.json` | authored |
-| `proposed_interpretations`, `interpretations` | `reports/interpretations.json` | machine / authored-on-adopt |
-| `rendered_narratives`, `critic_reports` | `reports/*` | machine |
-| `steward_decisions`, `findings`, `ratification_records` | `reports/governance.json` | authored |
+| `observation_reviews`, `inquiry_notes` | **not exported by WBS 1.x** (planned `study/reviews.json`; see §6.3) | — |
+| `interpretations` | `reports/interpretations.json` (Blueprint chain component, §6.2) | canonical |
+| `proposed_interpretations` | `reports/proposed_interpretations.json` (§6.2) | canonical |
+| `ai_provenance` | `reports/ai_provenance.json` (§6.2) | canonical |
+| `narrative_blueprints`, `blueprint_observation_links`, `blueprint_interpretation_links` | `study/blueprints.json`, `study/blueprint_observation_links.json`, `study/blueprint_interpretation_links.json` (§6.2) | canonical |
+| `architect_plans`, `architect_plan_paragraphs` | `study/architect_plans.json`, `study/architect_plan_paragraphs.json` (§6.2) | canonical |
+| Blueprint `supersession_relations` | `study/blueprint_supersessions.json` (§6.2) | canonical |
+| `blueprint_proposal_acceptances` | `study/blueprint_proposal_acceptances.json` (§6.2) | canonical |
+| `rendered_narratives`, `critic_reports` | **not exported by WBS 1.x** (planned `reports/*`; see §6.3) | — |
+| `steward_decisions`, `findings`, `ratification_records` | **not exported by WBS 1.x** (planned `reports/governance.json`; see §6.3) | — |
 | synthesis packet (runtime) | `synthesis/packet-*.json` | derived |
 | lineage (#62, runtime) | `lineage/lineage.json` | derived |
 | evaluation scorers (runtime) | `evaluation/report.json` | derived |
@@ -243,27 +253,76 @@ Both files have manifest role `authored`: they are human intellectual judgment
 and must be restored verbatim. They are not `canonical` source evidence and are
 not derived projections.
 
-### 6.2 Declared unsupported: the Blueprint dependency chain (2026-10-10, #215 P8)
+### 6.2 The Blueprint dependency chain (P10, #252; gated)
 
-The §6 table maps `interpretations` to `reports/interpretations.json`. The
-WBS 1.x exporter does **not** implement that row. It also exports none of
-these:
+**History.** WBS 1.x through 2026-10-10 exported no chain table, and the old
+§6 row for `interpretations` was never implemented. Restore declared P8
+acceptance history `unsupported`.
 
-- `narrative_blueprints` and their links;
-- `architect_plans`;
-- Blueprint `supersession_relations`;
-- `blueprint_proposal_acceptances` (P8 acceptance receipts).
+**Component (`docs/design/blueprint-chain-portability-v1.md`).**
+- The chain is one all-or-nothing component behind the required capability
+  `blueprint-dependency-chain-v1`. Its ten tables are:
+  - `ai_provenance`, `proposed_interpretations`, `interpretations`;
+  - `narrative_blueprints` and its two link tables;
+  - `architect_plans` and `architect_plan_paragraphs`;
+  - Blueprint→Blueprint `supersession_relations`;
+  - `blueprint_proposal_acceptances`.
+- Rows are exact (exact column sets) and primary-key ordered. Every file has
+  role `canonical`. The role is not authorship; Study Lineage projects
+  authorship.
+- Export checks schema, integrity, supersession scope and full reference
+  closure inside its read snapshot. On any failure it writes no chain file
+  and records
+  `manifest.declared_unsupported["blueprint-dependency-chain-v1"]` with a
+  reason code. There is never a partial chain.
+- Restore validates every file before writing. It inserts in dependency
+  order inside the one restore transaction, then re-proves closure and P8
+  receipt verification against the target. A covered chain requires a fresh
+  target.
+- Coverage is reported as `coverage["blueprint_dependency_chain"]`, which
+  `coverage["blueprint_proposal_acceptances"]` mirrors.
 
-Restore therefore reports, in both `read_bundle` and `preview_restore`
-coverage, `blueprint_proposal_acceptances` as `unsupported` with its reason.
-It never creates a receipt.
+**Gate.**
+- Chain export is **off by default**: the export option is
+  `blueprint_chain`; the web setting is `WBS_BLUEPRINT_CHAIN`, enabled with
+  `HERMENEIA_WBS_BLUEPRINT_CHAIN=enabled`.
+- Off, bundles are byte-identical to the earlier exporter, and P8
+  acceptance history remains declared `unsupported`. This is P8's
+  portability gate (`docs/design/blueprint-proposal-p8-disposition.md` §1),
+  which opens only by owner decision (#252 criterion 9).
+- Restore always understands the component. Older bundles report the chain
+  `unsupported`, and nothing is reconstructed.
 
-No WBS 1.x bundle preserves Blueprint proposal acceptance history, or the
-Blueprints, plans, supersessions and Interpretations that history closes over.
-Local durability in `workspace.db` is not portable recoverability. The owner
-deferred the complete chain to #215 P10. P8 generation stays disabled by
-default until that portability gate passes
-(`docs/design/blueprint-proposal-p8-disposition.md`).
+**Spec correction (recorded decision, #252 criterion 7).** The former single
+`reports/interpretations.json` row with role "machine / authored-on-adopt"
+could not be represented, because a manifest entry has one role. It is
+replaced by three `canonical` files. Proposals and their ADR-0009 provenance
+travel with the adopted Interpretations, because Lineage needs them to
+project `accepted_model`.
+
+### 6.3 Mapped surfaces not yet exported (recorded 2026-10-13)
+
+The original §6 table also listed three bundle files that **no WBS 1.x
+exporter writes**:
+- `study/reviews.json`, for `observation_reviews` and `inquiry_notes`;
+- `reports/*`, for rendered narratives and critic reports;
+- `reports/governance.json`, for steward decisions, findings and
+  ratification records.
+
+They are outside #252's frozen scope and remain unimplemented. Since the
+2026-10-13 coverage audit (`blueprint-chain-portability-v1.md` §9) they are
+no longer silently absent:
+- every export records how many such records it left behind
+  (`manifest.not_exported`), together with custom Expression Profiles,
+  reading progress and the compile-time derived indexes;
+- restore reports each surface `unsupported` under `coverage.not_carried`,
+  and `coverage.study_portability` is `partial`;
+- the Reader's import preview lists them.
+
+Nothing is reconstructed, and the derived indexes are not rebuilt by
+restore. Blueprint-chain portability is therefore **not** complete study
+portability. One consequence: P1 capability decisions that read
+`inquiry_notes` (`preserve_question`) do not survive export and restore.
 
 ---
 

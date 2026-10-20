@@ -9048,6 +9048,9 @@ def create_app(
     # Download the whole workspace as a portable, deterministic WBS v1 bundle
     # (.zip). Read-only over the DB; the browser receives a self-contained
     # artifact. Storage adapters (server path, Git, folder) come later.
+    app.config.setdefault("WBS_BLUEPRINT_CHAIN",
+                          "enabled" if os.environ.get("HERMENEIA_WBS_BLUEPRINT_CHAIN") == "enabled" else "disabled")
+
     @app.route("/api/workspace/export")
     def api_workspace_export():
         if not db_path.exists():
@@ -9068,6 +9071,8 @@ def create_app(
             data = build_workspace_zip(
                 db_path, generated_at=generated_at,
                 workspace_id=identity["workspace_id"],
+                # #252: off until the owner opens the P8 portability gate (blueprint-chain-portability-v1 §8).
+                blueprint_chain=app.config.get("WBS_BLUEPRINT_CHAIN") == "enabled",
             )
         except (PerspectiveExecutionExportError, PublicationExportError) as exc:
             return jsonify({"error": str(exc), "export_status": "refused"}), 409
