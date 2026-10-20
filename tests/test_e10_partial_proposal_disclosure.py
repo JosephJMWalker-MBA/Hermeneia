@@ -52,6 +52,7 @@ def _request(case, db, ids):
 def _seed_discovery(db, ids, tmp_path):
     """Use the existing real two-Observation discovery fixture."""
     # The fixture builds an independent workspace at the supplied path.
+    tmp_path.mkdir(parents=True, exist_ok=True)
     path, seeded = _seed_discover_db(tmp_path)
     return path, seeded
 
