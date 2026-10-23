@@ -110,6 +110,19 @@ The Architecture Decision Record index is
 
 ---
 
+## Ratified Workspace Migration Authority
+
+| ADR | Status | Scope | Ratified |
+|---|---|---|---|
+| [ADR-0048: Newer Workspace Schemas Are Refused](adr/ADR-0048-newer-workspace-schemas-are-refused.md) | ACTIVE | Before any workspace initialization, migration, write connection or export, refuse newer, ambiguous or malformed schema markers without mutation; never downgrade a version marker | 2026-10-23 |
+
+ADR-0048 extends the migration rules of [`15_Storage.md`](15_Storage.md).
+It supersedes no earlier ADR or constitutional rule. Its ratification does not
+activate schema 22 or authorize a workspace migration. The implementing PR
+requires independent integration verification before merging and release.
+
+---
+
 ## Supersession Register
 
 | Earlier authority | Status | Successor | Superseded scope | Reason | Ratified |

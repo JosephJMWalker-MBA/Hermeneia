@@ -269,6 +269,37 @@ HTTP method or UI label.
 
 ---
 
+## Workspace Schema Compatibility and Non-Mutating Refusal (ADR-0048)
+
+[Ratified ADR-0048](adr/ADR-0048-newer-workspace-schemas-are-refused.md)
+(2026-10-23) governs migration compatibility. Before any workspace
+initialization, migration, DDL or data write, the implementation shall inspect
+the existing `schema_version` marker **without writing**. This applies to
+`SQLiteStore`, application startup, each request write connection, CLI
+entry points and workspace-bundle export.
+
+- A version **newer than the build supports** shall be refused rather than
+  opened or downgraded.
+- Multiple marker rows (ambiguous) or a non-integer/malformed marker shall
+  be refused rather than guessed or repaired by an untrusted older build.
+- An absent marker (new or pre-versioning workspace) may proceed through the
+  existing supported initialization or migration procedure.
+- A refused attempt shall leave workspace records, database bytes, sidecar
+  files and logical content unchanged; the refusal shall be explicit.
+- A schema-version marker shall **never decrease**. An unsuccessful migration
+  shall leave the previous marker intact.
+- Every writable connection site must be reviewed and pinned by a regression
+  tripwire; newly introduced sites must be classified before release.
+
+Known limits: a forged **lower** marker can still conceal incompatible newer
+content, and older deployed builds without this rule cannot be retroactively
+protected. Therefore a **verified schema-21 release implementing ADR-0048 must
+precede any separately authorized schema-22 release or real-workspace
+migration**. ADR-0048 alone neither activates schema 22 nor authorizes
+migration.
+
+---
+
 ## Constitutional Compliance
 
 The storage implementation is conformant only when the executable tests for
