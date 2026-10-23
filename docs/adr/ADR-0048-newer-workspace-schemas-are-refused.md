@@ -1,8 +1,12 @@
 # ADR-0048: Newer Workspace Schemas Are Refused
 
-**Status:** PROPOSED (ratification candidate)
-**Version:** 0.1
+**Status:** RATIFIED
+**Version:** 1.0
 **Date:** 2026-10-16
+**Ratified:** 2026-10-23
+**Ratified by:** Primary Human Steward
+**Ratified proposal HEAD:** `642983431d81a479b0900e97f34db7a05f5462df`
+**Scope:** Newer, ambiguous or malformed workspace schema markers are refused before initialization, migration or writing; schema markers never decrease.
 
 **Relies on:**
 - Constitution Art. XIII: the storage specification defines migration rules;
@@ -12,9 +16,10 @@
 **Precondition for:** ADR-0046's `unverifiable` activation (its P2). That
 activation must follow a release containing this ADR.
 
-**Steward recommendation, 2026-10-16:** authorize P2. That is an engineering
-brief and confers no authority. **Authority arises only from the ratification
-record below.**
+**Steward recommendation, 2026-10-16:** authorize P2. That engineering
+brief did not confer authority. The Primary Human Steward ratified this ADR
+in full on 2026-10-23, as recorded below. Implementation and release remain
+subject to their separate integration and validation gates.
 
 ---
 
@@ -38,7 +43,7 @@ So an older build opening a newer workspace would:
 - then fail, or misreport, wherever newer records appear. ADR-0046 measured
   `KeyError` in the trust card and audit dashboard.
 
-## Decision (proposed)
+## Decision (ratified)
 
 1. **Probe first.** Every entry point that would initialize, migrate or write
    a workspace reads its schema marker first, without writing:
@@ -64,8 +69,8 @@ So an older build opening a newer workspace would:
 5. **Every writable connection site in `hermeneia/` has been reviewed** and is
    pinned by a tripwire test. A new site fails the test until it is
    classified.
-6. **On ratification,** the storage specification's migration rules gain this
-   rule. This ADR does not edit it.
+6. **Storage specification.** The active storage specification carries this
+   ratified migration-compatibility rule. The implementation must conform.
 
 ## Residual risks (recorded, not solved)
 
@@ -97,8 +102,9 @@ To be completed **only** by the Primary Human Steward.
 
 | Field | Value |
 | --- | --- |
-| Decision | ☐ ratified ☐ ratified with amendments ☐ returned |
-| Ratified by | |
-| Date | |
-| Ratified proposal HEAD | |
-| Amendments at ratification | |
+| Decision | **RATIFIED IN FULL** |
+| Ratified by | **Primary Human Steward** |
+| Date | **2026-10-23** |
+| Ratified proposal HEAD | **`642983431d81a479b0900e97f34db7a05f5462df`** |
+| Amendments at ratification | **None; accepted as written** |
+| Activation boundary | **Schema 21 only; schema-22 activation and any real-workspace migration require separate authorization and verified release order** |
