@@ -131,6 +131,25 @@ def _semantic_obligations(
     return result
 
 
+class PlanLinkIntegrityError(ValueError):
+    """ADR-0047 L2-a: a plan would require Observations its Blueprint does not link. Nothing was written."""
+
+
+def require_plan_obligations_linked(conn: sqlite3.Connection, blueprint_id: str, paragraph_rows: list[dict]) -> None:
+    """ADR-0047 L2-a: every Observation a plan requires must be linked to the plan's Blueprint.
+
+    Called before every plan write. Historical plans are never rewritten; the Critic still checks each link on read
+    (ADR-0047 L2-b), because older or imported records may predate this boundary.
+    """
+    linked = {row[0] for row in conn.execute(
+        "SELECT observation_id FROM blueprint_observation_links WHERE blueprint_id = ?", (blueprint_id,))}
+    required = {observation for row in paragraph_rows for observation in json.loads(row["required_observations"] or "[]")}
+    unlinked = sorted(required - linked)
+    if unlinked:
+        raise PlanLinkIntegrityError(f"the plan requires {len(unlinked)} Observation(s) that Blueprint "
+                                     f"{blueprint_id[:12]} does not link; nothing was written")
+
+
 def compile_architect_plan(
     blueprint_id: str,
     conn: sqlite3.Connection,
