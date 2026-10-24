@@ -184,5 +184,7 @@ that decision.
 - **Schema-22 severity:** inferred from unmerged, unratified #266 code.
 - **CLI witness:** W3 uses `profile create`, because `bootstrap` needs the Gatsby corpus (`OBS-19`) and exits on a
   synthetic workspace before writing.
-- **Pinning:** the witnesses are not yet pinned in the suite. This repository pins known defects as strict-xfail
-  tests, and that can follow the decision.
+- **Pinning:** the witnesses are now pinned as strict xfails in `tests/test_adr0048_post_open_write_races.py`. They
+  replay each operation with the newer migration committed before its transactions, so they do not depend on where
+  the probe lives. The proposed rule is drafted as `docs/adr/ADR-0050-every-write-transaction-rechecks-the-workspace-schema.md`,
+  which is unratified.
