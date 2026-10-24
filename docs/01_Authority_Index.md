@@ -115,11 +115,14 @@ The Architecture Decision Record index is
 | ADR | Status | Scope | Ratified |
 |---|---|---|---|
 | [ADR-0048: Newer Workspace Schemas Are Refused](adr/ADR-0048-newer-workspace-schemas-are-refused.md) | ACTIVE | Before any workspace initialization, migration, write connection or export, refuse newer, ambiguous or malformed schema markers without mutation; never downgrade a version marker | 2026-10-23 |
+| [ADR-0050: Every Write Transaction Re-checks the Workspace Schema](adr/ADR-0050-every-write-transaction-rechecks-the-workspace-schema.md) | ACTIVE | Extends ADR-0048 to re-check compatibility inside every DML/DDL write transaction; guard external migration DDL; quiesce processes and verify backup before later schema migrations; governed refusal evidence and exhaustive write-path tripwire required | 2026-10-24 |
 
 ADR-0048 extends the migration rules of [`15_Storage.md`](15_Storage.md).
-It supersedes no earlier ADR or constitutional rule. Its ratification does not
-activate schema 22 or authorize a workspace migration. The implementing PR
-requires independent integration verification before merging and release.
+It supersedes no earlier ADR or constitutional rule. ADR-0050 extends ADR-0048
+without editing or superseding its ratified text, and adds the V1/V2 verification
+stipulations in its ratification record. Neither ratification activates schema 22
+or authorizes a real-workspace migration. The implementation requires independent
+current-main integration verification before merging and release.
 
 ---
 
