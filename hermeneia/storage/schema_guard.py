@@ -20,7 +20,9 @@ class NewerSchemaError(SchemaMarkerError):
 
 def check_schema_marker(conn: sqlite3.Connection, supported: int) -> int | None:
     """Read the schema marker without writing. Returns the recorded version, or None when there is none yet."""
-    if conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'").fetchone() is None:
+    # A view of that name is read by the store like the table, so it is a marker too, not its absence.
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') "
+                    "AND name = 'schema_version'").fetchone() is None:
         return None
     versions = [row[0] for row in conn.execute("SELECT version FROM schema_version")]
     if not versions:

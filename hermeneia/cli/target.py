@@ -24,9 +24,14 @@ def resolve_db_target(bundle_or_db: str | Path | None, default: str = DEFAULT_DB
 
 
 def require_cli_supported_schema(db_path: str | Path) -> None:
-    """ADR-0048: refuse a newer workspace before any CLI command opens it for writing."""
+    """ADR-0048: refuse a newer workspace before any CLI command opens it for writing.
+
+    A directory is probed through its own ``hermeneia.db``, the database a command will resolve it to.
+    """
     from ..storage.schema_guard import SchemaMarkerError, require_supported_schema
     from ..storage.sqlite import SCHEMA_VERSION
+    if Path(db_path).is_dir():
+        db_path = Path(db_path) / "hermeneia.db"
     try:
         require_supported_schema(db_path, SCHEMA_VERSION)
     except SchemaMarkerError as exc:
