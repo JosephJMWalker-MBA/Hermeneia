@@ -327,9 +327,20 @@ migration.
   and pinned by executable tripwire tests; sampling up to eight transaction
   seams does not itself establish exhaustive coverage.
 
-This rule is **ratified but not yet implemented/validated**. Its acceptance
-criteria do not authorize schema 22, a real-workspace migration, a release,
-writer-version fields, or a database-side write fence.
+**Implementation status (2026-10-24):** implemented and verified in PR #273,
+at code head `20e1b83`. It was checked against an isolated current-`main`
+baseline (`6e62a4d`): clean `main` passed 3122 tests, and the integration
+tree `2841c21` passed 3204, with 0 failures. See the
+[verification record](verification/2026-10-24-adr0050-write-transaction-guard.md).
+
+One narrowly justified exception is recorded and pinned by tests. A
+`PRAGMA journal_mode` change outside a transaction reads the marker without
+holding the write lock, because SQLite cannot change the journal mode inside
+a transaction. WAL is the only mode Hermeneia sets, and setting it on a WAL
+workspace writes nothing.
+
+The acceptance criteria do not authorize schema 22, a real-workspace
+migration, a release, writer-version fields, or a database-side write fence.
 
 ---
 
