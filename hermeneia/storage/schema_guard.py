@@ -83,16 +83,61 @@ def check_schema_marker(conn: sqlite3.Connection, supported: int) -> int | None:
 
 
 # Statements that open no write transaction of their own: connection settings, and explicit transaction control.
-_UNGUARDED = {"PRAGMA", "BEGIN", "COMMIT", "END", "ROLLBACK", "SAVEPOINT", "RELEASE"}
-# A GuardedConnection treats every other statement as a write unless it is one of these reads.
-_READS = {"SELECT", "VALUES", "EXPLAIN", "PRAGMA"}
+_CONTROL = {"BEGIN", "COMMIT", "END", "ROLLBACK", "SAVEPOINT", "RELEASE"}
+_UNGUARDED = {"PRAGMA"} | _CONTROL
+# A GuardedConnection treats every other statement as a write unless it is one of these reads, a read-only PRAGMA,
+# or a WITH statement whose program SQLite compiles without a write transaction.
+_READS = {"SELECT", "VALUES", "EXPLAIN"}
 _DML = {"INSERT", "UPDATE", "DELETE", "REPLACE"}
 _LEADING_COMMENTS = re.compile(r"(?:\s|--[^\n]*|/\*.*?\*/)*", re.S)
+
+# PRAGMAs that never write the database file, in any form: connection settings and introspection. Any PRAGMA not
+# named here or below counts as a write, so an unknown one fails safe.
+_PRAGMA_NEVER_WRITE = {
+    "analysis_limit", "automatic_index", "busy_timeout", "cache_size", "case_sensitive_like", "cell_size_check",
+    "collation_list", "compile_options", "data_version", "database_list", "defer_foreign_keys", "foreign_key_check",
+    "foreign_key_list", "foreign_keys", "freelist_count", "function_list", "index_info", "index_list", "index_xinfo",
+    "integrity_check", "legacy_alter_table", "mmap_size", "module_list", "page_count", "pragma_list", "query_only",
+    "quick_check", "recursive_triggers", "reverse_unordered_selects", "synchronous", "table_info", "table_list",
+    "table_xinfo", "temp_store", "threads", "trusted_schema",
+}
+# PRAGMAs that read a value stored in the database file, and write it there when given one.
+_PRAGMA_STORED = {"application_id", "auto_vacuum", "encoding", "journal_mode", "page_size", "schema_version",
+                  "user_version"}
+_PRAGMA = re.compile(r"PRAGMA\s+(?:\w+\s*\.\s*)?(\w+)\s*(=|\()?", re.I)
 
 
 def _keyword(sql: str) -> str:
     words = sql[_LEADING_COMMENTS.match(sql).end():].split(None, 1)
     return words[0].rstrip(";").upper() if words else ""
+
+
+def _pragma_kind(sql: str) -> str:
+    match = _PRAGMA.match(sql[_LEADING_COMMENTS.match(sql).end():])
+    if match is None:
+        return "write"
+    name, given = match.group(1).lower(), match.group(2)
+    if name in _PRAGMA_NEVER_WRITE or (name in _PRAGMA_STORED and not given):
+        return "read"
+    return "journal_mode" if name == "journal_mode" else "write"
+
+
+def _kind(conn: sqlite3.Connection, keyword: str, sql: str, parameters, many: bool) -> str:
+    """Whether a statement is transaction control, a read, a write, or a journal-mode change."""
+    if not keyword or keyword in _CONTROL:
+        return "control"
+    if keyword in _READS:
+        return "read"
+    if keyword == "PRAGMA":
+        return _pragma_kind(sql)
+    if keyword == "WITH" and not many:
+        # SQLite knows whether a CTE writes: its program opens a write transaction (OP_Transaction, P2 > 0) only then.
+        try:
+            program = sqlite3.Cursor(conn).execute("EXPLAIN " + sql, parameters).fetchall()
+        except sqlite3.Error:
+            return "write"
+        return "write" if any(op[1] == "Transaction" and op[3] for op in program) else "read"
+    return "write"
 
 
 def _statements(script: str):
@@ -179,7 +224,7 @@ class GuardedCursor(sqlite3.Cursor):
         return self.connection._guarded(self, sqlite3.Cursor.execute, sql, parameters)
 
     def executemany(self, sql, parameters):
-        return self.connection._guarded(self, sqlite3.Cursor.executemany, sql, parameters)
+        return self.connection._guarded(self, sqlite3.Cursor.executemany, sql, parameters, many=True)
 
     def executescript(self, script):
         """Commit first and commit at the end, as executescript() does, but run each statement through the guard."""
@@ -197,7 +242,12 @@ class GuardedConnection(sqlite3.Connection):
     - A write outside a transaction opens one with BEGIN IMMEDIATE and reads the marker under that lock.
     - An explicit BEGIN or SAVEPOINT that opens a transaction reads it at once. A deferred one cannot write from a
       stale snapshot in WAL mode, and that lock error is reported as the refusal it is.
-    - Every statement that is not a read or transaction control counts as a write. Reads never take the write lock.
+    - Every statement that is not a read or transaction control counts as a write. Reads never take the write lock:
+      a WITH statement is a read when SQLite compiles it without a write transaction, and a PRAGMA is a write unless
+      it is a known setting or introspection, or reads a stored value without setting it.
+    - The one exception is a journal-mode change outside a transaction, which SQLite cannot make inside one. It reads
+      the marker first, without the write lock. Every Hermeneia workspace is in WAL mode, and WAL is the only mode
+      Hermeneia sets, so a newer build that migrated in between finds nothing written.
     - A refused transaction is rolled back, so nothing is written and no lock is held. The refusal is ADR-0048's own
       error.
     - A write in a transaction whose marker was never read raises UnguardedWriteError, so no writer reaches the
@@ -236,11 +286,14 @@ class GuardedConnection(sqlite3.Connection):
         self._marker_read = False
         return super().__exit__(*exc_info)
 
-    def _guarded(self, cursor, run, sql, parameters):
+    def _guarded(self, cursor, run, sql, parameters, many=False):
         keyword = _keyword(sql)
-        writes = bool(keyword) and keyword not in _READS and keyword not in _UNGUARDED
+        kind = _kind(self, keyword, sql, parameters, many)
+        writes = kind == "write"
         if not self.in_transaction:
             self._marker_read = False
+            if kind == "journal_mode":  # the exception above: no transaction can hold the lock for it
+                check_schema_marker(self, _supported())
         opened = False
         try:
             if writes and not self.in_transaction:
