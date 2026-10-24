@@ -205,13 +205,21 @@ def create_app(
     db_path = Path(db_path)
     app = Flask(__name__, static_folder=str(STATIC_DIR))
 
+    # ADR-0048: refuse a newer workspace before any startup migration touches it, and again under each write lock
+    # the migration takes, in case a newer build migrates it in between.
+    from ..storage.schema_guard import GuardedInitialization as _GuardedInitialization
+    from ..storage.schema_guard import require_supported_schema as _require_supported_schema
+    from ..storage.sqlite import SCHEMA_VERSION as _SCHEMA_VERSION
+    _require_supported_schema(db_path, _SCHEMA_VERSION)
+
     # Run all pending schema migrations on startup if the DB exists
     if db_path.exists():
         from ..storage.sqlite import ensure_profile_tables as _migrate
         _mconn = sqlite3.connect(str(db_path))
         _mconn.row_factory = sqlite3.Row
         try:
-            _migrate(_mconn)
+            _migrate(_GuardedInitialization(_mconn, _SCHEMA_VERSION))
+            _mconn.commit()
         finally:
             _mconn.close()
 
@@ -605,6 +613,13 @@ def create_app(
     def _conn_rw() -> sqlite3.Connection:
         """Read-write connection for pipeline write endpoints (Artist, Critic)."""
         conn = sqlite3.connect(str(db_path))
+        try:
+            # ADR-0048: a newer build may have migrated the workspace since startup.
+            from ..storage.schema_guard import check_schema_marker
+            check_schema_marker(conn, _SCHEMA_VERSION)
+        except BaseException:
+            conn.close()
+            raise
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
         return conn

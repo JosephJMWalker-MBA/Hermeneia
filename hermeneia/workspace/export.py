@@ -669,6 +669,10 @@ def export_workspace_bundle(
     """
     db_path = Path(db_path)
     out_dir = Path(out_dir)
+    # ADR-0048: an older exporter cannot know what a newer workspace holds, so it must not describe its coverage.
+    from ..storage.schema_guard import require_supported_schema
+    from ..storage.sqlite import SCHEMA_VERSION
+    require_supported_schema(db_path, SCHEMA_VERSION)
     if workspace_id is None:
         workspace_id = _default_workspace_id(db_path)
 

@@ -16,6 +16,8 @@ from .hashing import make_semantic_hash
 
 SCHEMA_VERSION = 21  # append-only Blueprint proposal acceptance receipts (P8)
 
+from .schema_guard import GuardedInitialization, check_schema_marker
+
 # Supersession triggers must be dropped and recreated whenever the canonical object
 # list grows. SQLite has no ALTER TRIGGER. Every store open runs this, so it is one
 # IMMEDIATE transaction: concurrent opens cannot interleave (both drop, then both
@@ -1260,9 +1262,21 @@ class SQLiteStore:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
-        self._atomic = False
-        self._apply_schema()
+        try:
+            # ADR-0048: read the marker before any DDL, migration or write, and again under each write lock that
+            # initialization takes, so a newer build that migrates the workspace in between is refused first.
+            check_schema_marker(self._conn, SCHEMA_VERSION)
+            self._conn.row_factory = sqlite3.Row
+            self._atomic = False
+            conn, self._conn = self._conn, GuardedInitialization(self._conn, SCHEMA_VERSION)
+            try:
+                self._apply_schema()
+                conn.commit()
+            finally:
+                self._conn = conn
+        except BaseException:
+            self._conn.close()
+            raise
 
     @contextmanager
     def atomic(self):
@@ -1337,9 +1351,9 @@ class SQLiteStore:
                 (SCHEMA_VERSION, datetime.now(timezone.utc).isoformat()),
             )
             self._conn.commit()
-        elif row[0] != SCHEMA_VERSION:
+        elif row[0] < SCHEMA_VERSION:
             # Migrate: DDL is already idempotent (CREATE TABLE IF NOT EXISTS).
-            # Only the version record needs updating.
+            # Only the version record needs updating. It never decreases (ADR-0048).
             self._conn.execute(
                 "UPDATE schema_version SET version = ?, applied_at = ?",
                 (SCHEMA_VERSION, datetime.now(timezone.utc).isoformat()),

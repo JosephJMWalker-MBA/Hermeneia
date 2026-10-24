@@ -234,6 +234,8 @@ def main() -> None:
 
     args = parser.parse_args()
     db = args.db or "build/hermeneia.db"
+    from .target import require_cli_supported_schema
+    require_cli_supported_schema(db)
 
     if args.command == "health":
         cmd_health(bundle_or_db=db)
