@@ -15,6 +15,7 @@ The output is a map of the epistemic landscape, not a verdict.
 """
 from __future__ import annotations
 
+from ..storage.schema_guard import connect_workspace
 from .target import resolve_db_target
 
 import json
@@ -46,7 +47,7 @@ def _open_db(db_path: Path) -> sqlite3.Connection:
     if not db_path.exists():
         console.print(f"[red]Database not found:[/] {db_path}")
         sys.exit(1)
-    conn = sqlite3.connect(str(db_path))
+    conn = connect_workspace(str(db_path))
     conn.row_factory = sqlite3.Row
     return conn
 

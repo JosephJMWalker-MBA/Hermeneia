@@ -67,6 +67,10 @@ def workspace(tmp_path, monkeypatch):
     shim = types.SimpleNamespace(**{k: getattr(sqlite3, k) for k in dir(sqlite3) if not k.startswith("__")})
     shim.connect = lambda *a, **k: _FailingCommitConnection(sqlite3.connect(*a, **k))
     monkeypatch.setattr(webapp, "sqlite3", shim)
+    # Request write connections come from connect_workspace (ADR-0050), so the failing commit is injected there too.
+    connect_workspace = webapp.connect_workspace
+    monkeypatch.setattr(webapp, "connect_workspace",
+                        lambda *a, **k: _FailingCommitConnection(connect_workspace(*a, **k)))
     return db, client, {"doc": doc_id, "obs": obs_id, "hl": highlight["id"],
                         "note": (note.get("inquiry_note") or note)["id"]}
 

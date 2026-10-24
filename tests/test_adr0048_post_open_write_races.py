@@ -1,17 +1,20 @@
-"""ADR-0048 post-open write races: the witnesses of docs/verification/2026-10-24-adr0048-post-open-write-races.md.
+"""ADR-0048 post-open write races, guarded by ADR-0050: the witnesses of
+docs/verification/2026-10-24-adr0048-post-open-write-races.md, now acceptance tests under ADR-0050's stipulations.
 
-A newer build may commit its migration at any moment this build holds no transaction on the workspace. The rule these
-witnesses pin (Option B of that record, drafted as ADR-0050): wherever that happens, this build writes nothing to the
-workspace afterwards.
+A newer build may commit its migration at any moment this build holds no transaction on the workspace. Each witness
+runs one operation and finds every point where a workspace connection is about to start a transaction. It then
+replays the operation once per point, with a newer migration committed exactly there.
 
-Each witness runs one operation, finds every point where a workspace connection is about to start a transaction, and
-replays the operation with a newer migration committed exactly there. It replays every point, or eight evenly spaced
-points including the first and the last when there are more. The store's own guarded initialization is left out,
-because test_newer_schema_refusal_boundaries.py pins it.
+At every point (V2: every point, no sampling) it asserts all of the following (V1):
+- the newer migration really committed at that seam;
+- this build wrote nothing after it, whether DML, DDL or a canonical record;
+- the operation ended in the governed ADR-0048 refusal for that newer schema: NewerSchemaError raised by the library,
+  the CLI's DatabaseTargetError carrying it, or the HTTP 503 refusal body.
 
-Current main lets these writes land, so each witness is a strict xfail that may fail only by assertion. When the
-protection lands, it XPASSes, fails strictly, and must be unmarked. A witness whose operation never reaches a workspace
-transaction raises instead, so a moved seam cannot hide behind its xfail.
+An unrelated error, a generic 500, a lock error or a suppressed refusal fails the witness. So does an operation that
+never reaches a workspace transaction.
+
+The store's own initialization is left out here; test_newer_schema_refusal_boundaries.py pins its every point.
 """
 from __future__ import annotations
 
@@ -27,17 +30,15 @@ from unittest import mock
 import pytest
 
 import synthetic_study_lab as lab
-from hermeneia.storage.schema_guard import _keyword
+from hermeneia.cli.target import DatabaseTargetError
+from hermeneia.storage.schema_guard import NewerSchemaError, SchemaMarkerError, _keyword
 from hermeneia.storage.sqlite import SCHEMA_VERSION, SQLiteStore
 from hermeneia.web.app import create_app
 
 _connect = sqlite3.connect
-_TRANSACTION_STARTS = {"BEGIN", "INSERT", "UPDATE", "DELETE", "REPLACE", "CREATE", "DROP", "ALTER"}
-_SAMPLED_POINTS = 8
-
-RACE = pytest.mark.xfail(strict=True, raises=AssertionError, reason=(
-    "ADR-0048 post-open write race (docs/verification/2026-10-24-adr0048-post-open-write-races.md); "
-    "unmark when every write transaction re-checks the marker (draft ADR-0050)"))
+_TRANSACTION_STARTS = {"BEGIN", "SAVEPOINT", "INSERT", "UPDATE", "DELETE", "REPLACE", "CREATE", "DROP", "ALTER"}
+NEWER = SCHEMA_VERSION + 1
+REFUSAL = f"workspace schema {NEWER} is newer than this build supports"
 
 
 class SeamNotReached(RuntimeError):
@@ -52,7 +53,7 @@ def _migrate_as_newer_build(db: Path, shape: str) -> None:
             conn.execute("CREATE TABLE future_records (id TEXT PRIMARY KEY)")
         else:  # a newer schema that moved a table an older migration would recreate
             conn.execute("ALTER TABLE expression_profiles RENAME TO expression_profiles_v22")
-        conn.execute("UPDATE schema_version SET version = ?", (SCHEMA_VERSION + 1,))
+        conn.execute("UPDATE schema_version SET version = ?", (NEWER,))
         conn.commit()
     finally:
         conn.close()
@@ -110,88 +111,126 @@ def _newer_migration_at(db: Path, point: int | None, shape: str, skip, observed:
         yield seen
 
 
+def _outcome(operate, root, db):
+    try:
+        return "returned", operate(root, db)
+    except (Exception, SystemExit) as exc:  # noqa: BLE001 - every outcome is inspected, none is suppressed
+        return "raised", exc
+
+
+def _governed_refusal(outcome) -> bool:
+    """The operation ended in ADR-0048's refusal of exactly this newer schema, at its own boundary."""
+    kind, value = outcome
+    if kind == "raised":
+        return isinstance(value, (SchemaMarkerError, DatabaseTargetError)) and REFUSAL in str(value)
+    status, body = getattr(value, "status_code", None), (value.get_json(silent=True) if hasattr(value, "get_json") else None)
+    return (status == 503 and isinstance(body, dict) and body.get("refusal") == "workspace_schema"
+            and body.get("error_type") == "NewerSchemaError" and REFUSAL in body.get("error", ""))
+
+
 def _replay(tmp_path: Path, template: Path, database: str, operate, *, shape: str = "append",
             skip=_in_store_initialization) -> int:
-    """Replay ``operate`` on fresh copies of ``template`` with a newer migration at each transaction start.
+    """Replay ``operate`` on fresh copies of ``template`` with a newer migration before each transaction start.
 
-    Returns how many points were checked. Asserts that nothing was written after the newer migration at any of them.
+    Returns how many points were checked. Raises SeamNotReached when there were none.
     """
     def run(point):
         root = tmp_path / f"replay-{point}"
         shutil.copytree(template, root)
         db, observed = root / database, []
         with _newer_migration_at(db, point, shape, skip, observed) as seen:
-            with contextlib.suppress(Exception, SystemExit):
-                operate(root, db)
-        return seen[0], observed, db
+            outcome = _outcome(operate, root, db)
+        return seen[0], observed, db, outcome
 
-    points, _, _ = run(None)
-    if not points:
-        raise SeamNotReached("the operation started no transaction on the workspace")
-    step = max(1, (points - 1) // (_SAMPLED_POINTS - 1))
-    chosen = sorted(set(range(0, points, step)) | {points - 1}) if points > _SAMPLED_POINTS else range(points)
+    points, _, _, dry = run(None)
+    if dry[0] == "raised" or getattr(dry[1], "status_code", 200) >= 400:
+        raise SeamNotReached(f"the operation fails even without a newer migration: {dry}")
     checked = 0
-    for point in chosen:
-        _, observed, db = run(point)
-        if observed and isinstance(observed[0], tuple) and observed[0][0] == "error":
-            raise SeamNotReached(f"the newer migration could not be committed at point {point}: {observed[0][1]}")
+    for point in range(points):
+        _, observed, db, outcome = run(point)
         if observed == [None]:
             continue
+        if len(observed) != 1 or isinstance(observed[0], tuple) and observed[0][0] == "error":
+            raise SeamNotReached(f"the newer migration was not committed at point {point}: {observed}")
         checked += 1
-        assert _state(db) == observed[0], f"written after a newer migration committed before transaction {point}"
+        assert observed[0][1] == [NEWER], f"point {point}: the newer migration did not commit"
+        assert _state(db) == observed[0], f"point {point}: written after a newer migration committed"
+        assert _governed_refusal(outcome), f"point {point}: not the governed refusal: {outcome}"
+    if not checked:
+        raise SeamNotReached("the operation started no transaction on the workspace after its initialization")
     return checked
+
+
+def _app(db: Path, **kwargs):
+    return create_app(db_path=db, credential_store=lab._NoCredentials(), **kwargs).test_client()
 
 
 @pytest.fixture
 def study(tmp_path):
-    """A closed real workspace (one uploaded PDF, two Observations) and a WBS bundle of it, under ``template``."""
+    """A closed real workspace (one uploaded PDF, two Observations), its Architect plan and a null-provider narrative,
+    and a WBS bundle of it before the plan, under ``template``."""
     with lab.isolated(tmp_path):
         template = tmp_path / "template"
         db = template / "ws" / "hermeneia.db"
         SQLiteStore(db).close()
-        client = create_app(db_path=db, credential_store=lab._NoCredentials()).test_client()
+        client = _app(db)
         lab._ok(client.post("/api/upload", data={"file": (io.BytesIO(lab._pdf(["The lamp burned all night.",
                                                                                 "Nobody asked why."])), "a.pdf")},
                             content_type="multipart/form-data"))
         from hermeneia.workspace import export_workspace_bundle
         export_workspace_bundle(db, template / "bundle", generated_at="2026-10-24T00:00:00+00:00")
-        yield template
-
-
-def _app(db: Path):
-    return create_app(db_path=db, credential_store=lab._NoCredentials()).test_client()
+        conn = _connect(db)
+        observations = [r[0] for r in conn.execute("SELECT id FROM observations")]
+        conn.close()
+        candidate = {"title": "T", "thesis": "T.", "sections": [{"claim": "C.", "supporting_observations": observations,
+                                                                 "supporting_interpretations": []}]}
+        plan = lab._ok(client.post("/api/pipeline/ratify-blueprint", json={"candidate": candidate}))["plan_id"]
+        profile, other_profile = [p["slug"] for p in client.get("/api/profiles").get_json()["profiles"][:2]]
+        narrative = lab._ok(client.post("/api/pipeline/run-artist",
+                                        json={"plan_id": plan, "provider": "null", "profile": profile}))["id"]
+        yield template, {"candidate": {**candidate, "title": "T2"}, "plan": plan, "other_profile": other_profile,
+                         "narrative": narrative}
 
 
 # ── The harness itself ──────────────────────────────────────────────────────
 
 def test_the_harness_passes_where_the_build_already_refuses(study, tmp_path):
     """Every transaction start of a store open, guarded initialization included: each replay is refused unwritten."""
-    assert _replay(tmp_path, study, "ws/hermeneia.db", lambda _root, db: SQLiteStore(db).close(),
-                   skip=lambda: False) > 0
+    template, _ = study
+    def open_store(_root, db):
+        SQLiteStore(db).close()
+    assert _replay(tmp_path, template, "ws/hermeneia.db", open_store, skip=lambda: False) > 0
 
 
-# ── W1-W5 ───────────────────────────────────────────────────────────────────
+def test_the_harness_rejects_an_operation_that_is_not_refused(study, tmp_path):
+    """A write on a raw connection is not guarded; the harness must catch it rather than pass it."""
+    template, _ = study
+    def raw_write(_root, db):
+        conn = sqlite3.connect(db)  # the module's connect, so the harness sees it; deliberately not guarded
+        conn.execute("INSERT INTO terms (id, term) VALUES ('unguarded', 'unguarded')")
+        conn.commit()
+        conn.close()
+    with pytest.raises(AssertionError, match="written after a newer migration"):
+        _replay(tmp_path, template, "ws/hermeneia.db", raw_write)
 
-@RACE
-def test_w1_a_request_write_connection_writes_nothing_after_a_newer_migration(study, tmp_path):
-    conn = _connect(study / "ws" / "hermeneia.db")
-    observations = [r[0] for r in conn.execute("SELECT id FROM observations")]
-    conn.close()
-    candidate = {"title": "T", "thesis": "T.", "sections": [{"claim": "C.", "supporting_observations": observations,
-                                                             "supporting_interpretations": []}]}
-    _replay(tmp_path, study, "ws/hermeneia.db",
-            lambda _root, db: _app(db).post("/api/pipeline/ratify-blueprint", json={"candidate": candidate}))
+
+# ── Witnesses: every writer category, every transaction start ───────────────
+
+def test_w1_a_request_write_connection_refuses_a_newer_migration(study, tmp_path):
+    template, made = study
+    _replay(tmp_path, template, "ws/hermeneia.db",
+            lambda _root, db: _app(db).post("/api/pipeline/ratify-blueprint", json={"candidate": made["candidate"]}))
 
 
-@RACE
-def test_w2_a_request_store_writes_nothing_after_a_newer_migration(study, tmp_path):
+def test_w2_a_request_store_refuses_a_newer_migration(study, tmp_path):
+    template, _ = study
     pdf = lab._pdf(["A second page of evidence."])
-    _replay(tmp_path, study, "ws/hermeneia.db", lambda _root, db: _app(db).post(
+    _replay(tmp_path, template, "ws/hermeneia.db", lambda _root, db: _app(db).post(
         "/api/upload", data={"file": (io.BytesIO(pdf), "b.pdf")}, content_type="multipart/form-data"))
 
 
-@RACE
-def test_w3_a_cli_raw_connection_writes_nothing_after_a_newer_migration(study, tmp_path):
+def test_w3_a_cli_raw_connection_refuses_a_newer_migration(study, tmp_path):
+    template, _ = study
     from hermeneia.cli import main as cli_main, profile_cmd
 
     def create_profile(_root, db):
@@ -201,24 +240,74 @@ def test_w3_a_cli_raw_connection_writes_nothing_after_a_newer_migration(study, t
                 contextlib.redirect_stdout(io.StringIO()):
             cli_main.main()
 
-    _replay(tmp_path, study, "ws/hermeneia.db", create_profile)
+    _replay(tmp_path, template, "ws/hermeneia.db", create_profile)
 
 
-@RACE
-def test_w4_restore_writes_nothing_after_a_newer_migration(study, tmp_path):
+def test_w4_restore_refuses_a_newer_migration(study, tmp_path):
+    template, _ = study
     from hermeneia.workspace.restore import restore_workspace
-    _replay(tmp_path, study, "target/hermeneia.db", lambda root, db: restore_workspace(db, root / "bundle"))
+    _replay(tmp_path, template, "target/hermeneia.db", lambda root, db: restore_workspace(db, root / "bundle"))
 
 
-def _setup_init(_root, db):
-    _app(db).post("/api/setup/init")
+@pytest.mark.parametrize("shape", ["append", "rename"])
+def test_w5_setup_init_refuses_a_newer_migration(study, tmp_path, shape):
+    template, _ = study
+    _replay(tmp_path, template, "fresh/hermeneia.db", lambda _root, db: _app(db).post("/api/setup/init"), shape=shape)
 
 
-def test_w5a_setup_init_changes_nothing_under_an_append_only_newer_schema(study, tmp_path):
-    """Monotonic evolution: the older profile migration finds every table it creates and writes nothing."""
-    _replay(tmp_path, study, "fresh/hermeneia.db", _setup_init)
+def test_w6_workspace_creation_refuses_a_newer_migration(study, tmp_path):
+    template, _ = study
+    from hermeneia.workspace.lifecycle import create_workspace
+    _replay(tmp_path, template, "managed/witness/hermeneia.db",
+            lambda root, _db: create_workspace("Witness", workspace_root=root / "managed"))
 
 
-@RACE
-def test_w5b_setup_init_migrates_nothing_after_a_newer_migration(study, tmp_path):
-    _replay(tmp_path, study, "fresh/hermeneia.db", _setup_init, shape="rename")
+def test_w7_the_artist_refuses_a_newer_migration_after_its_provider_call(study, tmp_path):
+    """The route catches every exception into its own 500. The refusal it caught is still the response (ADR-0050)."""
+    template, made = study
+    _replay(tmp_path, template, "ws/hermeneia.db", lambda _root, db: _app(db).post(
+        "/api/pipeline/run-artist", json={"plan_id": made["plan"], "provider": "null",
+                                          "profile": made["other_profile"]}))
+
+
+def test_w8_the_critic_refuses_a_newer_migration_before_writing_findings(study, tmp_path):
+    template, made = study
+    _replay(tmp_path, template, "ws/hermeneia.db", lambda _root, db: _app(db).post(
+        "/api/pipeline/run-critic", json={"narrative_id": made["narrative"]}))
+
+
+def test_w9_e10_generation_refuses_rather_than_reporting_a_partial_result(tmp_path, monkeypatch):
+    """The E10 route reports a participant's staging failure as a partial result (#272). A refusal is no such
+    failure: it ends the request as the governed 503, and no earlier proposal is reported as a success."""
+    import hermeneia.web.app as webapp
+    from test_constitutional_p0 import _seed_full_chain
+    from test_e10_vertical_slice_api import _cloud_catalog_registry, _reset_catalog_provider
+    monkeypatch.setenv("HERMENEIA_CONNECTIONS_SETTINGS_PATH", str(tmp_path / "connections.json"))
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only-openai")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-only-anthropic")
+    monkeypatch.setattr(webapp, "generate_candidate_interpretation",
+                        lambda *_a, **_k: ("An independent candidate.", "frozen synthetic prompt"))
+    _reset_catalog_provider()
+    template = tmp_path / "template"
+    store = SQLiteStore(template / "workspace.db")
+    ids = _seed_full_chain(store)
+    store.close()
+    body = {"observation_id": ids["obs_id"], "participants": ["gpt", "claude"]}
+    _replay(tmp_path, template, "workspace.db", lambda _root, db: create_app(
+        db_path=db, provider_registry=_cloud_catalog_registry()).test_client().post(
+            "/api/e10/interpretations/generate", json=body))
+
+
+def test_w10_an_authoring_write_connection_refuses_a_newer_migration(study, tmp_path):
+    template, _ = study
+    from hermeneia.authoring import service
+
+    def write(_root, db):
+        conn = service._conn_rw(db)
+        try:
+            conn.execute("INSERT INTO terms (id, term) VALUES ('authoring-witness', 'authoring witness')")
+            conn.commit()
+        finally:
+            conn.close()
+
+    _replay(tmp_path, template, "ws/hermeneia.db", write)

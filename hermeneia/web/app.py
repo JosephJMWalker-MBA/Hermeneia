@@ -61,6 +61,7 @@ from ..compiler.projections.interpretive_divergence import (
     InterpretiveDivergenceError,
     interpretive_divergence_projection,
 )
+from ..storage.schema_guard import connect_workspace
 from ..storage.sqlite import SQLiteStore
 from ..reader_span import reader_span_display_locator, reader_span_raw_locator
 from ..scope_resolution import ScopeResolutionError, resolve_scope_for_provider
@@ -215,7 +216,7 @@ def create_app(
     # Run all pending schema migrations on startup if the DB exists
     if db_path.exists():
         from ..storage.sqlite import ensure_profile_tables as _migrate
-        _mconn = sqlite3.connect(str(db_path))
+        _mconn = connect_workspace(str(db_path))
         _mconn.row_factory = sqlite3.Row
         try:
             _migrate(_GuardedInitialization(_mconn, _SCHEMA_VERSION))
@@ -612,7 +613,7 @@ def create_app(
 
     def _conn_rw() -> sqlite3.Connection:
         """Read-write connection for pipeline write endpoints (Artist, Critic)."""
-        conn = sqlite3.connect(str(db_path))
+        conn = connect_workspace(str(db_path))
         try:
             # ADR-0048: a newer build may have migrated the workspace since startup.
             from ..storage.schema_guard import check_schema_marker
@@ -650,6 +651,33 @@ def create_app(
     @app.errorhandler(_JSONBodyError)
     def _json_body_error(_exc):
         return jsonify({"error": "request body must be a JSON object"}), 400
+
+    # ADR-0050: a workspace-schema refusal raised while serving a request is that request's response, even where the
+    # route caught it, so a client always meets the governed refusal and never a partial success or a generic error.
+    from ..storage import schema_guard as _schema_guard
+
+    def _schema_refusal_response(refusal):
+        return jsonify({"error": str(refusal), "error_type": type(refusal).__name__,
+                        "refusal": "workspace_schema"}), 503
+
+    @app.errorhandler(_schema_guard.SchemaMarkerError)
+    def _schema_refusal(refusal):
+        return _schema_refusal_response(refusal)
+
+    @app.before_request
+    def _record_schema_refusals():
+        g.hermeneia_schema_refusals = _schema_guard.start_recording_refusals()
+
+    @app.after_request
+    def _report_schema_refusals(response):
+        refusals = _schema_guard.recorded_refusals()
+        return make_response(_schema_refusal_response(refusals[0])) if refusals else response
+
+    @app.teardown_request
+    def _stop_recording_schema_refusals(_exc):
+        token = g.pop("hermeneia_schema_refusals", None)
+        if token is not None:
+            _schema_guard.stop_recording_refusals(token)
 
     def _json_body(*, force: bool = False) -> dict:
         """The request's JSON object body; {} when absent; a 400 when it is another JSON value."""
@@ -3357,7 +3385,7 @@ def create_app(
             from ..storage.sqlite import ensure_profile_tables as _migrate
             store = _Store(db_path)
             store.close()
-            _mconn = sqlite3.connect(str(db_path))
+            _mconn = connect_workspace(str(db_path))
             _mconn.row_factory = sqlite3.Row
             try:
                 _migrate(_mconn)

@@ -16,7 +16,7 @@ from .hashing import make_semantic_hash
 
 SCHEMA_VERSION = 21  # append-only Blueprint proposal acceptance receipts (P8)
 
-from .schema_guard import GuardedInitialization, check_schema_marker
+from .schema_guard import GuardedInitialization, check_schema_marker, connect_workspace, guarded_initialization
 
 # Supersession triggers must be dropped and recreated whenever the canonical object
 # list grows. SQLite has no ALTER TRIGGER. Every store open runs this, so it is one
@@ -861,9 +861,10 @@ CREATE INDEX IF NOT EXISTS idx_arch_plan_bp ON architect_plans(blueprint_id);
 
 
 def ensure_architect_tables(conn: "sqlite3.Connection") -> None:
-    """Idempotently create architect tables on any open connection."""
-    conn.executescript(_ARCHITECT_DDL)
-    conn.commit()
+    """Idempotently create architect tables on any open connection, as guarded initialization (ADR-0050)."""
+    with guarded_initialization(conn, SCHEMA_VERSION) as conn:
+        conn.executescript(_ARCHITECT_DDL)
+        conn.commit()
 
 
 _PROFILE_BASE_DDL = """
@@ -920,7 +921,7 @@ END;
 """
 
 
-def ensure_profile_tables(conn: "sqlite3.Connection") -> None:
+def _ensure_profile_tables(conn: "sqlite3.Connection") -> None:
     """Idempotently create expression_profiles + rendered_narratives on any open connection.
 
     Handles three migration scenarios:
@@ -1214,6 +1215,12 @@ CREATE TABLE IF NOT EXISTS workspace_identity (
     conn.commit()
 
 
+def ensure_profile_tables(conn: "sqlite3.Connection") -> None:
+    """The profile migrations, as guarded initialization wherever they run (ADR-0050)."""
+    with guarded_initialization(conn, SCHEMA_VERSION) as guarded:
+        _ensure_profile_tables(guarded)
+
+
 # Backwards-compat alias used by CLI commands written before v9
 ensure_artist_tables = ensure_profile_tables
 
@@ -1251,17 +1258,18 @@ END;
 
 
 def ensure_critic_tables(conn: "sqlite3.Connection") -> None:
-    """Idempotently create validation_reports on any open connection."""
-    ensure_profile_tables(conn)
-    conn.executescript(_CRITIC_DDL)
-    conn.commit()
+    """Idempotently create validation_reports on any open connection, as guarded initialization (ADR-0050)."""
+    with guarded_initialization(conn, SCHEMA_VERSION) as conn:
+        ensure_profile_tables(conn)
+        conn.executescript(_CRITIC_DDL)
+        conn.commit()
 
 
 class SQLiteStore:
     def __init__(self, db_path: str | Path):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        self._conn = connect_workspace(str(self.db_path), check_same_thread=False)
         try:
             # ADR-0048: read the marker before any DDL, migration or write, and again under each write lock that
             # initialization takes, so a newer build that migrates the workspace in between is refused first.

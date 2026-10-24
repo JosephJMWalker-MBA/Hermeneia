@@ -30,6 +30,7 @@ from rich.table import Table
 from rich import box
 
 from ..storage.hashing import make_blueprint_id
+from ..storage.schema_guard import connect_workspace
 from .target import resolve_db_target
 from ..compiler.blueprint_extractor import extract_blueprint_from_text, BlueprintExtractionError
 from ..compiler.architect import compile_architect_plan
@@ -45,7 +46,7 @@ def _open_db(bundle_or_db: str | None) -> tuple[Path, sqlite3.Connection]:
         console.print("Run [bold]herm bootstrap[/] first.")
         sys.exit(1)
 
-    conn = sqlite3.connect(str(db_path))
+    conn = connect_workspace(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     return db_path, conn

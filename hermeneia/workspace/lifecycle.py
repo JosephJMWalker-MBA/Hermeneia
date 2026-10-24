@@ -12,6 +12,7 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..storage.schema_guard import connect_workspace
 from ..storage.sqlite import SQLiteStore
 from .identity import read_workspace_identity, set_workspace_name
 
@@ -128,7 +129,7 @@ def create_workspace(
 
     db_path = workspace_dir / WORKSPACE_DB_NAME
     SQLiteStore(db_path).close()
-    conn = sqlite3.connect(db_path)
+    conn = connect_workspace(db_path)
     try:
         set_workspace_name(conn, name.strip())
     finally:

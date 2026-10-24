@@ -30,6 +30,7 @@ from rich.table import Table
 from ..explorer.bucketer import BucketingError, generate_candidate_buckets
 from ..explorer.interpreter import ExplorerError, generate_interpretation_from_bucket
 from ..compiler.staging.interpretation import StagingError, propose_interpretation
+from ..storage.schema_guard import connect_workspace
 from ..storage.sqlite import SQLiteStore
 from ..narrative.artist_providers import DEFAULT_PROVIDER_REGISTRY, get_provider
 
@@ -53,7 +54,7 @@ def cmd_explorer_discover(
 
     from .target import require_cli_supported_schema
     require_cli_supported_schema(db_path)
-    conn = sqlite3.connect(str(db_path))
+    conn = connect_workspace(str(db_path))
     conn.row_factory = sqlite3.Row
 
     # ── Resolve observations ──────────────────────────────────────────────────

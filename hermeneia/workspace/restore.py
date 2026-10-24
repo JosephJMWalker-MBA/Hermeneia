@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from ..perspective_identity import FRAME_V2_SCHEME, validate_frame_v2_row_identity
+from ..storage.schema_guard import connect_workspace
 from ..storage.sqlite import SQLiteStore
 from .compile_records import (
     CAPABILITY as _COMPILE_RECORDS_CAPABILITY, COVERAGE_KEY as _COMPILE_RECORDS_COVERAGE, CompileRecordsError,
@@ -496,7 +497,7 @@ def preview_restore(db_path: str | Path, bundle_dir: str | Path) -> dict[str, An
     db_path = Path(db_path)
     target_empty = True
     if db_path.exists():
-        conn = sqlite3.connect(db_path)
+        conn = connect_workspace(db_path)
         try:
             target_empty = _workspace_is_empty(conn)
         finally:
@@ -558,7 +559,7 @@ def restore_workspace(
     # Ensure schema exists (creates the DB and all tables if absent).
     SQLiteStore(db_path).close()
 
-    conn = sqlite3.connect(db_path)
+    conn = connect_workspace(db_path)
     conn.row_factory = sqlite3.Row
     staging: Path | None = None
     installed: list[Path] = []

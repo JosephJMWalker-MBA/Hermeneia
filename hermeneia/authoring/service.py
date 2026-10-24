@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..storage.schema_guard import connect_workspace
 from ..workspace.identity import ensure_workspace_identity, read_workspace_id
 from . import store
 from .store import canonical_json, sha256_bytes
@@ -203,7 +204,7 @@ def _conn_rw(db_path: Path) -> sqlite3.Connection:
     from ..storage.sqlite import SQLiteStore
 
     SQLiteStore(db_path).close()  # write path: ensures schema, including authoring tables
-    conn = sqlite3.connect(str(db_path))
+    conn = connect_workspace(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     return conn

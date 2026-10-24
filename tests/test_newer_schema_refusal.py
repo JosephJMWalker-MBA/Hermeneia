@@ -193,17 +193,17 @@ def test_a_missing_workspace_is_created_normally(tmp_path):
 
 # A connection site that is not visibly read-only, with the guard that precedes it. A new site fails this test until
 # it is reviewed and added here.
+# ADR-0050 extends this tripwire: every connection that may write a workspace now comes from connect_workspace(), so
+# the raw sites left are read-only URIs (built on the line before), ADR-0048's probe, the guarded factory itself and
+# the backup destination. test_adr0050_write_transaction_guard.py pins the full writer inventory.
 REVIEWED_CONNECTION_SITES = {
-    "hermeneia/storage/sqlite.py": 2,       # SQLiteStore (guarded); backup_to() writes a new destination file
-    "hermeneia/storage/schema_guard.py": 1,  # the probe itself, which only reads
-    "hermeneia/web/app.py": 4,              # startup migration (after the startup guard); _conn (read-only URI);
-                                            # _conn_rw (guarded); a new database created through SQLiteStore
+    "hermeneia/storage/sqlite.py": 1,       # backup_to() copies pages into a fresh destination file
+    "hermeneia/storage/schema_guard.py": 2,  # the probe, which only reads; connect_workspace(), the guarded factory
+    "hermeneia/web/app.py": 1,              # _conn (read-only URI)
     "hermeneia/workspace/export.py": 1,     # read-only URI, after the export guard
-    "hermeneia/workspace/restore.py": 2,    # emptiness probe of the target; the target after SQLiteStore (guarded)
-    "hermeneia/workspace/lifecycle.py": 3,  # a new workspace after SQLiteStore (guarded); two read-only URIs
-    "hermeneia/authoring/service.py": 1,    # after SQLiteStore (guarded)
+    "hermeneia/workspace/lifecycle.py": 2,  # two read-only URIs
 }
-CLI_SITES_AFTER_RESOLVE_DB_TARGET_OR_MAIN = 13
+CLI_SITES_AFTER_RESOLVE_DB_TARGET_OR_MAIN = 0  # every CLI connection is connect_workspace() (ADR-0050)
 
 
 def test_every_writable_connection_site_is_reviewed():
