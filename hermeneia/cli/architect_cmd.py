@@ -48,7 +48,7 @@ def _parse_obs_ref(ref: str) -> int:
 
 def cmd_architect(obs_ref: str, bundle_or_db: str | None = None) -> None:
     """Appoint the Architect for the blueprint that cites OBS-N."""
-    from ..compiler.architect import compile_architect_plan
+    from ..compiler.architect import PlanLinkIntegrityError, compile_architect_plan, require_plan_obligations_linked
     from ..storage.hashing import make_blueprint_id
     from ..storage.sqlite import ensure_architect_tables
 
@@ -122,6 +122,12 @@ def cmd_architect(obs_ref: str, bundle_or_db: str | None = None) -> None:
     console.print("  Compiling deterministic plan…\n")
 
     result = compile_architect_plan(blueprint_id, conn)
+    try:
+        require_plan_obligations_linked(conn, blueprint_id, result["paragraph_rows"])
+    except PlanLinkIntegrityError as exc:
+        console.print(f"[red]✗  {exc}[/]")
+        conn.close()
+        return
 
     # Persist via raw SQL (mirrors SQLiteStore.insert_architect_plan)
     conn.execute(

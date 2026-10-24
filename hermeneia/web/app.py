@@ -899,7 +899,7 @@ def create_app(
         *,
         source: str,
     ) -> dict:
-        from ..compiler.architect import compile_architect_plan
+        from ..compiler.architect import compile_architect_plan, require_plan_obligations_linked
         from ..storage.hashing import make_blueprint_id
         from ..storage.sqlite import ensure_architect_tables
 
@@ -936,6 +936,7 @@ def create_app(
             )
 
         plan = compile_architect_plan(bp_id, conn)
+        require_plan_obligations_linked(conn, plan["plan_row"]["blueprint_id"], plan["paragraph_rows"])
         pr = plan["plan_row"]
         conn.execute(
             """INSERT OR IGNORE INTO architect_plans
@@ -1032,7 +1033,7 @@ def create_app(
         source: str,
     ) -> dict:
         """The append-only revision writes inside a caller-owned write transaction (no commit)."""
-        from ..compiler.architect import compile_architect_plan
+        from ..compiler.architect import compile_architect_plan, require_plan_obligations_linked
 
         sections = candidate["sections"]
         predecessor = conn.execute(
@@ -1060,6 +1061,7 @@ def create_app(
 
         if existing_edge is not None and existing_successor is not None:
             plan = compile_architect_plan(successor_id, conn)
+            require_plan_obligations_linked(conn, plan["plan_row"]["blueprint_id"], plan["paragraph_rows"])
             pr = plan["plan_row"]
             conn.execute(
                 """INSERT OR IGNORE INTO architect_plans
@@ -1121,6 +1123,7 @@ def create_app(
             )
 
         plan = compile_architect_plan(successor_id, conn)
+        require_plan_obligations_linked(conn, plan["plan_row"]["blueprint_id"], plan["paragraph_rows"])
         pr = plan["plan_row"]
         conn.execute(
             """INSERT OR IGNORE INTO architect_plans
@@ -6731,7 +6734,7 @@ def create_app(
             return jsonify({"error": "provider is required"}), 400
 
         from ..narrative.artist_providers import get_provider
-        from ..compiler.architect import compile_architect_plan
+        from ..compiler.architect import compile_architect_plan, require_plan_obligations_linked
         from ..storage.hashing import make_blueprint_id, make_architect_plan_id
 
         conn = _conn_rw()
@@ -6884,6 +6887,7 @@ def create_app(
 
             # ── Compile ArchitectPlan ──────────────────────────────────────
             plan = compile_architect_plan(bp_id, conn)
+            require_plan_obligations_linked(conn, plan["plan_row"]["blueprint_id"], plan["paragraph_rows"])
             pr   = plan["plan_row"]
             plan_id = pr["id"]
 
