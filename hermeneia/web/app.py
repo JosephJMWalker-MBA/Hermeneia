@@ -205,7 +205,9 @@ def create_app(
     db_path = Path(db_path)
     app = Flask(__name__, static_folder=str(STATIC_DIR))
 
-    # ADR-0048: refuse a newer workspace before any startup migration touches it.
+    # ADR-0048: refuse a newer workspace before any startup migration touches it, and again under each write lock
+    # the migration takes, in case a newer build migrates it in between.
+    from ..storage.schema_guard import GuardedInitialization as _GuardedInitialization
     from ..storage.schema_guard import require_supported_schema as _require_supported_schema
     from ..storage.sqlite import SCHEMA_VERSION as _SCHEMA_VERSION
     _require_supported_schema(db_path, _SCHEMA_VERSION)
@@ -216,7 +218,8 @@ def create_app(
         _mconn = sqlite3.connect(str(db_path))
         _mconn.row_factory = sqlite3.Row
         try:
-            _migrate(_mconn)
+            _migrate(_GuardedInitialization(_mconn, _SCHEMA_VERSION))
+            _mconn.commit()
         finally:
             _mconn.close()
 

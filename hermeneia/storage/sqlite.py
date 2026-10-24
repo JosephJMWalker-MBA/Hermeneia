@@ -16,7 +16,7 @@ from .hashing import make_semantic_hash
 
 SCHEMA_VERSION = 21  # append-only Blueprint proposal acceptance receipts (P8)
 
-from .schema_guard import check_schema_marker
+from .schema_guard import GuardedInitialization, check_schema_marker
 
 # Supersession triggers must be dropped and recreated whenever the canonical object
 # list grows. SQLite has no ALTER TRIGGER.
@@ -1259,14 +1259,20 @@ class SQLiteStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         try:
-            # ADR-0048: read the marker before any DDL, migration or write.
+            # ADR-0048: read the marker before any DDL, migration or write, and again under each write lock that
+            # initialization takes, so a newer build that migrates the workspace in between is refused first.
             check_schema_marker(self._conn, SCHEMA_VERSION)
+            self._conn.row_factory = sqlite3.Row
+            self._atomic = False
+            conn, self._conn = self._conn, GuardedInitialization(self._conn, SCHEMA_VERSION)
+            try:
+                self._apply_schema()
+                conn.commit()
+            finally:
+                self._conn = conn
         except BaseException:
             self._conn.close()
             raise
-        self._conn.row_factory = sqlite3.Row
-        self._atomic = False
-        self._apply_schema()
 
     @contextmanager
     def atomic(self):
