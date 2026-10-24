@@ -291,6 +291,39 @@ entry points and workspace-bundle export.
 - Every writable connection site must be reviewed and pinned by a regression
   tripwire; newly introduced sites must be classified before release.
 
+## Every Workspace Write Transaction Is Schema-Guarded (ADR-0050)
+
+[Ratified ADR-0050](adr/ADR-0050-every-write-transaction-rechecks-the-workspace-schema.md)
+(2026-10-24) **extends** ADR-0048 without superseding its ratified text:
+
+- Every transaction that writes a workspace, including DML and DDL, shall
+  re-read the schema marker **inside that transaction and before its first
+  write**. It shall refuse newer, ambiguous or malformed markers without
+  mutation, using an explicit governed refusal rather than an incidental
+  lock error or generic exception.
+- This applies to store and request connections, the CLI, restore, lifecycle,
+  authoring, and every other workspace writer. Migration DDL in `ensure_*`
+  helpers and the second `/api/setup/init` migration shall use the existing
+  guarded-initialization mechanism.
+- Provider calls, model generation and interactive user input shall occur
+  **outside** workspace write transactions. Read-only transactions remain
+  unaffected and need not acquire write locks.
+- Before any future schema migration, all Hermeneia processes using the
+  workspace must be stopped and a verified backup must exist. This is an
+  operational prerequisite even when the write guards are implemented.
+- Verification must establish **both** absence of mutation after a simulated
+  newer migration and an explicit, governed refusal outcome. An unrelated
+  exception, generic HTTP 500, raw lock error or unexercised seam is not a
+  passing test. Every actual DML/DDL write path must be inventoried, guarded
+  and pinned by executable tripwire tests; sampling up to eight transaction
+  seams does not itself establish exhaustive coverage.
+
+This rule is **ratified but not yet implemented/validated**. Its acceptance
+criteria do not authorize schema 22, a real-workspace migration, a release,
+writer-version fields, or a database-side write fence.
+
+---
+
 Known limits: a forged **lower** marker can still conceal incompatible newer
 content, and older deployed builds without this rule cannot be retroactively
 protected. Therefore a **verified schema-21 release implementing ADR-0048 must
