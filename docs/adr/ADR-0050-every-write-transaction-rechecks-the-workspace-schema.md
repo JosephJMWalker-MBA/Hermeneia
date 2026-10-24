@@ -1,8 +1,11 @@
 # ADR-0050: Every Write Transaction Re-checks the Workspace Schema
 
-**Status:** DRAFT. Unratified; proposed for the Primary Human Steward's review.
-**Version:** 0.1
+**Status:** RATIFIED (decisions 1–6, with explicit verification stipulations)
+**Version:** 1.0
 **Date:** 2026-10-24
+**Ratified by:** Primary Human Steward
+**Ratified proposal HEAD:** `af4d1555bbb1ca4dbff3691ef085abcb8d7736a5`
+**Implementation status:** Not implemented; no writer guard, schema-22 activation, migration or release authorized by recording this ratification.
 **Extends:** [ADR-0048](ADR-0048-newer-workspace-schemas-are-refused.md), ratified 2026-10-23. **Supersedes:** nothing.
 ADR-0048's text stays as ratified. ADRs are immutable records (`ADR_README.md`; Constitution Art. XV), so this
 extension is a separate ADR rather than an edit.
@@ -17,7 +20,7 @@ extension is a separate ADR rather than an edit.
 - CA-0001: the forensic evidence chain, which the measured races reach;
 - CA-0004: monotonic knowledge and auditable governance.
 
-**Proposed precondition for:** ADR-0046's `unverifiable` activation (schema 22), in addition to ADR-0048's release.
+**Ratified additional precondition for:** ADR-0046's `unverifiable` activation (schema 22), in addition to ADR-0048's schema-21 refusal release. This ratification does **not** itself authorize schema-22 activation.
 
 ---
 
@@ -58,7 +61,7 @@ write immutable `findings` that it can never mark `unverifiable`.
   `database is locked`.
 - One check costs about 10.6 µs.
 
-## Decision (proposed)
+## Decision (ratified, with the verification stipulations below)
 
 1. **Every write transaction re-checks.** This covers every transaction that writes a workspace, whether DML or DDL:
    - through the store;
@@ -78,9 +81,8 @@ write immutable `findings` that it can never mark `unverifiable`.
    - the `ensure_*` helpers, when they run on request or CLI connections;
    - `/api/setup/init`'s second migration.
 
-   This decision may be read as already within ADR-0048 Decision 1 ("every entry point that would initialize, migrate
-   or write ... reads its schema marker first"). The Steward may therefore ratify it separately, or ahead of
-   decisions 1 and 2.
+   This clarifies and extends ADR-0048 Decision 1's initialization/migration coverage.
+   The Primary Human Steward ratified this requirement together with decisions 1 and 2.
 4. **A migration requires a quiesced workspace.** A schema migration (schema 22 and later) runs only after two
    conditions hold:
    - every Hermeneia process using the workspace (servers, supervised runtimes, CLI commands) has stopped;
@@ -92,8 +94,37 @@ write immutable `findings` that it can never mark `unverifiable`.
      none may be removed.
    - ADR-0048's write-site tripwire extends from connection sites to their write transactions. A new writing site
      fails until it is shown to be guarded.
-6. **Storage specification.** On ratification, the ADR-0048 section of `docs/15_Storage.md` gains the
-   transaction-level rule and the quiesced-migration precondition.
+6. **Storage specification.** The ADR-0048 section of `docs/15_Storage.md` incorporates the
+   ratified transaction-level rule and the quiesced-migration precondition.
+
+## Ratification stipulations — mandatory implementation acceptance criteria (2026-10-24)
+
+The Primary Human Steward ratified decisions 1–6 in full **with two binding verification stipulations**:
+
+**V1. Governed refusal, not merely non-mutation after any error.** Every race regression must prove that a newer
+schema migration actually committed at the intended seam, that the older writer committed no DML, DDL or
+canonical record, **and** that the operation returned or raised an explicit, governed ADR-0048 refusal
+(`NewerSchemaError`, `SchemaMarkerError`, or a deliberately specified equivalent at the HTTP/CLI boundary).
+An unrelated exception, generic HTTP 500, `database is locked`, silently suppressed error, or unreached seam
+cannot count as passing the requirement. The existing witnesses currently suppress operation exceptions and
+primarily assert no mutation: they are **baseline evidence**, not sufficient final acceptance tests, until these
+outcome assertions are added. Existing passing control and append-only fixtures remain.
+
+**V2. Exhaustive write-path inventory and future-proof enforcement.** The implementation must identify **every**
+workspace DML/DDL writer (store methods including `atomic()` and `_own_transaction()`, request write connections,
+CLI writers, `ensure_*` migrations, `/api/setup/init`, restore, lifecycle, authoring and any other discovered
+paths) and demonstrate the schema re-check occurs **inside each write transaction before its first write**.
+Read-only transactions must remain non-writing and need no write lock. The regression harness samples at most
+eight transaction points in long operations, so those samples alone do not prove exhaustive coverage. Pin the
+full inventory and its guard at an executable write-site/transaction tripwire that fails on any newly introduced
+unguarded writer, and add focused tests for the uncovered categories and race interleavings. Confirm slow provider
+and interactive work remains outside write locks. Re-run focused tests and the full suite against an isolated,
+current-main baseline before merging implementation.
+
+Neither stipulation changes the substantive storage rule; both are conditions of implementation validation.
+They do **not** ratify writer-version metadata, database-side fence mechanisms, or policies for sidecar files.
+
+---
 
 ## Consequences
 
@@ -107,8 +138,10 @@ write immutable `findings` that it can never mark `unverifiable`.
 - `GuardedInitialization` guards reads as well, so request connections need a write-only variant.
 
 **What it costs:**
-- About 10.6 µs per write transaction.
-- No added lock time, under decision 2.
+- A measured schema-marker probe was about 10.6 µs in the recorded synthetic benchmark. This is
+  not a guarantee of negligible lock acquisition time or end-to-end latency.
+- Decision 2 avoids holding write locks throughout provider calls or human input;
+  actual contention and timing must be verified during implementation.
 
 **Behavior:**
 - A schema-21 build that meets a migrated workspace mid-operation fails that operation explicitly.
@@ -157,10 +190,10 @@ To be completed **only** by the Primary Human Steward.
 
 | Field | Value |
 | --- | --- |
-| Decision | |
-| Decisions ratified (1–6, in full or in part) | |
-| Ratified by | |
-| Date | |
-| Ratified proposal HEAD | |
-| Amendments at ratification | |
-| Activation boundary | |
+| Decision | **RATIFIED IN FULL, WITH VERIFICATION STIPULATIONS** |
+| Decisions ratified (1–6, in full or in part) | **1, 2, 3, 4, 5, 6 — all** |
+| Ratified by | **Primary Human Steward** |
+| Date | **2026-10-24** |
+| Ratified proposal HEAD | **`af4d1555bbb1ca4dbff3691ef085abcb8d7736a5`** |
+| Amendments at ratification | **V1 explicit governed refusal outcomes, not incidental exceptions; V2 exhaustive write-path coverage with executable tripwire, not merely sampled seams. No other scope added.** |
+| Activation boundary | **No runtime activation, schema-22 migration, real-workspace migration, release, or change to another ADR authorized here.** |
