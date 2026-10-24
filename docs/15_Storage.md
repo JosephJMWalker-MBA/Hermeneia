@@ -328,16 +328,17 @@ migration.
   seams does not itself establish exhaustive coverage.
 
 **Implementation status (2026-10-24):** implemented and verified in PR #273,
-at code head `20e1b83`. It was checked against an isolated current-`main`
+at code head `66663ae`. It was checked against an isolated current-`main`
 baseline (`6e62a4d`): clean `main` passed 3122 tests, and the integration
-tree `2841c21` passed 3204, with 0 failures. See the
+tree `b665d8d` passed 3215, with 0 failures. See the
 [verification record](verification/2026-10-24-adr0050-write-transaction-guard.md).
 
-One narrowly justified exception is recorded and pinned by tests. A
-`PRAGMA journal_mode` change outside a transaction reads the marker without
-holding the write lock, because SQLite cannot change the journal mode inside
-a transaction. WAL is the only mode Hermeneia sets, and setting it on a WAL
-workspace writes nothing.
+No exception to this rule is claimed. A `PRAGMA journal_mode` change cannot
+run inside a transaction, so a guarded connection may set only WAL:
+- it refuses every other mode before anything runs;
+- it only reads a workspace already in WAL;
+- it converts any other workspace on a connection of its own. That connection
+  holds the exclusive lock from the marker read until the mode has changed.
 
 The acceptance criteria do not authorize schema 22, a real-workspace
 migration, a release, writer-version fields, or a database-side write fence.

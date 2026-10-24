@@ -2,7 +2,8 @@
 
 **Status:** implementation on #273, branch `claude/hermeneia-adr-0048-verify-merge-138b06`:
 - commits `b6c8736` (guard) and `3ccb4e8` (tests);
-- review fixes in `20e1b83` (see [Review revisions](#review-revisions-2026-10-24-20e1b83)).
+- review fixes in `20e1b83` (see [Review revisions](#review-revisions-2026-10-24-20e1b83));
+- the journal-mode revision in `66663ae` (see [Journal-mode revision](#journal-mode-revision-2026-10-24-66663ae)).
 
 It is verified against an isolated current-`main` baseline, but **not merged**.
 
@@ -37,9 +38,16 @@ It is verified against an isolated current-`main` baseline, but **not merged**.
   - a PRAGMA that is a known setting or introspection, or that reads a stored value without setting it.
 
   Reads open no transaction and take no write lock.
-- **The one recorded exception:** a `journal_mode` change outside a transaction reads the marker without the write
-  lock, because SQLite cannot change the journal mode inside a transaction. WAL is the only mode Hermeneia sets, and
-  setting it on a WAL workspace writes nothing. Both facts are pinned by tests.
+- **Journal mode.** SQLite cannot change the journal mode inside a transaction, so this is held to the rule by a
+  lock instead:
+  - WAL is the only mode a guarded connection may set. Any other target raises `UnsupportedJournalModeError` before
+    anything runs.
+  - A workspace already in WAL is only read; the assignment is never executed.
+  - Any other workspace is converted on a connection of its own. In exclusive locking mode, its `BEGIN EXCLUSIVE`
+    lock outlives the transaction, so the marker is read under the lock and the lock is held until the mode has
+    changed.
+
+  No exception to the rule is claimed. See the interpretive point under [Limits](#limits).
 - **Refusal:** a refused transaction is rolled back, so nothing is written and no lock is held. A write in a
   transaction whose marker was never read raises `UnguardedWriteError`, so a writer cannot get around the guard.
 - **Commit behavior is unchanged:**
@@ -171,10 +179,61 @@ while the tests that pin unchanged behavior pass there too.
        every stored value unchanged.
      - PRAGMA reads and settings take no write lock.
      - A stored PRAGMA still sets a supported workspace.
-     - The journal-mode exception is pinned: on a newer WAL workspace, an unguarded `journal_mode=WAL` leaves the
-       file bytes and sidecars unchanged.
-     - `test_every_pragma_hermeneia_issues_reads_or_is_the_recorded_exception` is a tripwire over every PRAGMA in
-       `hermeneia/`'s SQL. Only `journal_mode=WAL` in the store DDL is not a read.
+     - A PRAGMA tripwire covers every PRAGMA in `hermeneia/`'s SQL.
+   - The unlocked journal-mode exception this revision introduced was itself found unsafe, and is replaced below.
+
+## Journal-mode revision (2026-10-24, `66663ae`)
+
+**The finding.** The unlocked journal-mode exception let a newer build migrate between the marker check and
+`PRAGMA journal_mode`. Both directions were reproduced on `0f1db85`:
+- a schema-21 workspace in **DELETE** mode passed the check, a second connection migrated it to schema 22, and the
+  first connection's `PRAGMA journal_mode=WAL` changed the newer database's mode and bytes;
+- a schema-21 workspace in **WAL** mode, after the same migration, was changed by `PRAGMA journal_mode=DELETE`.
+
+**The design.** It needs no exception to the ratified rule:
+- **WAL only.** A guarded connection may set only WAL. DELETE, TRUNCATE, PERSIST, MEMORY, OFF or an unknown mode
+  raises `UnsupportedJournalModeError`, and nothing runs. Hermeneia sets no other mode.
+- **WAL on WAL** only reads: the assignment is never executed, and a newer workspace is still refused.
+- **Any other workspace** is converted by `GuardedConnection._convert_to_wal` on a connection of its own:
+  1. `PRAGMA locking_mode=EXCLUSIVE`, then `BEGIN EXCLUSIVE`;
+  2. the marker read;
+  3. `COMMIT`, after which the lock is kept in exclusive locking mode;
+  4. `PRAGMA journal_mode=WAL`;
+  5. close.
+
+  From the marker read to the mode change, no other connection can commit. A connection opened before the
+  conversion takes up WAL at its next transaction.
+
+**Tests**, all in `tests/test_adr0050_write_transaction_guard.py`:
+- `test_a_newer_migration_at_any_point_of_a_wal_conversion_is_refused_or_locked_out` is the DELETE → WAL race. A
+  newer build tries to migrate at each of the conversion's 11 seams: after every marker check, and before every
+  statement on any connection to the workspace.
+  - **4 seams:** it commits while the workspace is still DELETE, and the conversion is refused with
+    `NewerSchemaError`. The marker, logical data, journal mode, file bytes and sidecars are unchanged since.
+  - **5 seams:** it is locked out (`database is locked`), and the conversion completes on schema 21.
+  - **2 seams:** it commits after the conversion has finished, and nothing is written after it.
+- `test_a_newer_migration_after_a_passed_check_leaves_a_journal_mode_change_refused` covers the WAL → DELETE race,
+  refused before anything runs, and DELETE → WAL after a caller's check, refused under the lock. Both leave all five
+  properties unchanged.
+- `test_a_store_refuses_to_convert_a_non_wal_workspace_a_newer_build_migrated_after_its_probe`.
+- `test_no_newer_build_can_migrate_while_a_workspace_is_converted_to_wal`: a migration attempted at the mode change
+  cannot commit.
+- Six non-WAL targets are refused before anything runs.
+- A supported conversion persists and is then written in WAL.
+- WAL on WAL only reads, and takes no write lock.
+
+The writer inventory and ADR-0048's tripwire count the conversion's connection. The PRAGMA tripwire names its two
+PRAGMAs.
+
+**On `0f1db85`**, 10 of these regressions fail. Both races are among them:
+- WAL → DELETE fails the passed-check test;
+- DELETE → WAL fails the every-seam test at seam 2.
+
+The E10, CTE, PRAGMA, V1 and V2 regressions are kept.
+
+**Environment.** 68 tracked files in the session's own worktree were iCloud placeholders ("dataless": the disk was
+99% full), and reading one blocked. Every test was therefore run in fresh scratch worktrees under `/private/tmp`, and
+each full suite ran behind a free-disk watchdog.
 
 ## Mutation checks
 
@@ -212,20 +271,33 @@ Each mutation was applied to one file, run against the tests that should catch i
 
 | Tree | Passed | Skipped | xfailed | Failed | Time |
 | --- | --- | --- | --- | --- | --- |
-| clean `main` `6e62a4d` (tree `97cce2e`) | 3122 | 21 | 7 | 0 | 2:47 |
-| `main` + `20e1b83` (merge `c5db042`, tree `2841c21`, identical to the branch head's tree) | **3204** | 21 | 7 | 0 | 2:56 |
+| clean `main` `6e62a4d` (tree `97cce2e`) | 3122 | 21 | 7 | 0 | 3:27 |
+| `main` + `66663ae` (merge `738c50b`, tree `b665d8d`, identical to the head's tree) | **3215** | 21 | 7 | 0 | 3:23 (4 chunks) |
 
-The 82 added tests are the 13 witnesses and the 69 guard tests. The five former strict xfails are among the
-witnesses, now passing. The focused files all pass on the branch: ADR-0048's evidence and boundaries, the witnesses,
-the guard tests, #237, #261, #267, #271, #272 and the Critic ledger, 192 tests in all.
+**How the integration run was done.** The tree was run in four sequential chunks by file: the full collected set of
+3243 tests, each chunk with its own `--basetemp` and `TMPDIR`, deleted before the next. A single run was stopped by
+the free-disk watchdog at 200 MB free, and produced no result. The clean-`main` row is a single run.
 
-Before the review fixes, `3ccb4e8` measured 3170 passed against the same baseline. The repository has no CI checks, so
-these are local runs.
+The added tests are the 13 witnesses and the 80 guard tests. The five former strict xfails are among the witnesses,
+now passing.
+
+The focused files all pass at `66663ae`: 203 tests. They are ADR-0048's evidence and boundaries, the witnesses, the
+guard tests, #237, #261, #267, #271, #272 and the Critic ledger.
+
+Earlier measurements against the same baseline: `3ccb4e8` 3170 passed, `20e1b83` 3204. The repository has no CI
+checks, so these are local runs.
 
 ## Limits
 
-- **The journal-mode exception** reads the marker without the write lock. It could matter only for a workspace not
-  already in WAL mode, and every Hermeneia workspace is WAL. The tripwire pins that WAL is the only mode set.
+- **Interpretive point for the Steward: no exception is claimed.** ADR-0050 says the marker is re-read "inside
+  that transaction and before its first write".
+  - SQLite cannot change the journal mode inside any transaction. So the conversion reads the marker inside an
+    exclusive transaction, commits it, and changes the mode under the same exclusive lock, which it keeps.
+  - The guarantee is the same: no newer build can commit between the read and the write.
+  - If decision 1 is read to require the change itself to sit inside that SQL transaction, journal-mode
+    initialization would need a governing decision. This revision does not add one.
+- **A conversion briefly blocks other connections.** Its exclusive lock blocks readers as well as writers, but only
+  while a non-WAL workspace is converted, which happens once. WAL workspaces are never converted.
 - **`executemany` of a `WITH` statement** is treated as a write without asking SQLite: the parameter sets are an
   iterator. Hermeneia has no such call.
 - **Files beside the database** (uploads, compile output) are not covered by the schema marker. ADR-0050 leaves that
