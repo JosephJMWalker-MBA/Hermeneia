@@ -291,6 +291,15 @@ entry points and workspace-bundle export.
 - Every writable connection site must be reviewed and pinned by a regression
   tripwire; newly introduced sites must be classified before release.
 
+Known limits: a forged **lower** marker can still conceal incompatible newer
+content, and older deployed builds without this rule cannot be retroactively
+protected. Therefore a **verified schema-21 release implementing ADR-0048 must
+precede any separately authorized schema-22 release or real-workspace
+migration**. ADR-0048 alone neither activates schema 22 nor authorizes
+migration.
+
+---
+
 ## Every Workspace Write Transaction Is Schema-Guarded (ADR-0050)
 
 [Ratified ADR-0050](adr/ADR-0050-every-write-transaction-rechecks-the-workspace-schema.md)
@@ -321,15 +330,6 @@ entry points and workspace-bundle export.
 This rule is **ratified but not yet implemented/validated**. Its acceptance
 criteria do not authorize schema 22, a real-workspace migration, a release,
 writer-version fields, or a database-side write fence.
-
----
-
-Known limits: a forged **lower** marker can still conceal incompatible newer
-content, and older deployed builds without this rule cannot be retroactively
-protected. Therefore a **verified schema-21 release implementing ADR-0048 must
-precede any separately authorized schema-22 release or real-workspace
-migration**. ADR-0048 alone neither activates schema 22 nor authorizes
-migration.
 
 ---
 
