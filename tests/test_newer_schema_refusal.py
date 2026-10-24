@@ -198,7 +198,8 @@ def test_a_missing_workspace_is_created_normally(tmp_path):
 # the backup destination. test_adr0050_write_transaction_guard.py pins the full writer inventory.
 REVIEWED_CONNECTION_SITES = {
     "hermeneia/storage/sqlite.py": 1,       # backup_to() copies pages into a fresh destination file
-    "hermeneia/storage/schema_guard.py": 2,  # the probe, which only reads; connect_workspace(), the guarded factory
+    "hermeneia/storage/schema_guard.py": 3,  # the probe, which only reads; connect_workspace(), the guarded factory;
+                                            # the WAL conversion, under the exclusive lock
     "hermeneia/web/app.py": 1,              # _conn (read-only URI)
     "hermeneia/workspace/export.py": 1,     # read-only URI, after the export guard
     "hermeneia/workspace/lifecycle.py": 2,  # two read-only URIs

@@ -11,7 +11,8 @@
 - Slow work (decision 2): no write lock is held while a provider generates or a person answers a prompt.
 - Review of #273: a refusal partway through an E10 request still discloses the proposals it committed (#272);
   read-only recursive CTEs take no write lock while writable ones stay guarded; no PRAGMA can change a newer
-  workspace, with the one recorded journal-mode exception pinned.
+  workspace. A journal-mode change, which SQLite cannot make inside a transaction, is held to the same guarantee by
+  the exclusive lock, and only WAL may be set.
 """
 from __future__ import annotations
 
@@ -32,7 +33,8 @@ import pytest
 import synthetic_study_lab as lab
 import test_adr0048_post_open_write_races as witnesses
 from hermeneia.storage.schema_guard import (GuardedConnection, NewerSchemaError, SchemaMarkerError,
-                                            UnguardedWriteError, connect_workspace)
+                                            UnguardedWriteError, UnsupportedJournalModeError, _keyword,
+                                            connect_workspace)
 from hermeneia.storage.sqlite import SCHEMA_VERSION, SQLiteStore
 from hermeneia.web.app import create_app
 from test_adr0048_post_open_write_races import study  # noqa: F401  (a fixture)
@@ -235,6 +237,8 @@ WRITER_INVENTORY = {
 RAW_CONNECTIONS = {
     ("hermeneia/storage/schema_guard.py", "connect_workspace"): "the guarded factory itself",
     ("hermeneia/storage/schema_guard.py", "require_supported_schema"): "ADR-0048's probe, which only reads",
+    ("hermeneia/storage/schema_guard.py", "GuardedConnection._convert_to_wal"):
+        "the WAL conversion, which reads the marker under the exclusive lock it holds until the mode has changed",
     ("hermeneia/storage/sqlite.py", "SQLiteStore.backup_to"):
         "the backup API copies pages into a fresh destination file; no SQL writes a workspace",
 }
@@ -548,7 +552,7 @@ def _stored_values(db: Path) -> tuple:
 
 MUTATING_PRAGMAS = ["user_version = 7", "user_version(7)", "main.application_id = 7", "schema_version = 999",
                     "page_size = 8192", "auto_vacuum = FULL", "incremental_vacuum", "optimize", "wal_checkpoint(TRUNCATE)",
-                    "journal_mode = DELETE", "journal_mode = WAL", "writable_schema = ON"]
+                    "journal_mode = WAL", "writable_schema = ON"]
 
 
 @pytest.mark.parametrize("pragma", MUTATING_PRAGMAS)
@@ -585,17 +589,210 @@ def test_a_stored_pragma_still_sets_a_supported_workspace(tmp_path):
     assert _stored_values(db)[0] == 7
 
 
-def test_the_journal_mode_exception_writes_nothing_to_a_newer_wal_workspace(tmp_path):
-    """The recorded exception: the journal-mode check runs without the write lock, because SQLite cannot change the
-    mode inside a transaction. A newer build that migrated in that gap finds a WAL workspace, and setting WAL on it
-    writes nothing, as an unguarded connection shows here."""
+def _journal_state(db: Path) -> tuple:
+    """After a checkpoint: the journal mode, the marker, the logical content, the file bytes, the sidecars and sizes."""
+    conn = _connect(db)
+    try:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        state = (conn.execute("PRAGMA journal_mode").fetchone()[0],
+                 [r[0] for r in conn.execute("SELECT version FROM schema_version")],
+                 "\n".join(conn.iterdump()))
+    finally:
+        conn.close()
+    return state + (db.read_bytes(), sorted((p.name, p.stat().st_size) for p in db.parent.iterdir()))
+
+
+def _in_journal_mode(db: Path, mode: str) -> Path:
+    conn = _connect(db)
+    assert conn.execute(f"PRAGMA journal_mode = {mode}").fetchone()[0] == mode.lower()
+    conn.close()
+    return db
+
+
+@pytest.mark.parametrize("start, target, refusal", [("DELETE", "WAL", NewerSchemaError),
+                                                    ("WAL", "DELETE", UnsupportedJournalModeError)])
+def test_a_newer_migration_after_a_passed_check_leaves_a_journal_mode_change_refused(tmp_path, start, target, refusal):
+    """A caller's compatibility check passes, a newer build migrates, and only then is the journal mode set.
+
+    WAL to DELETE is the reported race: it changed the newer workspace on 0f1db85 and is now refused before anything
+    runs. DELETE to WAL is refused under the conversion's lock. The DELETE-to-WAL race inside the guard's own check is
+    the every-point test below.
+    """
+    from hermeneia.storage import schema_guard
+    db = _in_journal_mode(_workspace(tmp_path), start)
+    conn = connect_workspace(db)
+    check, observed = schema_guard.check_schema_marker, []
+
+    def check_then_newer_build(c, supported):
+        version = check(c, supported)
+        if not observed:  # the check has passed; a newer build migrates before the journal mode is set
+            witnesses._migrate_as_newer_build(db, "append")
+            observed.append(_journal_state(db))
+        return version
+
+    with mock.patch.object(schema_guard, "check_schema_marker", check_then_newer_build):
+        assert check_then_newer_build(conn, SCHEMA_VERSION) == SCHEMA_VERSION
+        with pytest.raises(refusal):
+            conn.execute(f"PRAGMA journal_mode = {target}")
+    assert observed[0][:2] == (start.lower(), [SCHEMA_VERSION + 1])
+    assert _journal_state(db) == observed[0]  # marker, logical data, journal mode, bytes and sidecars
+    conn.close()
+
+
+def _convert_with_newer_migration_at(db: Path, point: int | None, outcome: dict) -> int:
+    """Set WAL on a DELETE-mode workspace through a guarded connection.
+
+    At the ``point``-th seam, a newer build tries to migrate. A seam is just after any marker check returns, or just
+    before any statement starts on any connection to the workspace. Returns how many seams there were.
+    """
+    from hermeneia.storage import schema_guard
+    seen, check, target = [0], schema_guard.check_schema_marker, db.resolve()
+
+    def attempt():
+        if seen[0] == point:
+            try:
+                witnesses._migrate_as_newer_build(db, "append")
+                outcome["migrated"] = _journal_state(db)
+            except sqlite3.OperationalError as exc:
+                outcome["locked_out"] = str(exc)
+        seen[0] += 1
+
+    def connect(database, *args, **kwargs):
+        conn = _connect(database, *args, **kwargs)
+        if Path(str(database)).resolve() == target:
+            conn.set_trace_callback(lambda _sql: attempt())
+        return conn
+
+    def checked(conn, supported):
+        version = check(conn, supported)
+        attempt()
+        return version
+
+    with mock.patch.object(sqlite3, "connect", connect), mock.patch.object(schema_guard, "check_schema_marker", checked):
+        conn = connect_workspace(db)
+        try:
+            outcome["mode"] = conn.execute("PRAGMA journal_mode = WAL").fetchone()[0]
+        except Exception as exc:  # noqa: BLE001 - the outcome is inspected
+            outcome["raised"] = exc
+        finally:
+            conn.close()
+    return seen[0]
+
+
+def test_a_newer_migration_at_any_point_of_a_wal_conversion_is_refused_or_locked_out(tmp_path):
+    """The DELETE-to-WAL race reproduced against 0f1db85. A newer build migrated just after the guard's unlocked
+    check, and the older build then changed the newer workspace's journal mode and bytes.
+
+    Now, wherever a newer build tries to migrate during a conversion, one of three things happens:
+    - it commits while the workspace is still DELETE, and the conversion is refused;
+    - it commits after the conversion has finished;
+    - it is locked out, from the marker read to the mode change, and the conversion completes on the supported
+      workspace.
+
+    In the first two cases nothing is written after it: the marker, logical data, journal mode, file bytes and sidecars
+    are unchanged since.
+    """
+    template = _in_journal_mode(_workspace(tmp_path / "template"), "DELETE").parent
+
+    def fresh(name: str) -> Path:
+        return Path(shutil.copytree(template, tmp_path / name)) / "hermeneia.db"
+
+    seams = _convert_with_newer_migration_at(fresh("dry-run"), None, {})
+    kinds = set()
+    for point in range(seams):
+        db, outcome = fresh(f"at-{point}"), {}
+        _convert_with_newer_migration_at(db, point, outcome)
+        if "migrated" in outcome:
+            assert outcome["migrated"][1] == [SCHEMA_VERSION + 1], point
+            if outcome["migrated"][0] == "delete":
+                kinds.add("refused")
+                assert isinstance(outcome.get("raised"), NewerSchemaError), (point, outcome)
+                assert _journal_state(db) == outcome["migrated"], point  # sidecars included: none in DELETE mode
+            else:
+                kinds.add("after the conversion")
+                assert outcome.get("mode") == "wal", (point, outcome)
+                # Mode, marker, logical data and bytes. Closing the last WAL connection removes its transient -wal and
+                # -shm, which is SQLite's housekeeping, not a write.
+                assert _journal_state(db)[:4] == outcome["migrated"][:4], point
+        else:
+            kinds.add("locked out")
+            assert outcome["locked_out"] == "database is locked" and outcome.get("mode") == "wal", (point, outcome)
+            assert _journal_state(db)[:2] == ("wal", [SCHEMA_VERSION]), point
+    assert {"refused", "locked out"} <= kinds, kinds
+
+
+def test_a_store_refuses_to_convert_a_non_wal_workspace_a_newer_build_migrated_after_its_probe(tmp_path):
+    db = _in_journal_mode(_workspace(tmp_path), "DELETE")
+    observed = []
+
+    class RacedOpen(SQLiteStore):
+        def _apply_schema(self):
+            witnesses._migrate_as_newer_build(db, "append")  # after the store's probe, before its journal-mode change
+            observed.append(_journal_state(db))
+            super()._apply_schema()
+
+    with pytest.raises(NewerSchemaError):
+        RacedOpen(db)
+    assert observed[0][0] == "delete" and _journal_state(db) == observed[0]
+
+
+def test_no_newer_build_can_migrate_while_a_workspace_is_converted_to_wal(tmp_path):
+    """The exclusive lock covers the marker read and the mode change: a migration attempted in between cannot commit."""
+    db = _in_journal_mode(_workspace(tmp_path), "DELETE")
+    attempts = []
+
+    def connect(database, *args, **kwargs):
+        conn = _connect(database, *args, **kwargs)
+        if kwargs.get("isolation_level", "") is None:  # the conversion's own connection
+            def trace(sql):
+                if _keyword(sql) == "PRAGMA" and "journal_mode" in sql:
+                    try:
+                        witnesses._migrate_as_newer_build(db, "append")
+                        attempts.append("committed")
+                    except sqlite3.OperationalError as exc:
+                        attempts.append(str(exc))
+            conn.set_trace_callback(trace)
+        return conn
+
+    conn = connect_workspace(db)
+    with mock.patch.object(sqlite3, "connect", connect):
+        assert conn.execute("PRAGMA journal_mode = WAL").fetchone()[0] == "wal"
+    assert attempts == ["database is locked"]
+    conn.close()
+    assert _journal_state(db)[:2] == ("wal", [SCHEMA_VERSION])
+
+
+@pytest.mark.parametrize("pragma", ["journal_mode = DELETE", "journal_mode = 'truncate'", "journal_mode(persist)",
+                                    "main.journal_mode = MEMORY", "journal_mode = OFF", "journal_mode = wal2"])
+def test_a_journal_mode_other_than_wal_is_refused_before_anything_runs(tmp_path, pragma):
     db = _workspace(tmp_path)
-    _mark(db, SCHEMA_VERSION + 1)
-    before = (db.read_bytes(), sorted(p.name for p in db.parent.iterdir()))
-    raw = _connect(db)
-    assert raw.execute("PRAGMA journal_mode = WAL").fetchone()[0] == "wal"
-    raw.close()
-    assert (db.read_bytes(), sorted(p.name for p in db.parent.iterdir())) == before
+    conn = connect_workspace(db)
+    before = _journal_state(db)
+    with pytest.raises(UnsupportedJournalModeError):
+        conn.execute(f"PRAGMA {pragma}")
+    assert _journal_state(db) == before
+    conn.close()
+
+
+def test_a_supported_non_wal_workspace_is_converted_and_written_in_wal(tmp_path):
+    db = _in_journal_mode(_workspace(tmp_path), "DELETE")
+    conn = connect_workspace(db)
+    assert conn.execute("PRAGMA journal_mode = WAL").fetchone()[0] == "wal"
+    conn.execute("INSERT INTO terms (id, term) VALUES ('l', 'l')")
+    conn.commit()
+    assert (db.parent / (db.name + "-wal")).exists()  # this connection, opened before the change, now writes in WAL
+    conn.close()
+    assert _journal_state(db)[0] == "wal" and _terms(db) == 1
+
+
+def test_setting_wal_on_a_wal_workspace_only_reads(tmp_path):
+    """A workspace already in WAL is not written: the change is only read back, and takes no write lock."""
+    db = _workspace(tmp_path)
+    conn = connect_workspace(db, timeout=0)
+    with _holding_write_lock(db):
+        assert conn.execute("PRAGMA journal_mode = WAL").fetchone()[0] == "wal"
+        assert not conn.in_transaction
+    conn.close()
 
 
 def _pragma_statements():
@@ -615,9 +812,14 @@ def _pragma_statements():
                     yield str(path.relative_to(ROOT)), re.sub(r"\s+", "", match.group(0)).replace("PRAGMA", "PRAGMA ")
 
 
-def test_every_pragma_hermeneia_issues_reads_or_is_the_recorded_exception():
+def test_every_pragma_hermeneia_issues_reads_or_is_the_guarded_wal_conversion():
     from hermeneia.storage.schema_guard import _pragma_kind
     found = set(_pragma_statements())
     assert found, "the scan found no PRAGMA statements"
     unguarded = {(path, sql) for path, sql in found if _pragma_kind(sql) != "read"}
-    assert unguarded == {("hermeneia/storage/sqlite.py", "PRAGMA journal_mode=WAL")}, unguarded
+    assert unguarded == {
+        ("hermeneia/storage/sqlite.py", "PRAGMA journal_mode=WAL"),  # the store DDL, routed to the guarded conversion
+        # The conversion itself, on its own connection under the exclusive lock (GuardedConnection._convert_to_wal).
+        ("hermeneia/storage/schema_guard.py", "PRAGMA locking_mode=EXCLUSIVE"),
+        ("hermeneia/storage/schema_guard.py", "PRAGMA journal_mode=WAL"),
+    }, unguarded

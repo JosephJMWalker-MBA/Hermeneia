@@ -29,6 +29,10 @@ class UnguardedWriteError(RuntimeError):
     """A write reached a transaction whose schema marker was never read (ADR-0050); nothing was written."""
 
 
+class UnsupportedJournalModeError(RuntimeError):
+    """A workspace's journal mode may only be set to WAL through a guarded connection (ADR-0050); nothing changed."""
+
+
 _REFUSALS: ContextVar[list | None] = ContextVar("hermeneia_schema_refusals", default=None)
 
 
@@ -105,6 +109,7 @@ _PRAGMA_NEVER_WRITE = {
 _PRAGMA_STORED = {"application_id", "auto_vacuum", "encoding", "journal_mode", "page_size", "schema_version",
                   "user_version"}
 _PRAGMA = re.compile(r"PRAGMA\s+(?:\w+\s*\.\s*)?(\w+)\s*(=|\()?", re.I)
+_JOURNAL_MODE = re.compile(r"PRAGMA\s+(?:\w+\s*\.\s*)?journal_mode\s*(?:=\s*|\(\s*)['\"]?(\w+)", re.I)
 
 
 def _keyword(sql: str) -> str:
@@ -245,9 +250,10 @@ class GuardedConnection(sqlite3.Connection):
     - Every statement that is not a read or transaction control counts as a write. Reads never take the write lock:
       a WITH statement is a read when SQLite compiles it without a write transaction, and a PRAGMA is a write unless
       it is a known setting or introspection, or reads a stored value without setting it.
-    - The one exception is a journal-mode change outside a transaction, which SQLite cannot make inside one. It reads
-      the marker first, without the write lock. Every Hermeneia workspace is in WAL mode, and WAL is the only mode
-      Hermeneia sets, so a newer build that migrated in between finds nothing written.
+    - A journal-mode change, which SQLite cannot make inside a transaction, is held to the same guarantee by a lock
+      instead. WAL is the only mode it may set, and any other is refused before anything runs. A workspace already in
+      WAL is only read. Any other workspace is converted on a connection of its own, which takes the exclusive lock,
+      reads the marker under it and holds the lock until the mode has changed.
     - A refused transaction is rolled back, so nothing is written and no lock is held. The refusal is ADR-0048's own
       error.
     - A write in a transaction whose marker was never read raises UnguardedWriteError, so no writer reaches the
@@ -292,8 +298,8 @@ class GuardedConnection(sqlite3.Connection):
         writes = kind == "write"
         if not self.in_transaction:
             self._marker_read = False
-            if kind == "journal_mode":  # the exception above: no transaction can hold the lock for it
-                check_schema_marker(self, _supported())
+        if kind == "journal_mode":
+            return self._journal_mode(cursor, run, sql, parameters)
         opened = False
         try:
             if writes and not self.in_transaction:
@@ -332,11 +338,49 @@ class GuardedConnection(sqlite3.Connection):
             raise
         self._marker_read = True
 
+    def _journal_mode(self, cursor, run, sql, parameters):
+        target = _JOURNAL_MODE.match(sql[_LEADING_COMMENTS.match(sql).end():])
+        if target is None or target.group(1).lower() != "wal":
+            raise UnsupportedJournalModeError(f"{sql.strip()!r} would set a journal mode other than WAL, the only "
+                                              "mode a workspace may be set to. Nothing was changed.")
+        path = self._main_path()
+        if self.in_transaction or not path:
+            # SQLite refuses a mode change inside a transaction, and a database with no file is no workspace.
+            return run(cursor, sql, parameters)
+        if sqlite3.Cursor(self).execute("PRAGMA journal_mode").fetchone()[0] == "wal":
+            check_schema_marker(self, _supported())  # nothing is written, but a newer workspace is still refused
+        else:
+            self._convert_to_wal(path)
+        sqlite3.Cursor(self).execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchall()  # take up the new mode
+        return sqlite3.Cursor.execute(cursor, "PRAGMA journal_mode")
+
+    @staticmethod
+    def _convert_to_wal(path: str) -> None:
+        """Change a workspace to WAL with no gap a newer build could migrate in.
+
+        In exclusive locking mode the lock that BEGIN EXCLUSIVE takes outlives its transaction, so it covers both the
+        marker read and the mode change. Closing the connection releases it.
+        """
+        lock = sqlite3.connect(path, isolation_level=None)
+        try:
+            lock.execute("PRAGMA locking_mode = EXCLUSIVE")
+            lock.execute("BEGIN EXCLUSIVE")
+            check_schema_marker(lock, _supported())
+            lock.execute("COMMIT")
+            mode = lock.execute("PRAGMA journal_mode = WAL").fetchone()[0]
+        finally:
+            lock.close()
+        if mode != "wal":
+            raise sqlite3.OperationalError(f"the workspace stayed in journal mode {mode!r}")
+
+    def _main_path(self) -> str:
+        return next((row[2] for row in sqlite3.Cursor(self).execute("PRAGMA database_list") if row[1] == "main"), "")
+
     def _refusal_behind(self, exc: sqlite3.OperationalError) -> SchemaMarkerError | None:
         """A lock error on a write is a refusal when a newer build has since migrated the workspace."""
         if getattr(exc, "sqlite_errorcode", 0) & 0xFF != sqlite3.SQLITE_BUSY:
             return None
-        path = next((row[2] for row in sqlite3.Cursor(self).execute("PRAGMA database_list") if row[1] == "main"), "")
+        path = self._main_path()
         if not path:
             return None
         try:
