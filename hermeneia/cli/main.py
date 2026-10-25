@@ -47,7 +47,7 @@ from hermeneia.cli.workspace_cmd import (
 from hermeneia.workspace import WorkspaceLifecycleError
 
 
-def main() -> None:
+def _main() -> None:
     parser = argparse.ArgumentParser(prog="herm", description="Hermeneia inspection CLI")
     parser.add_argument("--db", default=None, help="Path to hermeneia.db")
 
@@ -412,6 +412,22 @@ def main() -> None:
             cmd_interpret_create(obs_args[1], bundle_or_db=db)
         else:
             cmd_interpret_view(obs_args[0], bundle_or_db=db)
+
+
+def main() -> None:
+    """Run one command. A workspace-schema refusal raised anywhere in it, even one a command caught, ends the command
+    as the governed CLI refusal: DatabaseTargetError carrying ADR-0048's message (ADR-0050)."""
+    from hermeneia.cli.target import DatabaseTargetError
+    from hermeneia.storage.schema_guard import SchemaMarkerError, recording_refusals
+    with recording_refusals() as refusals:
+        try:
+            _main()
+        except BaseException as exc:
+            if not refusals and not isinstance(exc, SchemaMarkerError):
+                raise
+            raise DatabaseTargetError(str(refusals[0] if refusals else exc)) from exc
+    if refusals:
+        raise DatabaseTargetError(str(refusals[0]))
 
 
 if __name__ == "__main__":

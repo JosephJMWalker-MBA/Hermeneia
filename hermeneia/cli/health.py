@@ -16,6 +16,7 @@ Uncovered observations are raw material waiting for interpretation.
 """
 from __future__ import annotations
 
+from ..storage.schema_guard import connect_workspace
 from .target import resolve_db_target
 
 import json
@@ -38,7 +39,7 @@ console = Console()
 def _open_db(db_path: Path) -> sqlite3.Connection | None:
     if not db_path.exists():
         return None
-    conn = sqlite3.connect(str(db_path))
+    conn = connect_workspace(str(db_path))
     conn.row_factory = sqlite3.Row
     return conn
 
