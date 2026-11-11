@@ -46,6 +46,19 @@
         writing.addEventListener('paste', safePaste);
         writing.addEventListener('keyup', inspect);
         writing.addEventListener('mouseup', inspect);
+        writing.addEventListener('keydown', event => {
+          // Focus mode hides the toolbar; Esc must always provide a way out.
+          if (event.key === 'Escape' && document.body.classList.contains('writer-focus')) {
+            document.body.classList.remove('writer-focus');
+            $('writer-focus').setAttribute('aria-pressed', 'false');
+            event.preventDefault();
+          }
+          // Browsers deliver keystrokes to the iframe, not the parent page.
+          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+            event.preventDefault();
+            save();
+          }
+        });
         resolve();
       }, {once:true});
       frame.srcdoc = src;
