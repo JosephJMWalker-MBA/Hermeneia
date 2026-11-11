@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from hermeneia.workspace import WorkspaceLifecycleError, resolve_serve_db
+from hermeneia.workspace.startup import select_initial_workspace
 from hermeneia.web.app import create_app
 
 if __name__ == "__main__":
@@ -23,10 +24,16 @@ if __name__ == "__main__":
         help="Named workspace to launch (slug, name, id, or Gatsby)",
     )
     parser.add_argument("--port", type=int, default=5173)
-    parser.add_argument(
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument(
         "--supervised",
         action="store_true",
-        help="Run a stable public supervisor that hands off between workspace child runtimes",
+        help="Use the normal, workspace-switching runtime (default)",
+    )
+    modes.add_argument(
+        "--direct",
+        action="store_true",
+        help="Advanced troubleshooting: pin one workspace; switching unavailable",
     )
     args = parser.parse_args()
 
@@ -35,7 +42,15 @@ if __name__ == "__main__":
     except WorkspaceLifecycleError as exc:
         parser.error(str(exc))
 
-    if args.supervised:
+    # Normal launches must be able to switch workspaces without a special flag.
+    # Respect explicitly named workspaces and database paths.
+    initial_selector = args.workspace
+    if not args.db and not args.workspace and not args.direct:
+        initial = select_initial_workspace()
+        db_path = initial.db_path
+        initial_selector = initial.slug
+
+    if not args.direct:
         from hermeneia.web.supervisor import (
             WorkspaceRuntimeSupervisor,
             create_supervisor_app,
@@ -45,7 +60,7 @@ if __name__ == "__main__":
         supervisor = WorkspaceRuntimeSupervisor(
             initial_target=runtime_target_from_serve_args(
                 db_path=db_path,
-                workspace_selector=args.workspace,
+                workspace_selector=initial_selector,
             )
         )
         try:
