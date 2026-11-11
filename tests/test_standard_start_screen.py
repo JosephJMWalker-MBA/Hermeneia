@@ -89,7 +89,9 @@ def test_start_surface_and_launcher_contracts():
     assert "new Function" not in script
     assert "/api/workspaces/" in script
     assert "authorJournalOpen" in script
-    assert "Blank manuscript editing and KDP setup are still in development." in html
+    assert "Write &amp; edit" in html
+    assert "Formal editions follow later." in html
+    assert 'value="journal"' in html
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node.js is not installed")
