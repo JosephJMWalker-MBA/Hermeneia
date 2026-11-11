@@ -45,6 +45,7 @@ from hermeneia.cli.workspace_cmd import (
     resolve_cli_serve_db,
 )
 from hermeneia.workspace import WorkspaceLifecycleError
+from hermeneia.workspace.startup import select_initial_workspace
 
 
 def _main() -> None:
@@ -63,10 +64,16 @@ def _main() -> None:
         help="Named workspace to launch (slug, name, id, or Gatsby)",
     )
     p_serve.add_argument("--port", type=int, default=5173)
-    p_serve.add_argument(
+    runtime_modes = p_serve.add_mutually_exclusive_group()
+    runtime_modes.add_argument(
         "--supervised",
         action="store_true",
-        help="Run a stable public supervisor that hands off between workspace child runtimes",
+        help="Use normal workspace-switching runtime (default)",
+    )
+    runtime_modes.add_argument(
+        "--direct",
+        action="store_true",
+        help="Advanced: pin a single workspace and disable switching",
     )
 
     p_workspace = sub.add_parser("workspace", help="List, create, and inspect runtime workspaces")
@@ -249,7 +256,12 @@ def _main() -> None:
         except WorkspaceLifecycleError as exc:
             print(str(exc))
             sys.exit(2)
-        if args.supervised:
+        initial_selector = args.workspace
+        if not args.db and not args.serve_db and not args.workspace and not args.direct:
+            initial = select_initial_workspace()
+            serve_db = initial.db_path
+            initial_selector = initial.slug
+        if not args.direct:
             from hermeneia.web.supervisor import (
                 WorkspaceRuntimeSupervisor,
                 create_supervisor_app,
@@ -259,7 +271,7 @@ def _main() -> None:
             supervisor = WorkspaceRuntimeSupervisor(
                 initial_target=runtime_target_from_serve_args(
                     db_path=serve_db,
-                    workspace_selector=args.workspace,
+                    workspace_selector=initial_selector,
                 )
             )
             try:
