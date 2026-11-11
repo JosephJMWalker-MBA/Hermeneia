@@ -75,10 +75,11 @@
       const title = document.createElement('strong');
       title.textContent = ws.name || name;
       const detail = document.createElement('small');
-      const docs = Number(ws.document_count || 0);
+      const hasCount = Number.isInteger(ws.document_count);
+      const docs = hasCount ? ws.document_count : 0;
       detail.textContent =
         (isSame(ws, state.current) ? 'Open now · ' : '') +
-        (docs ? docs + ' document' + (docs === 1 ? '' : 's') : 'Empty workspace');
+        (hasCount ? (docs ? docs + ' document' + (docs === 1 ? '' : 's') : 'No documents yet') : 'Existing workspace');
       copy.append(title, detail);
       label.append(input, copy);
       host.appendChild(label);
