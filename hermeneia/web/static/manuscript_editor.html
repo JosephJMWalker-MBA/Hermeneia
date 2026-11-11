@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Write · Hermeneia</title>
+<link rel="stylesheet" href="/static/manuscript_editor.css">
+<script src="/static/manuscript_editor.js" defer></script>
+</head>
+<body>
+<header class="writer-topbar">
+  <div class="writer-brand">
+    <a href="/" class="writer-home" title="Back to Hermeneia workspace chooser">HERMENEIA</a>
+    <span class="writer-divider" aria-hidden="true"></span>
+    <span class="writer-lane">Write</span>
+  </div>
+  <div class="writer-name">
+    <label class="sr-only" for="writer-title">Document title</label>
+    <input type="text" id="writer-title" maxlength="200" placeholder="Untitled manuscript" autocomplete="off" spellcheck="false">
+    <span id="writer-workspace" class="writer-workspace">Loading workspace…</span>
+  </div>
+  <div class="writer-actions">
+    <span id="writer-save-status" role="status" aria-live="polite">Loading…</span>
+    <button type="button" id="writer-save" class="writer-primary">Save version</button>
+    <a href="/" class="writer-back" title="Choose a different workspace">Workspaces</a>
+  </div>
+</header>
+
+<nav class="writer-toolbar" aria-label="Manuscript formatting">
+  <div class="writer-toolgroup">
+    <button type="button" data-command="undo" title="Undo (Cmd/Ctrl+Z)" aria-label="Undo">↶</button>
+    <button type="button" data-command="redo" title="Redo (Cmd/Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+  </div>
+  <div class="writer-toolgroup">
+    <label for="writer-block" class="sr-only">Paragraph style</label>
+    <select id="writer-block" aria-label="Paragraph style">
+      <option value="p">Normal text</option>
+      <option value="h1">Heading 1</option>
+      <option value="h2">Heading 2</option>
+      <option value="h3">Heading 3</option>
+      <option value="blockquote">Quote</option>
+    </select>
+  </div>
+  <div class="writer-toolgroup">
+    <button type="button" data-command="bold" title="Bold (Cmd/Ctrl+B)" aria-label="Bold"><strong>B</strong></button>
+    <button type="button" data-command="italic" title="Italic (Cmd/Ctrl+I)" aria-label="Italic"><em>I</em></button>
+    <button type="button" data-command="underline" title="Underline (Cmd/Ctrl+U)" aria-label="Underline"><u>U</u></button>
+    <button type="button" data-command="strikeThrough" title="Strikethrough" aria-label="Strikethrough"><s>S</s></button>
+  </div>
+  <div class="writer-toolgroup">
+    <button type="button" data-command="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list">• List</button>
+    <button type="button" data-command="insertOrderedList" title="Numbered list" aria-label="Numbered list">1. List</button>
+    <button type="button" id="writer-link" title="Add a link" aria-label="Insert link">Link</button>
+  </div>
+  <div class="writer-toolgroup writer-toolgroup-end">
+    <button type="button" id="writer-focus" aria-pressed="false">Focus</button>
+    <button type="button" id="writer-styles-toggle" aria-expanded="false" aria-controls="writer-styles">Document CSS</button>
+    <button type="button" id="writer-import">Import .md/.txt</button>
+    <input type="file" id="writer-file" accept=".md,.markdown,.txt,text/plain,text/markdown" hidden>
+    <button type="button" id="writer-export">Export HTML</button>
+  </div>
+</nav>
+
+<div class="writer-main">
+  <aside class="writer-sidebar" id="writer-sidebar" aria-label="Document navigation">
+    <section>
+      <h2>Outline</h2>
+      <div id="writer-outline"><p class="writer-muted">Add a heading to build an outline.</p></div>
+    </section>
+    <section class="writer-history-section">
+      <h2>Saved versions</h2>
+      <div id="writer-history"><p class="writer-muted">No saved revisions yet.</p></div>
+      <p class="writer-hint">Selecting an earlier version previews it without rewriting history. Save again to create a new version.</p>
+    </section>
+  </aside>
+
+  <main class="writer-stage" aria-label="Manuscript">
+    <div id="writer-warning" role="alert" hidden></div>
+    <div class="writer-stage-topline"><span>Working manuscript · not an approved edition</span><span id="writer-count">0 words</span></div>
+    <div class="writer-sheet-wrap">
+      <!-- User document styles are restricted to the sandboxed, script-disabled
+           writing canvas, never the Hermeneia navigation or Reader. -->
+      <iframe id="writer-frame" title="Editable manuscript" sandbox="allow-same-origin" spellcheck="true"></iframe>
+    </div>
+    <div class="writer-stage-footer">Write naturally. Format text from the toolbar. Saved versions are immutable snapshots in this workspace.</div>
+  </main>
+
+  <aside id="writer-styles" class="writer-styles" hidden aria-label="Document CSS">
+    <div class="writer-styles-head">
+      <h2>Document CSS</h2>
+      <button type="button" id="writer-styles-close" aria-label="Close CSS panel">×</button>
+    </div>
+    <p>Paste your CSS here. It styles only the manuscript canvas. The Reader and controls keep their own design.</p>
+    <label for="writer-css" class="sr-only">Custom document stylesheet</label>
+    <textarea id="writer-css" spellcheck="false" placeholder="/* Example */\nh1 { color: #5fcfd4; }\np { line-height: 1.8; }"></textarea>
+    <p class="writer-hint">Your CSS is saved with each draft revision. External resources and scripts are blocked in the canvas.</p>
+    <button type="button" id="writer-reset-css">Use default document styling</button>
+  </aside>
+</div>
+</body>
+</html>
