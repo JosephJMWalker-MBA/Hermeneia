@@ -1,0 +1,55 @@
+
+/* Entry screen: a readable workspace-and-mode chooser, independent of Reader chrome. */
+#herm-start-screen[hidden] { display: none !important; }
+#herm-start-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  background: var(--bg, #0a0a0a);
+  color: var(--fg, #e2e2e2);
+  overflow-y: auto;
+  padding: clamp(18px, 5vw, 60px) 16px;
+  font-family: var(--sans, system-ui, sans-serif);
+}
+.herm-start-inner { width: min(760px, 100%); margin: 0 auto; }
+.herm-start-identity { color: var(--accent, #5fcfd4); font-size: 12px; letter-spacing: .13em; font-weight: 650; text-transform: uppercase; }
+.herm-start-head { font-size: clamp(29px, 5vw, 43px); font-weight: 650; line-height: 1.12; margin: 12px 0; }
+.herm-start-sub { font-size: 15px; color: var(--fg2, #aaa); line-height: 1.6; margin: 0 0 26px; }
+.herm-start-section { border-top: 1px solid var(--border2, #282828); padding-top: 20px; margin-top: 22px; }
+.herm-start-label { display: block; font-size: 13px; font-weight: 650; margin: 0 0 12px; }
+.herm-start-choice-group { display: grid; gap: 9px; }
+.herm-start-choice {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface, #151515);
+  border: 1px solid var(--border2, #333);
+  border-radius: 10px;
+  padding: 15px;
+  cursor: pointer;
+  line-height: 1.45;
+}
+.herm-start-choice:has(input:checked) { border-color: var(--accent, #5fcfd4); box-shadow: inset 0 0 0 1px var(--accent, #5fcfd4); }
+.herm-start-choice input { accent-color: var(--accent, #5fcfd4); flex: 0 0 auto; }
+.herm-start-choice strong { display:block; font-size: 15px; font-weight: 650; }
+.herm-start-choice small { display:block; font-size: 12px; color: var(--fg2, #aaa); margin-top: 3px; }
+.herm-start-create { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.herm-start-create input {
+  flex: 1; min-width: 180px; background: var(--surface, #151515);
+  border: 1px solid var(--border2, #333); border-radius: 8px;
+  padding: 12px; color: var(--fg, #e2e2e2); font: inherit; font-size: 14px;
+}
+.herm-start-action {
+  background: var(--accent, #5fcfd4);
+  color: #081617;
+  border: 0; border-radius: 8px; padding: 13px 19px;
+  font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.herm-start-action.secondary { background: var(--surface2, #222); color: var(--fg, #e2e2e2); border: 1px solid var(--border2, #333); }
+.herm-start-action:disabled { opacity: .5; cursor: wait; }
+.herm-start-submit { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:24px; }
+#herm-start-status { font-size: 13px; line-height: 1.5; min-height: 18px; color: var(--fg2, #aaa); }
+#herm-start-status[data-error="true"] { color: var(--red, #d45f5f); }
+.herm-start-empty { font-size: 13px; color: var(--fg2, #aaa); padding: 10px 0; }
+#herm-start-screen :focus-visible { outline: 2px solid var(--accent, #5fcfd4); outline-offset: 3px; }
+@media (min-width: 660px) {
+  .herm-start-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
