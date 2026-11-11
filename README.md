@@ -185,10 +185,18 @@ herm serve
 
 Open **http://localhost:5173**. The standard launch uses a workspace-switching
 runtime and opens a **start screen**: select an existing workspace or create one,
-then choose **Read & investigate** or **Write & reflect**. You do not need
-Terminal commands to change workspaces. The second mode currently opens the
-append-only Author Journal; source-free manuscript editing and KDP setup remain
-future work tracked in [#274](https://github.com/JosephJMWalker-MBA/Hermeneia/issues/274).
+then choose **Read & investigate**, **Write & edit**, or **Reflect & journal**.
+You do not need terminal commands to change workspaces.
+
+**Write & edit** opens the dedicated working manuscript editor at /editor,
+with in-place text editing, common formatting, Markdown/plain-text import,
+custom document CSS, working revision snapshots, and HTML export.
+**Reflect & journal** opens the immutable workspace Author Journal.
+These are separate from Compositor's approved editorial edition and final proof.
+See [the manuscript-editor pilot](docs/integrations/working-manuscript-editor-pilot.md)
+for backup, portability, and test limitations. True Compositor-authored
+publication roots and optional KDP setup remain tracked in
+[#274](https://github.com/JosephJMWalker-MBA/Hermeneia/issues/274).
 
 If this is a new installation without a legacy Gatsby database or any named
 workspaces, the launcher prepares one empty **Starter Workspace** so the UI can
