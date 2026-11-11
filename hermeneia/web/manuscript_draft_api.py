@@ -300,7 +300,7 @@ def register_manuscript_draft_routes(app: Flask, db_path: Path) -> None:
         else:
             converted = "".join(
                 f"<p>{html.escape(paragraph)}</p>"
-                for paragraph in re.split(r"\\n\\s*\\n", content)
+                for paragraph in re.split(r"\n\s*\n", content)
                 if paragraph.strip()
             )
         return jsonify({"html": _sanitize_markup(converted)})
