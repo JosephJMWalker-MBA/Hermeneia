@@ -49,10 +49,6 @@
     return a.kind === b.kind && selector(a) === selector(b);
   }
 
-  function selectedWorkspace() {
-    return state.workspaces.find((ws) => selector(ws) === state.selected) || null;
-  }
-
   function renderWorkspaces() {
     const host = el('herm-start-workspaces');
     if (!host) return;
@@ -147,8 +143,9 @@
         if (!state.canSwitch) throw new Error('Switching is disabled in this server session. Relaunch Hermeneia using its standard launcher.');
         // Reuse the existing authored-draft scope guard, so switching from the
         // start screen cannot silently carry a draft into another workspace.
-        if (typeof window._runtimeFlushActiveDraftsForScope === 'function') {
-          window._runtimeFlushActiveDraftsForScope(window._runtimeDraftWorkspaceScope);
+        if (typeof _runtimeFlushActiveDraftsForScope === 'function' &&
+            typeof _runtimeDraftWorkspaceScope !== 'undefined') {
+          _runtimeFlushActiveDraftsForScope(_runtimeDraftWorkspaceScope);
         }
         if (typeof window._wsCurrentDraftLabels === 'function' &&
             typeof window._wsConfirmOpenWithDrafts === 'function' &&
@@ -170,9 +167,10 @@
       }
       launchMode(selectedMode);
     } catch (error) {
-      notice(error.message || String(error), true);
-      // If a switch succeeded but confirmation failed, refresh backend truth.
+      // If a switch succeeded but confirmation failed, refresh backend truth
+      // without obscuring the actionable failure message.
       await refresh().catch(() => {});
+      notice(error.message || String(error), true);
     } finally {
       busy(false);
     }
@@ -189,6 +187,10 @@
     if (!name) {
       notice('Enter a name for the new workspace.', true);
       el('herm-start-name')?.focus();
+      return;
+    }
+    if (!state.canSwitch) {
+      notice('This server session cannot open a newly created workspace. Relaunch with the standard Hermeneia launcher.', true);
       return;
     }
     busy(true);
