@@ -222,12 +222,15 @@ def _save(db_path: Path, body: dict) -> tuple[dict, int]:
 
 
 def _html_export(title: str, markup: str, css: str) -> str:
-    # style payload is data, not an executable script. Escape closing tag.
-    safe_css = re.sub(r"</style", r"<\\/style", css, flags=re.I)
+    # Embed both the default manuscript stylesheet and author CSS. The exported
+    # article retains the canvas ID so selectors behave the same outside Hermeneia.
+    stylesheet = Path(__file__).parent / "static" / "manuscript_canvas.css"
+    base_css = stylesheet.read_text(encoding="utf-8")
+    safe_css = re.sub(r"</style", r"<\\/style", base_css + "\n" + css, flags=re.I)
     return (
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
         f"<title>{html.escape(title)}</title><style>{safe_css}</style></head>"
-        f"<body><article>{markup}</article></body></html>"
+        f"<body><article id=\"writer-document\">{markup}</article></body></html>"
     )
 
 
