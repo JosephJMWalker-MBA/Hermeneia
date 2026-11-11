@@ -3126,8 +3126,12 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
           <span><strong>Read &amp; investigate</strong><small>Open the Reader, explore documents, and preserve findings.</small></span>
         </label>
         <label class="herm-start-choice">
+          <input type="radio" name="herm-start-mode" value="write" />
+          <span><strong>Write &amp; edit</strong><small>Open a real editable working manuscript, style it with your CSS, and save versions. Formal editions follow later.</small></span>
+        </label>
+        <label class="herm-start-choice">
           <input type="radio" name="herm-start-mode" value="journal" />
-          <span><strong>Write &amp; reflect</strong><small>Open the Author Journal now. Blank manuscript editing and KDP setup are still in development.</small></span>
+          <span><strong>Reflect &amp; journal</strong><small>Capture questions and thoughts without changing manuscript text.</small></span>
         </label>
       </div>
     </fieldset>
@@ -3141,7 +3145,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
 
 <nav class="nav">
   <span class="nav-brand" onclick="e10Go('onboarding')" style="cursor:pointer">Hermeneia</span>
-  <button type="button" id="herm-start-nav" class="nav-step" onclick="hermStartOpen()" title="Choose a workspace and working mode" style="display:inline-block;white-space:nowrap">Start / Switch</button>
+  <button type="button" id="herm-start-nav" onclick="hermStartOpen()" title="Choose a workspace and working mode" style="background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--fg2);font:600 12px var(--sans);padding:8px 12px;cursor:pointer;white-space:nowrap">Start / Switch</button>
   <div class="nav-workspace-chip" id="runtime-workspace-chip" title="Current workspace reported by the running backend" hidden>
     <span class="nav-workspace-prefix">Workspace</span>
     <span id="runtime-workspace-name"></span>
