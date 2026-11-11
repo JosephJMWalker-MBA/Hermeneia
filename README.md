@@ -183,12 +183,29 @@ pip install -e .
 herm serve
 ```
 
-Create and launch an isolated workspace:
+Open **http://localhost:5173**. The standard launch uses a workspace-switching
+runtime and opens a **start screen**: select an existing workspace or create one,
+then choose **Read & investigate** or **Write & reflect**. You do not need
+Terminal commands to change workspaces. The second mode currently opens the
+append-only Author Journal; source-free manuscript editing and KDP setup remain
+future work tracked in [#274](https://github.com/JosephJMWalker-MBA/Hermeneia/issues/274).
+
+If this is a new installation without a legacy Gatsby database or any named
+workspaces, the launcher prepares one empty **Starter Workspace** so the UI can
+serve immediately. If you already have a workspace it is chosen for the initial
+runtime without creating another. This does not import a manuscript.
+
+For explicit launch selection or advanced troubleshooting:
 
 ```bash
-herm workspace create "The Second Sale"
-herm serve --workspace "The Second Sale"
+herm serve --workspace "The Second Sale"  # optional initial workspace
+herm serve --direct                       # advanced, disables workspace switching
 ```
+
+The equivalent `python scripts/herm_server.py` entrypoint has the same default
+and `--direct` escape hatch. Updating an already-running server requires a restart.
+Use `--direct` only if you deliberately need to pin a specific workspace; it is
+not the normal end-user path.
 
 Inspect current pipeline/runtime health:
 
