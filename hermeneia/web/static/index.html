@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hermeneia</title>
+<link rel="stylesheet" href="/static/start_screen.css">
 <style>
 :root {
   --bg:       #0a0a0a;
@@ -3100,8 +3101,51 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
 </head>
 <body>
 
+<!-- The ordinary entry experience is workspace-first; Reader loads behind it. -->
+<div id="herm-start-screen" role="dialog" aria-modal="true" aria-labelledby="herm-start-title">
+  <div class="herm-start-inner">
+    <p class="herm-start-identity">Hermeneia</p>
+    <h1 class="herm-start-head" id="herm-start-title">Where would you like to begin?</h1>
+    <p class="herm-start-sub">Choose the work you want to enter, then how you want to work. No terminal commands or imported manuscript required to start taking notes.</p>
+    <section class="herm-start-section" aria-labelledby="herm-start-workspace-label">
+      <h2 class="herm-start-label" id="herm-start-workspace-label">1. Your workspace</h2>
+      <div class="herm-start-choice-group" id="herm-start-workspaces" role="radiogroup" aria-labelledby="herm-start-workspace-label">
+        <p class="herm-start-empty">Loading workspaces…</p>
+      </div>
+      <form id="herm-start-create-form" class="herm-start-create">
+        <label for="herm-start-name" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)">New workspace name</label>
+        <input id="herm-start-name" type="text" maxlength="120" autocomplete="off" placeholder="Name a new workspace" />
+        <button type="submit" id="herm-start-create" class="herm-start-action secondary">Create &amp; open</button>
+      </form>
+    </section>
+    <fieldset class="herm-start-section" style="border-left:0;border-right:0;border-bottom:0" aria-label="Working mode">
+      <legend class="herm-start-label" style="padding:0">2. What would you like to do?</legend>
+      <div class="herm-start-choice-group herm-start-modes">
+        <label class="herm-start-choice">
+          <input type="radio" name="herm-start-mode" value="read" checked />
+          <span><strong>Read &amp; investigate</strong><small>Open the Reader, explore documents, and preserve findings.</small></span>
+        </label>
+        <label class="herm-start-choice">
+          <input type="radio" name="herm-start-mode" value="write" />
+          <span><strong>Write &amp; edit</strong><small>Open a real editable working manuscript, style it with your CSS, and save versions. Formal editions follow later.</small></span>
+        </label>
+        <label class="herm-start-choice">
+          <input type="radio" name="herm-start-mode" value="journal" />
+          <span><strong>Reflect &amp; journal</strong><small>Capture questions and thoughts without changing manuscript text.</small></span>
+        </label>
+      </div>
+    </fieldset>
+    <div class="herm-start-submit">
+      <p id="herm-start-status" role="status" aria-live="polite">Loading…</p>
+      <button type="button" id="herm-start-continue" class="herm-start-action">Continue</button>
+    </div>
+  </div>
+</div>
+
+
 <nav class="nav">
   <span class="nav-brand" onclick="e10Go('onboarding')" style="cursor:pointer">Hermeneia</span>
+  <button type="button" id="herm-start-nav" onclick="hermStartOpen()" title="Choose a workspace and working mode" style="background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--fg2);font:600 12px var(--sans);padding:8px 12px;cursor:pointer;white-space:nowrap">Start / Switch</button>
   <div class="nav-workspace-chip" id="runtime-workspace-chip" title="Current workspace reported by the running backend" hidden>
     <span class="nav-workspace-prefix">Workspace</span>
     <span id="runtime-workspace-name"></span>
@@ -3127,6 +3171,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
   </div>
   <div class="nav-right">
     <button class="reader-home-btn" id="reader-home-btn" onclick="e10Go('reader')" title="Return to the book">Read</button>
+    <a href="/editor" id="reader-write-btn" class="reader-home-btn" title="Open the working manuscript editor" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-color:var(--border2);background:transparent;color:var(--fg2)">Write</a>
     <button class="nav-btn" id="workspace-menu-btn" onclick="toggleWorkspaceMenu()" aria-expanded="false" aria-controls="workspace-drawer" style="font-size:13px" title="Pipeline tools that support the reading">Workspace ▾</button>
     <button class="nav-btn" onclick="e10Go('guide')" style="font-size:13px">Guide</button>
     <button class="nav-btn" onclick="e10Go('constitution')" style="font-size:13px">Constitution</button>
@@ -3153,6 +3198,7 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
   <button class="workspace-drawer-item" role="menuitem" onclick="_wsGo('critic')"><span class="workspace-drawer-name">Critic</span><span class="workspace-drawer-desc">audit fidelity</span></button>
   <button class="workspace-drawer-item" role="menuitem" onclick="_wsGo('lineage')"><span class="workspace-drawer-name">Lineage</span><span class="workspace-drawer-desc">trace claims back to evidence</span></button>
   <button class="workspace-drawer-item" role="menuitem" onclick="_wsCloseMenu();obOpenUploadArea()"><span class="workspace-drawer-name">Add document</span><span class="workspace-drawer-desc">upload a PDF to this workspace</span></button>
+  <button class="workspace-drawer-item" role="menuitem" onclick="authorJournalOpen()"><span class="workspace-drawer-name">✎ Author Journal</span><span class="workspace-drawer-desc">record ideas before or during writing; saved as Field Notes</span></button>
   <button class="workspace-drawer-item workspace-drawer-export" role="menuitem" onclick="exportWorkspace()"><span class="workspace-drawer-name">⬇ Export workspace</span><span class="workspace-drawer-desc">download a .zip bundle of your workspace; some record types are not included yet</span></button>
   <button class="workspace-drawer-item workspace-drawer-export" role="menuitem" onclick="importWorkspace()"><span class="workspace-drawer-name">⬆ Import workspace</span><span class="workspace-drawer-desc">preview and restore a .zip bundle into a fresh workspace</span></button>
   <div class="workspace-catalog" id="workspace-catalog" aria-label="Known workspaces">
@@ -3172,6 +3218,39 @@ body.a11y-text-lg .obs-raw-text { font-size: 19px !important; line-height: 1.85 
     </div>
   </div>
 </div>
+<!-- Workspace Author Journal. Reuses the constitutional Investigation Log, not manuscript storage. -->
+<div id="author-journal-overlay" hidden
+     style="position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.85);overflow-y:auto;padding:24px">
+  <section role="dialog" aria-modal="true" aria-labelledby="author-journal-title"
+           style="max-width:700px;margin:5vh auto;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:24px;color:var(--fg);">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px">
+      <h2 id="author-journal-title" style="font-size:20px">Author Journal</h2>
+      <button type="button" onclick="authorJournalClose()" aria-label="Close Author Journal"
+              style="background:transparent;border:1px solid var(--border2);color:var(--fg);border-radius:5px;padding:6px 12px;cursor:pointer">Close</button>
+    </div>
+    <p style="color:var(--fg2);font-size:13px;line-height:1.5;margin:12px 0 16px">
+      Preserve the thinking behind a work, even before you have a source document.
+      These are workspace Field Notes, not manuscript text or publication approval.
+      Reader notes in the same workspace also appear below.
+    </p>
+    <label for="author-journal-thought" style="display:block;font-size:13px;margin-bottom:6px">What are you thinking about writing?</label>
+    <textarea id="author-journal-thought" rows="5" placeholder="An idea, an intention, a decision, or why this matters…"
+              style="width:100%;min-height:100px;resize:vertical;padding:10px;background:var(--bg);color:var(--fg);border:1px solid var(--border2);border-radius:5px;font:inherit;font-size:14px;line-height:1.5"></textarea>
+    <label for="author-journal-questions" style="display:block;font-size:13px;margin:12px 0 6px">Questions to explore (optional)</label>
+    <textarea id="author-journal-questions" rows="2" placeholder="What is uncertain? What should be investigated?"
+              style="width:100%;resize:vertical;padding:10px;background:var(--bg);color:var(--fg);border:1px solid var(--border2);border-radius:5px;font:inherit;font-size:14px;line-height:1.5"></textarea>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap">
+      <p id="author-journal-status" role="status" aria-live="polite" style="flex:1;color:var(--dim2);font-size:12px"></p>
+      <button id="author-journal-save" type="button" onclick="authorJournalSave()" class="btn-primary">Keep this reflection</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:24px">
+      <h3 style="font-size:15px">Workspace reflections</h3>
+      <span id="author-journal-count" style="color:var(--dim2);font-size:12px"></span>
+    </div>
+    <div id="author-journal-entries" style="margin-top:12px;font-size:13px;line-height:1.5;max-height:340px;overflow-y:auto"></div>
+  </section>
+</div>
+
 <input type="file" id="ws-import-file" accept=".zip,application/zip" hidden>
 <div class="ws-import-overlay" id="ws-import-overlay" hidden>
   <div class="ws-import-modal" role="dialog" aria-modal="true" aria-labelledby="ws-import-title">
@@ -4670,6 +4749,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) a11yS
   try {
     const health = await get('/api/health');
     mount(health);
+    document.dispatchEvent(new Event('hermeneia:mounted'));
     setTimeout(() => _wsRefreshWorkspaceShell(health.runtime?.workspace), 0);
   } catch(e) {
     // A missing database is not an error — it is a fresh environment.
@@ -4678,6 +4758,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) a11yS
       const s = await get('/api/setup/state');
       if (!s.database_exists) {
         mount({ document: { filename: null }, _noDatabase: true, runtime: s.runtime || null });
+        document.dispatchEvent(new Event('hermeneia:mounted'));
         setTimeout(() => _wsRefreshWorkspaceShell(s.runtime?.workspace), 0);
         return;
       }
@@ -18590,5 +18671,7 @@ It is not a summariser. It is not a content generator. It is a constitutional su
     </div>`;
 }
 </script>
+<script src="/static/author_journal.js"></script>
+<script src="/static/start_screen.js"></script>
 </body>
 </html>

@@ -3357,6 +3357,13 @@ def create_app(
         resp.headers["Pragma"] = "no-cache"
         return resp
 
+    @app.route("/editor")
+    def manuscript_editor():
+        """A dedicated working-manuscript editor, separate from Reader evidence."""
+        resp = make_response(send_from_directory(str(STATIC_DIR), "manuscript_editor.html"))
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return resp
+
     # ── /api/health ──────────────────────────────────────────────────────────
 
     # ── First-run setup (issue #20) ───────────────────────────────────
@@ -10938,5 +10945,7 @@ def create_app(
 
     from .authoring_api import register_authoring_routes
     register_authoring_routes(app, db_path)
+    from .manuscript_draft_api import register_manuscript_draft_routes
+    register_manuscript_draft_routes(app, db_path)
 
     return app

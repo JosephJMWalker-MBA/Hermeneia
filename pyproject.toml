@@ -42,4 +42,4 @@ include = ["hermeneia", "hermeneia.*", "hermenia"]
 
 [tool.setuptools.package-data]
 "hermeneia" = ["data/*.json"]
-"hermeneia.web" = ["static/*.html"]
+"hermeneia.web" = ["static/*.html", "static/*.js", "static/*.css"]
