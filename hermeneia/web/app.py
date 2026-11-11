@@ -10938,5 +10938,7 @@ def create_app(
 
     from .authoring_api import register_authoring_routes
     register_authoring_routes(app, db_path)
+    from .manuscript_draft_api import register_manuscript_draft_routes
+    register_manuscript_draft_routes(app, db_path)
 
     return app
