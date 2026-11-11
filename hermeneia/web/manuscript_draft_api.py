@@ -16,6 +16,8 @@ import re
 import tempfile
 from datetime import datetime, timezone
 from html.parser import HTMLParser
+
+import markdown
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
@@ -281,6 +283,27 @@ def register_manuscript_draft_routes(app: Flask, db_path: Path) -> None:
             return jsonify({**_public(snapshot), "kind": "working_draft"})
         except DraftError as exc:
             return error(exc)
+
+    @app.post("/api/manuscript-draft/convert")
+    def manuscript_draft_convert():
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"error": "A JSON object is required."}), 400
+        content = body.get("content")
+        fmt = body.get("format")
+        if not isinstance(content, str) or fmt not in ("text", "markdown"):
+            return jsonify({"error": "Expected text and format (markdown or text)."}), 400
+        if len(content.encode("utf-8")) > MAX_HTML_BYTES:
+            return jsonify({"error": "Imported text exceeds the 2 MiB pilot limit."}), 413
+        if fmt == "markdown":
+            converted = markdown.markdown(content, extensions=["extra", "sane_lists"])
+        else:
+            converted = "".join(
+                f"<p>{html.escape(paragraph)}</p>"
+                for paragraph in re.split(r"\\n\\s*\\n", content)
+                if paragraph.strip()
+            )
+        return jsonify({"html": _sanitize_markup(converted)})
 
     @app.get("/api/manuscript-draft/export")
     def manuscript_draft_export():
