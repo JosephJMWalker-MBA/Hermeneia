@@ -111,6 +111,11 @@
   }
 
   function launchMode(selectedMode) {
+    // A working manuscript is a separate route, never a Reader overlay.
+    if (selectedMode === 'write') {
+      window.location.assign('/editor');
+      return;
+    }
     const target = selectedMode === 'journal' ? 'journal' : 'read';
     const go = () => {
       if (!el('reader')) return false;
@@ -236,7 +241,7 @@
       sessionStorage.removeItem(RETURN_MODE_KEY);
     } catch (_) {}
 
-    if (resumed === 'read' || resumed === 'journal') {
+    if (resumed === 'read' || resumed === 'journal' || resumed === 'write') {
       // A validated workspace handoff just happened. Do not force a second
       // chooser interaction; the new child is authoritative after reload.
       launchMode(resumed);
